@@ -1,0 +1,50 @@
+# Text files: normalize line endings
+* text=auto eol=lf
+
+# Python
+*.py text eol=lf
+
+# Markdown / docs
+*.md text eol=lf
+*.txt text eol=lf
+
+# Lyrics
+*.lrc text eol=lf
+
+# Qt / UI
+*.qss text eol=lf
+*.ui text eol=lf
+*.qml text eol=lf
+
+# Config
+*.json text eol=lf
+*.yml  text eol=lf
+*.yaml text eol=lf
+*.toml text eol=lf
+
+# Shell scripts
+*.sh text eol=lf
+
+# Binary files (no diff, no eol)
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.svg binary
+
+*.ttf binary
+*.otf binary
+*.woff binary
+*.woff2 binary
+
+# SQLite / DB
+*.sqlite binary
+*.sqlite3 binary
+*.db binary
+
+# Archives
+*.zip binary
+*.7z binary
+*.tar binary
+*.gz binary
