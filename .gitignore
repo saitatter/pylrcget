@@ -1,0 +1,68 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+.eggs/
+.env
+.venv
+venv/
+ENV/
+env/
+.python-version
+
+# PySide / Qt
+*.qmlc
+*.qmlcache
+.qmake.stash
+*.pro.user
+*.pro.user.*
+*.qtc_clangd
+*.qtc_clangd/*
+*.qtc_clangd.db
+*.qtc_clangd.db.*
+*.qtc_clangd.index
+*.qtc_clangd.index/*
+build/
+dist/
+
+# SQLite
+*.sqlite
+*.sqlite3
+*.db
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDEs / Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*.bak
+*.tmp
+
+# Logs
+*.log
+
+# Packaging / installers
+*.spec
+
+# PyInstaller
+*.manifest
+*.toc
+
+# Coverage / testing
+.coverage
+.pytest_cache/
+
+# Node / leftovers (in case)
+node_modules/
+
+# Misc
+.cache/
+.mypy_cache/
