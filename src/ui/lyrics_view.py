@@ -108,6 +108,7 @@ class LyricsView(QWidget):
     publishSyncedRequested = Signal()
     publishPlainRequested = Signal()
     saveRequested = Signal(str, str)     # lrc, txt  (dacă nu o ai deja)
+    embedRequested = Signal()            # 👉 nou
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -140,6 +141,15 @@ class LyricsView(QWidget):
 
         self.btn_publish_synced.clicked.connect(lambda: self.publishSyncedRequested.emit())
         self.btn_publish_plain.clicked.connect(lambda: self.publishPlainRequested.emit())
+
+        # 👉 nou: buton Embed
+        self.btn_embed = QPushButton("Embed in file")
+        self.btn_embed.setEnabled(False)
+        self.btn_embed.clicked.connect(lambda: self.embedRequested.emit())
+
+        header.addWidget(self.btn_publish_synced)
+        header.addWidget(self.btn_publish_plain)
+        header.addWidget(self.btn_embed)
 
         header.addWidget(self.btn_publish_synced)
         header.addWidget(self.btn_publish_plain)
@@ -235,29 +245,34 @@ class LyricsView(QWidget):
         self.title.setText(title or "Lyrics")
 
         if instrumental:
-            self.show_none("Instrumental")
             self.btn_publish_synced.setEnabled(False)
             self.btn_publish_plain.setEnabled(False)
+            self.btn_embed.setEnabled(False)
+            self.show_none("Instrumental")
             return
 
         lrc = (lrc_lyrics or "").strip()
         txt = (txt_lyrics or "").strip()
 
-        self.btn_publish_synced.setEnabled(bool(lrc))
-        self.btn_publish_plain.setEnabled(bool(txt))
+        has_synced = bool(lrc)
+        has_plain = bool(txt)
 
-        # prefer synced dacă există, altfel plain
-        if lrc:
+        self.btn_publish_synced.setEnabled(has_synced)
+        self.btn_publish_plain.setEnabled(has_plain)
+        self.btn_embed.setEnabled(has_synced or has_plain)
+
+        # aici păstrezi logica ta de afișare:
+        if has_synced:
             pairs = parse_lrc(lrc)
             if pairs:
                 self._set_synced(pairs)
                 return
-            # dacă parsarea nu scoate nimic, cădem pe plain
 
-        if txt:
+        if has_plain:
             self._set_plain(txt)
-        else:
-            self.show_none("No lyrics found")
+            return
+
+        self.show_none("No lyrics")
     
     def _set_message(self, message: str):
         self._reset_synced()

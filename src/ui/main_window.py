@@ -15,7 +15,7 @@ from ui.player_bar import PlayerBar
 from ui.lyrics_view import LyricsView
 from ui.dialogs.publish_lyrics_dialog import PublishLyricsDialog
 from player.player import NowPlaying
-
+from core.embed_lyrics import embed_lyrics_for_track
 
 @dataclass
 class ScanProgress:
@@ -98,6 +98,7 @@ class MainWindow(QMainWindow):
 
         self.lyrics_view.publishSyncedRequested.connect(self._publish_synced)
         self.lyrics_view.publishPlainRequested.connect(self._publish_plain)
+        self.lyrics_view.embedRequested.connect(self._on_embed_requested)
 
         splitter.setStretchFactor(0, 3)
         splitter.setStretchFactor(1, 2)
@@ -426,3 +427,31 @@ class MainWindow(QMainWindow):
         tid = self.track_list.selected_track_id()
         if tid is not None:
             self.on_play_track(tid)
+
+    def _on_embed_requested(self):
+        # embed doar pentru track-ul care cântă acum (simplu și clar)
+        if not self.app_state.player or not self.app_state.player.track:
+            QMessageBox.information(self, "Embed lyrics", "No track playing.")
+            return
+
+        track_id = self.app_state.player.track.track_id
+
+        try:
+            track = get_track_by_id(self.app_state.db, track_id)
+        except Exception as e:
+            QMessageBox.warning(self, "Embed lyrics", f"Cannot read track from database: {e}")
+            return
+
+        try:
+            embed_lyrics_for_track(track)
+            QMessageBox.information(
+                self,
+                "Embed lyrics",
+                "Lyrics have been embedded into the audio file tags."
+            )
+        except Exception as e:
+            QMessageBox.warning(
+                self,
+                "Embed lyrics",
+                f"Failed to embed lyrics: {e}"
+            )
