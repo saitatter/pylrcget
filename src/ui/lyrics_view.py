@@ -151,9 +151,6 @@ class LyricsView(QWidget):
         header.addWidget(self.btn_publish_plain)
         header.addWidget(self.btn_embed)
 
-        header.addWidget(self.btn_publish_synced)
-        header.addWidget(self.btn_publish_plain)
-
         root.addLayout(header)
 
         self.stack = QStackedWidget()

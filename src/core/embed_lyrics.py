@@ -60,18 +60,20 @@ def embed_lyrics_in_file(path: str, plain: Optional[str], synced: Optional[str])
       - .ogg/.oga/.opus -> LYRICS + LRCLIB_LRC
       - .m4a/.mp4 -> ©lyr + custom atom pentru LRC
     """
-    ext = os.path.splitext(path)[1].lower()
+    EMBEDDER_MAP = {
+        '.mp3': _embed_mp3,
+        '.flac': _embed_flac,
+        '.ogg': _embed_ogg_vorbis,
+        '.oga': _embed_ogg_vorbis,
+        '.opus': _embed_ogg_opus,
+        '.m4a': _embed_mp4,
+        '.mp4': _embed_mp4,
+    }
 
-    if ext == ".mp3":
-        _embed_mp3(path, plain, synced)
-    elif ext == ".flac":
-        _embed_flac(path, plain, synced)
-    elif ext in (".ogg", ".oga"):
-        _embed_ogg_vorbis(path, plain, synced)
-    elif ext == ".opus":
-        _embed_ogg_opus(path, plain, synced)
-    elif ext in (".m4a", ".mp4"):
-        _embed_mp4(path, plain, synced)
+    ext = os.path.splitext(path)[1].lower()
+    embedder = EMBEDDER_MAP.get(ext)
+    if embedder:
+        embedder(path, plain, synced)
     else:
         # fallback generic: încearcă text-only dacă mutagen știe ceva
         audio = MutagenFile(path, easy=True)
@@ -81,6 +83,38 @@ def embed_lyrics_in_file(path: str, plain: Optional[str], synced: Optional[str])
             audio["lyrics"] = [plain]
         audio.save()
 
+def _embed_vorbis_comment(
+    audio_cls,
+    path: str,
+    plain: Optional[str],
+    synced: Optional[str]
+) -> None:
+    """Helper to embed lyrics for formats using Vorbis comments."""
+    audio = audio_cls(path)
+
+    if plain:
+        audio["LYRICS"] = [plain]
+    elif "LYRICS" in audio:
+        del audio["LYRICS"]
+
+    if synced:
+        audio["LRCLIB_LRC"] = [synced]
+    elif "LRCLIB_LRC" in audio:
+        del audio["LRCLIB_LRC"]
+
+    audio.save()
+
+
+def _embed_flac(path: str, plain: Optional[str], synced: Optional[str]) -> None:
+    _embed_vorbis_comment(FLAC, path, plain, synced)
+
+
+def _embed_ogg_vorbis(path: str, plain: Optional[str], synced: Optional[str]) -> None:
+    _embed_vorbis_comment(OggVorbis, path, plain, synced)
+
+
+def _embed_ogg_opus(path: str, plain: Optional[str], synced: Optional[str]) -> None:
+    _embed_vorbis_comment(OggOpus, path, plain, synced)
 
 def _embed_mp3(path: str, plain: Optional[str], synced: Optional[str]) -> None:
     try:
@@ -112,57 +146,6 @@ def _embed_mp3(path: str, plain: Optional[str], synced: Optional[str]) -> None:
         )
 
     tags.save(path)
-
-
-def _embed_flac(path: str, plain: Optional[str], synced: Optional[str]) -> None:
-    audio = FLAC(path)
-
-    # LYRICS pentru plain
-    if plain:
-        audio["LYRICS"] = [plain]
-    elif "LYRICS" in audio:
-        del audio["LYRICS"]
-
-    # LRCLIB_LRC pentru synced raw
-    if synced:
-        audio["LRCLIB_LRC"] = [synced]
-    elif "LRCLIB_LRC" in audio:
-        del audio["LRCLIB_LRC"]
-
-    audio.save()
-
-
-def _embed_ogg_vorbis(path: str, plain: Optional[str], synced: Optional[str]) -> None:
-    audio = OggVorbis(path)
-
-    if plain:
-        audio["LYRICS"] = [plain]
-    elif "LYRICS" in audio:
-        del audio["LYRICS"]
-
-    if synced:
-        audio["LRCLIB_LRC"] = [synced]
-    elif "LRCLIB_LRC" in audio:
-        del audio["LRCLIB_LRC"]
-
-    audio.save()
-
-
-def _embed_ogg_opus(path: str, plain: Optional[str], synced: Optional[str]) -> None:
-    audio = OggOpus(path)
-
-    if plain:
-        audio["LYRICS"] = [plain]
-    elif "LYRICS" in audio:
-        del audio["LYRICS"]
-
-    if synced:
-        audio["LRCLIB_LRC"] = [synced]
-    elif "LRCLIB_LRC" in audio:
-        del audio["LRCLIB_LRC"]
-
-    audio.save()
-
 
 def _embed_mp4(path: str, plain: Optional[str], synced: Optional[str]) -> None:
     audio = MP4(path)
