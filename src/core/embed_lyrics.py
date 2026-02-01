@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from typing import Optional
-import os
+from pathlib import Path
 
 from mutagen import File as MutagenFile
 from mutagen.id3 import ID3, USLT, TXXX, ID3NoHeaderError
@@ -83,7 +83,7 @@ def embed_lyrics_in_file(path: str, plain: Optional[str], synced: Optional[str])
         ".mp4": _embed_mp4,
     }
 
-    ext = os.path.splitext(path)[1].lower()
+    ext = Path(path).suffix.lower()
     embedder = EMBEDDER_MAP.get(ext)
     if embedder:
         embedder(path, plain, synced)

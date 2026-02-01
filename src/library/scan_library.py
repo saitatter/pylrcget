@@ -16,6 +16,12 @@ from mutagen._util import MutagenError
 
 from core.models import FsTrack
 
+from core.embed_lyrics import (
+    VORBIS_PLAIN_KEY, VORBIS_SYNCED_KEY,
+    ID3_PLAIN_DESC, ID3_SYNCED_DESC,
+    MP4_PLAIN_KEY, MP4_SYNCED_KEY
+)
+
 logger = logging.getLogger(__name__)
 
 AUDIO_EXTS = {".mp3", ".m4a", ".flac", ".ogg", ".opus", ".wav"}
@@ -74,51 +80,6 @@ def _read_sidecar(path: str) -> tuple[str | None, str | None]:
     lrc = lrc.strip() if lrc else None
     return txt, lrc
 
-def new_fs_track_from_path(path: str) -> FsTrack | None:
-    audio = MutagenFile(path, easy=True)
-    if audio is None:
-        return None
-
-    # Rust: title/album/artist required (errors). In Python, be lenient but keep good defaults.
-    title = _first(audio, "title")
-    album = _first(audio, "album")
-    artist = _first(audio, "artist")
-
-    # If you want strict behavior like Rust, return None when missing:
-    title = title or os.path.splitext(os.path.basename(path))[0]
-    album = album or "Unknown Album"
-    artist = artist or "Unknown Artist"
-
-    album_artist = (
-        _first(audio, "albumartist")
-        or _first(audio, "album artist")
-        or artist
-    )
-
-    track_number = _parse_track_number(_first(audio, "tracknumber"))
-
-    duration = 0.0
-    try:
-        if getattr(audio, "info", None) and getattr(audio.info, "length", None):
-            duration = float(audio.info.length)
-    except Exception:
-        duration = 0.0
-
-    txt_lyrics, lrc_lyrics = _read_sidecar(path)
-
-    return FsTrack(
-        file_path=path,
-        file_name=os.path.basename(path),
-        title=title,
-        album=album,
-        artist=artist,
-        album_artist=album_artist,
-        duration=duration,
-        txt_lyrics=txt_lyrics,
-        lrc_lyrics=lrc_lyrics,
-        track_number=track_number,
-    )
-
 def read_embedded_lyrics(path: str) -> Tuple[Optional[str], Optional[str]]:
     """
     Read embedded plain lyrics and synced LRC (if present) from an audio file.
@@ -151,7 +112,7 @@ def read_embedded_lyrics(path: str) -> Tuple[Optional[str], Optional[str]]:
             # TXXX custom frames: find one with desc == LRCLIB_LRC (case-sensitive)
             txxx_frames = tags.getall("TXXX")
             for t in txxx_frames:
-                if getattr(t, "desc", "") == "LRCLIB_LRC":
+                if getattr(t, "desc", "") == ID3_SYNCED_DESC:
                     # TXXX.text is usually a list-like (mutagen uses [text]) but can be str
                     txt = getattr(t, "text", None)
                     if isinstance(txt, (list, tuple)) and txt:
@@ -163,36 +124,35 @@ def read_embedded_lyrics(path: str) -> Tuple[Optional[str], Optional[str]]:
         elif ext in {".flac"}:
             audio = FLAC(path)
             # Vorbis comments are lists
-            plain_list = audio.get("LYRICS") or audio.get("lyrics")
-            synced_list = audio.get("LRCLIB_LRC")
-            plain = (plain_list[0] if isinstance(plain_list, (list, tuple)) and plain_list else None)
-            synced = (synced_list[0] if isinstance(synced_list, (list, tuple)) and synced_list else None)
-
+            plain_list = audio.get(VORBIS_PLAIN_KEY)
+            synced_list = audio.get(VORBIS_SYNCED_KEY)
+            plain = plain_list[0] if plain_list else None
+            synced = synced_list[0] if synced_list else None
         elif ext in {".ogg", ".oga"}:
             audio = OggVorbis(path)
-            plain_list = audio.get("LYRICS") or audio.get("lyrics")
-            synced_list = audio.get("LRCLIB_LRC")
+            plain_list = audio.get(VORBIS_PLAIN_KEY)
+            synced_list = audio.get(VORBIS_SYNCED_KEY)
             plain = (plain_list[0] if isinstance(plain_list, (list, tuple)) and plain_list else None)
             synced = (synced_list[0] if isinstance(synced_list, (list, tuple)) and synced_list else None)
 
         elif ext == ".opus":
             audio = OggOpus(path)
-            plain_list = audio.get("LYRICS") or audio.get("lyrics")
-            synced_list = audio.get("LRCLIB_LRC")
+            plain_list = audio.get(VORBIS_PLAIN_KEY)
+            synced_list = audio.get(VORBIS_SYNCED_KEY)
             plain = (plain_list[0] if isinstance(plain_list, (list, tuple)) and plain_list else None)
             synced = (synced_list[0] if isinstance(synced_list, (list, tuple)) and synced_list else None)
 
         elif ext in {".m4a", ".mp4"}:
             audio = MP4(path)
             # plain lyrics: '\xa9lyr'
-            plain_list = audio.get("\xa9lyr")
+            plain_list = audio.get(MP4_PLAIN_KEY)
             if isinstance(plain_list, (list, tuple)) and plain_list:
                 plain = str(plain_list[0])
             elif isinstance(plain_list, str):
                 plain = plain_list
 
             # synced: custom atom '----:com.lrclib:lrc' -> stored as bytes inside a list
-            key = "----:com.lrclib:lrc"
+            key = MP4_SYNCED_KEY
             atom = audio.get(key)
             if isinstance(atom, (list, tuple)) and atom:
                 first = atom[0]
@@ -210,7 +170,7 @@ def read_embedded_lyrics(path: str) -> Tuple[Optional[str], Optional[str]]:
             audio = MutagenFile(path, easy=False)
             if audio is not None:
                 # Try common keys (case-sensitive and lowercase)
-                for key in ("LYRICS", "lyrics", "USLT", "\xa9lyr"):
+                for key in (VORBIS_SYNCED_KEY, VORBIS_PLAIN_KEY, "USLT", MP4_PLAIN_KEY, MP4_SYNCED_KEY, "lyrics", "LYRICS", "LYRICS_SYNCD"):
                     val = audio.tags.get(key) if getattr(audio, "tags", None) else None
                     if val:
                         # val could be list or frame; handle politely
