@@ -25,6 +25,8 @@ class TrackListWidget(QWidget):
             instrumental=False,
             none=True,
         )
+        self._artist_id: int | None = None
+        self._album_id: int | None = None
 
         self.table = QTableView()
         self.model = TrackTableModel([])
@@ -74,6 +76,9 @@ class TrackListWidget(QWidget):
 
     def setSearchValue(self, text: str):
         self._search = text or ""
+        # Optional: typing search exits artist/album drill-down
+        self._artist_id = None
+        self._album_id = None
         if self._active:
             self.refresh()
 
@@ -91,6 +96,8 @@ class TrackListWidget(QWidget):
             plain_lyrics_tracks=self._filters["plain"],
             instrumental_tracks=self._filters["instrumental"],
             no_lyrics_tracks=self._filters["none"],
+            artist_id=self._artist_id,
+            album_id=self._album_id,
         )
 
         ui_rows: list[TrackListRow] = []
@@ -193,6 +200,16 @@ class TrackListWidget(QWidget):
         if not idx.isValid():
             return None
         return self.model.track_id_at(idx.row())
+
+    def setArtistFilter(self, artist_id: int | None):
+        self._artist_id = artist_id
+        if self._active:
+            self.refresh()
+
+    def setAlbumFilter(self, album_id: int | None):
+        self._album_id = album_id
+        if self._active:
+            self.refresh()
 
     def _apply_styles(self):
         self.setStyleSheet("""
