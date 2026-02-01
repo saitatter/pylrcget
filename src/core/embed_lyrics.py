@@ -46,7 +46,7 @@ def _norm(s: Optional[str]) -> Optional[str]:
     return s or None
 
 
-def embed_lyrics_for_track(track) -> None:
+def embed_lyrics_for_track(track: TrackWithLyrics) -> None:
     """
     Embed lyrics for a Track object from the DB.
     The object is expected to have:
