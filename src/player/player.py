@@ -78,7 +78,24 @@ class Player(QObject):
             self.play()
 
     def seek_ms(self, ms: int):
-        self.media.setPosition(max(0, ms))
+        if ms < 0:
+            ms = 0
+
+        p = self.media  # QMediaPlayer
+
+        # If paused/stopped, seeking often feels slower because play resumes after rebuffer.
+        # Keep it playing if possible.
+        was_playing = (p.playbackState() == p.PlaybackState.PlayingState)
+
+        p.setPosition(ms)
+
+        if was_playing:
+            # keep playing; do NOT call stop() anywhere
+            pass
+        else:
+            # optional: resume immediately if you want click-to-seek to start playback
+            # p.play()
+            pass
 
     def set_volume(self, volume_0_to_1: float):
         self.audio.setVolume(min(1.0, max(0.0, float(volume_0_to_1))))
