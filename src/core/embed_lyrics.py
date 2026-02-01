@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 from typing import Optional
-
 import os
 
 from mutagen import File as MutagenFile
@@ -12,14 +11,27 @@ from mutagen.oggvorbis import OggVorbis
 from mutagen.oggopus import OggOpus
 from mutagen.mp4 import MP4
 
+# Convention:
+#   - Synced LRC goes into:   LYRICS
+#   - Unsynced (plain) goes into: UNSYNCEDLYRICS
+VORBIS_SYNCED_KEY = "LYRICS"
+VORBIS_PLAIN_KEY = "UNSYNCEDLYRICS"
+
+ID3_SYNCED_DESC = "LYRICS"
+ID3_PLAIN_DESC = "UNSYNCEDLYRICS"
+
+MP4_PLAIN_KEY = "\xa9lyr"
+MP4_SYNCED_KEY = "----:com.lrclib:LYRICS"  # custom atom name; keep stable across app versions
+
 
 def _strip_timestamps(lrc: str) -> str:
-    """Scoate [mm:ss.xx] din LRC pentru a obține plain lyrics."""
+    """Remove [mm:ss.xx] tokens from LRC to derive plain lyrics."""
     out_lines: list[str] = []
     for line in lrc.splitlines():
         line = line.strip()
         if not line:
             continue
+        # Remove any leading [....] blocks (timestamps or tags) repeatedly.
         while line.startswith("[") and "]" in line:
             line = line.split("]", 1)[1].lstrip()
         out_lines.append(line)
@@ -27,6 +39,7 @@ def _strip_timestamps(lrc: str) -> str:
 
 
 def _norm(s: Optional[str]) -> Optional[str]:
+    """Normalize optional strings (strip + convert empty to None)."""
     if not s:
         return None
     s = s.strip()
@@ -35,17 +48,17 @@ def _norm(s: Optional[str]) -> Optional[str]:
 
 def embed_lyrics_for_track(track) -> None:
     """
-    Embed lyrics pentru un obiect Track din DB.
-    track trebuie să aibă:
+    Embed lyrics for a Track object from the DB.
+    The object is expected to have:
       - file_path
-      - txt_lyrics
-      - lrc_lyrics
+      - txt_lyrics (unsynced/plain)
+      - lrc_lyrics (synced/LRC)
     """
     path = track.file_path
-    plain = _norm(track.txt_lyrics)
-    synced = _norm(track.lrc_lyrics)
+    plain = _norm(getattr(track, "txt_lyrics", None))
+    synced = _norm(getattr(track, "lrc_lyrics", None))
 
-    # dacă avem doar synced, derivăm plain din el
+    # If we only have synced lyrics, derive plain lyrics from it.
     if synced and not plain:
         plain = _norm(_strip_timestamps(synced))
 
@@ -54,53 +67,54 @@ def embed_lyrics_for_track(track) -> None:
 
 def embed_lyrics_in_file(path: str, plain: Optional[str], synced: Optional[str]) -> None:
     """
-    Embed lyrics în funcție de extensie:
-      - .mp3  -> ID3 USLT + TXXX pentru LRC raw
-      - .flac -> LYRICS + LRCLIB_LRC
-      - .ogg/.oga/.opus -> LYRICS + LRCLIB_LRC
-      - .m4a/.mp4 -> ©lyr + custom atom pentru LRC
+    Embed lyrics depending on file extension:
+      - .mp3            -> ID3: USLT for plain + TXXX for synced (LYRICS)
+      - .flac           -> Vorbis comments: UNSYNCEDLYRICS + LYRICS
+      - .ogg/.oga/.opus -> Vorbis comments: UNSYNCEDLYRICS + LYRICS
+      - .m4a/.mp4       -> MP4: ©lyr for plain + custom atom for synced
     """
     EMBEDDER_MAP = {
-        '.mp3': _embed_mp3,
-        '.flac': _embed_flac,
-        '.ogg': _embed_ogg_vorbis,
-        '.oga': _embed_ogg_vorbis,
-        '.opus': _embed_ogg_opus,
-        '.m4a': _embed_mp4,
-        '.mp4': _embed_mp4,
+        ".mp3": _embed_mp3,
+        ".flac": _embed_flac,
+        ".ogg": _embed_ogg_vorbis,
+        ".oga": _embed_ogg_vorbis,
+        ".opus": _embed_ogg_opus,
+        ".m4a": _embed_mp4,
+        ".mp4": _embed_mp4,
     }
 
     ext = os.path.splitext(path)[1].lower()
     embedder = EMBEDDER_MAP.get(ext)
     if embedder:
         embedder(path, plain, synced)
-    else:
-        # fallback generic: încearcă text-only dacă mutagen știe ceva
-        audio = MutagenFile(path, easy=True)
-        if audio is None:
-            return
-        if plain:
-            audio["lyrics"] = [plain]
-        audio.save()
+        return
 
-def _embed_vorbis_comment(
-    audio_cls,
-    path: str,
-    plain: Optional[str],
-    synced: Optional[str]
-) -> None:
-    """Helper to embed lyrics for formats using Vorbis comments."""
+    # Fallback: try a simple text-only lyrics field if mutagen supports it.
+    audio = MutagenFile(path, easy=True)
+    if audio is None:
+        return
+
+    if plain:
+        audio["lyrics"] = [plain]
+    elif "lyrics" in audio:
+        del audio["lyrics"]
+
+    audio.save()
+
+
+def _embed_vorbis_comment(audio_cls, path: str, plain: Optional[str], synced: Optional[str]) -> None:
+    """Helper for formats that use Vorbis comments (FLAC/Vorbis/Opus)."""
     audio = audio_cls(path)
 
     if plain:
-        audio["LYRICS"] = [plain]
-    elif "LYRICS" in audio:
-        del audio["LYRICS"]
+        audio[VORBIS_PLAIN_KEY] = [plain]
+    elif VORBIS_PLAIN_KEY in audio:
+        del audio[VORBIS_PLAIN_KEY]
 
     if synced:
-        audio["LRCLIB_LRC"] = [synced]
-    elif "LRCLIB_LRC" in audio:
-        del audio["LRCLIB_LRC"]
+        audio[VORBIS_SYNCED_KEY] = [synced]
+    elif VORBIS_SYNCED_KEY in audio:
+        del audio[VORBIS_SYNCED_KEY]
 
     audio.save()
 
@@ -116,51 +130,65 @@ def _embed_ogg_vorbis(path: str, plain: Optional[str], synced: Optional[str]) ->
 def _embed_ogg_opus(path: str, plain: Optional[str], synced: Optional[str]) -> None:
     _embed_vorbis_comment(OggOpus, path, plain, synced)
 
+
 def _embed_mp3(path: str, plain: Optional[str], synced: Optional[str]) -> None:
     try:
         tags = ID3(path)
     except ID3NoHeaderError:
         tags = ID3()
 
-    # șterge USLT/TXXX vechi
+    # Remove old frames we manage.
     tags.delall("USLT")
-    tags.delall("TXXX:LRCLIB_LRC")
+    tags.delall(f"TXXX:{ID3_SYNCED_DESC}")
+    tags.delall(f"TXXX:{ID3_PLAIN_DESC}")
 
+    # Plain lyrics: use USLT. ID3 requires a 3-letter language code, but we avoid
+    # a real language and use "und" (undefined).
     if plain:
         tags.add(
             USLT(
-                encoding=3,      # UTF-8
-                lang="eng",
+                encoding=3,  # UTF-8
+                lang="und",  # undefined language
                 desc="",
                 text=plain,
             )
         )
 
+        # Optional: also mirror plain lyrics into a TXXX for easier access in some tools.
+        tags.add(
+            TXXX(
+                encoding=3,
+                desc=ID3_PLAIN_DESC,
+                text=plain,
+            )
+        )
+
+    # Synced lyrics (raw LRC): store in a custom TXXX with desc="LYRICS".
     if synced:
         tags.add(
             TXXX(
                 encoding=3,
-                desc="LRCLIB_LRC",
+                desc=ID3_SYNCED_DESC,
                 text=synced,
             )
         )
 
     tags.save(path)
 
+
 def _embed_mp4(path: str, plain: Optional[str], synced: Optional[str]) -> None:
     audio = MP4(path)
 
-    # plain: standard Apple tag ©lyr
+    # Plain lyrics: standard Apple tag ©lyr.
     if plain:
-        audio["\xa9lyr"] = [plain]
-    elif "\xa9lyr" in audio:
-        del audio["\xa9lyr"]
+        audio[MP4_PLAIN_KEY] = [plain]
+    elif MP4_PLAIN_KEY in audio:
+        del audio[MP4_PLAIN_KEY]
 
-    # synced: custom atom
-    key = "----:com.lrclib:lrc"
+    # Synced lyrics: custom atom.
     if synced:
-        audio[key] = [synced.encode("utf-8")]
-    elif key in audio:
-        del audio[key]
+        audio[MP4_SYNCED_KEY] = [synced.encode("utf-8")]
+    elif MP4_SYNCED_KEY in audio:
+        del audio[MP4_SYNCED_KEY]
 
     audio.save()
