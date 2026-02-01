@@ -718,3 +718,50 @@ def get_album_rows(db, search_query: str = ""):
     cur = db.execute(q, params)
     cols = [c[0] for c in cur.description]
     return [dict(zip(cols, row)) for row in cur.fetchall()]
+
+def mark_tracks_instrumental(db: sqlite3.Connection, track_ids: list[int]) -> None:
+    ids = [int(x) for x in track_ids if x is not None]
+    if not ids:
+        return
+
+    # One transaction, many updates (fast)
+    db.execute("BEGIN")
+    try:
+        db.executemany(
+            """
+            UPDATE tracks
+            SET txt_lyrics = NULL,
+                lrc_lyrics = '[au: instrumental]',
+                instrumental = 1
+            WHERE id = ?
+            """,
+            [(i,) for i in ids],
+        )
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+
+def unmark_tracks_instrumental(db: sqlite3.Connection, track_ids: list[int]) -> None:
+    ids = [int(x) for x in track_ids if x is not None]
+    if not ids:
+        return
+
+    db.execute("BEGIN")
+    try:
+        db.executemany(
+            """
+            UPDATE tracks
+            SET instrumental = 0,
+                lrc_lyrics = CASE
+                    WHEN lrc_lyrics = '[au: instrumental]' THEN NULL
+                    ELSE lrc_lyrics
+                END
+            WHERE id = ?
+            """,
+            [(i,) for i in ids],
+        )
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise

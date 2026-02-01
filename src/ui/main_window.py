@@ -148,6 +148,8 @@ class MainWindow(QMainWindow):
         # --- Signals from track list ---
         self.track_list.playTrack.connect(self.on_play_track)
         self.track_list.downloadLyrics.connect(self.on_download_lyrics)
+        self.track_list.markInstrumental.connect(self._on_mark_instrumental)
+        self.track_list.unmarkInstrumental.connect(self._on_unmark_instrumental)
 
         # --- Filters wiring ---
         self.search_box.textChanged.connect(self._apply_track_filters)
@@ -496,3 +498,58 @@ class MainWindow(QMainWindow):
 
         # proper filtering, no search hack
         self.track_list.setArtistFilter(artist_id)
+    
+    def _confirm_bulk(self, title: str, text: str, count: int) -> bool:
+        # Confirm only when selection is "large"
+        if count < 10:
+            return True
+        res = QMessageBox.question(
+            self,
+            title,
+            f"{text}\n\nSelected: {count}",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
+        return res == QMessageBox.StandardButton.Yes
+
+
+    def _on_mark_instrumental(self, track_ids: list[int]):
+        track_ids = [int(x) for x in track_ids if x is not None]
+        if not track_ids:
+            return
+
+        if not self._confirm_bulk("Instrumental", "Mark selected tracks as instrumental?", len(track_ids)):
+            return
+
+        from db.database import mark_tracks_instrumental
+
+        # Preserve selection across refresh
+        selected_before = set(track_ids)
+
+        try:
+            mark_tracks_instrumental(self.app_state.db, track_ids)
+            self.statusBar().showMessage(f"Marked {len(track_ids)} track(s) as instrumental.", 3000)
+            self._apply_track_filters()
+            self.track_list.restore_selection(selected_before)
+        except Exception as e:
+            QMessageBox.warning(self, "Instrumental", f"Failed to update tracks: {e}")
+
+
+    def _on_unmark_instrumental(self, track_ids: list[int]):
+        track_ids = [int(x) for x in track_ids if x is not None]
+        if not track_ids:
+            return
+
+        if not self._confirm_bulk("Instrumental", "Unmark instrumental for selected tracks?", len(track_ids)):
+            return
+
+        from db.database import unmark_tracks_instrumental
+
+        selected_before = set(track_ids)
+
+        try:
+            unmark_tracks_instrumental(self.app_state.db, track_ids)
+            self.statusBar().showMessage(f"Unmarked {len(track_ids)} track(s).", 3000)
+            self._apply_track_filters()
+            self.track_list.restore_selection(selected_before)
+        except Exception as e:
+            QMessageBox.warning(self, "Instrumental", f"Failed to update tracks: {e}")
