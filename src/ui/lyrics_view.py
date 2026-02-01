@@ -88,7 +88,7 @@ def parse_lrc(lrc_text: str) -> List[Tuple[int, str]]:
             continue
 
         # ignore metadata
-        if line.startswith("[ar:") or line.startswith("[ti:") or line.startswith("[al:") or line.startswith("[by:") or line.startswith("[offset:"):
+        if line.startswith("[ar:") or line.startswith("[ti:") or line.startswith("[al:") or line.startswith("[by:") or line.startswith("[offset:") or line.startswith("[au:"):
             continue
 
         matches = list(_TS_RE.finditer(line))
