@@ -98,7 +98,7 @@ class MainWindow(QMainWindow):
 
         self.lyrics_view.publishSyncedRequested.connect(self._publish_synced)
         self.lyrics_view.publishPlainRequested.connect(self._publish_plain)
-        self.lyrics_view.embedRequested.connect(self._on_embed_requested)
+        self.lyrics_view.saveRequested.connect(self._on_embed_requested)
 
         splitter.setStretchFactor(0, 3)
         splitter.setStretchFactor(1, 2)
