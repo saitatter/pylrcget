@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from PySide6.QtCore import Qt, QSize
 from PySide6.QtGui import QIcon, QPixmap, QPainter
-from PySide6.QtWidgets import QWidget, QHBoxLayout, QLabel, QToolButton, QSlider
+from PySide6.QtWidgets import QWidget, QHBoxLayout, QLabel, QToolButton, QSlider, QComboBox
 from PySide6.QtCore import QByteArray
 from PySide6.QtSvg import QSvgRenderer
 
@@ -90,6 +90,16 @@ class PlayerBar(QWidget):
         self.lbl_time = QLabel("0:00")
         self.lbl_dur = QLabel("0:00")
 
+        # --- speed selector ---
+        self.cmb_speed = QComboBox()
+        self.cmb_speed.setObjectName("SpeedCombo")
+        self.cmb_speed.setToolTip("Playback speed")
+        # Display text -> speed float
+        self._speed_items = [("1.0×", 1.0), ("0.75×", 0.75), ("0.5×", 0.5), ("0.25×", 0.25)]
+        for label, speed in self._speed_items:
+            self.cmb_speed.addItem(label, speed)
+        self.cmb_speed.setCurrentIndex(0)
+
         # --- slider ---
         self.slider = QSlider(Qt.Orientation.Horizontal)
         self.slider.setRange(0, 0)
@@ -101,6 +111,7 @@ class PlayerBar(QWidget):
         root.addWidget(self.btn_next)
         root.addSpacing(6)
         root.addWidget(self.lbl_title, 1)
+        root.addWidget(self.cmb_speed)
         root.addWidget(self.lbl_time)
         root.addWidget(self.slider, 3)
         root.addWidget(self.lbl_dur)
@@ -109,6 +120,8 @@ class PlayerBar(QWidget):
         self.slider.sliderPressed.connect(self._on_slider_pressed)
         self.slider.sliderReleased.connect(self._on_slider_released)
         self.slider.sliderMoved.connect(self._on_slider_moved)
+
+        self.cmb_speed.currentIndexChanged.connect(self._on_speed_changed)
 
         if self.player:
             self.player.trackChanged.connect(self._on_track_changed)
@@ -126,6 +139,19 @@ class PlayerBar(QWidget):
     def set_prev_next_handlers(self, prev_fn, next_fn):
         self.btn_prev.clicked.connect(prev_fn)
         self.btn_next.clicked.connect(next_fn)
+
+    # --- speed handling ---
+    def _on_speed_changed(self, _index: int):
+        if not self.player:
+            return
+        speed = float(self.cmb_speed.currentData() or 1.0)
+
+        # Only works on mpv backend; Qt fallback may ignore.
+        if hasattr(self.player, "set_playback_speed"):
+            try:
+                self.player.set_playback_speed(speed)
+            except Exception:
+                pass
 
     # --- slider handling ---
     def _on_slider_pressed(self):
@@ -242,4 +268,16 @@ class PlayerBar(QWidget):
             color: #e5e7eb;
             font-size: 12px;
         }
+                           
+        QComboBox#SpeedCombo {
+            background: #0b1222;
+            border: 1px solid #1f2937;
+            border-radius: 10px;
+            padding: 4px 8px;
+            color: #e5e7eb;
+            min-width: 74px;
+            font-size: 11px;
+        }
+        QComboBox#SpeedCombo:hover { border-color: #38bdf8; }
+        QComboBox#SpeedCombo::drop-down { border: none; width: 18px; }
         """)

@@ -277,3 +277,21 @@ class Player(QObject):
     # Optional helper if you want to show which backend is active in UI/logs
     def backend_name(self) -> str:
         return "mpv-ipc" if (self._use_mpv and self._mpv) else "qt-multimedia"
+
+    def set_playback_speed(self, speed: float):
+        speed = max(0.25, min(2.0, float(speed)))
+
+        if self._use_mpv and self._mpv:
+            self._mpv.set_property("speed", speed)
+            return
+
+        # Qt fallback (best-effort)
+        try:
+            self.media.setPlaybackRate(speed)
+        except Exception:
+            pass
+
+    def playback_speed(self) -> float:
+        if self._use_mpv and self._mpv:
+            return float(self._mpv.get_property("speed") or 1.0)
+        return 1.0
