@@ -1,6 +1,9 @@
-from dataclasses import dataclass, asdict
+from __future__ import annotations
+
+from dataclasses import dataclass
 from typing import Optional
 import sqlite3
+
 
 @dataclass
 class Track:
@@ -22,6 +25,11 @@ class Track:
 
     @staticmethod
     def from_row(row: sqlite3.Row) -> "Track":
+        # Note: sqlite3.Row doesn't support .get; use "in row.keys()" checks if needed.
+        keys = set(row.keys())
+        def opt(k: str):
+            return row[k] if k in keys else None
+
         return Track(
             id=row["id"],
             file_path=row["file_path"],
@@ -30,15 +38,16 @@ class Track:
             artist_name=row["artist_name"],
             artist_id=row["artist_id"],
             album_name=row["album_name"],
-            album_artist_name=row.get("album_artist_name"),
+            album_artist_name=opt("album_artist_name"),
             album_id=row["album_id"],
             duration=row["duration"],
-            track_number=row.get("track_number"),
-            txt_lyrics=row.get("txt_lyrics"),
-            lrc_lyrics=row.get("lrc_lyrics"),
-            image_path=row.get("image_path"),
-            instrumental=bool(row["instrumental"])
+            track_number=opt("track_number"),
+            txt_lyrics=opt("txt_lyrics"),
+            lrc_lyrics=opt("lrc_lyrics"),
+            image_path=opt("image_path"),
+            instrumental=bool(row["instrumental"]),
         )
+
 
 @dataclass
 class Album:
@@ -49,11 +58,40 @@ class Album:
     album_artist_name: Optional[str]
     tracks_count: int
 
+    @staticmethod
+    def from_row(row: sqlite3.Row) -> "Album":
+        keys = set(row.keys())
+        def opt(k: str):
+            return row[k] if k in keys else None
+
+        return Album(
+            id=row["id"],
+            name=row["name"],
+            image_path=opt("image_path"),
+            artist_name=row.get("artist_name") if hasattr(row, "get") else opt("artist_name") or "",
+            album_artist_name=opt("album_artist_name"),
+            tracks_count=int(opt("tracks_count") or 0),
+        )
+
+
 @dataclass
 class Artist:
     id: int
     name: str
     tracks_count: int
+
+    @staticmethod
+    def from_row(row: sqlite3.Row) -> "Artist":
+        keys = set(row.keys())
+        def opt(k: str):
+            return row[k] if k in keys else None
+
+        return Artist(
+            id=row["id"],
+            name=row["name"],
+            tracks_count=int(opt("tracks_count") or 0),
+        )
+
 
 @dataclass
 class Config:
@@ -63,3 +101,6 @@ class Config:
     try_embed_lyrics: bool
     theme_mode: str
     lrclib_instance: str
+
+
+# Keep FsTrack here too if you already have it in this file.
