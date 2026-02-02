@@ -22,20 +22,19 @@ class ToastData:
     notify_type: str = "info"  # "info" | "success" | "warning" | "error"
     timeout_ms: int = 3000
 
+_TOAST_COLORS = {
+    "success": ("#052e1a", "#16a34a", "#e5e7eb"),
+    "warning": ("#2a1a05", "#f59e0b", "#e5e7eb"),
+    "error": ("#2a0a0a", "#ef4444", "#e5e7eb"),
+    "info": ("#0b1222", "#38bdf8", "#e5e7eb"),
+}
 
 def _colors(kind: str) -> tuple[str, str, str]:
     """
     Returns (bg, border, text).
     """
     kind = (kind or "info").lower()
-    if kind == "success":
-        return "#052e1a", "#16a34a", "#e5e7eb"
-    if kind == "warning":
-        return "#2a1a05", "#f59e0b", "#e5e7eb"
-    if kind == "error":
-        return "#2a0a0a", "#ef4444", "#e5e7eb"
-    return "#0b1222", "#38bdf8", "#e5e7eb"
-
+    return _TOAST_COLORS.get(kind, _TOAST_COLORS["info"])
 
 class ToastWidget(QFrame):
     def __init__(self, data: ToastData, parent: QWidget):

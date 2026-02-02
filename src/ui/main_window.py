@@ -12,7 +12,7 @@ from ui.workers.library_scanner import LibraryScanner
 from ui.widgets.track_list_widget import TrackListWidget
 from ui.dialogs.music_folders_dialog import MusicFoldersDialog
 from ui.player_bar import PlayerBar
-from ui.lyrics_view import LyricsView
+from ui.widgets.lyrics_editor_widget import LyricsEditorWidget
 from ui.dialogs.publish_lyrics_dialog import PublishLyricsDialog
 from player.player import NowPlaying
 from core.embed_lyrics import embed_lyrics_for_track
@@ -93,7 +93,7 @@ class MainWindow(QMainWindow):
         self.track_list = TrackListWidget(self.app_state)
         splitter.addWidget(self.track_list)
 
-        self.lyrics_view = LyricsView()
+        self.lyrics_view = LyricsEditorWidget()
         self.lyrics_view.show_none("Select a track to see lyrics")
         self.lyrics_view.saveRequested.connect(self._on_lyrics_save_requested)
 
@@ -372,12 +372,6 @@ class MainWindow(QMainWindow):
             self._on_notify(n)
         if hasattr(self.app_state, "queued_notifications"):
             self.app_state.queued_notifications.clear()
-
-    def show_toast(self, notify):
-        # notify is your core.state.Notify
-        msg = getattr(notify, "message", str(notify))
-        kind = getattr(notify, "notify_type", "info")
-        self.toasts.show_toast(msg, notify_type=kind, timeout_ms=3000)
 
     def _on_tab_changed(self, idx: int):
         w = self.tabs.widget(idx)
