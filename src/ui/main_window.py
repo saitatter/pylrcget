@@ -19,6 +19,8 @@ from core.embed_lyrics import embed_lyrics_for_track
 from ui.widgets.album_list_widget import AlbumListWidget
 from ui.widgets.artist_list_widget import ArtistListWidget
 from ui.widgets.toast import ToastManager
+from PySide6.QtWidgets import QToolButton
+from PySide6.QtWidgets import QStyle
 
 @dataclass
 class ScanProgress:
@@ -77,6 +79,27 @@ class MainWindow(QMainWindow):
         self.chk_none = QCheckBox("No lyrics")
         self.chk_none.setChecked(True)
         top_bar.addWidget(self.chk_none)
+        top_bar.addStretch(1)  # pushes icons to the right
+
+        # --- Action icons (top-right) ---
+        self.btn_refresh = QToolButton()
+        self.btn_refresh.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_BrowserReload))
+        self.btn_refresh.setToolTip("Refresh library")
+        self.btn_refresh.clicked.connect(self.refresh_library)
+
+        self.btn_config = QToolButton()
+        self.btn_config.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_FileDialogDetailedView))
+        self.btn_config.setToolTip("Settings")
+        self.btn_config.clicked.connect(self.open_config_modal)
+
+        self.btn_about = QToolButton()
+        self.btn_about.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MessageBoxInformation))
+        self.btn_about.setToolTip("About")
+        self.btn_about.clicked.connect(self.open_about_modal)
+
+        top_bar.addWidget(self.btn_refresh)
+        top_bar.addWidget(self.btn_config)
+        top_bar.addWidget(self.btn_about)
 
         self.layout.addLayout(top_bar)
 
@@ -154,19 +177,6 @@ class MainWindow(QMainWindow):
         self.scan_row.setVisible(False)
         self.scan_row.setObjectName("ScanRow")
 
-        # --- Bottom buttons ---
-        self.config_button = QPushButton("Open Config")
-        self.about_button = QPushButton("Open About")
-        self.refresh_button = QPushButton("Refresh Library")
-
-        self.layout.addWidget(self.config_button)
-        self.layout.addWidget(self.about_button)
-        self.layout.addWidget(self.refresh_button)
-
-        self.config_button.clicked.connect(self.open_config_modal)
-        self.about_button.clicked.connect(self.open_about_modal)
-        self.refresh_button.clicked.connect(self.refresh_library)
-
         # --- Signals from track list ---
         self.track_list.playTrack.connect(self.on_play_track)
         self.track_list.downloadLyrics.connect(self.on_download_lyrics)
@@ -209,6 +219,21 @@ class MainWindow(QMainWindow):
                     stop:0 #38bdf8, stop:1 #22c55e
                 );
             }
+            QToolButton {
+                border: 1px solid transparent;
+                background: transparent;
+                padding: 6px;
+                border-radius: 10px;
+            }
+
+            QToolButton:hover {
+                background: #0b1222;
+                border-color: #1f2937;
+            }
+
+            QToolButton:pressed {
+                background: #0f172a;
+            }
             """)
 
     # ------------------ filters ------------------
@@ -250,7 +275,7 @@ class MainWindow(QMainWindow):
         self.scanner.progress_signal.connect(self._update_scan_progress)
         self.scanner.finished_signal.connect(self._scan_finished)
         self.scanner.start()
-        self.refresh_button.setEnabled(False)
+        self.btn_refresh.setEnabled(False)
         self.statusBar().showMessage("Scanning library…")
 
     def _update_scan_progress(self, scanned: int, total: int):
@@ -298,7 +323,7 @@ class MainWindow(QMainWindow):
         else:
             self.app_state.notify(f"Library scanning failed: {msg}", "error")
 
-        self.refresh_button.setEnabled(True)
+        self.btn_refresh.setEnabled(True)
         self.statusBar().showMessage(msg, 4000)
 
     # ------------------ track actions ------------------
