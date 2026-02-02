@@ -560,31 +560,69 @@ def get_artists(db: sqlite3.Connection) -> List[Artist]:
     return [Artist.from_row(row) for row in rows]
 
 
-def get_album_by_id(db: sqlite3.Connection, album_id: int) -> Album:
-    query = """
-        SELECT albums.id, albums.name, albums.album_artist_name,
-               COUNT(tracks.id) AS tracks_count
-        FROM albums
-        JOIN tracks ON tracks.album_id = albums.id
-        WHERE albums.id = ?
-        GROUP BY albums.id, albums.name, albums.album_artist_name
-        LIMIT 1
+def get_album_by_id(db, album_id: int):
+    q = """
+    SELECT
+        a.id                  AS album_id,
+        a.name                AS album_name,
+        COALESCE(ar.name, '') AS artist_name,
+        COALESCE(a.album_artist_name, '') AS album_artist_name,
+        a.artist_id           AS artist_id
+    FROM albums a
+    LEFT JOIN artists ar ON ar.id = a.artist_id
+    WHERE a.id = ?
+    LIMIT 1
     """
-    row = db.execute(query, (album_id,)).fetchone()
-    return Album.from_row(row)
+    cur = db.execute(q, (int(album_id),))
+    row = cur.fetchone()
+    if not row:
+        raise KeyError(f"Album not found: {album_id}")
+    cols = [c[0] for c in cur.description]
+    return dict(zip(cols, row))
 
 
-def get_artist_by_id(db: sqlite3.Connection, artist_id: int) -> Artist:
-    query = """
-        SELECT artists.id, artists.name, COUNT(tracks.id) AS tracks_count
-        FROM artists
-        JOIN tracks ON tracks.artist_id = artists.id
-        WHERE artists.id = ?
-        GROUP BY artists.id, artists.name
-        LIMIT 1
+def get_artist_rows(db, search_query: str = ""):
+    q = """
+    SELECT
+        ar.id                AS artist_id,
+        ar.name              AS artist_name,
+        COUNT(t.id)          AS track_count,
+        COUNT(DISTINCT t.album_id) AS album_count
+    FROM artists ar
+    LEFT JOIN tracks t ON t.artist_id = ar.id
+    WHERE 1=1
     """
-    row = db.execute(query, (artist_id,)).fetchone()
-    return Artist.from_row(row)
+    params = []
+
+    if search_query:
+        q += " AND ar.name LIKE ?"
+        params.append(f"%{search_query}%")
+
+    q += """
+    GROUP BY ar.id, ar.name
+    ORDER BY ar.name COLLATE NOCASE
+    """
+
+    cur = db.execute(q, params)
+    cols = [c[0] for c in cur.description]
+    return [dict(zip(cols, row)) for row in cur.fetchall()]
+
+
+def get_artist_by_id(db, artist_id: int):
+    q = """
+    SELECT
+        id   AS artist_id,
+        name AS artist_name
+    FROM artists
+    WHERE id = ?
+    LIMIT 1
+    """
+    cur = db.execute(q, (int(artist_id),))
+    row = cur.fetchone()
+    if not row:
+        raise KeyError(f"Artist not found: {artist_id}")
+    cols = [c[0] for c in cur.description]
+    return dict(zip(cols, row))
 
 def get_track_rows(
     db: sqlite3.Connection,
@@ -594,6 +632,8 @@ def get_track_rows(
     instrumental_tracks: bool,
     no_lyrics_tracks: bool,
     limit: int | None = None,
+    artist_id: int | None = None,
+    album_id: int | None = None
 ) -> list[sqlite3.Row]:
     """
     Returns rows for table view:
@@ -622,6 +662,13 @@ def get_track_rows(
         conditions.append("tracks.instrumental = 0")
     if not no_lyrics_tracks:
         conditions.append("(tracks.txt_lyrics IS NOT NULL OR tracks.lrc_lyrics IS NOT NULL OR tracks.instrumental = 1)")
+    if artist_id is not None:
+        conditions.append("tracks.artist_id = ?")
+        params.append(int(artist_id))
+
+    if album_id is not None:
+        conditions.append("tracks.album_id = ?")
+        params.append(int(album_id))
 
     where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
     limit_clause = f"LIMIT {int(limit)}" if limit else ""
@@ -643,3 +690,78 @@ def get_track_rows(
         {limit_clause}
     """
     return db.execute(query, params).fetchall()
+
+def get_album_rows(db, search_query: str = ""):
+    q = """
+    SELECT
+        a.id                    AS album_id,
+        a.name                  AS album_name,
+        COALESCE(ar.name, '')   AS artist_name,
+        COUNT(t.id)             AS track_count
+    FROM albums a
+    LEFT JOIN artists ar ON ar.id = a.artist_id
+    LEFT JOIN tracks  t  ON t.album_id = a.id
+    WHERE 1=1
+    """
+    params = []
+
+    if search_query:
+        q += " AND (a.name LIKE ? OR ar.name LIKE ? OR a.album_artist_name LIKE ?)"
+        like = f"%{search_query}%"
+        params += [like, like, like]
+
+    q += """
+    GROUP BY a.id, a.name, ar.name
+    ORDER BY ar.name COLLATE NOCASE, a.name COLLATE NOCASE
+    """
+
+    cur = db.execute(q, params)
+    cols = [c[0] for c in cur.description]
+    return [dict(zip(cols, row)) for row in cur.fetchall()]
+
+def mark_tracks_instrumental(db: sqlite3.Connection, track_ids: list[int]) -> None:
+    ids = [int(x) for x in track_ids if x is not None]
+    if not ids:
+        return
+
+    # One transaction, many updates (fast)
+    db.execute("BEGIN")
+    try:
+        db.executemany(
+            """
+            UPDATE tracks
+            SET txt_lyrics = NULL,
+                lrc_lyrics = '[au: instrumental]',
+                instrumental = 1
+            WHERE id = ?
+            """,
+            [(i,) for i in ids],
+        )
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+
+def unmark_tracks_instrumental(db: sqlite3.Connection, track_ids: list[int]) -> None:
+    ids = [int(x) for x in track_ids if x is not None]
+    if not ids:
+        return
+
+    db.execute("BEGIN")
+    try:
+        db.executemany(
+            """
+            UPDATE tracks
+            SET instrumental = 0,
+                lrc_lyrics = CASE
+                    WHEN lrc_lyrics = '[au: instrumental]' THEN NULL
+                    ELSE lrc_lyrics
+                END
+            WHERE id = ?
+            """,
+            [(i,) for i in ids],
+        )
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise

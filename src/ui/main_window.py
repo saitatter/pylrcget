@@ -16,6 +16,8 @@ from ui.lyrics_view import LyricsView
 from ui.dialogs.publish_lyrics_dialog import PublishLyricsDialog
 from player.player import NowPlaying
 from core.embed_lyrics import embed_lyrics_for_track
+from ui.widgets.album_list_widget import AlbumListWidget
+from ui.widgets.artist_list_widget import ArtistListWidget
 
 @dataclass
 class ScanProgress:
@@ -106,8 +108,9 @@ class MainWindow(QMainWindow):
         tracks_layout.addWidget(splitter)
 
         # other tabs placeholder
-        self.albums_tab = QLabel("Album list")
-        self.artists_tab = QLabel("Artist list")
+        self.albums_tab = AlbumListWidget(self.app_state)
+        self.artists_tab = ArtistListWidget(self.app_state)
+
         self.mylrclib_tab = QLabel("My Lrclib")
 
         self.tabs.addTab(self.tracks_tab, "Tracks")
@@ -117,6 +120,8 @@ class MainWindow(QMainWindow):
 
         self.layout.addWidget(self.tabs)
         self.tabs.currentChanged.connect(self._on_tab_changed)
+        self.albums_tab.openAlbum.connect(self._on_open_album)
+        self.artists_tab.openArtist.connect(self._on_open_artist)
 
         # --- PlayerBar (fără Now Playing label separat) ---
         self.player_bar = PlayerBar(self.app_state.player, self)
@@ -143,6 +148,8 @@ class MainWindow(QMainWindow):
         # --- Signals from track list ---
         self.track_list.playTrack.connect(self.on_play_track)
         self.track_list.downloadLyrics.connect(self.on_download_lyrics)
+        self.track_list.markInstrumental.connect(self._on_mark_instrumental)
+        self.track_list.unmarkInstrumental.connect(self._on_unmark_instrumental)
 
         # --- Filters wiring ---
         self.search_box.textChanged.connect(self._apply_track_filters)
@@ -281,8 +288,13 @@ class MainWindow(QMainWindow):
             self.app_state.queued_notifications.clear()
 
     def _on_tab_changed(self, idx: int):
-        if self.tabs.widget(idx) is self.tracks_tab:
+        w = self.tabs.widget(idx)
+        if w is self.tracks_tab:
             self._apply_track_filters()
+        elif w is self.albums_tab:
+            self.albums_tab.refresh()
+        elif w is self.artists_tab:
+            self.artists_tab.refresh()
 
     def _on_player_track_changed(self, now_playing):
         # doar highlight în listă, fără label de text
@@ -455,3 +467,89 @@ class MainWindow(QMainWindow):
                 "Embed lyrics",
                 f"Failed to embed lyrics: {e}"
             )
+
+    def _on_open_album(self, album_id: int):
+        # Get album details from DB so we can build a search query.
+        # You can replace this with a richer "filter by album_id" later.
+        from db.database import get_album_by_id
+
+        try:
+            alb = get_album_by_id(self.app_state.db, int(album_id))
+        except Exception:
+            return
+
+        album_name = (alb.get("album_name") or "").strip()
+        artist_name = (alb.get("artist_name") or "").strip()
+
+        # Switch to Tracks tab
+        self.tabs.setCurrentWidget(self.tracks_tab)
+
+        # Cheap-but-effective: push album into search box.
+        # You can do album-only or "artist album" depending on your search semantics.
+        query = album_name
+        if artist_name and album_name:
+            query = f'{artist_name} {album_name}'
+
+        self.search_box.setText(query)
+        self._apply_track_filters()
+    
+    def _on_open_artist(self, artist_id: int):
+        self.tabs.setCurrentWidget(self.tracks_tab)
+
+        # proper filtering, no search hack
+        self.track_list.setArtistFilter(artist_id)
+    
+    def _confirm_bulk(self, title: str, text: str, count: int) -> bool:
+        # Confirm only when selection is "large"
+        if count < 10:
+            return True
+        res = QMessageBox.question(
+            self,
+            title,
+            f"{text}\n\nSelected: {count}",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
+        return res == QMessageBox.StandardButton.Yes
+
+
+    def _on_mark_instrumental(self, track_ids: list[int]):
+        track_ids = [int(x) for x in track_ids if x is not None]
+        if not track_ids:
+            return
+
+        if not self._confirm_bulk("Instrumental", "Mark selected tracks as instrumental?", len(track_ids)):
+            return
+
+        from db.database import mark_tracks_instrumental
+
+        # Preserve selection across refresh
+        selected_before = set(track_ids)
+
+        try:
+            mark_tracks_instrumental(self.app_state.db, track_ids)
+            self.statusBar().showMessage(f"Marked {len(track_ids)} track(s) as instrumental.", 3000)
+            self._apply_track_filters()
+            self.track_list.restore_selection(selected_before)
+        except Exception as e:
+            QMessageBox.warning(self, "Instrumental", f"Failed to update tracks: {e}")
+
+
+    def _on_unmark_instrumental(self, track_ids: list[int]):
+        track_ids = [int(x) for x in track_ids if x is not None]
+        if not track_ids:
+            return
+
+        if not self._confirm_bulk("Instrumental", "Unmark instrumental for selected tracks?", len(track_ids)):
+            return
+
+        from db.database import unmark_tracks_instrumental
+
+        selected_before = set(track_ids)
+
+        try:
+            unmark_tracks_instrumental(self.app_state.db, track_ids)
+            self.statusBar().showMessage(f"Unmarked {len(track_ids)} track(s).", 3000)
+            self._apply_track_filters()
+            self.track_list.restore_selection(selected_before)
+        except Exception as e:
+            QMessageBox.warning(self, "Instrumental", f"Failed to update tracks: {e}")

@@ -17,6 +17,17 @@ from ui.main_window import MainWindow
 
 app_state = AppState()
 
+def debug_print_tracks_schema(db):
+    cur = db.execute("PRAGMA table_info(tracks)")
+    print("\n[tracks table schema]")
+    for cid, name, col_type, notnull, default, pk in cur.fetchall():
+        print(f"- {name} ({col_type})")
+
+    cur = db.execute("PRAGMA table_info(albums)")
+    print("\n[albums table schema]")
+    for cid, name, col_type, notnull, default, pk in cur.fetchall():
+        print(f"- {name} ({col_type})")
+
 def get_app_data_dir() -> str:
     base = QStandardPaths.writableLocation(QStandardPaths.AppDataLocation)
     os.makedirs(base, exist_ok=True)
@@ -31,7 +42,8 @@ def init_app_state():
 
     # initialize database connection
     app_state.db = initialize_database(app_data_dir)
-
+    debug_print_tracks_schema(app_state.db)
+    
     try:
         app_state.player = Player()
     except Exception as e:

@@ -13,6 +13,8 @@ from db.database import get_track_rows
 class TrackListWidget(QWidget):
     playTrack = Signal(int)       # track_id
     downloadLyrics = Signal(int)  # track_id
+    markInstrumental = Signal(list)        # list[int]
+    unmarkInstrumental = Signal(list)      # list[int]
 
     def __init__(self, app_state):
         super().__init__()
@@ -25,13 +27,15 @@ class TrackListWidget(QWidget):
             instrumental=False,
             none=True,
         )
+        self._artist_id: int | None = None
+        self._album_id: int | None = None
 
         self.table = QTableView()
         self.model = TrackTableModel([])
         self.table.setModel(self.model)
 
         self.table.setSelectionBehavior(QTableView.SelectionBehavior.SelectRows)
-        self.table.setSelectionMode(QTableView.SelectionMode.SingleSelection)
+        self.table.setSelectionMode(QTableView.SelectionMode.ExtendedSelection)
         self.table.verticalHeader().setVisible(False)
         self.table.setShowGrid(False)
         self.table.setAlternatingRowColors(True)
@@ -74,6 +78,9 @@ class TrackListWidget(QWidget):
 
     def setSearchValue(self, text: str):
         self._search = text or ""
+        # Optional: typing search exits artist/album drill-down
+        self._artist_id = None
+        self._album_id = None
         if self._active:
             self.refresh()
 
@@ -91,6 +98,8 @@ class TrackListWidget(QWidget):
             plain_lyrics_tracks=self._filters["plain"],
             instrumental_tracks=self._filters["instrumental"],
             no_lyrics_tracks=self._filters["none"],
+            artist_id=self._artist_id,
+            album_id=self._album_id,
         )
 
         ui_rows: list[TrackListRow] = []
@@ -152,21 +161,36 @@ class TrackListWidget(QWidget):
         if not idx.isValid():
             return
 
-        row = idx.row()
-        track_id = self.model.track_id_at(row)
-        if track_id is None:
+        # If clicked row isn't selected, select it (common UX)
+        sm = self.table.selectionModel()
+        if sm is not None and not sm.isRowSelected(idx.row(), idx.parent()):
+            sm.setCurrentIndex(idx, QItemSelectionModel.ClearAndSelect | QItemSelectionModel.Rows)
+
+        selected_ids = self.selected_track_ids()
+        if not selected_ids:
             return
-        track_id = int(track_id)
 
         menu = QMenu(self)
         act_play = menu.addAction("Play")
         act_dl = menu.addAction("Download lyrics")
 
+        menu.addSeparator()
+        act_instr = menu.addAction(f"Mark as instrumental ({len(selected_ids)})")
+        act_uninstr = menu.addAction(f"Unmark instrumental ({len(selected_ids)})")
+
         chosen = menu.exec(self.table.viewport().mapToGlobal(pos))
         if chosen == act_play:
-            self.playTrack.emit(track_id)
+            track_id = self.model.track_id_at(idx.row())
+            if track_id is not None:
+                self.playTrack.emit(int(track_id))
         elif chosen == act_dl:
-            self.downloadLyrics.emit(track_id)
+            track_id = self.model.track_id_at(idx.row())
+            if track_id is not None:
+                self.downloadLyrics.emit(int(track_id))
+        elif chosen == act_instr:
+            self.markInstrumental.emit(selected_ids)
+        elif chosen == act_uninstr:
+            self.unmarkInstrumental.emit(selected_ids)
 
     def set_now_playing(self, track_id: int | None):
         if track_id is None:
@@ -193,6 +217,55 @@ class TrackListWidget(QWidget):
         if not idx.isValid():
             return None
         return self.model.track_id_at(idx.row())
+
+    def setArtistFilter(self, artist_id: int | None):
+        self._artist_id = artist_id
+        if self._active:
+            self.refresh()
+
+    def setAlbumFilter(self, album_id: int | None):
+        self._album_id = album_id
+        if self._active:
+            self.refresh()
+
+    def selected_track_ids(self) -> list[int]:
+        sm = self.table.selectionModel()
+        if sm is None or not sm.hasSelection():
+            return []
+        ids: list[int] = []
+        for idx in sm.selectedRows():
+            tid = self.model.track_id_at(idx.row())
+            if tid is not None:
+                ids.append(int(tid))
+        # keep stable order (row order)
+        return ids
+
+    def _selected_track_ids_set(self) -> set[int]:
+        return set(self.selected_track_ids())
+
+    def restore_selection(self, track_ids: set[int]):
+        if not track_ids:
+            return
+        sm = self.table.selectionModel()
+        if sm is None:
+            return
+
+        sm.clearSelection()
+
+        first_idx = None
+        for row in range(self.model.rowCount()):
+            tid = self.model.track_id_at(row)
+            if tid is None:
+                continue
+            if int(tid) in track_ids:
+                idx = self.model.index(row, 0)
+                sm.select(idx, QItemSelectionModel.Select | QItemSelectionModel.Rows)
+                if first_idx is None:
+                    first_idx = idx
+
+        if first_idx is not None:
+            sm.setCurrentIndex(first_idx, QItemSelectionModel.Current | QItemSelectionModel.Rows)
+            self.table.scrollTo(first_idx, QTableView.ScrollHint.PositionAtCenter)
 
     def _apply_styles(self):
         self.setStyleSheet("""
