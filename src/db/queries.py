@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 import sqlite3
-from typing import List
+from typing import List, Sequence
 
 from core.utils import prepare_input
 from db.models import Album, Artist, Config, Track
@@ -212,7 +212,12 @@ def add_album(db: sqlite3.Connection, name: str, album_artist_name: str, *, comm
     return int(cursor.lastrowid)
 
 
-def get_album_rows(db: sqlite3.Connection, search_query: str = "") -> list[dict]:
+def get_album_rows(
+    db: sqlite3.Connection,
+    search_query: str = "",
+    artist_id: int | None = None,
+    artist_ids: Sequence[int] | None = None,
+) -> list[dict]:
     q = """
     SELECT
         a.id                    AS album_id,
@@ -230,6 +235,14 @@ def get_album_rows(db: sqlite3.Connection, search_query: str = "") -> list[dict]
         q += " AND (a.name LIKE ? OR ar.name LIKE ? OR a.album_artist_name LIKE ?)"
         like = f"%{search_query}%"
         params += [like, like, like]
+
+    if artist_ids:
+        placeholders = ", ".join("?" for _ in artist_ids)
+        q += f" AND a.artist_id IN ({placeholders})"
+        params.extend(int(v) for v in artist_ids)
+    elif artist_id is not None:
+        q += " AND a.artist_id = ?"
+        params.append(int(artist_id))
 
     q += """
     GROUP BY a.id, a.name, ar.name
@@ -404,6 +417,8 @@ def get_track_rows(
     limit: int | None = None,
     artist_id: int | None = None,
     album_id: int | None = None,
+    artist_ids: Sequence[int] | None = None,
+    album_ids: Sequence[int] | None = None,
 ) -> list[sqlite3.Row]:
     conditions: list[str] = []
     params: list[object] = []
@@ -425,11 +440,19 @@ def get_track_rows(
     if not no_lyrics_tracks:
         conditions.append("(tracks.txt_lyrics IS NOT NULL OR tracks.lrc_lyrics IS NOT NULL OR tracks.instrumental = 1)")
 
-    if artist_id is not None:
+    if artist_ids:
+        placeholders = ", ".join("?" for _ in artist_ids)
+        conditions.append(f"tracks.artist_id IN ({placeholders})")
+        params.extend(int(v) for v in artist_ids)
+    elif artist_id is not None:
         conditions.append("tracks.artist_id = ?")
         params.append(int(artist_id))
 
-    if album_id is not None:
+    if album_ids:
+        placeholders = ", ".join("?" for _ in album_ids)
+        conditions.append(f"tracks.album_id IN ({placeholders})")
+        params.extend(int(v) for v in album_ids)
+    elif album_id is not None:
         conditions.append("tracks.album_id = ?")
         params.append(int(album_id))
 
@@ -440,7 +463,10 @@ def get_track_rows(
         SELECT
             tracks.id,
             tracks.title,
+            tracks.artist_id,
+            tracks.album_id,
             artists.name AS artist_name,
+            albums.name AS album_name,
             tracks.duration,
             tracks.txt_lyrics,
             tracks.lrc_lyrics,

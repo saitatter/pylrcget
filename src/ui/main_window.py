@@ -8,7 +8,7 @@ import os
 
 from dataclasses import replace
 
-from db.database import get_config, get_directories, get_track_by_id, set_config
+from db.database import get_album_by_id, get_artist_by_id, get_config, get_directories, get_track_by_id, set_config
 from core.lyrics_sidecar import export_lyrics_sidecars
 from ui.workers.library_scanner import LibraryScanner
 from ui.widgets.track_list_widget import TrackListWidget
@@ -30,6 +30,20 @@ from PySide6.QtWidgets import QToolButton
 
 
 class MainWindow(QMainWindow):
+    @staticmethod
+    def _display_album_name(value: str | None) -> str:
+        text = (value or "").strip()
+        if text.casefold() in {"", "album", "unknown album"}:
+            return "N/A"
+        return text
+
+    @staticmethod
+    def _display_artist_name(value: str | None) -> str:
+        text = (value or "").strip()
+        if text.casefold() in {"", "artist", "unknown artist"}:
+            return "N/A"
+        return text
+
     def __init__(self, app_state):
         super().__init__()
         self.setWindowTitle("LrcGet")
@@ -215,14 +229,14 @@ class MainWindow(QMainWindow):
 
         self.layout.addWidget(self.tabs)
         self.tabs.currentChanged.connect(self._on_tab_changed)
-        self.albums_tab.openAlbum.connect(self._on_open_album)
-        self.artists_tab.openArtist.connect(self._on_open_artist)
 
         # --- PlayerBar (fără Now Playing label separat) ---
         self.player_bar = PlayerBar(self.app_state.player, self)
         self.layout.addWidget(self.player_bar)
         self.player_bar.set_prev_next_handlers(self.play_prev, self.play_next)
         self.player_bar.playbackSpeedChanged.connect(self._persist_playback_speed)
+        self.player_bar.artistNavigationRequested.connect(self._open_current_track_artist)
+        self.player_bar.albumNavigationRequested.connect(self._open_current_track_album)
         self.lyrics_view.set_reaction_delay_ms(get_config(self.app_state.db).reaction_delay_ms)
         self._apply_saved_playback_speed()
 
@@ -263,11 +277,29 @@ class MainWindow(QMainWindow):
         # --- Signals from track list ---
         self.track_list.playTrack.connect(self.on_play_track)
         self.track_list.downloadLyrics.connect(self.on_download_lyrics)
+        self.track_list.openArtist.connect(self._on_open_artist)
+        self.track_list.openAlbum.connect(self._on_open_album)
         self.track_list.markInstrumental.connect(self._on_mark_instrumental)
         self.track_list.unmarkInstrumental.connect(self._on_unmark_instrumental)
         self.track_list.clearFiltersRequested.connect(self._reset_track_filters)
         self.track_list.configureFoldersRequested.connect(self.open_config_modal)
         self.lyrics_view.downloadRequested.connect(self._download_current_track_lyrics)
+        self.albums_tab.playTrack.connect(self.on_play_track)
+        self.albums_tab.downloadLyrics.connect(self.on_download_lyrics)
+        self.albums_tab.openAlbum.connect(self._open_album_in_albums_tab)
+        self.albums_tab.openArtist.connect(self._open_artist_in_artists_tab)
+        self.albums_tab.markInstrumental.connect(self._on_mark_instrumental)
+        self.albums_tab.unmarkInstrumental.connect(self._on_unmark_instrumental)
+        self.albums_tab.clearFiltersRequested.connect(self._reset_track_filters)
+        self.albums_tab.configureFoldersRequested.connect(self.open_config_modal)
+        self.artists_tab.playTrack.connect(self.on_play_track)
+        self.artists_tab.downloadLyrics.connect(self.on_download_lyrics)
+        self.artists_tab.openArtist.connect(self._open_artist_in_artists_tab)
+        self.artists_tab.openAlbum.connect(self._open_album_in_artists_tab)
+        self.artists_tab.markInstrumental.connect(self._on_mark_instrumental)
+        self.artists_tab.unmarkInstrumental.connect(self._on_unmark_instrumental)
+        self.artists_tab.clearFiltersRequested.connect(self._reset_track_filters)
+        self.artists_tab.configureFoldersRequested.connect(self.open_config_modal)
 
         # --- Filters wiring ---
         self.search_box.textChanged.connect(self._apply_track_filters)
@@ -714,6 +746,8 @@ class MainWindow(QMainWindow):
         self.search_box.blockSignals(True)
         self.search_box.setText("")
         self.search_box.blockSignals(False)
+        self.track_list.setArtistFilter(None)
+        self.track_list.setAlbumFilter(None)
 
         for checkbox, checked in (
             (self.chk_synced, True),
@@ -794,13 +828,71 @@ class MainWindow(QMainWindow):
         self.search_box.setText("")
         self.search_box.blockSignals(False)
 
+        try:
+            album = get_album_by_id(self.app_state.db, int(album_id))
+            self.track_list.setAlbumFilterLabel(self._display_album_name(album.get("album_name", "")))
+        except Exception:
+            self.track_list.setAlbumFilterLabel("")
         self.track_list.setAlbumFilter(int(album_id))
+
+    def _open_album_in_albums_tab(self, album_id: int) -> None:
+        self.tabs.setCurrentWidget(self.albums_tab)
+        try:
+            album = get_album_by_id(self.app_state.db, int(album_id))
+            album_name = self._display_album_name(album.get("album_name", ""))
+        except Exception:
+            album_name = ""
+        self.albums_tab.show_album_tracks(int(album_id), album_name)
+
+    def _open_album_in_artists_tab(self, album_id: int) -> None:
+        self.tabs.setCurrentWidget(self.artists_tab)
+        try:
+            album = get_album_by_id(self.app_state.db, int(album_id))
+            artist_id = album.get("artist_id")
+            artist_name = self._display_artist_name(album.get("artist_name") or album.get("album_artist_name") or "")
+            album_name = self._display_album_name(album.get("album_name", ""))
+        except Exception:
+            artist_id = None
+            artist_name = ""
+            album_name = ""
+
+        if artist_id is not None:
+            self.artists_tab.show_artist_albums(int(artist_id), str(artist_name))
+        self.artists_tab.show_album_tracks(int(album_id), album_name)
     
     def _on_open_artist(self, artist_id: int):
         self.tabs.setCurrentWidget(self.tracks_tab)
 
         # proper filtering, no search hack
+        try:
+            artist = get_artist_by_id(self.app_state.db, int(artist_id))
+            self.track_list.setArtistFilterLabel(self._display_artist_name(artist.get("artist_name", "")))
+        except Exception:
+            self.track_list.setArtistFilterLabel("")
         self.track_list.setArtistFilter(artist_id)
+
+    def _open_artist_in_artists_tab(self, artist_id: int) -> None:
+        self.tabs.setCurrentWidget(self.artists_tab)
+        try:
+            artist = get_artist_by_id(self.app_state.db, int(artist_id))
+            artist_name = self._display_artist_name(artist.get("artist_name", ""))
+        except Exception:
+            artist_name = ""
+        self.artists_tab.show_artist_albums(int(artist_id), artist_name)
+
+    def _open_current_track_album(self, track_id: int) -> None:
+        try:
+            track = get_track_by_id(self.app_state.db, int(track_id))
+        except Exception:
+            return
+        self._on_open_album(int(track.album_id))
+
+    def _open_current_track_artist(self, track_id: int) -> None:
+        try:
+            track = get_track_by_id(self.app_state.db, int(track_id))
+        except Exception:
+            return
+        self._on_open_artist(int(track.artist_id))
     
     def _confirm_bulk(self, title: str, text: str, count: int) -> bool:
         # Confirm only when selection is "large"

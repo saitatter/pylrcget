@@ -2,14 +2,16 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from typing import Sequence
 
 from PySide6.QtCore import Signal, Qt, QItemSelectionModel, QSortFilterProxyModel
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QTableView, QMenu, QStackedWidget
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QTableView, QMenu, QStackedWidget, QLabel, QPushButton, QHBoxLayout
 
 from db.database import get_directories, get_track_rows
 from ui.widgets.empty_state_widget import EmptyStateWidget
 from ui.models.track_table_model import TrackTableModel
 from ui.delegates.actions_delegate import ActionsDelegate
+from ui.delegates.track_info_delegate import TrackInfoDelegate
 from ui.style_loader import load_stylesheet
 from ui.widgets.sortable_header_view import SortableHeaderView
 from core.tracklist_models import TrackListRow
@@ -50,6 +52,8 @@ class TrackSortProxyModel(QSortFilterProxyModel):
 class TrackListWidget(QWidget):
     playTrack = Signal(int)       # track_id
     downloadLyrics = Signal(int)  # track_id
+    openArtist = Signal(int)
+    openAlbum = Signal(int)
     markInstrumental = Signal(list)        # list[int]
     unmarkInstrumental = Signal(list)      # list[int]
     clearFiltersRequested = Signal()
@@ -68,7 +72,25 @@ class TrackListWidget(QWidget):
         )
         self._artist_id: int | None = None
         self._album_id: int | None = None
+        self._artist_ids: list[int] | None = None
+        self._album_ids: list[int] | None = None
+        self._scope_label: str = ""
+        self._scope_banner_enabled = True
         self._download_states: dict[int, str] = {}
+
+        self.scope_bar = QWidget()
+        self.scope_bar.setObjectName("TrackScopeBar")
+        scope_layout = QHBoxLayout(self.scope_bar)
+        scope_layout.setContentsMargins(10, 6, 10, 6)
+        scope_layout.setSpacing(8)
+        self.scope_label = QLabel("")
+        self.scope_label.setObjectName("TrackScopeLabel")
+        self.scope_clear_btn = QPushButton("Clear Filter")
+        self.scope_clear_btn.setObjectName("TrackScopeClearButton")
+        self.scope_clear_btn.clicked.connect(self.clearFiltersRequested.emit)
+        scope_layout.addWidget(self.scope_label, 1)
+        scope_layout.addWidget(self.scope_clear_btn)
+        self.scope_bar.hide()
 
         self.stack = QStackedWidget()
         self.table = QTableView()
@@ -103,7 +125,7 @@ class TrackListWidget(QWidget):
         self.header.setStretchLastSection(True)
         self.table.setObjectName("TrackTable")
 
-        self.table.verticalHeader().setDefaultSectionSize(30)
+        self.table.verticalHeader().setDefaultSectionSize(44)
 
         self._apply_styles()
 
@@ -111,6 +133,11 @@ class TrackListWidget(QWidget):
         self.actions = ActionsDelegate(self.table)
         self.actions.downloadClicked.connect(self.downloadLyrics.emit)
         self.table.setItemDelegateForColumn(3, self.actions)
+
+        self.track_info = TrackInfoDelegate(self.table)
+        self.track_info.artistClicked.connect(self.openArtist.emit)
+        self.track_info.albumClicked.connect(self.openAlbum.emit)
+        self.table.setItemDelegateForColumn(0, self.track_info)
 
         # Double click -> play
         self.table.doubleClicked.connect(self._on_double_click)
@@ -127,6 +154,8 @@ class TrackListWidget(QWidget):
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(8)
+        layout.addWidget(self.scope_bar)
         layout.addWidget(self.stack)
 
         self._empty_action = ""
@@ -145,6 +174,10 @@ class TrackListWidget(QWidget):
         # Optional: typing search exits artist/album drill-down
         self._artist_id = None
         self._album_id = None
+        self._artist_ids = None
+        self._album_ids = None
+        self._scope_label = ""
+        self._update_scope_banner()
         if self._active:
             self.refresh()
 
@@ -152,6 +185,10 @@ class TrackListWidget(QWidget):
         self._filters = dict(synced=synced, plain=plain, instrumental=instrumental, none=none_)
         if self._active:
             self.refresh()
+
+    def setScopeBannerEnabled(self, enabled: bool) -> None:
+        self._scope_banner_enabled = bool(enabled)
+        self._update_scope_banner()
 
     def refresh(self):
         db = self.app_state.db
@@ -176,6 +213,8 @@ class TrackListWidget(QWidget):
             no_lyrics_tracks=self._filters["none"],
             artist_id=self._artist_id,
             album_id=self._album_id,
+            artist_ids=self._artist_ids,
+            album_ids=self._album_ids,
         )
 
         ui_rows: list[TrackListRow] = []
@@ -201,6 +240,9 @@ class TrackListWidget(QWidget):
                     track_id=int(r["id"]),
                     title=r["title"] or "",
                     artist=r["artist_name"],
+                    artist_id=int(r["artist_id"]) if r["artist_id"] is not None else None,
+                    album=r["album_name"] or "",
+                    album_id=int(r["album_id"]) if r["album_id"] is not None else None,
                     duration_s=dur_s,
                     lyrics_state=state,
                     download_state=self._download_states.get(int(r["id"]), "idle"),
@@ -316,15 +358,45 @@ class TrackListWidget(QWidget):
             return None
         return self.model.track_id_at(self._source_row(idx))
 
-    def setArtistFilter(self, artist_id: int | None):
-        self._artist_id = artist_id
+    def setArtistFilter(self, artist_id: int | Sequence[int] | None):
+        if isinstance(artist_id, Sequence) and not isinstance(artist_id, (str, bytes)):
+            values = [int(v) for v in artist_id]
+            self._artist_ids = values or None
+            self._artist_id = values[0] if len(values) == 1 else None
+        else:
+            self._artist_id = int(artist_id) if artist_id is not None else None
+            self._artist_ids = None
+        if artist_id is None or self._artist_ids == []:
+            self._scope_label = ""
+        elif not self._scope_label.startswith("Artist: "):
+            self._scope_label = "Artist filter active"
+        self._update_scope_banner()
         if self._active:
             self.refresh()
 
-    def setAlbumFilter(self, album_id: int | None):
-        self._album_id = album_id
+    def setArtistFilterLabel(self, label: str) -> None:
+        self._scope_label = f"Artist: {label}" if label else "Artist filter active"
+        self._update_scope_banner()
+
+    def setAlbumFilter(self, album_id: int | Sequence[int] | None):
+        if isinstance(album_id, Sequence) and not isinstance(album_id, (str, bytes)):
+            values = [int(v) for v in album_id]
+            self._album_ids = values or None
+            self._album_id = values[0] if len(values) == 1 else None
+        else:
+            self._album_id = int(album_id) if album_id is not None else None
+            self._album_ids = None
+        if album_id is None or self._album_ids == []:
+            self._scope_label = ""
+        elif not self._scope_label.startswith("Album: "):
+            self._scope_label = "Album filter active"
+        self._update_scope_banner()
         if self._active:
             self.refresh()
+
+    def setAlbumFilterLabel(self, label: str) -> None:
+        self._scope_label = f"Album: {label}" if label else "Album filter active"
+        self._update_scope_banner()
 
     def selected_track_ids(self) -> list[int]:
         sm = self.table.selectionModel()
@@ -366,6 +438,24 @@ class TrackListWidget(QWidget):
 
     def _apply_styles(self):
         self.setStyleSheet(load_stylesheet("data_table.qss", table_name="TrackTable"))
+
+    def _update_scope_banner(self) -> None:
+        if not self._scope_banner_enabled:
+            self.scope_bar.hide()
+            self.scope_label.setText("")
+            return
+        active = bool(
+            self._artist_id is not None
+            or self._album_id is not None
+            or self._artist_ids
+            or self._album_ids
+        )
+        self.scope_bar.setVisible(active)
+        if not active:
+            self.scope_label.setText("")
+            return
+        detail = self._scope_label.strip() or "Library filter active"
+        self.scope_label.setText(f"Showing a filtered view. {detail}")
 
     def _source_row(self, index) -> int:
         return self.proxy_model.mapToSource(index).row()
