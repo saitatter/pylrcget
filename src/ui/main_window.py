@@ -6,7 +6,9 @@ from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QShortcut, QKeySequence
 import os
 
-from db.database import get_config, get_directories, get_track_by_id
+from dataclasses import replace
+
+from db.database import get_config, get_directories, get_track_by_id, set_config
 from core.lyrics_sidecar import export_lyrics_sidecars
 from ui.workers.library_scanner import LibraryScanner
 from ui.widgets.track_list_widget import TrackListWidget
@@ -215,7 +217,9 @@ class MainWindow(QMainWindow):
         self.player_bar = PlayerBar(self.app_state.player, self)
         self.layout.addWidget(self.player_bar)
         self.player_bar.set_prev_next_handlers(self.play_prev, self.play_next)
+        self.player_bar.playbackSpeedChanged.connect(self._persist_playback_speed)
         self.lyrics_view.set_reaction_delay_ms(get_config(self.app_state.db).reaction_delay_ms)
+        self._apply_saved_playback_speed()
 
         # --- Scan progress (pretty + hidden when idle) ---
         self.scan_row = QWidget()
@@ -670,6 +674,20 @@ class MainWindow(QMainWindow):
                 self.app_state.notify(f"Failed to embed lyrics: {exc}", "error")
             else:
                 self.statusBar().showMessage("Lyrics embedded into the audio file.", 3000)
+
+    def _apply_saved_playback_speed(self) -> None:
+        config = get_config(self.app_state.db)
+        speed = float(config.playback_speed or 1.0)
+        if self.app_state.player and hasattr(self.app_state.player, "set_playback_speed"):
+            try:
+                self.app_state.player.set_playback_speed(speed)
+            except Exception:
+                speed = 1.0
+        self.player_bar.set_playback_speed_value(speed)
+
+    def _persist_playback_speed(self, speed: float) -> None:
+        config = get_config(self.app_state.db)
+        set_config(self.app_state.db, replace(config, playback_speed=float(speed)))
 
     def _play_selected_or_current(self):
         tid = self.track_list.selected_track_id()

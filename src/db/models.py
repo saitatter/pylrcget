@@ -107,6 +107,7 @@ class Config:
     scan_excluded_paths: str
     scan_excluded_patterns: str
     reaction_delay_ms: int
+    playback_speed: float
 
 
 # Keep FsTrack here too if you already have it in this file.

@@ -172,3 +172,12 @@ def upgrade_database_if_needed(db: sqlite3.Connection, existing_version: int) ->
             ALTER TABLE config_data ADD COLUMN reaction_delay_ms INTEGER DEFAULT 0;
         """)
         db.commit()
+
+    # v14
+    if existing_version <= 13:
+        print("Migrate database version 14...")
+        db.execute("PRAGMA user_version=14")
+        db.executescript("""
+            ALTER TABLE config_data ADD COLUMN playback_speed REAL DEFAULT 1.0;
+        """)
+        db.commit()

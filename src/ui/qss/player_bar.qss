@@ -161,3 +161,20 @@ QComboBox#SpeedCombo::drop-down {
     border: none;
     width: 18px;
 }
+
+QToolButton#SpeedAdjustButton {
+    background: {{color-bg-control}};
+    border: 1px solid {{color-border}};
+    border-radius: {{radius-md}};
+    min-width: 28px;
+    min-height: 28px;
+    font-size: 14px;
+    font-weight: 600;
+    padding: 2px;
+}
+
+QToolButton#SpeedAdjustButton:hover {
+    border-color: {{color-accent}};
+    background: {{color-bg-elevated}};
+    color: {{color-accent}};
+}
