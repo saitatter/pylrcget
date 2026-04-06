@@ -270,59 +270,63 @@ def _read_sidecar(path: str) -> tuple[Optional[str], Optional[str]]:
 
 
 def new_fs_track_from_path(path: str) -> FsTrack | None:
-    audio = MutagenFile(path, easy=True)
-    if audio is None:
-        return None
-
-    # title/album/artist extraction
-    def _first(easy, key: str) -> str | None:
-        v = easy.get(key)
-        if not v:
-            return None
-        if isinstance(v, list):
-            return (str(v[0]).strip() if v else None) or None
-        s = str(v).strip()
-        return s or None
-
-    title = _first(audio, "title")
-    album = _first(audio, "album")
-    artist = _first(audio, "artist")
-
-    title = title or os.path.splitext(os.path.basename(path))[0]
-    album = album or "Unknown Album"
-    artist = artist or "Unknown Artist"
-
-    album_artist = (
-        _first(audio, "albumartist")
-        or _first(audio, "album artist")
-        or artist
-    )
-
-    track_number = _parse_track_number(_first(audio, "tracknumber"))
-
-    duration = 0.0
     try:
-        if getattr(audio, "info", None) and getattr(audio.info, "length", None):
-            duration = float(audio.info.length)
-    except Exception:
+        audio = MutagenFile(path, easy=True)
+        if audio is None:
+            return None
+
+        # title/album/artist extraction
+        def _first(easy, key: str) -> str | None:
+            v = easy.get(key)
+            if not v:
+                return None
+            if isinstance(v, list):
+                return (str(v[0]).strip() if v else None) or None
+            s = str(v).strip()
+            return s or None
+
+        title = _first(audio, "title")
+        album = _first(audio, "album")
+        artist = _first(audio, "artist")
+
+        title = title or os.path.splitext(os.path.basename(path))[0]
+        album = album or "Unknown Album"
+        artist = artist or "Unknown Artist"
+
+        album_artist = (
+            _first(audio, "albumartist")
+            or _first(audio, "album artist")
+            or artist
+        )
+
+        track_number = _parse_track_number(_first(audio, "tracknumber"))
+
         duration = 0.0
+        try:
+            if getattr(audio, "info", None) and getattr(audio.info, "length", None):
+                duration = float(audio.info.length)
+        except Exception:
+            duration = 0.0
 
-    # SIDE-CAR (preferred) then EMBEDDED
-    txt_sidecar, lrc_sidecar = _read_sidecar(path)
-    txt_embedded, lrc_embedded = read_embedded_lyrics(path)
+        # SIDE-CAR (preferred) then EMBEDDED
+        txt_sidecar, lrc_sidecar = _read_sidecar(path)
+        txt_embedded, lrc_embedded = read_embedded_lyrics(path)
 
-    txt_lyrics = txt_sidecar or txt_embedded
-    lrc_lyrics = lrc_sidecar or lrc_embedded
+        txt_lyrics = txt_sidecar or txt_embedded
+        lrc_lyrics = lrc_sidecar or lrc_embedded
 
-    return FsTrack(
-        file_path=path,
-        file_name=os.path.basename(path),
-        title=title,
-        album=album,
-        artist=artist,
-        album_artist=album_artist,
-        duration=duration,
-        txt_lyrics=txt_lyrics,
-        lrc_lyrics=lrc_lyrics,
-        track_number=track_number,
-    )
+        return FsTrack(
+            file_path=path,
+            file_name=os.path.basename(path),
+            title=title,
+            album=album,
+            artist=artist,
+            album_artist=album_artist,
+            duration=duration,
+            txt_lyrics=txt_lyrics,
+            lrc_lyrics=lrc_lyrics,
+            track_number=track_number,
+        )
+    except (MutagenError, Exception) as exc:
+        logger.warning("Skipping unreadable audio file during scan: %s (%s)", path, exc)
+        return None
