@@ -5,7 +5,7 @@ import re
 from bisect import bisect_right
 from typing import List, Optional, Tuple
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt, Signal, QTimer
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QStackedWidget,
     QTextEdit, QTableWidget, QTableWidgetItem,
@@ -140,6 +140,9 @@ class LyricsEditorWidget(QWidget):
         self._current_pos_ms: int = 0
         self._times: List[int] = []
         self._current_index: int = -1
+        self._default_button_text: dict[QPushButton, str] = {}
+        self._publish_synced_available = False
+        self._publish_plain_available = False
 
         root = QVBoxLayout(self)
         set_layout_spacing(root, margins=SPACE_3, spacing=SPACE_2)
@@ -215,6 +218,12 @@ class LyricsEditorWidget(QWidget):
 
         self.stack.addWidget(self.table)
 
+        self._default_button_text = {
+            self.btn_save: "Save",
+            self.btn_publish_synced: "Publish Synced",
+            self.btn_publish_plain: "Publish Plain",
+        }
+
         self.setStyleSheet(load_stylesheet("lyrics_editor.qss"))
         self.show_none("No track selected")
 
@@ -271,8 +280,10 @@ class LyricsEditorWidget(QWidget):
         lrc = (lrc_lyrics or "").strip()
         txt = (txt_lyrics or "").strip()
 
-        self.btn_publish_synced.setEnabled(bool(lrc))
-        self.btn_publish_plain.setEnabled(bool(txt))
+        self._publish_synced_available = bool(lrc)
+        self._publish_plain_available = bool(txt)
+        self.btn_publish_synced.setEnabled(self._publish_synced_available)
+        self.btn_publish_plain.setEnabled(self._publish_plain_available)
 
         # Prefer showing synced editor if we have LRC that parses
         if lrc:
@@ -308,6 +319,8 @@ class LyricsEditorWidget(QWidget):
     def _reset_state(self):
         self._times = []
         self._current_index = -1
+        self._publish_synced_available = False
+        self._publish_plain_available = False
         self.table.blockSignals(True)
         self.table.setRowCount(0)
         self.table.blockSignals(False)
@@ -490,3 +503,41 @@ class LyricsEditorWidget(QWidget):
             txt = (self.plain.toPlainText() or "").strip()
             self.saveRequested.emit("", txt)
             return
+
+    def set_save_feedback(self, state: str, message: str | None = None) -> None:
+        self._set_button_feedback(self.btn_save, state, message)
+
+    def set_publish_feedback(self, *, is_synced: bool, state: str, message: str | None = None) -> None:
+        button = self.btn_publish_synced if is_synced else self.btn_publish_plain
+        self._set_button_feedback(button, state, message)
+
+    def _set_button_feedback(self, button: QPushButton, state: str, message: str | None = None) -> None:
+        default_text = self._default_button_text.get(button, button.text())
+        text = message or {
+            "loading": "Working...",
+            "success": "Done",
+            "error": "Try Again",
+        }.get(state, default_text)
+
+        button.setText(text)
+        button.setProperty("actionState", state if state != "idle" else "")
+        button.style().unpolish(button)
+        button.style().polish(button)
+        button.update()
+        button.setEnabled(state != "loading")
+
+        if state in {"success", "error"}:
+            QTimer.singleShot(1800, lambda b=button, t=default_text: self._reset_button_feedback(b, t))
+
+    def _reset_button_feedback(self, button: QPushButton, default_text: str) -> None:
+        button.setText(default_text)
+        button.setProperty("actionState", "")
+        button.style().unpolish(button)
+        button.style().polish(button)
+        button.update()
+        if button is self.btn_save:
+            button.setEnabled(self.stack.currentWidget() in {self.table, self.plain})
+        elif button is self.btn_publish_synced:
+            button.setEnabled(self._publish_synced_available)
+        elif button is self.btn_publish_plain:
+            button.setEnabled(self._publish_plain_available)

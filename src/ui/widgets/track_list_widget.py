@@ -1,6 +1,8 @@
 # ui/track_list_widget.py
 from __future__ import annotations
 
+from dataclasses import replace
+
 from PySide6.QtCore import Signal, Qt, QItemSelectionModel, QSortFilterProxyModel
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QTableView, QMenu, QStackedWidget
 
@@ -66,6 +68,7 @@ class TrackListWidget(QWidget):
         )
         self._artist_id: int | None = None
         self._album_id: int | None = None
+        self._download_states: dict[int, str] = {}
 
         self.stack = QStackedWidget()
         self.table = QTableView()
@@ -198,6 +201,7 @@ class TrackListWidget(QWidget):
                     artist=r["artist_name"],
                     duration_s=dur_s,
                     lyrics_state=state,
+                    download_state=self._download_states.get(int(r["id"]), "idle"),
                 )
             )
 
@@ -370,3 +374,13 @@ class TrackListWidget(QWidget):
             self.clearFiltersRequested.emit()
         elif self._empty_action == "configure-folders":
             self.configureFoldersRequested.emit()
+
+    def set_download_state(self, track_id: int, state: str) -> None:
+        self._download_states[int(track_id)] = state
+        row = self.model.row_for_track_id(int(track_id))
+        if row < 0:
+            return
+        current = self.model._rows[row]
+        self.model._rows[row] = replace(current, download_state=state)
+        idx = self.model.index(row, 3)
+        self.model.dataChanged.emit(idx, idx, [Qt.DisplayRole, Qt.UserRole])

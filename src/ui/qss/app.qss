@@ -37,6 +37,24 @@ QPushButton:hover {
     background-color: #111827;
 }
 
+QPushButton[actionState="loading"] {
+    background-color: #0f172a;
+    border-color: #38bdf8;
+    color: #e0f2fe;
+}
+
+QPushButton[actionState="success"] {
+    background-color: #052e1a;
+    border-color: #16a34a;
+    color: #dcfce7;
+}
+
+QPushButton[actionState="error"] {
+    background-color: #2a0a0a;
+    border-color: #ef4444;
+    color: #fee2e2;
+}
+
 QPushButton:pressed {
     background-color: #0f172a;
 }

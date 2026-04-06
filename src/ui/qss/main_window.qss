@@ -34,6 +34,24 @@ QToolButton#TopBarAction {
     min-height: 36px;
 }
 
+QToolButton#TopBarAction[actionState="loading"] {
+    background: #0f172a;
+    border-color: #38bdf8;
+    color: #38bdf8;
+}
+
+QToolButton#TopBarAction[actionState="success"] {
+    background: #052e1a;
+    border-color: #16a34a;
+    color: #86efac;
+}
+
+QToolButton#TopBarAction[actionState="error"] {
+    background: #2a0a0a;
+    border-color: #ef4444;
+    color: #fca5a5;
+}
+
 QWidget#ScanRow {
     background: #020617;
     border-top: 1px solid #111827;

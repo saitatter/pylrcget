@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import List, Optional
 
-from PySide6.QtCore import Qt, QThread, Signal
+from PySide6.QtCore import Qt, QThread, Signal, QTimer
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QTableWidget, QTableWidgetItem, QWidget, QStackedWidget
@@ -71,8 +71,10 @@ class PublishLyricsDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle("Publish Lyrics")
         self.setModal(True)
+        self.setObjectName("PublishLyricsDialog")
 
         self._is_publishing = False
+        self.publish_result: bool | None = None
         self._lint = lint_result or []
         self._is_synced = is_synced
 
@@ -195,8 +197,10 @@ class PublishLyricsDialog(QDialog):
 
     def _start_publish(self):
         self._is_publishing = True
+        self.publish_result = None
         self.btn_primary.setEnabled(False)
         self.btn_secondary.setEnabled(False)
+        self._set_primary_feedback("loading", "Publishing...")
 
         # update text like Vue "Publishing..."
         kind = "synchronized" if self._is_synced else "unsynchronized"
@@ -232,5 +236,23 @@ class PublishLyricsDialog(QDialog):
 
     def _publish_done(self, ok: bool, msg: str):
         self._is_publishing = False
-        # close dialog like Vue finally { close() }
-        self.accept() if ok else self.reject()
+        if ok:
+            self.publish_result = True
+            self._set_primary_feedback("success", "Published")
+            self.info_label.setText(f"<b>{msg}</b>")
+            QTimer.singleShot(1000, self.accept)
+            return
+
+        self.publish_result = False
+        self._set_primary_feedback("error", "Retry Publish")
+        self.info_label.setText(f"<b>Publish failed.</b><br>{msg}")
+        self.btn_primary.setEnabled(True)
+        self.btn_secondary.setEnabled(True)
+
+    def _set_primary_feedback(self, state: str, text: str):
+        self.btn_primary.setText(text)
+        self.btn_primary.setProperty("actionState", state if state != "idle" else "")
+        self.btn_primary.style().unpolish(self.btn_primary)
+        self.btn_primary.style().polish(self.btn_primary)
+        self.btn_primary.update()
+        self.btn_primary.setEnabled(state != "loading")
