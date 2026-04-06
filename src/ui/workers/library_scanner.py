@@ -5,18 +5,14 @@ from PySide6.QtCore import QThread, Signal
 
 from library.scan_library import (
     get_audio_file_signature,
-    iter_audio_paths_with_directory_cache,
+    iter_audio_paths,
     new_fs_track_from_path,
 )
 from db.database import (
     add_tracks,
     delete_tracks_by_paths,
     get_library_file_index,
-    get_scan_cache_meta,
-    get_scan_directory_index,
     prune_library,
-    replace_scan_directory_index,
-    set_scan_cache_meta,
 )
 
 class LibraryScanner(QThread):
@@ -46,17 +42,8 @@ class LibraryScanner(QThread):
             db.row_factory = sqlite3.Row
 
             existing_index = get_library_file_index(db)
-            previous_excluded_paths = get_scan_cache_meta(db, "excluded_paths")
-            previous_excluded_patterns = get_scan_cache_meta(db, "excluded_patterns")
-            cache_compatible = (
-                previous_excluded_paths == self.excluded_paths
-                and previous_excluded_patterns == self.excluded_patterns
-            )
-            cached_directory_mtimes = get_scan_directory_index(db) if cache_compatible else {}
-            paths, directory_mtimes = iter_audio_paths_with_directory_cache(
+            paths = iter_audio_paths(
                 self.directories,
-                existing_paths=list(existing_index.keys()),
-                cached_directory_mtimes=cached_directory_mtimes,
                 excluded_paths=self.excluded_paths,
                 excluded_patterns=self.excluded_patterns,
             )
@@ -68,9 +55,7 @@ class LibraryScanner(QThread):
 
             current_path_set = set(paths)
             removed_paths = [path for path in existing_index.keys() if path not in current_path_set]
-            if removed_paths:
-                delete_tracks_by_paths(db, removed_paths)
-                removed = len(removed_paths)
+            removed = len(removed_paths)
 
             batch = []
             pending_replacements: list[str] = []
@@ -92,7 +77,7 @@ class LibraryScanner(QThread):
                 if p in existing_index:
                     pending_replacements.append(p)
 
-                t = new_fs_track_from_path(p)
+                t = new_fs_track_from_path(p, signature=signature)
 
                 if t is not None:
                     batch.append(t)
@@ -124,10 +109,10 @@ class LibraryScanner(QThread):
                     db.rollback()
                     raise
 
+            if removed_paths:
+                delete_tracks_by_paths(db, removed_paths)
+
             prune_library(db)
-            replace_scan_directory_index(db, directory_mtimes)
-            set_scan_cache_meta(db, "excluded_paths", self.excluded_paths)
-            set_scan_cache_meta(db, "excluded_patterns", self.excluded_patterns)
             db.close()
             self.progress_signal.emit(scanned, total, "", time.perf_counter() - started_at)
             self.finished_signal.emit(

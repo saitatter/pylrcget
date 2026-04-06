@@ -38,14 +38,17 @@ def _split_lines(block: str | None) -> list[str]:
     return [line.strip() for line in (block or "").splitlines() if line.strip()]
 
 
+def _path_variants(path: str) -> tuple[str, str]:
+    normalized = os.path.normcase(os.path.abspath(os.path.expanduser(path)))
+    posix = normalized.replace("\\", "/")
+    return normalized, posix
+
+
 def _normalize_excluded_paths(excluded_paths: str | None) -> list[str]:
     normalized: list[str] = []
     for entry in _split_lines(excluded_paths):
-        try:
-            resolved_path = Path(entry).expanduser().resolve(strict=False)
-            normalized.append(str(resolved_path).casefold())
-        except Exception:
-            normalized.append(Path(entry).expanduser().as_posix().casefold())
+        native, _ = _path_variants(entry)
+        normalized.append(native)
     return normalized
 
 
@@ -60,13 +63,11 @@ def _compile_excluded_patterns(excluded_patterns: str | None) -> list[re.Pattern
 
 
 def _is_path_excluded(path: str, excluded_roots: list[str], excluded_patterns: list[re.Pattern[str]]) -> bool:
-    resolved_path = Path(path).resolve(strict=False)
-    resolved = str(resolved_path).casefold()
-    resolved_posix = resolved_path.as_posix().casefold()
+    resolved, resolved_posix = _path_variants(path)
 
     for root in excluded_roots:
         root_clean = root.rstrip("/\\")
-        if resolved == root_clean or resolved.startswith(root_clean + os.sep.casefold()):
+        if resolved == root_clean or resolved.startswith(root_clean + os.sep):
             return True
         if resolved_posix == root_clean or resolved_posix.startswith(root_clean + "/"):
             return True
@@ -95,100 +96,13 @@ def iter_audio_paths(
             for fn in filenames:
                 file_path = os.path.join(dirpath, fn)
                 ext = os.path.splitext(fn)[1].lower()
-                normalized = str(Path(file_path).resolve())
+                normalized, _ = _path_variants(file_path)
                 if normalized in seen:
                     continue
                 if ext in AUDIO_EXTS and not _is_path_excluded(file_path, excluded_roots, compiled_patterns):
                     seen.add(normalized)
                     paths.append(file_path)
     return paths
-
-
-def iter_audio_paths_with_directory_cache(
-    directories: list[str],
-    *,
-    existing_paths: list[str],
-    cached_directory_mtimes: dict[str, float] | None = None,
-    excluded_paths: str | None = None,
-    excluded_patterns: str | None = None,
-) -> tuple[list[str], dict[str, float]]:
-    excluded_roots = _normalize_excluded_paths(excluded_paths)
-    compiled_patterns = _compile_excluded_patterns(excluded_patterns)
-    cached_directory_mtimes = cached_directory_mtimes or {}
-    seen_paths: set[str] = set()
-    collected_paths: list[str] = []
-    directory_mtimes: dict[str, float] = {}
-
-    subtree_index: dict[str, list[str]] = {}
-    for original in existing_paths:
-        try:
-            resolved_path = Path(original).resolve(strict=False)
-        except Exception:
-            continue
-        current_parent = resolved_path.parent
-        while True:
-            subtree_index.setdefault(str(current_parent), []).append(original)
-            next_parent = current_parent.parent
-            if next_parent == current_parent:
-                break
-            current_parent = next_parent
-
-    def _collect_known_subtree(dir_path: str) -> None:
-        resolved_dir_path = Path(dir_path).resolve(strict=False)
-        resolved_dir = str(resolved_dir_path)
-        for original in subtree_index.get(resolved_dir, []):
-            if original in seen_paths:
-                continue
-            if _is_path_excluded(original, excluded_roots, compiled_patterns):
-                continue
-            seen_paths.add(original)
-            collected_paths.append(original)
-
-    def _walk_dir(dir_path: str) -> None:
-        try:
-            resolved_dir_path = Path(dir_path).resolve(strict=False)
-            resolved_dir = str(resolved_dir_path)
-            dir_mtime = float(os.path.getmtime(resolved_dir))
-        except OSError:
-            return
-
-        directory_mtimes[resolved_dir] = dir_mtime
-        if cached_directory_mtimes.get(resolved_dir) == dir_mtime:
-            _collect_known_subtree(resolved_dir)
-            return
-
-        try:
-            with os.scandir(resolved_dir) as entries:
-                for entry in entries:
-                    entry_path = entry.path
-                    if entry.is_dir(follow_symlinks=False):
-                        if _is_path_excluded(entry_path, excluded_roots, compiled_patterns):
-                            continue
-                        _walk_dir(entry_path)
-                        continue
-
-                    if not entry.is_file(follow_symlinks=False):
-                        continue
-
-                    ext = os.path.splitext(entry.name)[1].lower()
-                    if ext not in AUDIO_EXTS:
-                        continue
-                    normalized = str(Path(entry_path).resolve(strict=False))
-                    if normalized in seen_paths:
-                        continue
-                    if _is_path_excluded(entry_path, excluded_roots, compiled_patterns):
-                        continue
-                    seen_paths.add(normalized)
-                    collected_paths.append(entry_path)
-        except OSError:
-            return
-
-    for root in directories:
-        if not root or not os.path.isdir(root):
-            continue
-        _walk_dir(root)
-
-    return collected_paths, directory_mtimes
 
 
 def preview_audio_path_exclusions(
@@ -210,7 +124,7 @@ def preview_audio_path_exclusions(
             for fn in filenames:
                 file_path = os.path.join(dirpath, fn)
                 ext = os.path.splitext(fn)[1].lower()
-                normalized = str(Path(file_path).resolve())
+                normalized, _ = _path_variants(file_path)
                 if normalized in seen:
                     continue
                 if ext not in AUDIO_EXTS:
@@ -465,7 +379,11 @@ def _read_sidecar(path: str) -> tuple[Optional[str], Optional[str]]:
     return txt, lrc
 
 
-def new_fs_track_from_path(path: str) -> FsTrack | None:
+def new_fs_track_from_path(
+    path: str,
+    *,
+    signature: tuple[float | None, int | None] | None = None,
+) -> FsTrack | None:
     try:
         audio = MutagenFile(path, easy=True)
         if audio is None:
@@ -511,7 +429,7 @@ def new_fs_track_from_path(path: str) -> FsTrack | None:
         txt_lyrics = txt_sidecar or txt_embedded
         lrc_lyrics = lrc_sidecar or lrc_embedded
 
-        modified_time, file_size = get_audio_file_signature(path)
+        modified_time, file_size = signature if signature is not None else get_audio_file_signature(path)
 
         return FsTrack(
             file_path=path,
