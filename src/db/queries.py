@@ -368,14 +368,16 @@ def add_track(db: sqlite3.Connection, track: FsTrack, *, commit: bool = True) ->
 def add_tracks(db: sqlite3.Connection, tracks: List[FsTrack], *, commit: bool = True) -> None:
     if not tracks:
         return
+
+    def _do_add() -> None:
+        for t in tracks:
+            add_track(db, t, commit=False)
+
     if commit:
         with db:
-            for t in tracks:
-                add_track(db, t, commit=False)
-        return
-
-    for t in tracks:
-        add_track(db, t, commit=False)
+            _do_add()
+    else:
+        _do_add()
 
 
 def get_tracks(db: sqlite3.Connection) -> List[Track]:
@@ -633,38 +635,6 @@ def get_library_file_index(db: sqlite3.Connection) -> dict[str, tuple[float | No
         )
         for row in rows
     }
-
-
-def get_scan_directory_index(db: sqlite3.Connection) -> dict[str, float]:
-    rows = db.execute("SELECT path, modified_time FROM scan_directory_state").fetchall()
-    return {row["path"]: float(row["modified_time"]) for row in rows if row["modified_time"] is not None}
-
-
-def replace_scan_directory_index(db: sqlite3.Connection, entries: dict[str, float]) -> None:
-    db.execute("DELETE FROM scan_directory_state")
-    if entries:
-        db.executemany(
-            "INSERT INTO scan_directory_state (path, modified_time) VALUES (?, ?)",
-            [(path, modified_time) for path, modified_time in entries.items()],
-        )
-    db.commit()
-
-
-def get_scan_cache_meta(db: sqlite3.Connection, key: str) -> str:
-    row = db.execute("SELECT value FROM scan_cache_meta WHERE key = ? LIMIT 1", (key,)).fetchone()
-    return str(row["value"]) if row and row["value"] is not None else ""
-
-
-def set_scan_cache_meta(db: sqlite3.Connection, key: str, value: str) -> None:
-    db.execute(
-        """
-        INSERT INTO scan_cache_meta (key, value)
-        VALUES (?, ?)
-        ON CONFLICT(key) DO UPDATE SET value = excluded.value
-        """,
-        (key, value),
-    )
-    db.commit()
 
 
 def delete_tracks_by_paths(db: sqlite3.Connection, paths: list[str], *, commit: bool = True) -> None:

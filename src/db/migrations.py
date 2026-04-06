@@ -181,3 +181,13 @@ def upgrade_database_if_needed(db: sqlite3.Connection, existing_version: int) ->
             ALTER TABLE config_data ADD COLUMN playback_speed REAL DEFAULT 1.0;
         """)
         db.commit()
+
+    # v15
+    if existing_version <= 14:
+        print("Migrate database version 15...")
+        db.execute("PRAGMA user_version=15")
+        db.executescript("""
+            DROP TABLE IF EXISTS scan_directory_state;
+            DROP TABLE IF EXISTS scan_cache_meta;
+        """)
+        db.commit()
