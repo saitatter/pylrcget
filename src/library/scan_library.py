@@ -8,6 +8,8 @@ from typing import Optional, Tuple
 
 from mutagen import File as MutagenFile
 from mutagen.asf import ASF
+from mutagen.dsf import DSF
+from mutagen.dsdiff import DSDIFF
 from mutagen.id3 import ID3, USLT, TXXX, ID3NoHeaderError
 from mutagen.flac import FLAC
 from mutagen.oggvorbis import OggVorbis
@@ -25,7 +27,7 @@ from core.embed_lyrics import (
 
 logger = logging.getLogger(__name__)
 
-AUDIO_EXTS = {".mp3", ".m4a", ".flac", ".ogg", ".opus", ".wav", ".wma", ".asf"}
+AUDIO_EXTS = {".mp3", ".m4a", ".flac", ".ogg", ".opus", ".wav", ".wma", ".asf", ".dsf", ".dff"}
 
 ASF_PLAIN_KEYS = ("WM/Lyrics", "LYRICS", "UNSYNCEDLYRICS")
 ASF_SYNCED_KEYS = ("LRCLIB_LRC", "SYNCEDLYRICS")
@@ -94,6 +96,7 @@ def read_embedded_lyrics(path: str) -> Tuple[Optional[str], Optional[str]]:
       - FLAC/Vorbis/Ogg: reads 'LYRICS' and 'LRCLIB_LRC' vorbis comments.
       - MP4/M4A: reads '\xa9lyr' and '----:com.lrclib:lrc' (custom atom, bytes).
       - WMA/ASF: reads ASF string attributes for plain and synced lyrics.
+      - DSF/DSDIFF (.dff): reads ID3 lyrics frames.
       - Fallback: tries MutagenFile() and some common keys.
     """
     p = Path(path)
@@ -125,6 +128,25 @@ def read_embedded_lyrics(path: str) -> Tuple[Optional[str], Optional[str]]:
                     elif isinstance(txt, str):
                         synced = txt
                     break
+
+        elif ext in {".dsf", ".dff"}:
+            audio = DSF(path) if ext == ".dsf" else DSDIFF(path)
+            tags = getattr(audio, "tags", None)
+
+            if tags:
+                uslt_frames = tags.getall("USLT")
+                if uslt_frames:
+                    plain = uslt_frames[0].text if getattr(uslt_frames[0], "text", None) else None
+
+                txxx_frames = tags.getall("TXXX")
+                for t in txxx_frames:
+                    if getattr(t, "desc", "") == ID3_SYNCED_DESC:
+                        txt = getattr(t, "text", None)
+                        if isinstance(txt, (list, tuple)) and txt:
+                            synced = str(txt[0])
+                        elif isinstance(txt, str):
+                            synced = txt
+                        break
 
         elif ext in {".flac"}:
             audio = FLAC(path)

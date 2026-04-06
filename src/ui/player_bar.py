@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import struct
 from pathlib import Path
 
 from PySide6.QtCore import QSize, Qt
@@ -21,6 +22,7 @@ from mutagen import File as MutagenFile
 from mutagen.flac import FLAC, Picture
 from mutagen.id3 import APIC
 from mutagen.mp4 import MP4, MP4Cover
+from mutagen.asf import ASF
 from mutagen.oggopus import OggOpus
 from mutagen.oggvorbis import OggVorbis
 
@@ -107,6 +109,29 @@ def _embedded_cover_bytes(audio_path: str | None) -> bytes | None:
         return None
 
     try:
+        if isinstance(audio, ASF) and getattr(audio, "tags", None):
+            for picture in audio.tags.get("WM/Picture", []):
+                raw = getattr(picture, "value", picture)
+                if not raw:
+                    continue
+                try:
+                    _picture_type, size = struct.unpack_from("<bi", raw)
+                    pos = 5
+
+                    while raw[pos:pos + 2] != b"\x00\x00":
+                        pos += 2
+                    pos += 2
+
+                    while raw[pos:pos + 2] != b"\x00\x00":
+                        pos += 2
+                    pos += 2
+
+                    image_data = raw[pos:pos + size]
+                    if image_data:
+                        return bytes(image_data)
+                except Exception:
+                    continue
+
         if isinstance(audio, FLAC) and getattr(audio, "pictures", None):
             picture = audio.pictures[0]
             return bytes(getattr(picture, "data", b"") or b"")
