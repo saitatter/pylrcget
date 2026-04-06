@@ -101,6 +101,8 @@ class Config:
     try_embed_lyrics: bool
     theme_mode: str
     lrclib_instance: str
+    lyrics_output_dir: str
+    lyrics_file_pattern: str
 
 
 # Keep FsTrack here too if you already have it in this file.

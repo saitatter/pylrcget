@@ -6,7 +6,8 @@ from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QShortcut, QKeySequence
 import os
 
-from db.database import get_directories, get_track_by_id
+from db.database import get_config, get_directories, get_track_by_id
+from core.lyrics_sidecar import export_lyrics_sidecars
 from ui.workers.library_scanner import LibraryScanner
 from ui.widgets.track_list_widget import TrackListWidget
 from ui.dialogs.music_folders_dialog import MusicFoldersDialog
@@ -508,7 +509,8 @@ class MainWindow(QMainWindow):
 
     # ------------------ lyrics download & save ------------------
     def on_download_lyrics(self, track_id: int):
-        lrclib_instance = "https://lrclib.net"
+        config = get_config(self.app_state.db)
+        lrclib_instance = config.lrclib_instance or "https://lrclib.net"
         lrclib_instance = self._normalize_lrclib_base(lrclib_instance)
 
         self.statusBar().showMessage(f"Starting lyrics download... ({lrclib_instance})")
@@ -531,6 +533,8 @@ class MainWindow(QMainWindow):
 
         try:
             track = get_track_by_id(self.app_state.db, track_id)
+            if ok:
+                self._export_track_lyrics(track)
             title = f"{track.artist_name} — {track.title}"
             self.lyrics_view.set_track_lyrics(
                 title=title,
@@ -574,6 +578,7 @@ class MainWindow(QMainWindow):
                 update_track_null_lyrics(self.app_state.db, track_id)
 
             track = get_track_by_id(self.app_state.db, track_id)
+            self._export_track_lyrics(track)
             title = f"{track.artist_name} - {track.title}"
             self.lyrics_view.set_track_lyrics(
                 title=title,
@@ -633,6 +638,16 @@ class MainWindow(QMainWindow):
         if not u.endswith("/api"):
             u += "/api"
         return u
+
+    def _export_track_lyrics(self, track) -> None:
+        config = get_config(self.app_state.db)
+        try:
+            written_paths = export_lyrics_sidecars(track, config)
+        except Exception as exc:
+            self.app_state.notify(f"Failed to export lyrics files: {exc}", "error")
+            return
+        if written_paths:
+            self.statusBar().showMessage(f"Lyrics exported to {os.path.dirname(written_paths[0])}", 3000)
 
     def _play_selected_or_current(self):
         tid = self.track_list.selected_track_id()

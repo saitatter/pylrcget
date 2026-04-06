@@ -46,7 +46,9 @@ def get_config(db: sqlite3.Connection) -> Config:
                show_line_count,
                try_embed_lyrics,
                theme_mode,
-               lrclib_instance
+               lrclib_instance,
+               lyrics_output_dir,
+               lyrics_file_pattern
         FROM config_data
         LIMIT 1
     """).fetchone()
@@ -58,6 +60,8 @@ def get_config(db: sqlite3.Connection) -> Config:
         try_embed_lyrics=bool(row["try_embed_lyrics"]),
         theme_mode=row["theme_mode"],
         lrclib_instance=row["lrclib_instance"],
+        lyrics_output_dir=row["lyrics_output_dir"] or "",
+        lyrics_file_pattern=row["lyrics_file_pattern"] or "{artist} - {title}",
     )
 
 
@@ -69,7 +73,9 @@ def set_config(db: sqlite3.Connection, config: Config) -> None:
             show_line_count = ?,
             try_embed_lyrics = ?,
             theme_mode = ?,
-            lrclib_instance = ?
+            lrclib_instance = ?,
+            lyrics_output_dir = ?,
+            lyrics_file_pattern = ?
         WHERE 1
     """, (
         config.skip_tracks_with_synced_lyrics,
@@ -78,6 +84,8 @@ def set_config(db: sqlite3.Connection, config: Config) -> None:
         config.try_embed_lyrics,
         config.theme_mode,
         config.lrclib_instance,
+        config.lyrics_output_dir,
+        config.lyrics_file_pattern,
     ))
     db.commit()
 
