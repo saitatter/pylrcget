@@ -20,8 +20,16 @@ QLineEdit, QTextEdit, QPlainTextEdit, QComboBox {
     selection-color: {{color-bg-app}};
 }
 
+QLineEdit, QComboBox, QPushButton {
+    min-height: 38px;
+}
+
 QLineEdit:focus, QTextEdit:focus, QPlainTextEdit:focus, QComboBox:focus {
     border-color: {{color-accent}};
+}
+
+QLineEdit:hover, QTextEdit:hover, QPlainTextEdit:hover, QComboBox:hover {
+    border-color: #334155;
 }
 
 QPushButton {
@@ -61,10 +69,14 @@ QPushButton:pressed {
 
 QPushButton:disabled, QLineEdit:disabled, QTextEdit:disabled, QComboBox:disabled {
     color: #6b7280;
+    border-color: #172033;
+    background: #08101f;
 }
 
 QCheckBox {
     spacing: 8px;
+    color: {{color-text}};
+    min-height: 20px;
 }
 
 QCheckBox::indicator {
@@ -78,6 +90,25 @@ QCheckBox::indicator {
 QCheckBox::indicator:checked {
     background: {{color-accent}};
     border-color: {{color-accent}};
+}
+
+QCheckBox::indicator:hover {
+    border-color: {{color-accent}};
+}
+
+QComboBox {
+    padding-right: 32px;
+}
+
+QComboBox::drop-down {
+    border: none;
+    width: 28px;
+}
+
+QComboBox QAbstractItemView {
+    border-radius: {{radius-md}};
+    padding: 4px;
+    outline: 0;
 }
 
 QTabWidget#MainTabs::pane {
