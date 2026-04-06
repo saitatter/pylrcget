@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Iterable
 
-from PySide6.QtCore import Qt, Signal, QModelIndex
+from PySide6.QtCore import Qt, Signal, QModelIndex, QItemSelectionModel
 from PySide6.QtGui import QStandardItem, QStandardItemModel
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QTableView, QMenu
 
@@ -139,13 +139,24 @@ class ArtistListWidget(QWidget):
         if not idx.isValid():
             return
 
+        sm = self.table.selectionModel()
+        if sm is not None and not sm.isRowSelected(idx.row(), idx.parent()):
+            sm.setCurrentIndex(idx, QItemSelectionModel.ClearAndSelect | QItemSelectionModel.Rows)
+
         artist_id = self.model.index(idx.row(), 0).data(Qt.ItemDataRole.UserRole)
         if artist_id is None:
             return
         artist_id = int(artist_id)
+        artist_name = self.model.index(idx.row(), 0).data(Qt.ItemDataRole.DisplayRole) or "Artist"
 
         menu = QMenu(self)
-        act_open = menu.addAction("Open artist")
+        info = menu.addAction(str(artist_name))
+        info.setEnabled(False)
+
+        menu.addSeparator()
+        browse = menu.addAction("Browse")
+        browse.setEnabled(False)
+        act_open = menu.addAction("Open artist in tracks")
 
         chosen = menu.exec(self.table.viewport().mapToGlobal(pos))
         if chosen == act_open:

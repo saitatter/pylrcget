@@ -172,13 +172,24 @@ class AlbumListWidget(QWidget):
         if not idx.isValid():
             return
 
+        sm = self.table.selectionModel()
+        if sm is not None and not sm.isRowSelected(idx.row(), idx.parent()):
+            sm.setCurrentIndex(idx, QItemSelectionModel.ClearAndSelect | QItemSelectionModel.Rows)
+
         album_id = self.model.index(idx.row(), 0).data(Qt.ItemDataRole.UserRole)
         if album_id is None:
             return
         album_id = int(album_id)
+        album_name = self.model.index(idx.row(), 0).data(Qt.ItemDataRole.DisplayRole) or "Album"
 
         menu = QMenu(self)
-        act_open = menu.addAction("Open album")
+        info = menu.addAction(str(album_name))
+        info.setEnabled(False)
+
+        menu.addSeparator()
+        browse = menu.addAction("Browse")
+        browse.setEnabled(False)
+        act_open = menu.addAction("Open album in tracks")
 
         chosen = menu.exec(self.table.viewport().mapToGlobal(pos))
         if chosen == act_open:

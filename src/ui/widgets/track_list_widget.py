@@ -256,22 +256,31 @@ class TrackListWidget(QWidget):
             return
 
         menu = QMenu(self)
-        act_play = menu.addAction("Play")
-        act_dl = menu.addAction("Download lyrics")
+        current_track_id = self.model.track_id_at(self._source_row(idx))
+
+        info = menu.addAction(f"{len(selected_ids)} track selected" if len(selected_ids) == 1 else f"{len(selected_ids)} tracks selected")
+        info.setEnabled(False)
 
         menu.addSeparator()
-        act_instr = menu.addAction(f"Mark as instrumental ({len(selected_ids)})")
-        act_uninstr = menu.addAction(f"Unmark instrumental ({len(selected_ids)})")
+        quick = menu.addAction("Quick Actions")
+        quick.setEnabled(False)
+        act_play = menu.addAction("Play now")
+        act_dl = menu.addAction("Download lyrics for this track")
+
+        menu.addSeparator()
+        bulk = menu.addAction("Selection Actions")
+        bulk.setEnabled(False)
+        count_suffix = f"({len(selected_ids)})"
+        act_instr = menu.addAction(f"Mark selection as instrumental {count_suffix}")
+        act_uninstr = menu.addAction(f"Unmark instrumental on selection {count_suffix}")
 
         chosen = menu.exec(self.table.viewport().mapToGlobal(pos))
         if chosen == act_play:
-            track_id = self.model.track_id_at(self._source_row(idx))
-            if track_id is not None:
-                self.playTrack.emit(int(track_id))
+            if current_track_id is not None:
+                self.playTrack.emit(int(current_track_id))
         elif chosen == act_dl:
-            track_id = self.model.track_id_at(self._source_row(idx))
-            if track_id is not None:
-                self.downloadLyrics.emit(int(track_id))
+            if current_track_id is not None:
+                self.downloadLyrics.emit(int(current_track_id))
         elif chosen == act_instr:
             self.markInstrumental.emit(selected_ids)
         elif chosen == act_uninstr:
