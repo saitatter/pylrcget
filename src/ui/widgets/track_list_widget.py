@@ -8,6 +8,7 @@ from PySide6.QtCore import Signal, Qt, QItemSelectionModel, QSortFilterProxyMode
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QTableView, QMenu, QStackedWidget, QLabel, QPushButton, QHBoxLayout
 
 from db.database import get_directories, get_track_rows
+from ui.library_routes import LibraryRoute, tracks_album, tracks_artist
 from ui.widgets.empty_state_widget import EmptyStateWidget
 from ui.models.track_table_model import TrackTableModel
 from ui.delegates.actions_delegate import ActionsDelegate
@@ -54,6 +55,7 @@ class TrackListWidget(QWidget):
     downloadLyrics = Signal(int)  # track_id
     openArtist = Signal(int)
     openAlbum = Signal(int)
+    navigateRequested = Signal(object)
     markInstrumental = Signal(list)        # list[int]
     unmarkInstrumental = Signal(list)      # list[int]
     clearFiltersRequested = Signal()
@@ -135,8 +137,8 @@ class TrackListWidget(QWidget):
         self.table.setItemDelegateForColumn(3, self.actions)
 
         self.track_info = TrackInfoDelegate(self.table)
-        self.track_info.artistClicked.connect(self.openArtist.emit)
-        self.track_info.albumClicked.connect(self.openAlbum.emit)
+        self.track_info.artistClicked.connect(self._emit_artist_navigation)
+        self.track_info.albumClicked.connect(self._emit_album_navigation)
         self.table.setItemDelegateForColumn(0, self.track_info)
 
         # Double click -> play
@@ -189,6 +191,31 @@ class TrackListWidget(QWidget):
     def setScopeBannerEnabled(self, enabled: bool) -> None:
         self._scope_banner_enabled = bool(enabled)
         self._update_scope_banner()
+
+    def apply_route(self, route: LibraryRoute) -> None:
+        if route.tab != "tracks":
+            return
+
+        if route.mode == "root":
+            self._artist_id = None
+            self._album_id = None
+            self._artist_ids = None
+            self._album_ids = None
+            self._scope_label = ""
+        elif route.mode == "artist":
+            self.setAlbumFilter(None)
+            self.setArtistFilter(list(route.artist_ids) if len(route.artist_ids) > 1 else (route.artist_ids[0] if route.artist_ids else None))
+            self.setArtistFilterLabel(route.artist_label)
+            return
+        elif route.mode == "album":
+            self.setArtistFilter(None)
+            self.setAlbumFilter(list(route.album_ids) if len(route.album_ids) > 1 else (route.album_ids[0] if route.album_ids else None))
+            self.setAlbumFilterLabel(route.album_label)
+            return
+
+        self._update_scope_banner()
+        if self._active:
+            self.refresh()
 
     def refresh(self):
         db = self.app_state.db
@@ -329,6 +356,14 @@ class TrackListWidget(QWidget):
             self.markInstrumental.emit(selected_ids)
         elif chosen == act_uninstr:
             self.unmarkInstrumental.emit(selected_ids)
+
+    def _emit_artist_navigation(self, artist_id: int) -> None:
+        self.openArtist.emit(int(artist_id))
+        self.navigateRequested.emit(tracks_artist((int(artist_id),)))
+
+    def _emit_album_navigation(self, album_id: int) -> None:
+        self.openAlbum.emit(int(album_id))
+        self.navigateRequested.emit(tracks_album((int(album_id),)))
 
     def set_now_playing(self, track_id: int | None):
         if track_id is None:

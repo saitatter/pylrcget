@@ -108,6 +108,7 @@ class Config:
     scan_excluded_patterns: str
     reaction_delay_ms: int
     playback_speed: float
+    last_library_route: str
 
 
 # Keep FsTrack here too if you already have it in this file.

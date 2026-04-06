@@ -8,6 +8,7 @@ from PySide6.QtGui import QStandardItem, QStandardItemModel
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QTableView, QMenu, QStackedWidget
 
 from ui.style_loader import load_stylesheet
+from ui.library_routes import LibraryRoute, artists_detail
 from ui.widgets.album_list_widget import AlbumListWidget
 from ui.widgets.sortable_header_view import SortableHeaderView
 
@@ -29,6 +30,7 @@ class ArtistListWidget(QWidget):
     unmarkInstrumental = Signal(list)
     clearFiltersRequested = Signal()
     configureFoldersRequested = Signal()
+    navigateRequested = Signal(object)
 
     def __init__(self, app_state):
         super().__init__()
@@ -73,10 +75,12 @@ class ArtistListWidget(QWidget):
         self.stack.addWidget(self.browser_page)
 
         self.album_browser = AlbumListWidget(self.app_state)
+        self.album_browser.setRouteTab("artists")
         self.album_browser.playTrack.connect(self.playTrack.emit)
         self.album_browser.downloadLyrics.connect(self.downloadLyrics.emit)
         self.album_browser.openArtist.connect(self.openArtist.emit)
         self.album_browser.openAlbum.connect(self.openAlbum.emit)
+        self.album_browser.navigateRequested.connect(self.navigateRequested.emit)
         self.album_browser.markInstrumental.connect(self.markInstrumental.emit)
         self.album_browser.unmarkInstrumental.connect(self.unmarkInstrumental.emit)
         self.album_browser.clearFiltersRequested.connect(self.clearFiltersRequested.emit)
@@ -107,6 +111,21 @@ class ArtistListWidget(QWidget):
         self._search = text or ""
         if self._active and self.stack.currentWidget() is self.browser_page:
             self.refresh()
+
+    def apply_route(self, route: LibraryRoute) -> None:
+        if route.tab != "artists":
+            return
+
+        if route.mode == "root":
+            self._return_to_artists()
+            return
+        if route.mode == "artist":
+            self.show_artist_albums(list(route.artist_ids) if len(route.artist_ids) > 1 else (route.artist_ids[0] if route.artist_ids else None), route.artist_label)
+            return
+        if route.mode == "artist_album":
+            self.show_artist_albums(list(route.artist_ids) if len(route.artist_ids) > 1 else (route.artist_ids[0] if route.artist_ids else None), route.artist_label)
+            self.show_album_tracks(list(route.album_ids) if len(route.album_ids) > 1 else (route.album_ids[0] if route.album_ids else None), route.album_label)
+            return
 
     def refresh(self):
         from db.database import get_artist_rows
@@ -166,8 +185,8 @@ class ArtistListWidget(QWidget):
     def show_artist_albums(self, artist_id: int | list[int] | tuple[int, ...], artist_name: str = "") -> None:
         self._show_artist_albums(artist_id, artist_name)
 
-    def show_album_tracks(self, album_id: int, album_name: str = "") -> None:
-        self.album_browser.show_album_tracks(int(album_id), album_name)
+    def show_album_tracks(self, album_id: int | list[int] | tuple[int, ...], album_name: str = "") -> None:
+        self.album_browser.show_album_tracks(album_id, album_name)
         self.stack.setCurrentWidget(self.album_browser)
 
     def _return_to_artists(self) -> None:
@@ -183,9 +202,9 @@ class ArtistListWidget(QWidget):
         artist_name = self.model.index(index.row(), 0).data(Qt.ItemDataRole.DisplayRole) or "N/A"
         if artist_id is not None:
             if isinstance(artist_id, tuple):
-                self._show_artist_albums(list(artist_id), str(artist_name))
+                self.navigateRequested.emit(artists_detail(tuple(int(v) for v in artist_id), label=str(artist_name)))
             else:
-                self._show_artist_albums(int(artist_id), str(artist_name))
+                self.navigateRequested.emit(artists_detail((int(artist_id),), label=str(artist_name)))
 
     def _on_context_menu(self, pos):
         idx = self.table.indexAt(pos)
@@ -212,9 +231,9 @@ class ArtistListWidget(QWidget):
         chosen = menu.exec(self.table.viewport().mapToGlobal(pos))
         if chosen == act_open:
             if isinstance(artist_id, tuple):
-                self._show_artist_albums(list(artist_id), str(artist_name))
+                self.navigateRequested.emit(artists_detail(tuple(int(v) for v in artist_id), label=str(artist_name)))
             else:
-                self._show_artist_albums(int(artist_id), str(artist_name))
+                self.navigateRequested.emit(artists_detail((int(artist_id),), label=str(artist_name)))
 
     def _item_text(self, text: str, artist_id: int | tuple[int, ...], align: Qt.AlignmentFlag = Qt.AlignmentFlag.AlignVCenter):
         it = QStandardItem(text)

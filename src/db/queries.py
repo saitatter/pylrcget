@@ -53,7 +53,8 @@ def get_config(db: sqlite3.Connection) -> Config:
                scan_excluded_paths,
                scan_excluded_patterns,
                reaction_delay_ms,
-               playback_speed
+               playback_speed,
+               last_library_route
         FROM config_data
         LIMIT 1
     """).fetchone()
@@ -72,6 +73,7 @@ def get_config(db: sqlite3.Connection) -> Config:
         scan_excluded_patterns=row["scan_excluded_patterns"] or "",
         reaction_delay_ms=int(row["reaction_delay_ms"] or 0),
         playback_speed=float(row["playback_speed"] or 1.0),
+        last_library_route=row["last_library_route"] or "",
     )
 
 
@@ -90,7 +92,8 @@ def set_config(db: sqlite3.Connection, config: Config) -> None:
             scan_excluded_paths = ?,
             scan_excluded_patterns = ?,
             reaction_delay_ms = ?,
-            playback_speed = ?
+            playback_speed = ?,
+            last_library_route = ?
         WHERE 1
     """, (
         config.skip_tracks_with_synced_lyrics,
@@ -106,6 +109,7 @@ def set_config(db: sqlite3.Connection, config: Config) -> None:
         config.scan_excluded_patterns,
         config.reaction_delay_ms,
         config.playback_speed,
+        config.last_library_route,
     ))
     db.commit()
 
@@ -238,10 +242,10 @@ def get_album_rows(
 
     if artist_ids:
         placeholders = ", ".join("?" for _ in artist_ids)
-        q += f" AND a.artist_id IN ({placeholders})"
+        q += f" AND t.artist_id IN ({placeholders})"
         params.extend(int(v) for v in artist_ids)
     elif artist_id is not None:
-        q += " AND a.artist_id = ?"
+        q += " AND t.artist_id = ?"
         params.append(int(artist_id))
 
     q += """
