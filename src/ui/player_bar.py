@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import html
 from pathlib import Path
 
 from PySide6.QtCore import QSize, Qt, Signal
@@ -188,6 +189,8 @@ class SeekSlider(QSlider):
 
 class PlayerBar(QWidget):
     playbackSpeedChanged = Signal(float)
+    artistNavigationRequested = Signal(int)
+    albumNavigationRequested = Signal(int)
 
     def __init__(self, player, parent=None):
         super().__init__(parent)
@@ -197,6 +200,7 @@ class PlayerBar(QWidget):
         self._duration_ms = 0
         self._is_playing = False
         self._speed_step = 0.05
+        self._current_track_id: int | None = None
         self.setObjectName("PlayerBar")
         self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
 
@@ -230,9 +234,17 @@ class PlayerBar(QWidget):
 
         self.lbl_artist = QLabel("Choose a track to start playback")
         self.lbl_artist.setObjectName("NowPlayingArtist")
+        self.lbl_artist.setTextFormat(Qt.TextFormat.RichText)
+        self.lbl_artist.setTextInteractionFlags(Qt.TextInteractionFlag.LinksAccessibleByMouse)
+        self.lbl_artist.setOpenExternalLinks(False)
+        self.lbl_artist.linkActivated.connect(self._on_artist_link_activated)
 
         self.lbl_album = QLabel("")
         self.lbl_album.setObjectName("NowPlayingAlbum")
+        self.lbl_album.setTextFormat(Qt.TextFormat.RichText)
+        self.lbl_album.setTextInteractionFlags(Qt.TextInteractionFlag.LinksAccessibleByMouse)
+        self.lbl_album.setOpenExternalLinks(False)
+        self.lbl_album.linkActivated.connect(self._on_album_link_activated)
 
         text_stack.addWidget(self.lbl_title)
         text_stack.addWidget(self.lbl_artist)
@@ -517,14 +529,16 @@ class PlayerBar(QWidget):
     def _on_track_changed(self, now_playing):
         cover_size = self.lbl_cover.width() or 56
         if now_playing:
+            self._current_track_id = int(getattr(now_playing, "track_id", 0) or 0) or None
             artist = now_playing.artist or "Unknown Artist"
             title = now_playing.title or "Unknown"
             album = getattr(now_playing, "album", None) or ""
             self.lbl_title.setText(title)
-            self.lbl_artist.setText(artist)
-            self.lbl_album.setText(album)
+            self.lbl_artist.setText(f'<a href="artist">{html.escape(artist)}</a>')
+            self.lbl_album.setText(f'<a href="album">{html.escape(album)}</a>' if album else "")
             self.lbl_cover.setPixmap(_artwork_pixmap(title, artist, getattr(now_playing, "path", None), cover_size))
         else:
+            self._current_track_id = None
             self.lbl_title.setText("Nothing playing")
             self.lbl_artist.setText("Choose a track to start playback")
             self.lbl_album.setText("")
@@ -533,6 +547,14 @@ class PlayerBar(QWidget):
             self.lbl_time.setText("0:00")
             self.lbl_dur.setText("0:00")
             self._set_playing(False)
+
+    def _on_artist_link_activated(self, _link: str) -> None:
+        if self._current_track_id is not None:
+            self.artistNavigationRequested.emit(self._current_track_id)
+
+    def _on_album_link_activated(self, _link: str) -> None:
+        if self._current_track_id is not None:
+            self.albumNavigationRequested.emit(self._current_track_id)
 
     def _on_status_changed(self, status):
         name = getattr(status, "name", str(status)).lower()

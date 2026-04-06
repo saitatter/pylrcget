@@ -61,6 +61,40 @@ QWidget#ScanRow {
     border-top: 1px solid {{color-border-strong}};
 }
 
+QWidget#LibraryNavBar {
+    background: {{color-bg-panel}};
+    border: 1px solid {{color-border-strong}};
+    border-radius: {{radius-lg}};
+}
+
+QToolButton#LibraryNavButton {
+    min-width: 32px;
+    min-height: 32px;
+}
+
+QToolButton#LibraryBreadcrumbButton {
+    border: none;
+    background: transparent;
+    color: {{color-text-soft}};
+    padding: 4px 6px;
+}
+
+QToolButton#LibraryBreadcrumbButton:hover:enabled {
+    color: {{color-accent}};
+    background: {{color-bg-control}};
+    border-radius: {{radius-sm}};
+}
+
+QToolButton#LibraryBreadcrumbButton:disabled {
+    color: {{color-text}};
+    font-weight: 600;
+}
+
+QLabel#LibraryBreadcrumbSeparator {
+    color: {{color-text-muted}};
+    padding: 0 2px;
+}
+
 QLabel#ScanLabel {
     color: {{color-text-soft}};
     font-size: {{font-size-sm}};

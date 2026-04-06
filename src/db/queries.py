@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 import sqlite3
-from typing import List
+from typing import List, Sequence
 
 from core.utils import prepare_input
 from db.models import Album, Artist, Config, Track
@@ -53,7 +53,8 @@ def get_config(db: sqlite3.Connection) -> Config:
                scan_excluded_paths,
                scan_excluded_patterns,
                reaction_delay_ms,
-               playback_speed
+               playback_speed,
+               last_library_route
         FROM config_data
         LIMIT 1
     """).fetchone()
@@ -72,6 +73,7 @@ def get_config(db: sqlite3.Connection) -> Config:
         scan_excluded_patterns=row["scan_excluded_patterns"] or "",
         reaction_delay_ms=int(row["reaction_delay_ms"] or 0),
         playback_speed=float(row["playback_speed"] or 1.0),
+        last_library_route=row["last_library_route"] or "",
     )
 
 
@@ -90,7 +92,8 @@ def set_config(db: sqlite3.Connection, config: Config) -> None:
             scan_excluded_paths = ?,
             scan_excluded_patterns = ?,
             reaction_delay_ms = ?,
-            playback_speed = ?
+            playback_speed = ?,
+            last_library_route = ?
         WHERE 1
     """, (
         config.skip_tracks_with_synced_lyrics,
@@ -106,6 +109,7 @@ def set_config(db: sqlite3.Connection, config: Config) -> None:
         config.scan_excluded_patterns,
         config.reaction_delay_ms,
         config.playback_speed,
+        config.last_library_route,
     ))
     db.commit()
 
@@ -130,7 +134,15 @@ def add_artist(db: sqlite3.Connection, name: str, *, commit: bool = True) -> int
     return int(cursor.lastrowid)
 
 
-def get_artist_rows(db: sqlite3.Connection, search_query: str = "") -> list[dict]:
+def get_artist_rows(
+    db: sqlite3.Connection,
+    search_query: str = "",
+    *,
+    limit: int | None = None,
+    offset: int = 0,
+    sort_column: int = 0,
+    sort_order: str = "asc",
+) -> list[dict]:
     q = """
     SELECT
         ar.id                AS artist_id,
@@ -147,10 +159,18 @@ def get_artist_rows(db: sqlite3.Connection, search_query: str = "") -> list[dict
         q += " AND ar.name LIKE ?"
         params.append(f"%{search_query}%")
 
-    q += """
+    order = "DESC" if str(sort_order).lower() == "desc" else "ASC"
+    order_map = {
+        0: f"ar.name COLLATE NOCASE {order}",
+        1: f"album_count {order}, ar.name COLLATE NOCASE {order}",
+        2: f"track_count {order}, ar.name COLLATE NOCASE {order}",
+    }
+    q += f"""
     GROUP BY ar.id, ar.name
-    ORDER BY ar.name COLLATE NOCASE
+    ORDER BY {order_map.get(int(sort_column), order_map[0])}
     """
+    if limit:
+        q += f" LIMIT {int(limit)} OFFSET {max(0, int(offset))}"
 
     cur = db.execute(q, params)
     cols = [c[0] for c in cur.description]
@@ -212,12 +232,22 @@ def add_album(db: sqlite3.Connection, name: str, album_artist_name: str, *, comm
     return int(cursor.lastrowid)
 
 
-def get_album_rows(db: sqlite3.Connection, search_query: str = "") -> list[dict]:
+def get_album_rows(
+    db: sqlite3.Connection,
+    search_query: str = "",
+    artist_id: int | None = None,
+    artist_ids: Sequence[int] | None = None,
+    *,
+    limit: int | None = None,
+    offset: int = 0,
+    sort_column: int = 0,
+    sort_order: str = "asc",
+) -> list[dict]:
     q = """
     SELECT
         a.id                    AS album_id,
         a.name                  AS album_name,
-        COALESCE(ar.name, '')   AS artist_name,
+        COALESCE(NULLIF(a.album_artist_name, ''), ar.name, '') AS artist_name,
         COUNT(t.id)             AS track_count
     FROM albums a
     LEFT JOIN artists ar ON ar.id = a.artist_id
@@ -227,14 +257,30 @@ def get_album_rows(db: sqlite3.Connection, search_query: str = "") -> list[dict]
     params: list[object] = []
 
     if search_query:
-        q += " AND (a.name LIKE ? OR ar.name LIKE ? OR a.album_artist_name LIKE ?)"
+        q += " AND (a.name LIKE ? OR COALESCE(NULLIF(a.album_artist_name, ''), ar.name, '') LIKE ? OR a.album_artist_name LIKE ?)"
         like = f"%{search_query}%"
         params += [like, like, like]
 
-    q += """
-    GROUP BY a.id, a.name, ar.name
-    ORDER BY ar.name COLLATE NOCASE, a.name COLLATE NOCASE
+    if artist_ids:
+        placeholders = ", ".join("?" for _ in artist_ids)
+        q += f" AND t.artist_id IN ({placeholders})"
+        params.extend(int(v) for v in artist_ids)
+    elif artist_id is not None:
+        q += " AND t.artist_id = ?"
+        params.append(int(artist_id))
+
+    order = "DESC" if str(sort_order).lower() == "desc" else "ASC"
+    order_map = {
+        0: f"a.name COLLATE NOCASE {order}, COALESCE(NULLIF(a.album_artist_name, ''), ar.name, '') COLLATE NOCASE {order}",
+        1: f"COALESCE(NULLIF(a.album_artist_name, ''), ar.name, '') COLLATE NOCASE {order}, a.name COLLATE NOCASE {order}",
+        2: f"track_count {order}, a.name COLLATE NOCASE {order}",
+    }
+    q += f"""
+    GROUP BY a.id, a.name, a.album_artist_name, ar.name
+    ORDER BY {order_map.get(int(sort_column), order_map[0])}
     """
+    if limit:
+        q += f" LIMIT {int(limit)} OFFSET {max(0, int(offset))}"
 
     cur = db.execute(q, params)
     cols = [c[0] for c in cur.description]
@@ -259,7 +305,7 @@ def get_album_by_id(db: sqlite3.Connection, album_id: int) -> dict:
     SELECT
         a.id                  AS album_id,
         a.name                AS album_name,
-        COALESCE(ar.name, '') AS artist_name,
+        COALESCE(NULLIF(a.album_artist_name, ''), ar.name, '') AS artist_name,
         COALESCE(a.album_artist_name, '') AS album_artist_name,
         a.artist_id           AS artist_id
     FROM albums a
@@ -402,8 +448,13 @@ def get_track_rows(
     instrumental_tracks: bool,
     no_lyrics_tracks: bool,
     limit: int | None = None,
+    offset: int = 0,
     artist_id: int | None = None,
     album_id: int | None = None,
+    artist_ids: Sequence[int] | None = None,
+    album_ids: Sequence[int] | None = None,
+    sort_column: int = 0,
+    sort_order: str = "asc",
 ) -> list[sqlite3.Row]:
     conditions: list[str] = []
     params: list[object] = []
@@ -425,22 +476,48 @@ def get_track_rows(
     if not no_lyrics_tracks:
         conditions.append("(tracks.txt_lyrics IS NOT NULL OR tracks.lrc_lyrics IS NOT NULL OR tracks.instrumental = 1)")
 
-    if artist_id is not None:
+    if artist_ids:
+        placeholders = ", ".join("?" for _ in artist_ids)
+        conditions.append(f"tracks.artist_id IN ({placeholders})")
+        params.extend(int(v) for v in artist_ids)
+    elif artist_id is not None:
         conditions.append("tracks.artist_id = ?")
         params.append(int(artist_id))
 
-    if album_id is not None:
+    if album_ids:
+        placeholders = ", ".join("?" for _ in album_ids)
+        conditions.append(f"tracks.album_id IN ({placeholders})")
+        params.extend(int(v) for v in album_ids)
+    elif album_id is not None:
         conditions.append("tracks.album_id = ?")
         params.append(int(album_id))
 
     where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
-    limit_clause = f"LIMIT {int(limit)}" if limit else ""
+    order = "DESC" if str(sort_order).lower() == "desc" else "ASC"
+    order_map = {
+        0: f"artists.name_lower {order}, tracks.title_lower {order}, tracks.id {order}",
+        1: f"tracks.duration IS NULL ASC, tracks.duration {order}, tracks.id {order}",
+        2: (
+            "CASE "
+            "WHEN tracks.lrc_lyrics IS NOT NULL AND tracks.lrc_lyrics != '[au: instrumental]' THEN 0 "
+            "WHEN tracks.txt_lyrics IS NOT NULL THEN 1 "
+            "WHEN tracks.instrumental = 1 THEN 2 "
+            "ELSE 3 END "
+            f"{order}, tracks.title_lower {order}, tracks.id {order}"
+        ),
+        3: f"tracks.title_lower {order}, tracks.id {order}",
+    }
+    order_clause = order_map.get(int(sort_column), order_map[0])
+    limit_clause = f"LIMIT {int(limit)} OFFSET {max(0, int(offset))}" if limit else ""
 
     query = f"""
         SELECT
             tracks.id,
             tracks.title,
+            tracks.artist_id,
+            tracks.album_id,
             artists.name AS artist_name,
+            albums.name AS album_name,
             tracks.duration,
             tracks.txt_lyrics,
             tracks.lrc_lyrics,
@@ -449,7 +526,7 @@ def get_track_rows(
         JOIN artists ON tracks.artist_id = artists.id
         JOIN albums ON tracks.album_id = albums.id
         {where_clause}
-        ORDER BY tracks.title_lower ASC
+        ORDER BY {order_clause}
         {limit_clause}
     """
     return db.execute(query, params).fetchall()
