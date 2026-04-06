@@ -86,14 +86,9 @@ class LibraryScanner(QThread):
                     updated += 1
 
                 if len(batch) >= 100:
-                    db.execute("BEGIN")
-                    try:
+                    with db:
                         delete_tracks_by_paths(db, pending_replacements, commit=False)
                         add_tracks(db, batch, commit=False)
-                        db.commit()
-                    except Exception:
-                        db.rollback()
-                        raise
                     batch.clear()
                     pending_replacements.clear()
                     self.progress_signal.emit(scanned, total, p, time.perf_counter() - started_at)
@@ -102,14 +97,9 @@ class LibraryScanner(QThread):
                     self.progress_signal.emit(scanned, total, p, time.perf_counter() - started_at)
 
             if batch or pending_replacements:
-                db.execute("BEGIN")
-                try:
+                with db:
                     delete_tracks_by_paths(db, pending_replacements, commit=False)
                     add_tracks(db, batch, commit=False)
-                    db.commit()
-                except Exception:
-                    db.rollback()
-                    raise
 
             if removed_paths:
                 delete_tracks_by_paths(db, removed_paths)
