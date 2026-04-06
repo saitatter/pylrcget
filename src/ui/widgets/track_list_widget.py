@@ -2,14 +2,15 @@
 from __future__ import annotations
 
 from PySide6.QtCore import Signal, Qt, QItemSelectionModel, QSortFilterProxyModel
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QTableView, QMenu
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QTableView, QMenu, QStackedWidget
 
+from db.database import get_directories, get_track_rows
+from ui.widgets.empty_state_widget import EmptyStateWidget
 from ui.models.track_table_model import TrackTableModel
 from ui.delegates.actions_delegate import ActionsDelegate
 from ui.style_loader import load_stylesheet
 from ui.widgets.sortable_header_view import SortableHeaderView
 from core.tracklist_models import TrackListRow
-from db.database import get_track_rows
 
 
 class TrackSortProxyModel(QSortFilterProxyModel):
@@ -49,6 +50,8 @@ class TrackListWidget(QWidget):
     downloadLyrics = Signal(int)  # track_id
     markInstrumental = Signal(list)        # list[int]
     unmarkInstrumental = Signal(list)      # list[int]
+    clearFiltersRequested = Signal()
+    configureFoldersRequested = Signal()
 
     def __init__(self, app_state):
         super().__init__()
@@ -64,6 +67,7 @@ class TrackListWidget(QWidget):
         self._artist_id: int | None = None
         self._album_id: int | None = None
 
+        self.stack = QStackedWidget()
         self.table = QTableView()
         self.model = TrackTableModel([])
         self.proxy_model = TrackSortProxyModel(self)
@@ -110,9 +114,17 @@ class TrackListWidget(QWidget):
         self.table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.table.customContextMenuRequested.connect(self._on_context_menu)
 
+        self.empty_state = EmptyStateWidget()
+        self.empty_state.actionTriggered.connect(self._on_empty_state_action)
+
+        self.stack.addWidget(self.table)
+        self.stack.addWidget(self.empty_state)
+
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.addWidget(self.table)
+        layout.addWidget(self.stack)
+
+        self._empty_action = ""
 
     # -------------------------
     # External API
@@ -138,6 +150,18 @@ class TrackListWidget(QWidget):
 
     def refresh(self):
         db = self.app_state.db
+        directories = get_directories(db)
+        if not directories:
+            self.model.set_rows([])
+            self._show_empty_state(
+                icon_name="folder-open.svg",
+                title="No music folders configured",
+                body="Add one or more folders to scan your library and start browsing tracks.",
+                action_text="Open Music Folders",
+                action_key="configure-folders",
+            )
+            return
+
         rows = get_track_rows(
             db=db,
             search_query=self._search,
@@ -178,6 +202,16 @@ class TrackListWidget(QWidget):
             )
 
         self.model.set_rows(ui_rows)
+        if ui_rows:
+            self.stack.setCurrentWidget(self.table)
+        else:
+            self._show_empty_state(
+                icon_name="search-x.svg",
+                title="No tracks match these filters",
+                body="Try clearing the search query or loosening the lyric filters to see more tracks.",
+                action_text="Clear Filters",
+                action_key="clear-filters",
+            )
 
     def current_track_id(self) -> int | None:
         sm = self.table.selectionModel()
@@ -320,3 +354,19 @@ class TrackListWidget(QWidget):
 
     def _source_row(self, index) -> int:
         return self.proxy_model.mapToSource(index).row()
+
+    def _show_empty_state(self, *, icon_name: str, title: str, body: str, action_text: str, action_key: str) -> None:
+        self._empty_action = action_key
+        self.empty_state.configure(
+            icon_name=icon_name,
+            title=title,
+            body=body,
+            action_text=action_text,
+        )
+        self.stack.setCurrentWidget(self.empty_state)
+
+    def _on_empty_state_action(self) -> None:
+        if self._empty_action == "clear-filters":
+            self.clearFiltersRequested.emit()
+        elif self._empty_action == "configure-folders":
+            self.configureFoldersRequested.emit()

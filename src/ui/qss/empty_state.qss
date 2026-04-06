@@ -1,0 +1,24 @@
+QWidget#EmptyState {
+    background: transparent;
+}
+
+QLabel#EmptyStateIcon {
+    padding-bottom: 4px;
+}
+
+QLabel#EmptyStateTitle {
+    color: #e5e7eb;
+    font-size: 18px;
+    font-weight: 650;
+}
+
+QLabel#EmptyStateBody {
+    color: #94a3b8;
+    font-size: 12px;
+    line-height: 1.4;
+}
+
+QPushButton#EmptyStateAction {
+    margin-top: 8px;
+    min-width: 140px;
+}

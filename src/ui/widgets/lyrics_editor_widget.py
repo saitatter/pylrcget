@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
 
 from ui.spacing import SPACE_2, SPACE_3, set_layout_spacing
 from ui.style_loader import load_stylesheet
+from ui.widgets.empty_state_widget import EmptyStateWidget
 
 _TS_RE = re.compile(r"\[(\d+):(\d+)(?:\.(\d+))?\]")
 
@@ -131,6 +132,7 @@ class LyricsEditorWidget(QWidget):
     publishSyncedRequested = Signal()
     publishPlainRequested = Signal()
     saveRequested = Signal(str, str)     # lrc_text, plain_text
+    downloadRequested = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -187,11 +189,9 @@ class LyricsEditorWidget(QWidget):
         self.stack = QStackedWidget()
         root.addWidget(self.stack, 1)
 
-        self.msg = QLabel("No lyrics")
-        self.msg.setAlignment(Qt.AlignCenter)
-        self.msg.setWordWrap(True)
-        self.msg.setObjectName("LyricsMessage")
-        self.stack.addWidget(self.msg)
+        self.empty_state = EmptyStateWidget()
+        self.empty_state.actionTriggered.connect(self.downloadRequested.emit)
+        self.stack.addWidget(self.empty_state)
 
         # Plain editor (editable if you want)
         self.plain = QTextEdit()
@@ -246,16 +246,26 @@ class LyricsEditorWidget(QWidget):
 
     def show_none(self, message: str):
         self._reset_state()
-        self.msg.setText(message)
-        self.stack.setCurrentWidget(self.msg)
+        self.empty_state.configure(
+            icon_name="audio-waveform.svg",
+            title="Nothing selected",
+            body=message,
+            action_text=None,
+        )
+        self.stack.setCurrentWidget(self.empty_state)
 
     def set_track_lyrics(self, title: str, txt_lyrics: Optional[str], lrc_lyrics: Optional[str], instrumental: bool):
         self.title.setText(title or "Lyrics")
 
         if instrumental:
             self._reset_state()
-            self.msg.setText("Instrumental")
-            self.stack.setCurrentWidget(self.msg)
+            self.empty_state.configure(
+                icon_name="audio-waveform.svg",
+                title="Instrumental track",
+                body="This track is marked as instrumental, so there are no lyrics to edit or publish.",
+                action_text=None,
+            )
+            self.stack.setCurrentWidget(self.empty_state)
             return
 
         lrc = (lrc_lyrics or "").strip()
@@ -285,7 +295,14 @@ class LyricsEditorWidget(QWidget):
         if txt:
             self._set_plain(txt)
         else:
-            self.show_none("No lyrics")
+            self._reset_state()
+            self.empty_state.configure(
+                icon_name="audio-waveform.svg",
+                title="No lyrics yet",
+                body="Download lyrics from LRCLIB to start editing or keep this track lyric-free.",
+                action_text="Download Lyrics",
+            )
+            self.stack.setCurrentWidget(self.empty_state)
 
     # --- internal helpers ---
     def _reset_state(self):

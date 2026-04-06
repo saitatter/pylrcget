@@ -8,7 +8,10 @@ a = Analysis(
     ["main.py"],
     pathex=[str(ROOT), str(ROOT / "src")],
     binaries=[],
-    datas=[(str(ROOT / "src" / "ui" / "qss"), "ui/qss")],
+    datas=[
+        (str(ROOT / "src" / "ui" / "qss"), "ui/qss"),
+        (str(ROOT / "src" / "ui" / "assets"), "ui/assets"),
+    ],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},

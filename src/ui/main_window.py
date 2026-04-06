@@ -224,6 +224,9 @@ class MainWindow(QMainWindow):
         self.track_list.downloadLyrics.connect(self.on_download_lyrics)
         self.track_list.markInstrumental.connect(self._on_mark_instrumental)
         self.track_list.unmarkInstrumental.connect(self._on_unmark_instrumental)
+        self.track_list.clearFiltersRequested.connect(self._reset_track_filters)
+        self.track_list.configureFoldersRequested.connect(self.open_config_modal)
+        self.lyrics_view.downloadRequested.connect(self._download_current_track_lyrics)
 
         # --- Filters wiring ---
         self.search_box.textChanged.connect(self._apply_track_filters)
@@ -253,7 +256,8 @@ class MainWindow(QMainWindow):
     # ------------------ modals ------------------
     def open_config_modal(self):
         dlg = MusicFoldersDialog(self.app_state, self)
-        dlg.exec()
+        if dlg.exec():
+            self._apply_track_filters()
 
     def open_about_modal(self):
         self.app_state.notify("LrcGet Python — about modal TBD", "info")
@@ -527,6 +531,29 @@ class MainWindow(QMainWindow):
         tid = self.track_list.selected_track_id()
         if tid is not None:
             self.on_play_track(tid)
+
+    def _reset_track_filters(self):
+        self.search_box.blockSignals(True)
+        self.search_box.setText("")
+        self.search_box.blockSignals(False)
+
+        for checkbox, checked in (
+            (self.chk_synced, True),
+            (self.chk_plain, True),
+            (self.chk_instr, False),
+            (self.chk_none, True),
+        ):
+            checkbox.blockSignals(True)
+            checkbox.setChecked(checked)
+            checkbox.blockSignals(False)
+
+        self._apply_track_filters()
+
+    def _download_current_track_lyrics(self):
+        if not self.app_state.player or not self.app_state.player.track:
+            self.app_state.notify("No track selected.", "warning")
+            return
+        self.on_download_lyrics(int(self.app_state.player.track.track_id))
 
     def _on_embed_requested(self):
         # embed doar pentru track-ul care cântă acum (simplu și clar)
