@@ -13,6 +13,7 @@ if str(SRC_DIR) not in sys.path:
 
 from core.state import AppState, Notify
 from db.database import initialize_database
+from player.player import Player
 from ui.app_theme import apply_app_theme
 from ui.main_window import MainWindow
 
