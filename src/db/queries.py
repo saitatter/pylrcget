@@ -358,8 +358,8 @@ def add_track(db: sqlite3.Connection, track: FsTrack, *, commit: bool = True) ->
         track.txt_lyrics,
         track.lrc_lyrics,
         is_instrumental,
-        getattr(track, "modified_time", None),
-        getattr(track, "file_size", None),
+        track.modified_time,
+        track.file_size,
     ))
     if commit:
         db.commit()
@@ -369,16 +369,13 @@ def add_tracks(db: sqlite3.Connection, tracks: List[FsTrack], *, commit: bool = 
     if not tracks:
         return
     if commit:
-        db.execute("BEGIN")
-    try:
-        for t in tracks:
-            add_track(db, t, commit=False)
-        if commit:
-            db.commit()
-    except Exception:
-        if commit:
-            db.rollback()
-        raise
+        with db:
+            for t in tracks:
+                add_track(db, t, commit=False)
+        return
+
+    for t in tracks:
+        add_track(db, t, commit=False)
 
 
 def get_tracks(db: sqlite3.Connection) -> List[Track]:

@@ -44,11 +44,10 @@ def _path_variants(path: str) -> tuple[str, str]:
     return normalized, posix
 
 
-def _normalize_excluded_paths(excluded_paths: str | None) -> list[str]:
-    normalized: list[str] = []
+def _normalize_excluded_paths(excluded_paths: str | None) -> list[tuple[str, str]]:
+    normalized: list[tuple[str, str]] = []
     for entry in _split_lines(excluded_paths):
-        native, _ = _path_variants(entry)
-        normalized.append(native)
+        normalized.append(_path_variants(entry))
     return normalized
 
 
@@ -62,14 +61,15 @@ def _compile_excluded_patterns(excluded_patterns: str | None) -> list[re.Pattern
     return compiled
 
 
-def _is_path_excluded(path: str, excluded_roots: list[str], excluded_patterns: list[re.Pattern[str]]) -> bool:
+def _is_path_excluded(path: str, excluded_roots: list[tuple[str, str]], excluded_patterns: list[re.Pattern[str]]) -> bool:
     resolved, resolved_posix = _path_variants(path)
 
-    for root in excluded_roots:
-        root_clean = root.rstrip("/\\")
-        if resolved == root_clean or resolved.startswith(root_clean + os.sep):
+    for root_native, root_posix in excluded_roots:
+        root_native_clean = root_native.rstrip("/\\")
+        root_posix_clean = root_posix.rstrip("/")
+        if resolved == root_native_clean or resolved.startswith(root_native_clean + os.sep):
             return True
-        if resolved_posix == root_clean or resolved_posix.startswith(root_clean + "/"):
+        if resolved_posix == root_posix_clean or resolved_posix.startswith(root_posix_clean + "/"):
             return True
 
     for pattern in excluded_patterns:

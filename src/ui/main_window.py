@@ -3,7 +3,7 @@ from PySide6.QtWidgets import (
     QTabWidget, QProgressBar, QMessageBox, QLineEdit, QHBoxLayout, QCheckBox, QSplitter, QBoxLayout, QPushButton, QApplication
 )
 from PySide6.QtCore import Qt, QTimer
-from PySide6.QtGui import QShortcut, QKeySequence
+from PySide6.QtGui import QCloseEvent, QShortcut, QKeySequence
 import os
 
 from dataclasses import replace
@@ -39,6 +39,11 @@ class MainWindow(QMainWindow):
         self._queue_ids: list[int] = []
         self._queue_index: int = -1
         self._refresh_default_label = "Global Actions"
+        self._pending_playback_speed: float | None = None
+        self._playback_speed_save_timer = QTimer(self)
+        self._playback_speed_save_timer.setSingleShot(True)
+        self._playback_speed_save_timer.setInterval(350)
+        self._playback_speed_save_timer.timeout.connect(self._flush_playback_speed)
 
         # --- Player signals ---
         if self.app_state.player:
@@ -291,6 +296,10 @@ class MainWindow(QMainWindow):
     def resizeEvent(self, event):
         super().resizeEvent(event)
         self._update_responsive_layout()
+
+    def closeEvent(self, event: QCloseEvent) -> None:
+        self._flush_playback_speed()
+        super().closeEvent(event)
 
     # ------------------ filters ------------------
     def _apply_track_filters(self):
@@ -686,8 +695,15 @@ class MainWindow(QMainWindow):
         self.player_bar.set_playback_speed_value(speed)
 
     def _persist_playback_speed(self, speed: float) -> None:
+        self._pending_playback_speed = float(speed)
+        self._playback_speed_save_timer.start()
+
+    def _flush_playback_speed(self) -> None:
+        if self._pending_playback_speed is None:
+            return
         config = get_config(self.app_state.db)
-        set_config(self.app_state.db, replace(config, playback_speed=float(speed)))
+        set_config(self.app_state.db, replace(config, playback_speed=float(self._pending_playback_speed)))
+        self._pending_playback_speed = None
 
     def _play_selected_or_current(self):
         tid = self.track_list.selected_track_id()
