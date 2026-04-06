@@ -12,6 +12,10 @@ QWidget#TopBarGroup:hover {
     border-color: #1f2937;
 }
 
+QWidget#TopBarGroup {
+    min-height: 72px;
+}
+
 QLabel#TopBarLabel {
     color: #94a3b8;
     font-size: 10px;

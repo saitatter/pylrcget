@@ -1,6 +1,6 @@
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QLabel,
-    QTabWidget, QProgressBar, QMessageBox, QLineEdit, QHBoxLayout, QCheckBox, QSplitter
+    QTabWidget, QProgressBar, QMessageBox, QLineEdit, QHBoxLayout, QCheckBox, QSplitter, QBoxLayout
 )
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QShortcut, QKeySequence
@@ -59,6 +59,7 @@ class MainWindow(QMainWindow):
         self.top_bar = QWidget()
         self.top_bar.setObjectName("TopBar")
         top_bar = QHBoxLayout(self.top_bar)
+        self.top_bar_layout = top_bar
         set_layout_spacing(top_bar, margins=SPACE_2, spacing=SPACE_2)
 
         self.search_group = QWidget()
@@ -160,6 +161,7 @@ class MainWindow(QMainWindow):
         set_layout_spacing(tracks_layout, margins=0, spacing=SPACE_2)
 
         splitter = QSplitter(Qt.Orientation.Horizontal)
+        self.content_splitter = splitter
 
         self.track_list = TrackListWidget(self.app_state)
         splitter.addWidget(self.track_list)
@@ -243,8 +245,13 @@ class MainWindow(QMainWindow):
         # initial load
         self._apply_track_filters()
         self.show_queued_notifications()
+        self._update_responsive_layout()
 
         self.setStyleSheet(self.styleSheet() + load_stylesheet("main_window.qss"))
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._update_responsive_layout()
 
     # ------------------ filters ------------------
     def _apply_track_filters(self):
@@ -602,6 +609,28 @@ class MainWindow(QMainWindow):
         self._set_tool_feedback(self.btn_refresh, "idle")
         self.btn_refresh.setEnabled(True)
         self.actions_label.setText(self._refresh_default_label)
+
+    def _update_responsive_layout(self):
+        width = max(0, self.width())
+
+        if hasattr(self, "top_bar_layout"):
+            if width < 1120:
+                self.top_bar_layout.setDirection(QBoxLayout.TopToBottom)
+            else:
+                self.top_bar_layout.setDirection(QBoxLayout.LeftToRight)
+
+        if hasattr(self, "content_splitter"):
+            if width < 980:
+                if self.content_splitter.orientation() != Qt.Orientation.Vertical:
+                    self.content_splitter.setOrientation(Qt.Orientation.Vertical)
+                self.content_splitter.setSizes([int(self.height() * 0.54), int(self.height() * 0.46)])
+            else:
+                if self.content_splitter.orientation() != Qt.Orientation.Horizontal:
+                    self.content_splitter.setOrientation(Qt.Orientation.Horizontal)
+                self.content_splitter.setSizes([int(width * 0.58), int(width * 0.42)])
+
+        if hasattr(self, "player_bar"):
+            self.player_bar.set_compact_mode(width < 980)
 
     def _on_embed_requested(self):
         # embed doar pentru track-ul care cântă acum (simplu și clar)

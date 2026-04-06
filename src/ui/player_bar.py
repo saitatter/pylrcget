@@ -351,6 +351,25 @@ class PlayerBar(QWidget):
         self.btn_prev.clicked.connect(prev_fn)
         self.btn_next.clicked.connect(next_fn)
 
+    def set_compact_mode(self, compact: bool):
+        self.setProperty("compact", compact)
+        self.style().unpolish(self)
+        self.style().polish(self)
+        self.update()
+
+        self.lbl_album.setVisible(not compact)
+        self.lbl_speed.setVisible(not compact)
+        self.lbl_title.setMinimumWidth(160 if compact else 220)
+        self.lbl_cover.setFixedSize(48 if compact else 56, 48 if compact else 56)
+
+        now_playing = None
+        if self.player:
+            now_playing = getattr(self.player, "track", None)
+        if now_playing:
+            self.lbl_cover.setPixmap(_artwork_pixmap(now_playing.title or "?", now_playing.artist, getattr(now_playing, "path", None), 48 if compact else 56))
+        else:
+            self.lbl_cover.setPixmap(_artwork_pixmap("?", None, None, 48 if compact else 56))
+
     def _on_speed_changed(self, _index: int):
         if not self.player:
             return

@@ -3,6 +3,18 @@ QWidget#PlayerBar {
     border-top: 1px solid #111827;
 }
 
+QWidget#PlayerBar[compact="true"] QWidget#PlayerExtras {
+    min-width: 84px;
+}
+
+QWidget#PlayerBar[compact="true"] QLabel#NowPlaying {
+    font-size: 13px;
+}
+
+QWidget#PlayerBar[compact="true"] QLabel#NowPlayingArtist {
+    font-size: 10px;
+}
+
 QWidget#PlayerMeta,
 QWidget#PlayerCenter,
 QWidget#PlayerExtras {
