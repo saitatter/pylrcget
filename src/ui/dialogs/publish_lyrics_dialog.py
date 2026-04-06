@@ -10,6 +10,8 @@ from PySide6.QtWidgets import (
 )
 import re
 
+from ui.spacing import SPACE_2, SPACE_3, SPACE_4, set_layout_spacing
+
 @dataclass(frozen=True)
 class LintProblem:
     line: int
@@ -77,8 +79,7 @@ class PublishLyricsDialog(QDialog):
         self.resize(650, 420)
 
         root = QVBoxLayout(self)
-        root.setContentsMargins(14, 14, 14, 14)
-        root.setSpacing(10)
+        set_layout_spacing(root, margins=SPACE_4, spacing=SPACE_3)
 
         self.stack = QStackedWidget()
         root.addWidget(self.stack, 1)
@@ -86,7 +87,7 @@ class PublishLyricsDialog(QDialog):
         # --- page 0: lint table
         lint_page = QWidget()
         lint_layout = QVBoxLayout(lint_page)
-        lint_layout.setSpacing(8)
+        set_layout_spacing(lint_layout, spacing=SPACE_2)
 
         self.lint_header = QLabel("Please fix the following problem(s) before publishing")
         lint_layout.addWidget(self.lint_header)
@@ -104,7 +105,7 @@ class PublishLyricsDialog(QDialog):
         # --- page 1: confirm/progress
         pub_page = QWidget()
         pub_layout = QVBoxLayout(pub_page)
-        pub_layout.setSpacing(12)
+        set_layout_spacing(pub_layout, spacing=SPACE_3)
         pub_layout.setAlignment(Qt.AlignTop)
 
         self.info_label = QLabel()
@@ -129,6 +130,7 @@ class PublishLyricsDialog(QDialog):
 
         # --- footer buttons
         footer = QHBoxLayout()
+        set_layout_spacing(footer, spacing=SPACE_2)
         footer.addStretch(1)
 
         self.btn_primary = QPushButton()

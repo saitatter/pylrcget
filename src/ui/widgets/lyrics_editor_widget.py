@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
     QPushButton, QHBoxLayout
 )
 
+from ui.spacing import SPACE_2, SPACE_3, set_layout_spacing
 from ui.style_loader import load_stylesheet
 
 _TS_RE = re.compile(r"\[(\d+):(\d+)(?:\.(\d+))?\]")
@@ -139,12 +140,11 @@ class LyricsEditorWidget(QWidget):
         self._current_index: int = -1
 
         root = QVBoxLayout(self)
-        root.setContentsMargins(10, 10, 10, 10)
-        root.setSpacing(8)
+        set_layout_spacing(root, margins=SPACE_3, spacing=SPACE_2)
 
         # --- header ---
         header = QHBoxLayout()
-        header.setSpacing(8)
+        set_layout_spacing(header, spacing=SPACE_2)
 
         self.title = QLabel("Lyrics")
         self.title.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)

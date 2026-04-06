@@ -15,7 +15,7 @@ QLineEdit, QTextEdit, QPlainTextEdit, QTableWidget, QAbstractItemView, QComboBox
 
 QLineEdit, QTextEdit, QPlainTextEdit, QComboBox {
     border-radius: 10px;
-    padding: 6px 8px;
+    padding: 8px;
     selection-background-color: #38bdf8;
     selection-color: #020617;
 }
@@ -29,7 +29,7 @@ QPushButton {
     color: #e5e7eb;
     border: 1px solid #1f2937;
     border-radius: 10px;
-    padding: 6px 10px;
+    padding: 8px 12px;
 }
 
 QPushButton:hover {
@@ -76,11 +76,11 @@ QTabBar::tab:selected {
 }
 
 QMenu {
-    padding: 6px;
+    padding: 8px;
 }
 
 QMenu::item {
-    padding: 6px 18px;
+    padding: 8px 16px;
     border-radius: 8px;
 }
 

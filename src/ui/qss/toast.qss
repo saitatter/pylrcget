@@ -13,7 +13,7 @@ QToolButton {
     border: none;
     background: transparent;
     color: {{text}};
-    padding: 2px 6px;
+    padding: 4px 8px;
 }
 
 QToolButton:hover {

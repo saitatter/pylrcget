@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
     QGraphicsOpacityEffect,
 )
 
+from ui.spacing import SPACE_2, SPACE_3, set_layout_spacing
 from ui.style_loader import load_stylesheet
 
 
@@ -49,8 +50,7 @@ class ToastWidget(QFrame):
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
 
         root = QHBoxLayout(self)
-        root.setContentsMargins(12, 10, 10, 10)
-        root.setSpacing(10)
+        set_layout_spacing(root, margins=(SPACE_3, SPACE_2, SPACE_3, SPACE_2), spacing=SPACE_2)
 
         self.lbl = QLabel(data.message)
         self.lbl.setWordWrap(True)

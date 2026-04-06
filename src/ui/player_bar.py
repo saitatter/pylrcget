@@ -7,6 +7,7 @@ from PySide6.QtWidgets import QWidget, QHBoxLayout, QLabel, QToolButton, QSlider
 from PySide6.QtCore import QByteArray
 from PySide6.QtSvg import QSvgRenderer
 
+from ui.spacing import SPACE_2, SPACE_3, set_layout_spacing
 from ui.style_loader import load_stylesheet
 
 def _fmt(ms: int) -> str:
@@ -50,8 +51,7 @@ class PlayerBar(QWidget):
         self._is_playing = False
 
         root = QHBoxLayout(self)
-        root.setContentsMargins(8, 6, 8, 6)
-        root.setSpacing(10)
+        set_layout_spacing(root, margins=(SPACE_3, SPACE_2, SPACE_3, SPACE_2), spacing=SPACE_2)
 
         # --- buttons ---
         self.btn_prev = QToolButton()
@@ -111,7 +111,7 @@ class PlayerBar(QWidget):
         root.addWidget(self.btn_prev)
         root.addWidget(self.btn_play)
         root.addWidget(self.btn_next)
-        root.addSpacing(6)
+        root.addSpacing(SPACE_2)
         root.addWidget(self.lbl_title, 1)
         root.addWidget(self.cmb_speed)
         root.addWidget(self.lbl_time)

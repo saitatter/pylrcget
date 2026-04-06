@@ -17,6 +17,7 @@ from player.player import NowPlaying
 from core.embed_lyrics import embed_lyrics_for_track
 from ui.widgets.album_list_widget import AlbumListWidget
 from ui.widgets.artist_list_widget import ArtistListWidget
+from ui.spacing import SPACE_2, SPACE_3, set_layout_spacing
 from ui.style_loader import load_stylesheet
 from ui.widgets.toast import ToastManager
 from PySide6.QtWidgets import QToolButton
@@ -48,12 +49,14 @@ class MainWindow(QMainWindow):
         self.central_widget = QWidget()
         self.setCentralWidget(self.central_widget)
         self.layout = QVBoxLayout(self.central_widget)
+        set_layout_spacing(self.layout, margins=SPACE_3, spacing=SPACE_3)
 
         self.toasts = ToastManager(self)
         self.app_state.notification.connect(self._on_notify)
 
         # --- Top controls (search + filters) ---
         top_bar = QHBoxLayout()
+        set_layout_spacing(top_bar, spacing=SPACE_2)
 
         self.search_box = QLineEdit()
         self.search_box.setPlaceholderText("Search tracks / artists / albums...")
@@ -104,7 +107,7 @@ class MainWindow(QMainWindow):
         # Tracks tab
         self.tracks_tab = QWidget()
         tracks_layout = QVBoxLayout(self.tracks_tab)
-        tracks_layout.setContentsMargins(0, 0, 0, 0)
+        set_layout_spacing(tracks_layout, margins=0, spacing=SPACE_2)
 
         splitter = QSplitter(Qt.Orientation.Horizontal)
 
@@ -153,8 +156,7 @@ class MainWindow(QMainWindow):
         # --- Scan progress (pretty + hidden when idle) ---
         self.scan_row = QWidget()
         scan_layout = QHBoxLayout(self.scan_row)
-        scan_layout.setContentsMargins(8, 6, 8, 6)
-        scan_layout.setSpacing(10)
+        set_layout_spacing(scan_layout, margins=(SPACE_3, SPACE_2, SPACE_3, SPACE_2), spacing=SPACE_2)
 
         self.scan_label = QLabel("Scanning…")
         self.scan_label.setObjectName("ScanLabel")
