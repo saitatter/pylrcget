@@ -98,6 +98,7 @@ class Config:
     skip_tracks_with_synced_lyrics: bool
     skip_tracks_with_plain_lyrics: bool
     show_line_count: bool
+    save_lyrics_sidecars: bool
     try_embed_lyrics: bool
     theme_mode: str
     lrclib_instance: str

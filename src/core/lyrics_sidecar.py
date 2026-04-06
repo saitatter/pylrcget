@@ -10,6 +10,9 @@ _INVALID_FILENAME_CHARS = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
 
 
 def export_lyrics_sidecars(track: Track, config: Config) -> list[str]:
+    if not config.save_lyrics_sidecars:
+        return []
+
     plain = (track.txt_lyrics or "").strip()
     synced = (track.lrc_lyrics or "").strip()
 

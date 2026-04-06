@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from PySide6.QtWidgets import (
+    QCheckBox,
     QDialog,
     QFileDialog,
     QGridLayout,
@@ -44,29 +45,40 @@ class MusicFoldersDialog(QDialog):
         lyrics_box = QGroupBox("Lyrics Export")
         lyrics_layout = QGridLayout(lyrics_box)
 
+        self.save_sidecars_chk = QCheckBox("Save lyrics files")
+        self.save_sidecars_chk.setChecked(True)
+        lyrics_layout.addWidget(self.save_sidecars_chk, 0, 0, 1, 4)
+
         self.output_dir_edit = QLineEdit()
         self.output_dir_edit.setPlaceholderText("Leave empty to save next to the audio file")
-        browse_btn = QPushButton("Browse")
-        clear_btn = QPushButton("Use Track Folder")
+        self.browse_output_btn = QPushButton("Browse")
+        self.clear_output_btn = QPushButton("Use Track Folder")
 
-        lyrics_layout.addWidget(QLabel("Download directory"), 0, 0)
-        lyrics_layout.addWidget(self.output_dir_edit, 0, 1)
-        lyrics_layout.addWidget(browse_btn, 0, 2)
-        lyrics_layout.addWidget(clear_btn, 0, 3)
+        lyrics_layout.addWidget(QLabel("Download directory"), 1, 0)
+        lyrics_layout.addWidget(self.output_dir_edit, 1, 1)
+        lyrics_layout.addWidget(self.browse_output_btn, 1, 2)
+        lyrics_layout.addWidget(self.clear_output_btn, 1, 3)
 
         self.pattern_edit = QLineEdit()
         self.pattern_edit.setPlaceholderText(DEFAULT_LYRICS_FILE_PATTERN)
-        lyrics_layout.addWidget(QLabel("Filename pattern"), 1, 0)
-        lyrics_layout.addWidget(self.pattern_edit, 1, 1, 1, 3)
+        lyrics_layout.addWidget(QLabel("Filename pattern"), 2, 0)
+        lyrics_layout.addWidget(self.pattern_edit, 2, 1, 1, 3)
 
         hint = QLabel(
             "Available placeholders: {artist}, {title}, {album}, {track}. "
             "Extensions are added automatically as .lrc and .txt."
         )
         hint.setWordWrap(True)
-        lyrics_layout.addWidget(hint, 2, 0, 1, 4)
+        lyrics_layout.addWidget(hint, 3, 0, 1, 4)
 
         layout.addWidget(lyrics_box)
+
+        embed_box = QGroupBox("Audio File")
+        embed_layout = QVBoxLayout(embed_box)
+        self.embed_chk = QCheckBox("Embed lyrics into the audio file")
+        self.embed_chk.setChecked(True)
+        embed_layout.addWidget(self.embed_chk)
+        layout.addWidget(embed_box)
 
         self.save_btn = QPushButton("Save")
         layout.addWidget(self.save_btn)
@@ -76,8 +88,9 @@ class MusicFoldersDialog(QDialog):
         self.add_btn.clicked.connect(self.add_folder)
         self.remove_btn.clicked.connect(self.remove_selected)
         self.save_btn.clicked.connect(self.save)
-        browse_btn.clicked.connect(self._browse_output_dir)
-        clear_btn.clicked.connect(lambda: self.output_dir_edit.setText(""))
+        self.browse_output_btn.clicked.connect(self._browse_output_dir)
+        self.clear_output_btn.clicked.connect(lambda: self.output_dir_edit.setText(""))
+        self.save_sidecars_chk.toggled.connect(self._update_export_fields_enabled)
 
     def _load(self):
         self.list_widget.clear()
@@ -85,8 +98,11 @@ class MusicFoldersDialog(QDialog):
             self.list_widget.addItem(directory)
 
         config = get_config(self.app_state.db)
+        self.save_sidecars_chk.setChecked(config.save_lyrics_sidecars)
         self.output_dir_edit.setText(config.lyrics_output_dir)
         self.pattern_edit.setText(config.lyrics_file_pattern or DEFAULT_LYRICS_FILE_PATTERN)
+        self.embed_chk.setChecked(config.try_embed_lyrics)
+        self._update_export_fields_enabled()
 
     def add_folder(self):
         path = QFileDialog.getExistingDirectory(self, "Select Music Folder")
@@ -108,6 +124,13 @@ class MusicFoldersDialog(QDialog):
         if path:
             self.output_dir_edit.setText(path)
 
+    def _update_export_fields_enabled(self):
+        enabled = self.save_sidecars_chk.isChecked()
+        self.output_dir_edit.setEnabled(enabled)
+        self.pattern_edit.setEnabled(enabled)
+        self.browse_output_btn.setEnabled(enabled)
+        self.clear_output_btn.setEnabled(enabled)
+
     def save(self):
         folders = [self.list_widget.item(i).text() for i in range(self.list_widget.count())]
         if not folders:
@@ -119,7 +142,8 @@ class MusicFoldersDialog(QDialog):
             skip_tracks_with_synced_lyrics=config.skip_tracks_with_synced_lyrics,
             skip_tracks_with_plain_lyrics=config.skip_tracks_with_plain_lyrics,
             show_line_count=config.show_line_count,
-            try_embed_lyrics=config.try_embed_lyrics,
+            save_lyrics_sidecars=self.save_sidecars_chk.isChecked(),
+            try_embed_lyrics=self.embed_chk.isChecked(),
             theme_mode=config.theme_mode,
             lrclib_instance=config.lrclib_instance,
             lyrics_output_dir=self.output_dir_edit.text().strip(),

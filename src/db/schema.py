@@ -45,5 +45,5 @@ CREATE TABLE tracks (
 );
 
 INSERT INTO library_data (init) VALUES (0);
-INSERT INTO config_data (skip_not_needed_tracks, try_embed_lyrics) VALUES (1, 0);
+INSERT INTO config_data (skip_not_needed_tracks, try_embed_lyrics) VALUES (1, 1);
 """

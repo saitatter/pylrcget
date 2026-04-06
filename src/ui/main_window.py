@@ -187,7 +187,6 @@ class MainWindow(QMainWindow):
 
         self.lyrics_view.publishSyncedRequested.connect(self._publish_synced)
         self.lyrics_view.publishPlainRequested.connect(self._publish_plain)
-        self.lyrics_view.saveRequested.connect(self._on_embed_requested)
 
         splitter.setStretchFactor(0, 3)
         splitter.setStretchFactor(1, 2)
@@ -534,7 +533,7 @@ class MainWindow(QMainWindow):
         try:
             track = get_track_by_id(self.app_state.db, track_id)
             if ok:
-                self._export_track_lyrics(track)
+                self._sync_track_lyrics_outputs(track)
             title = f"{track.artist_name} — {track.title}"
             self.lyrics_view.set_track_lyrics(
                 title=title,
@@ -578,7 +577,7 @@ class MainWindow(QMainWindow):
                 update_track_null_lyrics(self.app_state.db, track_id)
 
             track = get_track_by_id(self.app_state.db, track_id)
-            self._export_track_lyrics(track)
+            self._sync_track_lyrics_outputs(track)
             title = f"{track.artist_name} - {track.title}"
             self.lyrics_view.set_track_lyrics(
                 title=title,
@@ -639,15 +638,24 @@ class MainWindow(QMainWindow):
             u += "/api"
         return u
 
-    def _export_track_lyrics(self, track) -> None:
+    def _sync_track_lyrics_outputs(self, track) -> None:
         config = get_config(self.app_state.db)
-        try:
-            written_paths = export_lyrics_sidecars(track, config)
-        except Exception as exc:
-            self.app_state.notify(f"Failed to export lyrics files: {exc}", "error")
-            return
-        if written_paths:
-            self.statusBar().showMessage(f"Lyrics exported to {os.path.dirname(written_paths[0])}", 3000)
+        if config.save_lyrics_sidecars:
+            try:
+                written_paths = export_lyrics_sidecars(track, config)
+            except Exception as exc:
+                self.app_state.notify(f"Failed to export lyrics files: {exc}", "error")
+            else:
+                if written_paths:
+                    self.statusBar().showMessage(f"Lyrics exported to {os.path.dirname(written_paths[0])}", 3000)
+
+        if config.try_embed_lyrics:
+            try:
+                embed_lyrics_for_track(track)
+            except Exception as exc:
+                self.app_state.notify(f"Failed to embed lyrics: {exc}", "error")
+            else:
+                self.statusBar().showMessage("Lyrics embedded into the audio file.", 3000)
 
     def _play_selected_or_current(self):
         tid = self.track_list.selected_track_id()
@@ -710,26 +718,6 @@ class MainWindow(QMainWindow):
 
         if hasattr(self, "player_bar"):
             self.player_bar.set_compact_mode(width < 980)
-
-    def _on_embed_requested(self):
-        # embed doar pentru track-ul care cântă acum (simplu și clar)
-        if not self.app_state.player or not self.app_state.player.track:
-            self.app_state.notify("Start playback or select a track first.", "warning")
-            return
-
-        track_id = self.app_state.player.track.track_id
-
-        try:
-            track = get_track_by_id(self.app_state.db, track_id)
-        except Exception as e:
-            self.app_state.notify(f"Cannot read track from database: {e}", "error")
-            return
-
-        try:
-            embed_lyrics_for_track(track)
-            self.app_state.notify("Lyrics were embedded into the audio file tags.", "success")
-        except Exception as e:
-            self.app_state.notify(f"Failed to embed lyrics: {e}", "error")
 
     def _on_open_album(self, album_id: int):
         self.tabs.setCurrentWidget(self.tracks_tab)
