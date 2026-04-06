@@ -1,3 +1,39 @@
+QWidget#TopBar {
+    background: transparent;
+}
+
+QWidget#TopBarGroup {
+    background: #08101f;
+    border: 1px solid #111827;
+    border-radius: 14px;
+}
+
+QWidget#TopBarGroup:hover {
+    border-color: #1f2937;
+}
+
+QLabel#TopBarLabel {
+    color: #94a3b8;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+}
+
+QLineEdit#TopBarSearch {
+    background: #020617;
+    border-color: #1f2937;
+}
+
+QLineEdit#TopBarSearch:focus {
+    border-color: #38bdf8;
+}
+
+QToolButton#TopBarAction {
+    min-width: 36px;
+    min-height: 36px;
+}
+
 QWidget#ScanRow {
     background: #020617;
     border-top: 1px solid #111827;

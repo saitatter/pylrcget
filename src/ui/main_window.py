@@ -17,7 +17,7 @@ from player.player import NowPlaying
 from core.embed_lyrics import embed_lyrics_for_track
 from ui.widgets.album_list_widget import AlbumListWidget
 from ui.widgets.artist_list_widget import ArtistListWidget
-from ui.spacing import SPACE_2, SPACE_3, set_layout_spacing
+from ui.spacing import SPACE_1, SPACE_2, SPACE_3, set_layout_spacing
 from ui.style_loader import load_stylesheet
 from ui.widgets.toast import ToastManager
 from PySide6.QtWidgets import QToolButton
@@ -55,51 +55,96 @@ class MainWindow(QMainWindow):
         self.app_state.notification.connect(self._on_notify)
 
         # --- Top controls (search + filters) ---
-        top_bar = QHBoxLayout()
-        set_layout_spacing(top_bar, spacing=SPACE_2)
+        self.top_bar = QWidget()
+        self.top_bar.setObjectName("TopBar")
+        top_bar = QHBoxLayout(self.top_bar)
+        set_layout_spacing(top_bar, margins=SPACE_2, spacing=SPACE_2)
+
+        self.search_group = QWidget()
+        self.search_group.setObjectName("TopBarGroup")
+        search_layout = QVBoxLayout(self.search_group)
+        set_layout_spacing(search_layout, margins=SPACE_2, spacing=SPACE_1)
+
+        self.search_label = QLabel("Search Library")
+        self.search_label.setObjectName("TopBarLabel")
+        search_layout.addWidget(self.search_label)
 
         self.search_box = QLineEdit()
         self.search_box.setPlaceholderText("Search tracks / artists / albums...")
-        top_bar.addWidget(self.search_box, stretch=1)
+        self.search_box.setObjectName("TopBarSearch")
+        search_layout.addWidget(self.search_box)
+        top_bar.addWidget(self.search_group, stretch=3)
+
+        self.filters_group = QWidget()
+        self.filters_group.setObjectName("TopBarGroup")
+        filters_layout = QVBoxLayout(self.filters_group)
+        set_layout_spacing(filters_layout, margins=SPACE_2, spacing=SPACE_1)
+
+        self.filters_label = QLabel("Filter Lyrics")
+        self.filters_label.setObjectName("TopBarLabel")
+        filters_layout.addWidget(self.filters_label)
+
+        filters_row = QHBoxLayout()
+        set_layout_spacing(filters_row, spacing=SPACE_2)
 
         self.chk_synced = QCheckBox("Synced")
         self.chk_synced.setChecked(True)
-        top_bar.addWidget(self.chk_synced)
+        filters_row.addWidget(self.chk_synced)
 
         self.chk_plain = QCheckBox("Plain")
         self.chk_plain.setChecked(True)
-        top_bar.addWidget(self.chk_plain)
+        filters_row.addWidget(self.chk_plain)
 
         self.chk_instr = QCheckBox("Instrumental")
         self.chk_instr.setChecked(False)
-        top_bar.addWidget(self.chk_instr)
+        filters_row.addWidget(self.chk_instr)
 
         self.chk_none = QCheckBox("No lyrics")
         self.chk_none.setChecked(True)
-        top_bar.addWidget(self.chk_none)
-        top_bar.addStretch(1)  # pushes icons to the right
+        filters_row.addWidget(self.chk_none)
+        filters_row.addStretch(1)
+        filters_layout.addLayout(filters_row)
+        top_bar.addWidget(self.filters_group, stretch=2)
 
         # --- Action icons (top-right) ---
+        self.actions_group = QWidget()
+        self.actions_group.setObjectName("TopBarGroup")
+        actions_layout = QVBoxLayout(self.actions_group)
+        set_layout_spacing(actions_layout, margins=SPACE_2, spacing=SPACE_1)
+
+        self.actions_label = QLabel("Global Actions")
+        self.actions_label.setObjectName("TopBarLabel")
+        actions_layout.addWidget(self.actions_label)
+
+        actions_row = QHBoxLayout()
+        set_layout_spacing(actions_row, spacing=SPACE_2)
+
         self.btn_refresh = QToolButton()
+        self.btn_refresh.setObjectName("TopBarAction")
         self.btn_refresh.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_BrowserReload))
         self.btn_refresh.setToolTip("Refresh library")
         self.btn_refresh.clicked.connect(self.refresh_library)
 
         self.btn_config = QToolButton()
+        self.btn_config.setObjectName("TopBarAction")
         self.btn_config.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_FileDialogDetailedView))
         self.btn_config.setToolTip("Settings")
         self.btn_config.clicked.connect(self.open_config_modal)
 
         self.btn_about = QToolButton()
+        self.btn_about.setObjectName("TopBarAction")
         self.btn_about.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MessageBoxInformation))
         self.btn_about.setToolTip("About")
         self.btn_about.clicked.connect(self.open_about_modal)
 
-        top_bar.addWidget(self.btn_refresh)
-        top_bar.addWidget(self.btn_config)
-        top_bar.addWidget(self.btn_about)
+        actions_row.addWidget(self.btn_refresh)
+        actions_row.addWidget(self.btn_config)
+        actions_row.addWidget(self.btn_about)
+        actions_row.addStretch(1)
+        actions_layout.addLayout(actions_row)
+        top_bar.addWidget(self.actions_group, stretch=1)
 
-        self.layout.addLayout(top_bar)
+        self.layout.addWidget(self.top_bar)
 
         # --- Tabs ---
         self.tabs = QTabWidget()
