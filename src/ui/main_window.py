@@ -243,15 +243,51 @@ class MainWindow(QMainWindow):
 
         tracks_layout.addWidget(splitter)
 
-        # other tabs placeholder
         self.albums_tab = AlbumListWidget(self.app_state)
+        self.albums_page = QWidget()
+        albums_layout = QVBoxLayout(self.albums_page)
+        set_layout_spacing(albums_layout, margins=0, spacing=SPACE_2)
+        self.albums_splitter = QSplitter(Qt.Orientation.Horizontal)
+        self.albums_splitter.addWidget(self.albums_tab)
+        self.albums_lyrics_view = LyricsEditorWidget()
+        self.albums_lyrics_view.show_none("Select a track to see lyrics")
+        self.albums_lyrics_view.saveRequested.connect(self._on_lyrics_save_requested)
+        self.albums_lyrics_view.seekRequested.connect(lambda ms: self.app_state.player.seek_ms(ms))
+        self.albums_lyrics_view.publishSyncedRequested.connect(self._publish_synced)
+        self.albums_lyrics_view.publishPlainRequested.connect(self._publish_plain)
+        self.albums_lyrics_view.downloadRequested.connect(self._download_current_track_lyrics)
+        if self.app_state.player:
+            self.app_state.player.positionChanged.connect(self.albums_lyrics_view.on_player_position)
+        self.albums_splitter.addWidget(self.albums_lyrics_view)
+        self.albums_splitter.setStretchFactor(0, 3)
+        self.albums_splitter.setStretchFactor(1, 2)
+        albums_layout.addWidget(self.albums_splitter)
+
         self.artists_tab = ArtistListWidget(self.app_state)
+        self.artists_page = QWidget()
+        artists_layout = QVBoxLayout(self.artists_page)
+        set_layout_spacing(artists_layout, margins=0, spacing=SPACE_2)
+        self.artists_splitter = QSplitter(Qt.Orientation.Horizontal)
+        self.artists_splitter.addWidget(self.artists_tab)
+        self.artists_lyrics_view = LyricsEditorWidget()
+        self.artists_lyrics_view.show_none("Select a track to see lyrics")
+        self.artists_lyrics_view.saveRequested.connect(self._on_lyrics_save_requested)
+        self.artists_lyrics_view.seekRequested.connect(lambda ms: self.app_state.player.seek_ms(ms))
+        self.artists_lyrics_view.publishSyncedRequested.connect(self._publish_synced)
+        self.artists_lyrics_view.publishPlainRequested.connect(self._publish_plain)
+        self.artists_lyrics_view.downloadRequested.connect(self._download_current_track_lyrics)
+        if self.app_state.player:
+            self.app_state.player.positionChanged.connect(self.artists_lyrics_view.on_player_position)
+        self.artists_splitter.addWidget(self.artists_lyrics_view)
+        self.artists_splitter.setStretchFactor(0, 3)
+        self.artists_splitter.setStretchFactor(1, 2)
+        artists_layout.addWidget(self.artists_splitter)
 
         self.mylrclib_tab = QLabel("My Lrclib")
 
         self.tabs.addTab(self.tracks_tab, "Tracks")
-        self.tabs.addTab(self.albums_tab, "Albums")
-        self.tabs.addTab(self.artists_tab, "Artists")
+        self.tabs.addTab(self.albums_page, "Albums")
+        self.tabs.addTab(self.artists_page, "Artists")
         self.tabs.addTab(self.mylrclib_tab, "My LRCLIB")
         self.tabs.setAccessibleName("Library navigation tabs")
 
@@ -265,7 +301,8 @@ class MainWindow(QMainWindow):
         self.player_bar.playbackSpeedChanged.connect(self._persist_playback_speed)
         self.player_bar.artistNavigationRequested.connect(self._navigate_current_track_artist)
         self.player_bar.albumNavigationRequested.connect(self._navigate_current_track_album)
-        self.lyrics_view.set_reaction_delay_ms(get_config(self.app_state.db).reaction_delay_ms)
+        for view in self._all_lyrics_views():
+            view.set_reaction_delay_ms(get_config(self.app_state.db).reaction_delay_ms)
         self._apply_saved_playback_speed()
 
         # --- Scan progress (pretty + hidden when idle) ---
@@ -386,9 +423,9 @@ class MainWindow(QMainWindow):
         text = self.search_box.text()
         if current is self.tracks_tab:
             self._apply_track_filters()
-        elif current is self.albums_tab:
+        elif current is self.albums_page:
             self.albums_tab.setSearchValue(text)
-        elif current is self.artists_tab:
+        elif current is self.artists_page:
             self.artists_tab.setSearchValue(text)
 
     # ------------------ modals ------------------
@@ -400,7 +437,8 @@ class MainWindow(QMainWindow):
             after = updated_config.theme_mode
             if after != before:
                 self._apply_theme(after)
-            self.lyrics_view.set_reaction_delay_ms(updated_config.reaction_delay_ms)
+            for view in self._all_lyrics_views():
+                view.set_reaction_delay_ms(updated_config.reaction_delay_ms)
             self._apply_track_filters()
 
     def open_about_modal(self):
@@ -541,13 +579,7 @@ class MainWindow(QMainWindow):
 
         self.app_state.player.play_file(path, meta)
 
-        title = f"{track.artist_name} — {track.title}"
-        self.lyrics_view.set_track_lyrics(
-            title=title,
-            txt_lyrics=track.txt_lyrics,
-            lrc_lyrics=track.lrc_lyrics,
-            instrumental=bool(track.instrumental),
-        )
+        self._set_track_lyrics_views(track)
 
     def play_next(self):
         if not self._queue_ids:
@@ -596,19 +628,22 @@ class MainWindow(QMainWindow):
         w = self.tabs.widget(idx)
         if w is self.tracks_tab:
             self.navigate_to(tracks_all())
-        elif w is self.albums_tab:
+        elif w is self.albums_page:
             self.navigate_to(LibraryRoute(tab="albums", mode="root"))
-        elif w is self.artists_tab:
+        elif w is self.artists_page:
             self.navigate_to(LibraryRoute(tab="artists", mode="root"))
         self._schedule_library_search()
 
     def _on_player_track_changed(self, now_playing):
-        # doar highlight în listă, fără label de text
         if hasattr(self, "track_list") and self.track_list:
             if now_playing:
                 self.track_list.set_now_playing(now_playing.track_id)
             else:
                 self.track_list.set_now_playing(None)
+        if hasattr(self, "albums_tab") and hasattr(self.albums_tab, "track_list"):
+            self.albums_tab.track_list.set_now_playing(now_playing.track_id if now_playing else None)
+        if hasattr(self, "artists_tab") and hasattr(self.artists_tab, "album_browser"):
+            self.artists_tab.album_browser.track_list.set_now_playing(now_playing.track_id if now_playing else None)
 
     def _on_player_status_changed(self, status):
         # momentan nu mai afișăm nimic text-based aici
@@ -642,13 +677,7 @@ class MainWindow(QMainWindow):
             track = get_track_by_id(self.app_state.db, track_id)
             if ok:
                 self._sync_track_lyrics_outputs(track)
-            title = f"{track.artist_name} — {track.title}"
-            self.lyrics_view.set_track_lyrics(
-                title=title,
-                txt_lyrics=track.txt_lyrics,
-                lrc_lyrics=track.lrc_lyrics,
-                instrumental=bool(track.instrumental),
-            )
+            self._set_track_lyrics_views(track)
         except Exception:
             pass
 
@@ -664,7 +693,8 @@ class MainWindow(QMainWindow):
     def _on_lyrics_save_requested(self, lrc: str, txt: str):
         if not self.app_state.player or not self.app_state.player.track:
             self.app_state.notify("Start playback or select a track first.", "warning")
-            self.lyrics_view.set_save_feedback("error", "No Track")
+            for view in self._all_lyrics_views():
+                view.set_save_feedback("error", "No Track")
             return
 
         track_id = self.app_state.player.track.track_id
@@ -675,7 +705,8 @@ class MainWindow(QMainWindow):
             update_track_null_lyrics,
         )
 
-        self.lyrics_view.set_save_feedback("loading", "Saving...")
+        for view in self._all_lyrics_views():
+            view.set_save_feedback("loading", "Saving...")
         try:
             if lrc.strip():
                 update_track_synced_lyrics(self.app_state.db, track_id, lrc.strip(), (txt or "").strip())
@@ -686,19 +717,15 @@ class MainWindow(QMainWindow):
 
             track = get_track_by_id(self.app_state.db, track_id)
             self._sync_track_lyrics_outputs(track)
-            title = f"{track.artist_name} - {track.title}"
-            self.lyrics_view.set_track_lyrics(
-                title=title,
-                txt_lyrics=track.txt_lyrics,
-                lrc_lyrics=track.lrc_lyrics,
-                instrumental=bool(track.instrumental),
-            )
+            self._set_track_lyrics_views(track)
             self.statusBar().showMessage("Lyrics saved.", 2500)
-            self.lyrics_view.set_save_feedback("success", "Saved")
+            for view in self._all_lyrics_views():
+                view.set_save_feedback("success", "Saved")
         except Exception as exc:
             self.statusBar().showMessage("Failed to save lyrics.", 4000)
             self.app_state.notify(f"Failed to save lyrics: {exc}", "error")
-            self.lyrics_view.set_save_feedback("error", "Save Failed")
+            for view in self._all_lyrics_views():
+                view.set_save_feedback("error", "Save Failed")
 
     # ------------------ publish dialogs ------------------
     def _publish_synced(self):
@@ -710,7 +737,8 @@ class MainWindow(QMainWindow):
     def _open_publish_dialog(self, is_synced: bool):
         if not self.app_state.player or not self.app_state.player.track:
             self.app_state.notify("Start playback or select a track first.", "warning")
-            self.lyrics_view.set_publish_feedback(is_synced=is_synced, state="error", message="No Track")
+            for view in self._all_lyrics_views():
+                view.set_publish_feedback(is_synced=is_synced, state="error", message="No Track")
             return
 
         track_id = self.app_state.player.track.track_id
@@ -727,15 +755,19 @@ class MainWindow(QMainWindow):
             lint_result=[],
             parent=self,
         )
-        self.lyrics_view.set_publish_feedback(is_synced=is_synced, state="loading", message="Publishing...")
+        for view in self._all_lyrics_views():
+            view.set_publish_feedback(is_synced=is_synced, state="loading", message="Publishing...")
         dlg.exec()
         if dlg.publish_result is True:
-            self.lyrics_view.set_publish_feedback(is_synced=is_synced, state="success", message="Published")
+            for view in self._all_lyrics_views():
+                view.set_publish_feedback(is_synced=is_synced, state="success", message="Published")
             self.app_state.notify("Lyrics published successfully.", "success")
         elif dlg.publish_result is False:
-            self.lyrics_view.set_publish_feedback(is_synced=is_synced, state="error", message="Publish Failed")
+            for view in self._all_lyrics_views():
+                view.set_publish_feedback(is_synced=is_synced, state="error", message="Publish Failed")
         else:
-            self.lyrics_view.set_publish_feedback(is_synced=is_synced, state="idle")
+            for view in self._all_lyrics_views():
+                view.set_publish_feedback(is_synced=is_synced, state="idle")
 
     # ------------------ helpers ------------------
     def _normalize_lrclib_base(self, url: str) -> str:
@@ -827,9 +859,9 @@ class MainWindow(QMainWindow):
         current = self.tabs.currentWidget()
         if current is self.tracks_tab:
             self._apply_track_filters()
-        elif current is self.albums_tab:
+        elif current is self.albums_page:
             self.albums_tab.setSearchValue("")
-        elif current is self.artists_tab:
+        elif current is self.artists_page:
             self.artists_tab.setSearchValue("")
 
     def _download_current_track_lyrics(self):
@@ -837,6 +869,19 @@ class MainWindow(QMainWindow):
             self.app_state.notify("Select a track before downloading lyrics.", "warning")
             return
         self.on_download_lyrics(int(self.app_state.player.track.track_id))
+
+    def _all_lyrics_views(self) -> list[LyricsEditorWidget]:
+        return [self.lyrics_view, self.albums_lyrics_view, self.artists_lyrics_view]
+
+    def _set_track_lyrics_views(self, track) -> None:
+        title = f"{track.artist_name} — {track.title}"
+        for view in self._all_lyrics_views():
+            view.set_track_lyrics(
+                title=title,
+                txt_lyrics=track.txt_lyrics,
+                lrc_lyrics=track.lrc_lyrics,
+                instrumental=bool(track.instrumental),
+            )
 
     def _set_tool_feedback(self, button: QToolButton, state: str) -> None:
         button.setProperty("actionState", state if state != "idle" else "")
@@ -869,6 +914,19 @@ class MainWindow(QMainWindow):
                     self.content_splitter.setOrientation(Qt.Orientation.Horizontal)
                 self.content_splitter.setSizes([int(width * 0.58), int(width * 0.42)])
 
+        for splitter_name in ("albums_splitter", "artists_splitter"):
+            splitter = getattr(self, splitter_name, None)
+            if splitter is None:
+                continue
+            if width < 980:
+                if splitter.orientation() != Qt.Orientation.Vertical:
+                    splitter.setOrientation(Qt.Orientation.Vertical)
+                splitter.setSizes([int(self.height() * 0.54), int(self.height() * 0.46)])
+            else:
+                if splitter.orientation() != Qt.Orientation.Horizontal:
+                    splitter.setOrientation(Qt.Orientation.Horizontal)
+                splitter.setSizes([int(width * 0.58), int(width * 0.42)])
+
         if hasattr(self, "player_bar"):
             self.player_bar.set_compact_mode(width < 980)
 
@@ -888,10 +946,10 @@ class MainWindow(QMainWindow):
                 self.search_box.blockSignals(False)
                 self.track_list.apply_route(route)
             elif route.tab == "albums":
-                self.tabs.setCurrentWidget(self.albums_tab)
+                self.tabs.setCurrentWidget(self.albums_page)
                 self.albums_tab.apply_route(route)
             elif route.tab == "artists":
-                self.tabs.setCurrentWidget(self.artists_tab)
+                self.tabs.setCurrentWidget(self.artists_page)
                 self.artists_tab.apply_route(route)
         finally:
             self._tab_sync_suppressed = False
@@ -1006,6 +1064,10 @@ class MainWindow(QMainWindow):
             self.artists_tab._apply_styles()
         if hasattr(self, "lyrics_view"):
             self.lyrics_view._apply_styles()
+        if hasattr(self, "albums_lyrics_view"):
+            self.albums_lyrics_view._apply_styles()
+        if hasattr(self, "artists_lyrics_view"):
+            self.artists_lyrics_view._apply_styles()
 
     def _on_open_album(self, album_id: int):
         try:
