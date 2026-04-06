@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import os
 import logging
+import re
 from pathlib import Path
 from typing import Optional, Tuple
 
@@ -32,17 +33,96 @@ AUDIO_EXTS = {".mp3", ".m4a", ".flac", ".ogg", ".opus", ".wav", ".wma", ".asf", 
 ASF_PLAIN_KEYS = ("WM/Lyrics", "LYRICS", "UNSYNCEDLYRICS")
 ASF_SYNCED_KEYS = ("LRCLIB_LRC", "SYNCEDLYRICS")
 
-def iter_audio_paths(directories: list[str]) -> list[str]:
+
+def _split_lines(block: str | None) -> list[str]:
+    return [line.strip() for line in (block or "").splitlines() if line.strip()]
+
+
+def _normalize_excluded_paths(excluded_paths: str | None) -> list[str]:
+    normalized: list[str] = []
+    for entry in _split_lines(excluded_paths):
+        try:
+            normalized.append(str(Path(entry).expanduser().resolve()).casefold())
+        except Exception:
+            normalized.append(str(Path(entry).expanduser()).resolve().as_posix().casefold())
+    return normalized
+
+
+def _compile_excluded_patterns(excluded_patterns: str | None) -> list[re.Pattern[str]]:
+    compiled: list[re.Pattern[str]] = []
+    for pattern in _split_lines(excluded_patterns):
+        try:
+            compiled.append(re.compile(pattern, re.IGNORECASE))
+        except re.error:
+            logger.warning("Ignoring invalid scan exclusion regex: %s", pattern)
+    return compiled
+
+
+def _is_path_excluded(path: str, excluded_roots: list[str], excluded_patterns: list[re.Pattern[str]]) -> bool:
+    resolved = str(Path(path).resolve()).casefold()
+    resolved_posix = Path(path).resolve().as_posix().casefold()
+
+    for root in excluded_roots:
+        root_clean = root.rstrip("/\\")
+        if resolved == root_clean or resolved.startswith(root_clean + os.sep.casefold()):
+            return True
+        if resolved_posix == root_clean or resolved_posix.startswith(root_clean + "/"):
+            return True
+
+    for pattern in excluded_patterns:
+        if pattern.search(path) or pattern.search(resolved_posix):
+            return True
+
+    return False
+
+
+def iter_audio_paths(
+    directories: list[str],
+    *,
+    excluded_paths: str | None = None,
+    excluded_patterns: str | None = None,
+) -> list[str]:
+    excluded_roots = _normalize_excluded_paths(excluded_paths)
+    compiled_patterns = _compile_excluded_patterns(excluded_patterns)
     paths: list[str] = []
     for root in directories:
         if not root or not os.path.isdir(root):
             continue
         for dirpath, _, filenames in os.walk(root):
             for fn in filenames:
+                file_path = os.path.join(dirpath, fn)
                 ext = os.path.splitext(fn)[1].lower()
-                if ext in AUDIO_EXTS:
-                    paths.append(os.path.join(dirpath, fn))
+                if ext in AUDIO_EXTS and not _is_path_excluded(file_path, excluded_roots, compiled_patterns):
+                    paths.append(file_path)
     return paths
+
+
+def preview_audio_path_exclusions(
+    directories: list[str],
+    *,
+    excluded_paths: str | None = None,
+    excluded_patterns: str | None = None,
+) -> tuple[list[str], list[str]]:
+    excluded_roots = _normalize_excluded_paths(excluded_paths)
+    compiled_patterns = _compile_excluded_patterns(excluded_patterns)
+    included: list[str] = []
+    excluded: list[str] = []
+
+    for root in directories:
+        if not root or not os.path.isdir(root):
+            continue
+        for dirpath, _, filenames in os.walk(root):
+            for fn in filenames:
+                file_path = os.path.join(dirpath, fn)
+                ext = os.path.splitext(fn)[1].lower()
+                if ext not in AUDIO_EXTS:
+                    continue
+                if _is_path_excluded(file_path, excluded_roots, compiled_patterns):
+                    excluded.append(file_path)
+                else:
+                    included.append(file_path)
+
+    return included, excluded
 
 def _first(easy, key: str) -> str | None:
     v = easy.get(key)

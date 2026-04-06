@@ -164,6 +164,26 @@ QLabel#OnboardingSteps {
     color: {{color-text}};
 }
 
+QLabel#SettingsValidationHint {
+    border-radius: {{radius-md}};
+    padding: 6px {{space-3}};
+    background: {{color-validation-bg}};
+    color: {{color-text}};
+    border: 1px solid {{color-validation-border}};
+}
+
+QLabel#SettingsValidationHint[validationState="error"] {
+    background: {{color-error-bg}};
+    color: {{color-error-text}};
+    border-color: {{color-error-border}};
+}
+
+QLabel#SettingsValidationHint[validationState="success"] {
+    background: {{color-success-bg}};
+    color: {{color-success-text}};
+    border-color: {{color-success-border}};
+}
+
 QTabWidget#MainTabs::pane {
     border: 1px solid {{color-border-strong}};
     border-radius: {{radius-xl}};

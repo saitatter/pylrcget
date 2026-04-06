@@ -125,3 +125,13 @@ def upgrade_database_if_needed(db: sqlite3.Connection, existing_version: int) ->
             UPDATE config_data SET save_lyrics_sidecars = 1;
         """)
         db.commit()
+
+    # v10
+    if existing_version <= 9:
+        print("Migrate database version 10...")
+        db.execute("PRAGMA user_version=10")
+        db.executescript("""
+            ALTER TABLE config_data ADD COLUMN scan_excluded_paths TEXT DEFAULT '';
+            ALTER TABLE config_data ADD COLUMN scan_excluded_patterns TEXT DEFAULT '';
+        """)
+        db.commit()

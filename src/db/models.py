@@ -104,6 +104,8 @@ class Config:
     lrclib_instance: str
     lyrics_output_dir: str
     lyrics_file_pattern: str
+    scan_excluded_paths: str
+    scan_excluded_patterns: str
 
 
 # Keep FsTrack here too if you already have it in this file.

@@ -340,7 +340,13 @@ class MainWindow(QMainWindow):
         self.scan_details.setText(f"Preparing a scan across {len(directories)} folder(s)…")
         self.btn_cancel_scan.setEnabled(True)
 
-        self.scanner = LibraryScanner(self.app_state.db_path, directories)
+        config = get_config(self.app_state.db)
+        self.scanner = LibraryScanner(
+            self.app_state.db_path,
+            directories,
+            excluded_paths=config.scan_excluded_paths,
+            excluded_patterns=config.scan_excluded_patterns,
+        )
         self.scanner.progress_signal.connect(self._update_scan_progress)
         self.scanner.finished_signal.connect(self._scan_finished)
         self.scanner.start()

@@ -10,16 +10,29 @@ class LibraryScanner(QThread):
     progress_signal = Signal(int, int, str, float)     # scanned, total, current path, elapsed seconds
     finished_signal = Signal(bool, str)    # ok, message
 
-    def __init__(self, db_path: str, directories: list[str]):
+    def __init__(
+        self,
+        db_path: str,
+        directories: list[str],
+        *,
+        excluded_paths: str = "",
+        excluded_patterns: str = "",
+    ):
         super().__init__()
         self.db_path = db_path
         self.directories = directories
+        self.excluded_paths = excluded_paths
+        self.excluded_patterns = excluded_patterns
 
     def run(self):
         db = None
         started_at = time.perf_counter()
         try:
-            paths = iter_audio_paths(self.directories)
+            paths = iter_audio_paths(
+                self.directories,
+                excluded_paths=self.excluded_paths,
+                excluded_patterns=self.excluded_patterns,
+            )
             total = len(paths)
             scanned = 0
 

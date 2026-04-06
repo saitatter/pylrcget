@@ -49,7 +49,9 @@ def get_config(db: sqlite3.Connection) -> Config:
                theme_mode,
                lrclib_instance,
                lyrics_output_dir,
-               lyrics_file_pattern
+               lyrics_file_pattern,
+               scan_excluded_paths,
+               scan_excluded_patterns
         FROM config_data
         LIMIT 1
     """).fetchone()
@@ -64,6 +66,8 @@ def get_config(db: sqlite3.Connection) -> Config:
         lrclib_instance=row["lrclib_instance"],
         lyrics_output_dir=row["lyrics_output_dir"] or "",
         lyrics_file_pattern=row["lyrics_file_pattern"] or "{artist} - {title}",
+        scan_excluded_paths=row["scan_excluded_paths"] or "",
+        scan_excluded_patterns=row["scan_excluded_patterns"] or "",
     )
 
 
@@ -78,7 +82,9 @@ def set_config(db: sqlite3.Connection, config: Config) -> None:
             theme_mode = ?,
             lrclib_instance = ?,
             lyrics_output_dir = ?,
-            lyrics_file_pattern = ?
+            lyrics_file_pattern = ?,
+            scan_excluded_paths = ?,
+            scan_excluded_patterns = ?
         WHERE 1
     """, (
         config.skip_tracks_with_synced_lyrics,
@@ -90,6 +96,8 @@ def set_config(db: sqlite3.Connection, config: Config) -> None:
         config.lrclib_instance,
         config.lyrics_output_dir,
         config.lyrics_file_pattern,
+        config.scan_excluded_paths,
+        config.scan_excluded_patterns,
     ))
     db.commit()
 
