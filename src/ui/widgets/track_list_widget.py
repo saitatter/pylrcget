@@ -383,7 +383,7 @@ class TrackListWidget(QWidget):
         else:
             self._artist_id = int(artist_id) if artist_id is not None else None
             self._artist_ids = None
-        if artist_id is None or self._artist_ids == []:
+        if self._artist_id is None and self._artist_ids is None:
             self._scope_label = ""
         elif not self._scope_label.startswith("Artist: "):
             self._scope_label = "Artist filter active"
@@ -403,7 +403,7 @@ class TrackListWidget(QWidget):
         else:
             self._album_id = int(album_id) if album_id is not None else None
             self._album_ids = None
-        if album_id is None or self._album_ids == []:
+        if self._album_id is None and self._album_ids is None:
             self._scope_label = ""
         elif not self._scope_label.startswith("Album: "):
             self._scope_label = "Album filter active"
