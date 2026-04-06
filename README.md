@@ -116,8 +116,8 @@ Think of it as:
 This repository now includes GitHub Actions automation for:
 
 - building standalone executables for **Windows**, **Linux**, and **macOS** via **PyInstaller**
-- generating a **CHANGELOG.md** automatically from commit history
 - creating semantic versions and GitHub releases with **python-semantic-release**
+- generating GitHub release notes automatically from commit history
 - publishing release assets directly to the GitHub release page
 
 ### Commit format for automatic changelog
@@ -134,7 +134,7 @@ Use `!` or a `BREAKING CHANGE:` footer for breaking changes.
 
 1. Merge commits into `main` using Conventional Commit messages.
 2. The `Release` workflow runs `semantic-release` on every push to `main`.
-3. If the commits require a new version, it creates the tag, updates `CHANGELOG.md`, and publishes the GitHub release.
+3. If the commits require a new version, it creates the tag and publishes the GitHub release.
 4. The same workflow builds platform-specific executables and uploads them to that release.
 
 ### Local executable build

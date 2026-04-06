@@ -1,0 +1,8 @@
+QLabel#LyricsTitle {
+    font-weight: 650;
+    font-size: 14px;
+}
+
+QLabel#LyricsMessage {
+    color: rgba(229, 231, 235, 0.75);
+}

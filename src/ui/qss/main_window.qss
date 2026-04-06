@@ -1,0 +1,40 @@
+QWidget#ScanRow {
+    background: #020617;
+    border-top: 1px solid #111827;
+}
+
+QLabel#ScanLabel {
+    color: #9ca3af;
+    font-size: 11px;
+}
+
+QProgressBar#ScanProgress {
+    background: #0b1222;
+    border: 1px solid #1f2937;
+    border-radius: 999px;
+    height: 10px;
+}
+
+QProgressBar#ScanProgress::chunk {
+    border-radius: 999px;
+    background: qlineargradient(
+        x1: 0, y1: 0, x2: 1, y2: 0,
+        stop: 0 #38bdf8, stop: 1 #22c55e
+    );
+}
+
+QToolButton {
+    border: 1px solid transparent;
+    background: transparent;
+    padding: 6px;
+    border-radius: 10px;
+}
+
+QToolButton:hover {
+    background: #0b1222;
+    border-color: #1f2937;
+}
+
+QToolButton:pressed {
+    background: #0f172a;
+}

@@ -9,8 +9,10 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QStackedWidget,
     QTextEdit, QTableWidget, QTableWidgetItem,
-    QPushButton, QHBoxLayout, QMessageBox
+    QPushButton, QHBoxLayout
 )
+
+from ui.style_loader import load_stylesheet
 
 _TS_RE = re.compile(r"\[(\d+):(\d+)(?:\.(\d+))?\]")
 
@@ -146,7 +148,7 @@ class LyricsEditorWidget(QWidget):
 
         self.title = QLabel("Lyrics")
         self.title.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-        self.title.setStyleSheet("font-weight: 650; font-size: 14px;")
+        self.title.setObjectName("LyricsTitle")
         header.addWidget(self.title, 1)
 
         self.btn_snap = QPushButton("Snap")
@@ -188,7 +190,7 @@ class LyricsEditorWidget(QWidget):
         self.msg = QLabel("No lyrics")
         self.msg.setAlignment(Qt.AlignCenter)
         self.msg.setWordWrap(True)
-        self.msg.setStyleSheet("opacity: 0.75;")
+        self.msg.setObjectName("LyricsMessage")
         self.stack.addWidget(self.msg)
 
         # Plain editor (editable if you want)
@@ -213,6 +215,7 @@ class LyricsEditorWidget(QWidget):
 
         self.stack.addWidget(self.table)
 
+        self.setStyleSheet(load_stylesheet("lyrics_editor.qss"))
         self.show_none("No track selected")
 
     # --- public API ---

@@ -8,6 +8,8 @@ from PySide6.QtCore import Qt, Signal, QItemSelectionModel, QModelIndex
 from PySide6.QtGui import QStandardItem, QStandardItemModel
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QTableView, QHeaderView, QMenu
 
+from ui.style_loader import load_stylesheet
+
 
 @dataclass(frozen=True)
 class AlbumListRow:
@@ -193,29 +195,4 @@ class AlbumListWidget(QWidget):
         return it
 
     def _apply_styles(self):
-        self.setStyleSheet("""
-        QTableView#AlbumTable {
-            background-color: #020617;
-            alternate-background-color: #030712;
-            border: none;
-            color: #e5e7eb;
-            gridline-color: #020617;
-            selection-background-color: rgba(56, 189, 248, 0.2);
-            selection-color: #e5e7eb;
-        }
-
-        QHeaderView::section {
-            background-color: #020617;
-            color: #9ca3af;
-            padding: 4px 6px;
-            border: none;
-            border-bottom: 1px solid #111827;
-            font-size: 11px;
-            text-transform: uppercase;
-            letter-spacing: 0.08em;
-        }
-
-        QTableView::item {
-            padding: 4px 6px;
-        }
-        """)
+        self.setStyleSheet(load_stylesheet("data_table.qss", table_name="AlbumTable"))

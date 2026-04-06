@@ -6,6 +6,7 @@ from PySide6.QtWidgets import QWidget, QVBoxLayout, QTableView, QMenu
 
 from ui.models.track_table_model import TrackTableModel
 from ui.delegates.actions_delegate import ActionsDelegate
+from ui.style_loader import load_stylesheet
 from core.tracklist_models import TrackListRow
 from db.database import get_track_rows
 
@@ -279,9 +280,6 @@ class TrackListWidget(QWidget):
         # keep stable order (row order)
         return ids
 
-    def _selected_track_ids_set(self) -> set[int]:
-        return set(self.selected_track_ids())
-
     def restore_selection(self, track_ids: set[int]):
         if not track_ids:
             return
@@ -309,32 +307,7 @@ class TrackListWidget(QWidget):
             self.table.scrollTo(first_idx, QTableView.ScrollHint.PositionAtCenter)
 
     def _apply_styles(self):
-        self.setStyleSheet("""
-        QTableView#TrackTable {
-            background-color: #020617;
-            alternate-background-color: #030712;
-            border: none;
-            color: #e5e7eb;
-            gridline-color: #020617;
-            selection-background-color: rgba(56, 189, 248, 0.2);
-            selection-color: #e5e7eb;
-        }
-
-        QHeaderView::section {
-            background-color: #020617;
-            color: #9ca3af;
-            padding: 4px 6px;
-            border: none;
-            border-bottom: 1px solid #111827;
-            font-size: 11px;
-            text-transform: uppercase;
-            letter-spacing: 0.08em;
-        }
-
-        QTableView::item {
-            padding: 4px 6px;
-        }
-        """)
+        self.setStyleSheet(load_stylesheet("data_table.qss", table_name="TrackTable"))
 
     def _source_row(self, index) -> int:
         return self.proxy_model.mapToSource(index).row()

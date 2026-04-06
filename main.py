@@ -13,10 +13,8 @@ if str(SRC_DIR) not in sys.path:
 
 from core.state import AppState, Notify
 from db.database import initialize_database
-from player.player import Player
+from ui.app_theme import apply_app_theme
 from ui.main_window import MainWindow
-
-app_state = AppState()
 
 def debug_print_schema(db) -> None:
     for table in ("tracks", "albums"):
@@ -54,6 +52,7 @@ def init_app_state() -> AppState:
 
 def main() -> int:
     qt_app = QApplication(sys.argv)
+    apply_app_theme(qt_app)
 
     app_state = init_app_state()
     main_window = MainWindow(app_state)
@@ -63,4 +62,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

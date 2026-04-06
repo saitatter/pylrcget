@@ -4,16 +4,16 @@ from dataclasses import dataclass
 from typing import Optional
 
 from PySide6.QtCore import Qt, QTimer, QEasingCurve, QPoint, QPropertyAnimation
-from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QWidget,
     QFrame,
     QLabel,
     QHBoxLayout,
-    QVBoxLayout,
     QToolButton,
     QGraphicsOpacityEffect,
 )
+
+from ui.style_loader import load_stylesheet
 
 
 @dataclass(frozen=True)
@@ -44,27 +44,7 @@ class ToastWidget(QFrame):
         bg, border, text = _colors(data.notify_type)
 
         self.setObjectName("Toast")
-        self.setStyleSheet(f"""
-        QFrame#Toast {{
-            background: {bg};
-            border: 1px solid {border};
-            border-radius: 14px;
-        }}
-        QLabel {{
-            color: {text};
-            font-size: 12px;
-        }}
-        QToolButton {{
-            border: none;
-            background: transparent;
-            color: {text};
-            padding: 2px 6px;
-        }}
-        QToolButton:hover {{
-            background: rgba(255,255,255,0.06);
-            border-radius: 8px;
-        }}
-        """)
+        self.setStyleSheet(load_stylesheet("toast.qss", bg=bg, border=border, text=text))
 
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
 

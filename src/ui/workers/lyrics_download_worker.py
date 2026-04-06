@@ -10,7 +10,6 @@ from db.database import (
     get_track_by_id,
     update_track_synced_lyrics,
     update_track_plain_lyrics,
-    update_track_instrumental,
 )
 
 def _strip_empty(s: str | None) -> str | None:

@@ -1,10 +1,9 @@
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QLabel,
-    QTabWidget, QPushButton, QProgressBar, QMessageBox, QLineEdit, QHBoxLayout, QCheckBox, QSplitter
+    QTabWidget, QProgressBar, QMessageBox, QLineEdit, QHBoxLayout, QCheckBox, QSplitter
 )
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QShortcut, QKeySequence
-from dataclasses import dataclass
 import os
 
 from db.database import get_directories, get_track_by_id
@@ -18,14 +17,10 @@ from player.player import NowPlaying
 from core.embed_lyrics import embed_lyrics_for_track
 from ui.widgets.album_list_widget import AlbumListWidget
 from ui.widgets.artist_list_widget import ArtistListWidget
+from ui.style_loader import load_stylesheet
 from ui.widgets.toast import ToastManager
 from PySide6.QtWidgets import QToolButton
 from PySide6.QtWidgets import QStyle
-
-@dataclass
-class ScanProgress:
-    files_scanned: int
-    files_count: int
 
 
 class MainWindow(QMainWindow):
@@ -194,47 +189,7 @@ class MainWindow(QMainWindow):
         self._apply_track_filters()
         self.show_queued_notifications()
 
-        self.setStyleSheet(self.styleSheet() + """
-            QWidget#ScanRow {
-                background: #020617;
-                border-top: 1px solid #111827;
-            }
-
-            QLabel#ScanLabel {
-                color: #9ca3af;
-                font-size: 11px;
-            }
-
-            QProgressBar#ScanProgress {
-                background: #0b1222;
-                border: 1px solid #1f2937;
-                border-radius: 999px;
-                height: 10px;
-            }
-
-            QProgressBar#ScanProgress::chunk {
-                border-radius: 999px;
-                background: qlineargradient(
-                    x1:0, y1:0, x2:1, y2:0,
-                    stop:0 #38bdf8, stop:1 #22c55e
-                );
-            }
-            QToolButton {
-                border: 1px solid transparent;
-                background: transparent;
-                padding: 6px;
-                border-radius: 10px;
-            }
-
-            QToolButton:hover {
-                background: #0b1222;
-                border-color: #1f2937;
-            }
-
-            QToolButton:pressed {
-                background: #0f172a;
-            }
-            """)
+        self.setStyleSheet(self.styleSheet() + load_stylesheet("main_window.qss"))
 
     # ------------------ filters ------------------
     def _apply_track_filters(self):
@@ -257,10 +212,6 @@ class MainWindow(QMainWindow):
         self.app_state.notify("LrcGet Python — about modal TBD", "info")
 
     # ------------------ scanning ------------------
-    def scanning_finished(self):
-        self._apply_track_filters()
-        self.app_state.notify("Library scanning complete!", "success")
-
     def refresh_library(self):
         directories = get_directories(self.app_state.db)
         if not directories:
@@ -489,27 +440,6 @@ class MainWindow(QMainWindow):
         self.statusBar().showMessage("Lyrics saved.", 2500)
 
     # ------------------ publish dialogs ------------------
-    def open_publish_dialog_for_current_track(self, is_synced: bool):
-        if not self.app_state.player or not self.app_state.player.track:
-            self.app_state.notify("No track playing.", "warning")
-            return
-
-        track_id = self.app_state.player.track.track_id
-        track = get_track_by_id(self.app_state.db, track_id)
-
-        lyrics_text = track.lrc_lyrics if is_synced else (track.txt_lyrics or "")
-        dlg = PublishLyricsDialog(
-            title=track.title,
-            artist_name=track.artist_name,
-            album_name=track.album_name,
-            duration_s=float(track.duration or 0.0),
-            lyrics_text=lyrics_text or "",
-            is_synced=is_synced,
-            lint_result=[],
-            parent=self,
-        )
-        dlg.exec()
-
     def _publish_synced(self):
         self._open_publish_dialog(is_synced=True)
 

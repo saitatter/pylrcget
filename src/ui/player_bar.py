@@ -7,6 +7,8 @@ from PySide6.QtWidgets import QWidget, QHBoxLayout, QLabel, QToolButton, QSlider
 from PySide6.QtCore import QByteArray
 from PySide6.QtSvg import QSvgRenderer
 
+from ui.style_loader import load_stylesheet
+
 def _fmt(ms: int) -> str:
     ms = max(0, int(ms))
     s = ms // 1000
@@ -204,80 +206,4 @@ class PlayerBar(QWidget):
         self.slider.setValue(int(ms))
 
     def _apply_styles(self):
-        self.setStyleSheet("""
-        QWidget#PlayerBar {
-            background-color: #020617;
-            border-top: 1px solid #111827;
-        }
-
-        QToolButton {
-            border: 1px solid transparent;
-            background: transparent;
-            padding: 6px;
-            border-radius: 10px;
-            color: #e5e7eb;      /* drives SVG via currentColor */
-        }
-        QToolButton:hover {
-            background: #0b1222;
-            border-color: #1f2937;
-            color: #38bdf8;
-        }
-        QToolButton:pressed {
-            background: #0f172a;
-        }
-
-        /* Round play button */
-        QToolButton#BtnPlay {
-            background: #111827;
-            border: 1px solid #1f2937;
-            border-radius: 999px;
-            padding: 8px;
-            color: #e5e7eb;
-        }
-        QToolButton#BtnPlay:hover {
-            border-color: #38bdf8;
-            background: #020617;
-            color: #38bdf8;
-        }
-        QToolButton#BtnPlay:pressed {
-            background: #0f172a;
-        }
-
-        QSlider::groove:horizontal {
-            height: 4px;
-            background: #0f172a;
-            border-radius: 2px;
-        }
-        QSlider::handle:horizontal {
-            width: 12px;
-            height: 12px;
-            margin: -4px 0;
-            border-radius: 6px;
-            background: #38bdf8;
-        }
-        QSlider::sub-page:horizontal {
-            background: #38bdf8;
-            border-radius: 2px;
-        }
-
-        QLabel {
-            color: #9ca3af;
-            font-size: 11px;
-        }
-        QLabel#NowPlaying {
-            color: #e5e7eb;
-            font-size: 12px;
-        }
-                           
-        QComboBox#SpeedCombo {
-            background: #0b1222;
-            border: 1px solid #1f2937;
-            border-radius: 10px;
-            padding: 4px 8px;
-            color: #e5e7eb;
-            min-width: 74px;
-            font-size: 11px;
-        }
-        QComboBox#SpeedCombo:hover { border-color: #38bdf8; }
-        QComboBox#SpeedCombo::drop-down { border: none; width: 18px; }
-        """)
+        self.setStyleSheet(load_stylesheet("player_bar.qss"))
