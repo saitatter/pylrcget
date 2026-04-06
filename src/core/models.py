@@ -1,6 +1,8 @@
 # core/models.py
 from __future__ import annotations
+
 from dataclasses import dataclass
+
 
 @dataclass(frozen=True)
 class TrackRow:
@@ -10,6 +12,7 @@ class TrackRow:
     duration_s: int | None
     lyrics_state: str  # "synced" | "plain" | "instrumental" | "none"
 
+
 @dataclass(frozen=True)
 class TrackFilters:
     synced: bool = True
@@ -17,10 +20,11 @@ class TrackFilters:
     instrumental: bool = False
     no_lyrics: bool = True
 
+
 @dataclass(frozen=True)
 class FsTrack:
-    file_path: str      # FULL path to audio file (ca în Rust)
-    file_name: str      # basename (song.mp3)
+    file_path: str
+    file_name: str
     title: str
     album: str
     artist: str
@@ -29,8 +33,9 @@ class FsTrack:
     txt_lyrics: str | None
     lrc_lyrics: str | None
     track_number: int | None
+    modified_time: float | None = None
+    file_size: int | None = None
 
-    # ca să nu-ți schimbi database.py (care folosește metode)
     def file_path_(self) -> str: return self.file_path
     def file_name_(self) -> str: return self.file_name
     def title_(self) -> str: return self.title
@@ -41,3 +46,5 @@ class FsTrack:
     def txt_lyrics_(self) -> str | None: return self.txt_lyrics
     def lrc_lyrics_(self) -> str | None: return self.lrc_lyrics
     def track_number_(self) -> int | None: return self.track_number
+    def modified_time_(self) -> float | None: return self.modified_time
+    def file_size_(self) -> int | None: return self.file_size

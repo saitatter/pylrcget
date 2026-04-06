@@ -401,7 +401,7 @@ class MainWindow(QMainWindow):
 
         if ok:
             self._apply_track_filters()
-            self.app_state.notify("Library scan finished successfully.", "success")
+            self.app_state.notify(msg or "Library scan finished successfully.", "success")
             self._set_tool_feedback(self.btn_refresh, "success")
         else:
             if "cancel" in (msg or "").lower():

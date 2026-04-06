@@ -282,6 +282,8 @@ def get_track_by_id(db: sqlite3.Connection, track_id: int) -> Track:
             album_id,
             duration,
             track_number,
+            modified_time,
+            file_size,
             albums.image_path,
             txt_lyrics,
             lrc_lyrics,
@@ -332,8 +334,8 @@ def add_track(db: sqlite3.Connection, track: FsTrack) -> None:
         INSERT INTO tracks (
             file_path, file_name, title, title_lower,
             album_id, artist_id, duration, track_number,
-            txt_lyrics, lrc_lyrics, instrumental
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            txt_lyrics, lrc_lyrics, instrumental, modified_time, file_size
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         track.file_path,
         track.file_name,
@@ -346,6 +348,8 @@ def add_track(db: sqlite3.Connection, track: FsTrack) -> None:
         track.txt_lyrics,
         track.lrc_lyrics,
         is_instrumental,
+        getattr(track, "modified_time", None),
+        getattr(track, "file_size", None),
     ))
     db.commit()
 
@@ -361,7 +365,7 @@ def get_tracks(db: sqlite3.Connection) -> List[Track]:
             tracks.id, file_path, file_name, title,
             artists.name AS artist_name, tracks.artist_id,
             albums.name AS album_name, albums.album_artist_name,
-            album_id, duration, track_number,
+            album_id, duration, track_number, modified_time, file_size,
             albums.image_path, txt_lyrics, lrc_lyrics, instrumental
         FROM tracks
         JOIN albums ON tracks.album_id = albums.id
@@ -598,6 +602,62 @@ def clean_library(db: sqlite3.Connection) -> None:
     db.execute("DELETE FROM tracks")
     db.execute("DELETE FROM albums")
     db.execute("DELETE FROM artists")
+    db.commit()
+
+
+def get_library_file_index(db: sqlite3.Connection) -> dict[str, tuple[float | None, int | None]]:
+    rows = db.execute("SELECT file_path, modified_time, file_size FROM tracks").fetchall()
+    return {
+        row["file_path"]: (
+            float(row["modified_time"]) if row["modified_time"] is not None else None,
+            int(row["file_size"]) if row["file_size"] is not None else None,
+        )
+        for row in rows
+    }
+
+
+def get_scan_directory_index(db: sqlite3.Connection) -> dict[str, float]:
+    rows = db.execute("SELECT path, modified_time FROM scan_directory_state").fetchall()
+    return {row["path"]: float(row["modified_time"]) for row in rows if row["modified_time"] is not None}
+
+
+def replace_scan_directory_index(db: sqlite3.Connection, entries: dict[str, float]) -> None:
+    db.execute("DELETE FROM scan_directory_state")
+    if entries:
+        db.executemany(
+            "INSERT INTO scan_directory_state (path, modified_time) VALUES (?, ?)",
+            [(path, modified_time) for path, modified_time in entries.items()],
+        )
+    db.commit()
+
+
+def get_scan_cache_meta(db: sqlite3.Connection, key: str) -> str:
+    row = db.execute("SELECT value FROM scan_cache_meta WHERE key = ? LIMIT 1", (key,)).fetchone()
+    return str(row["value"]) if row and row["value"] is not None else ""
+
+
+def set_scan_cache_meta(db: sqlite3.Connection, key: str, value: str) -> None:
+    db.execute(
+        """
+        INSERT INTO scan_cache_meta (key, value)
+        VALUES (?, ?)
+        ON CONFLICT(key) DO UPDATE SET value = excluded.value
+        """,
+        (key, value),
+    )
+    db.commit()
+
+
+def delete_tracks_by_paths(db: sqlite3.Connection, paths: list[str]) -> None:
+    if not paths:
+        return
+    db.executemany("DELETE FROM tracks WHERE file_path = ?", [(path,) for path in paths])
+    db.commit()
+
+
+def prune_library(db: sqlite3.Connection) -> None:
+    db.execute("DELETE FROM albums WHERE id NOT IN (SELECT DISTINCT album_id FROM tracks)")
+    db.execute("DELETE FROM artists WHERE id NOT IN (SELECT DISTINCT artist_id FROM tracks)")
     db.commit()
 
 

@@ -135,3 +135,31 @@ def upgrade_database_if_needed(db: sqlite3.Connection, existing_version: int) ->
             ALTER TABLE config_data ADD COLUMN scan_excluded_patterns TEXT DEFAULT '';
         """)
         db.commit()
+
+    # v11
+    if existing_version <= 10:
+        print("Migrate database version 11...")
+        db.execute("PRAGMA user_version=11")
+        db.executescript("""
+            ALTER TABLE tracks ADD COLUMN modified_time REAL;
+            ALTER TABLE tracks ADD COLUMN file_size INTEGER;
+            CREATE INDEX idx_tracks_file_path ON tracks(file_path);
+        """)
+        db.commit()
+
+    # v12
+    if existing_version <= 11:
+        print("Migrate database version 12...")
+        db.execute("PRAGMA user_version=12")
+        db.executescript("""
+            CREATE TABLE IF NOT EXISTS scan_directory_state (
+                path TEXT PRIMARY KEY,
+                modified_time REAL
+            );
+
+            CREATE TABLE IF NOT EXISTS scan_cache_meta (
+                key TEXT PRIMARY KEY,
+                value TEXT
+            );
+        """)
+        db.commit()
