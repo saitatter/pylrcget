@@ -106,6 +106,7 @@ class Config:
     lyrics_file_pattern: str
     scan_excluded_paths: str
     scan_excluded_patterns: str
+    reaction_delay_ms: int
 
 
 # Keep FsTrack here too if you already have it in this file.

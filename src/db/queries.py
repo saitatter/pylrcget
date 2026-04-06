@@ -51,7 +51,8 @@ def get_config(db: sqlite3.Connection) -> Config:
                lyrics_output_dir,
                lyrics_file_pattern,
                scan_excluded_paths,
-               scan_excluded_patterns
+               scan_excluded_patterns,
+               reaction_delay_ms
         FROM config_data
         LIMIT 1
     """).fetchone()
@@ -68,6 +69,7 @@ def get_config(db: sqlite3.Connection) -> Config:
         lyrics_file_pattern=row["lyrics_file_pattern"] or "{artist} - {title}",
         scan_excluded_paths=row["scan_excluded_paths"] or "",
         scan_excluded_patterns=row["scan_excluded_patterns"] or "",
+        reaction_delay_ms=int(row["reaction_delay_ms"] or 0),
     )
 
 
@@ -84,7 +86,8 @@ def set_config(db: sqlite3.Connection, config: Config) -> None:
             lyrics_output_dir = ?,
             lyrics_file_pattern = ?,
             scan_excluded_paths = ?,
-            scan_excluded_patterns = ?
+            scan_excluded_patterns = ?,
+            reaction_delay_ms = ?
         WHERE 1
     """, (
         config.skip_tracks_with_synced_lyrics,
@@ -98,6 +101,7 @@ def set_config(db: sqlite3.Connection, config: Config) -> None:
         config.lyrics_file_pattern,
         config.scan_excluded_paths,
         config.scan_excluded_patterns,
+        config.reaction_delay_ms,
     ))
     db.commit()
 

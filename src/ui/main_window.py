@@ -215,6 +215,7 @@ class MainWindow(QMainWindow):
         self.player_bar = PlayerBar(self.app_state.player, self)
         self.layout.addWidget(self.player_bar)
         self.player_bar.set_prev_next_handlers(self.play_prev, self.play_next)
+        self.lyrics_view.set_reaction_delay_ms(get_config(self.app_state.db).reaction_delay_ms)
 
         # --- Scan progress (pretty + hidden when idle) ---
         self.scan_row = QWidget()
@@ -304,9 +305,11 @@ class MainWindow(QMainWindow):
         before = get_config(self.app_state.db).theme_mode
         dlg = MusicFoldersDialog(self.app_state, self)
         if dlg.exec():
-            after = get_config(self.app_state.db).theme_mode
+            updated_config = get_config(self.app_state.db)
+            after = updated_config.theme_mode
             if after != before:
                 self._apply_theme(after)
+            self.lyrics_view.set_reaction_delay_ms(updated_config.reaction_delay_ms)
             self._apply_track_filters()
 
     def open_about_modal(self):

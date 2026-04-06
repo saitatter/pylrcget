@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
     QListWidget,
     QMessageBox,
     QPushButton,
+    QSpinBox,
     QTextEdit,
     QVBoxLayout,
 )
@@ -90,10 +91,21 @@ class MusicFoldersDialog(QDialog):
         layout.addWidget(lyrics_box)
 
         embed_box = QGroupBox("Audio File")
-        embed_layout = QVBoxLayout(embed_box)
+        embed_layout = QGridLayout(embed_box)
         self.embed_chk = QCheckBox("Embed lyrics into the audio file")
         self.embed_chk.setChecked(True)
-        embed_layout.addWidget(self.embed_chk)
+        embed_layout.addWidget(self.embed_chk, 0, 0, 1, 2)
+
+        self.reaction_delay_spin = QSpinBox()
+        self.reaction_delay_spin.setRange(-2000, 2000)
+        self.reaction_delay_spin.setSingleStep(10)
+        self.reaction_delay_spin.setSuffix(" ms")
+        embed_layout.addWidget(QLabel("Reaction delay"), 1, 0)
+        embed_layout.addWidget(self.reaction_delay_spin, 1, 1)
+
+        reaction_hint = QLabel("Negative values stamp earlier. Positive values stamp later.")
+        reaction_hint.setWordWrap(True)
+        embed_layout.addWidget(reaction_hint, 2, 0, 1, 2)
         layout.addWidget(embed_box)
 
         scan_box = QGroupBox("Library Scan")
@@ -171,6 +183,7 @@ class MusicFoldersDialog(QDialog):
         self.output_dir_edit.setText(config.lyrics_output_dir)
         self.pattern_edit.setText(config.lyrics_file_pattern or DEFAULT_LYRICS_FILE_PATTERN)
         self.embed_chk.setChecked(config.try_embed_lyrics)
+        self.reaction_delay_spin.setValue(int(config.reaction_delay_ms or 0))
         self.excluded_paths_edit.setPlainText(config.scan_excluded_paths)
         self.excluded_patterns_edit.setPlainText(config.scan_excluded_patterns)
         self._update_export_fields_enabled()
@@ -315,6 +328,7 @@ class MusicFoldersDialog(QDialog):
             lyrics_file_pattern=self.pattern_edit.text().strip() or DEFAULT_LYRICS_FILE_PATTERN,
             scan_excluded_paths=self.excluded_paths_edit.toPlainText().strip(),
             scan_excluded_patterns=self.excluded_patterns_edit.toPlainText().strip(),
+            reaction_delay_ms=int(self.reaction_delay_spin.value()),
         )
 
         set_directories(self.app_state.db, folders)
