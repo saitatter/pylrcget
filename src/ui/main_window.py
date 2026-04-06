@@ -65,6 +65,10 @@ class MainWindow(QMainWindow):
         self._playback_speed_save_timer.setSingleShot(True)
         self._playback_speed_save_timer.setInterval(350)
         self._playback_speed_save_timer.timeout.connect(self._flush_playback_speed)
+        self._search_apply_timer = QTimer(self)
+        self._search_apply_timer.setSingleShot(True)
+        self._search_apply_timer.setInterval(180)
+        self._search_apply_timer.timeout.connect(self._apply_library_search)
         self._route_save_timer = QTimer(self)
         self._route_save_timer.setSingleShot(True)
         self._route_save_timer.setInterval(250)
@@ -337,7 +341,7 @@ class MainWindow(QMainWindow):
         self.artists_tab.configureFoldersRequested.connect(self.open_config_modal)
 
         # --- Filters wiring ---
-        self.search_box.textChanged.connect(self._apply_track_filters)
+        self.search_box.textChanged.connect(self._schedule_library_search)
         self.chk_synced.toggled.connect(self._apply_track_filters)
         self.chk_plain.toggled.connect(self._apply_track_filters)
         self.chk_instr.toggled.connect(self._apply_track_filters)
@@ -383,6 +387,19 @@ class MainWindow(QMainWindow):
         )
         if self.app_state.player and self.app_state.player.track:
             self.track_list.set_now_playing(self.app_state.player.track.track_id)
+
+    def _schedule_library_search(self):
+        self._search_apply_timer.start()
+
+    def _apply_library_search(self):
+        current = self.tabs.currentWidget()
+        text = self.search_box.text()
+        if current is self.tracks_tab:
+            self._apply_track_filters()
+        elif current is self.albums_tab:
+            self.albums_tab.setSearchValue(text)
+        elif current is self.artists_tab:
+            self.artists_tab.setSearchValue(text)
 
     # ------------------ modals ------------------
     def open_config_modal(self):
@@ -593,6 +610,7 @@ class MainWindow(QMainWindow):
             self.navigate_to(LibraryRoute(tab="albums", mode="root"))
         elif w is self.artists_tab:
             self.navigate_to(LibraryRoute(tab="artists", mode="root"))
+        self._schedule_library_search()
 
     def _on_player_track_changed(self, now_playing):
         # doar highlight în listă, fără label de text

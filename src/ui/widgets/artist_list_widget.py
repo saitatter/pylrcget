@@ -41,6 +41,14 @@ class ArtistListWidget(QWidget):
         self.app_state = app_state
         self._active = True
         self._search = ""
+        self._page_size = 200
+        self._sort_column = 0
+        self._sort_order = Qt.SortOrder.AscendingOrder
+        self._has_more_rows = False
+        self._loading_more = False
+        self._unknown_artist_ids: list[int] = []
+        self._unknown_album_count = 0
+        self._unknown_track_count = 0
 
         root = QVBoxLayout(self)
         root.setContentsMargins(0, 0, 0, 0)
@@ -74,7 +82,10 @@ class ArtistListWidget(QWidget):
         self.table.setColumnWidth(1, 90)
         self.table.setColumnWidth(2, 90)
         self.header.setStretchLastSection(True)
-        self.table.setSortingEnabled(True)
+        self.table.setSortingEnabled(False)
+        self.header.setSortIndicator(0, Qt.SortOrder.AscendingOrder)
+        self.header.sortIndicatorChanged.connect(self._on_sort_changed)
+        self.table.verticalScrollBar().valueChanged.connect(self._maybe_load_more)
         browser_layout.addWidget(self.table)
 
         self.empty_state = EmptyStateWidget()
@@ -138,11 +149,15 @@ class ArtistListWidget(QWidget):
             return
 
     def refresh(self):
+        self._load_rows(reset=True)
+
+    def _load_rows(self, *, reset: bool) -> None:
         from db.database import get_artist_rows
 
         directories = get_directories(self.app_state.db)
         if not directories:
             self.model.setRowCount(0)
+            self._has_more_rows = False
             self._show_empty_state(
                 icon_name="folder-open.svg",
                 title="No music folders yet",
@@ -152,19 +167,30 @@ class ArtistListWidget(QWidget):
             )
             return
 
-        rows = get_artist_rows(self.app_state.db, self._search)
+        rows = get_artist_rows(
+            self.app_state.db,
+            self._search,
+            limit=self._page_size + 1,
+            offset=0 if reset else self._loaded_real_row_count(),
+            sort_column=self._sort_column,
+            sort_order="desc" if self._sort_order == Qt.SortOrder.DescendingOrder else "asc",
+        )
+        self._has_more_rows = len(rows) > self._page_size
+        visible_rows = rows[: self._page_size]
         ui_rows: list[ArtistListRow] = []
-        unknown_artist_ids: list[int] = []
-        unknown_album_count = 0
-        unknown_track_count = 0
-        for r in rows:
+        if reset:
+            self.model.setRowCount(0)
+            self._unknown_artist_ids = []
+            self._unknown_album_count = 0
+            self._unknown_track_count = 0
+        for r in visible_rows:
             artist_id = int(r["artist_id"])
             artist_name = r["artist_name"] or ""
             display_artist = self._display_artist(artist_name)
             if display_artist == "N/A":
-                unknown_artist_ids.append(artist_id)
-                unknown_album_count += int(r.get("album_count") or 0)
-                unknown_track_count += int(r.get("track_count") or 0)
+                self._unknown_artist_ids.append(artist_id)
+                self._unknown_album_count += int(r.get("album_count") or 0)
+                self._unknown_track_count += int(r.get("track_count") or 0)
                 continue
 
             ui_rows.append(
@@ -175,18 +201,10 @@ class ArtistListWidget(QWidget):
                     tracks=int(r.get("track_count") or 0),
                 )
             )
-        if unknown_artist_ids:
-            ui_rows.append(
-                ArtistListRow(
-                    artist_ids=tuple(unknown_artist_ids),
-                    artist="N/A",
-                    albums=unknown_album_count,
-                    tracks=unknown_track_count,
-                )
-            )
-
-        self.set_rows(ui_rows)
-        if ui_rows:
+        self._append_rows(ui_rows, reset=reset)
+        self._sync_unknown_bucket()
+        self._loading_more = False
+        if self.model.rowCount():
             self._show_table()
         elif self._search.strip():
             self._show_empty_state(
@@ -216,6 +234,17 @@ class ArtistListWidget(QWidget):
             self.model.appendRow(items)
 
         self.table.sortByColumn(0, Qt.SortOrder.AscendingOrder)
+
+    def _append_rows(self, rows: Iterable[ArtistListRow], *, reset: bool = False):
+        if reset:
+            self.model.setRowCount(0)
+        for r in rows:
+            items = [
+                self._item_text(r.artist, r.artist_ids),
+                self._item_text(str(r.albums), r.artist_ids, align=Qt.AlignmentFlag.AlignCenter),
+                self._item_text(str(r.tracks), r.artist_ids, align=Qt.AlignmentFlag.AlignCenter),
+            ]
+            self.model.appendRow(items)
 
     def _show_artist_albums(self, artist_id: int | list[int] | tuple[int, ...], artist_name: str) -> None:
         artist_ids = [int(v) for v in artist_id] if isinstance(artist_id, (list, tuple)) else [int(artist_id)]
@@ -307,3 +336,56 @@ class ArtistListWidget(QWidget):
             self.refreshLibraryRequested.emit()
         elif self._empty_action == "clear-search":
             self.clearSearchRequested.emit()
+
+    def _loaded_real_row_count(self) -> int:
+        return self.model.rowCount() - (1 if self._unknown_artist_ids else 0)
+
+    def _find_unknown_row(self) -> int:
+        for row in range(self.model.rowCount()):
+            if self.model.index(row, 0).data(Qt.ItemDataRole.DisplayRole) == "N/A":
+                return row
+        return -1
+
+    def _sync_unknown_bucket(self) -> None:
+        if not self._unknown_artist_ids:
+            row = self._find_unknown_row()
+            if row >= 0:
+                self.model.removeRow(row)
+            return
+
+        row = self._find_unknown_row()
+        if row < 0:
+            self.model.appendRow(
+                [
+                    self._item_text("N/A", tuple(self._unknown_artist_ids)),
+                    self._item_text(str(self._unknown_album_count), tuple(self._unknown_artist_ids), align=Qt.AlignmentFlag.AlignCenter),
+                    self._item_text(str(self._unknown_track_count), tuple(self._unknown_artist_ids), align=Qt.AlignmentFlag.AlignCenter),
+                ]
+            )
+            return
+
+        self.model.item(row, 0).setData(tuple(self._unknown_artist_ids), Qt.ItemDataRole.UserRole)
+        self.model.item(row, 1).setData(tuple(self._unknown_artist_ids), Qt.ItemDataRole.UserRole)
+        self.model.item(row, 2).setData(tuple(self._unknown_artist_ids), Qt.ItemDataRole.UserRole)
+        self.model.item(row, 1).setText(str(self._unknown_album_count))
+        self.model.item(row, 2).setText(str(self._unknown_track_count))
+
+    def _on_sort_changed(self, column: int, order: Qt.SortOrder) -> None:
+        self._sort_column = int(column)
+        self._sort_order = order
+        if self._active and self.stack.currentWidget() is self.browser_page:
+            self.refresh()
+
+    def _maybe_load_more(self, value: int) -> None:
+        if (
+            not self._has_more_rows
+            or self._loading_more
+            or self.stack.currentWidget() is not self.browser_page
+            or self.table.isHidden()
+        ):
+            return
+        scroll = self.table.verticalScrollBar()
+        if value < max(0, scroll.maximum() - 120):
+            return
+        self._loading_more = True
+        self._load_rows(reset=False)

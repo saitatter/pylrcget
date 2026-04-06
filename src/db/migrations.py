@@ -189,3 +189,15 @@ def upgrade_database_if_needed(db: sqlite3.Connection, existing_version: int) ->
         """)
         db.commit()
         db.execute("PRAGMA user_version=16")
+
+    # v17
+    if existing_version <= 16:
+        print("Migrate database version 17...")
+        db.executescript("""
+            CREATE INDEX IF NOT EXISTS idx_tracks_artist_id ON tracks(artist_id);
+            CREATE INDEX IF NOT EXISTS idx_tracks_album_id ON tracks(album_id);
+            CREATE INDEX IF NOT EXISTS idx_tracks_artist_album ON tracks(artist_id, album_id);
+            CREATE INDEX IF NOT EXISTS idx_tracks_album_track_number ON tracks(album_id, track_number);
+        """)
+        db.commit()
+        db.execute("PRAGMA user_version=17")

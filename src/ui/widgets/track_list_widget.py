@@ -4,7 +4,7 @@ from __future__ import annotations
 from dataclasses import replace
 from typing import Sequence
 
-from PySide6.QtCore import Signal, Qt, QItemSelectionModel, QSortFilterProxyModel
+from PySide6.QtCore import Signal, Qt, QItemSelectionModel
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QTableView, QMenu, QStackedWidget, QLabel, QPushButton, QHBoxLayout
 
 from db.database import get_directories, get_track_rows
@@ -16,38 +16,6 @@ from ui.delegates.track_info_delegate import TrackInfoDelegate
 from ui.style_loader import load_stylesheet
 from ui.widgets.sortable_header_view import SortableHeaderView
 from core.tracklist_models import TrackListRow
-
-
-class TrackSortProxyModel(QSortFilterProxyModel):
-    _LYRICS_ORDER = {
-        "synced": 0,
-        "plain": 1,
-        "instrumental": 2,
-        "none": 3,
-    }
-
-    def lessThan(self, left, right) -> bool:
-        left_row = self.sourceModel().data(left, Qt.ItemDataRole.UserRole)
-        right_row = self.sourceModel().data(right, Qt.ItemDataRole.UserRole)
-
-        if left_row is None or right_row is None:
-            return super().lessThan(left, right)
-
-        column = left.column()
-        if column == 0:
-            left_key = ((left_row.artist or "").casefold(), left_row.title.casefold(), left_row.track_id)
-            right_key = ((right_row.artist or "").casefold(), right_row.title.casefold(), right_row.track_id)
-            return left_key < right_key
-        if column == 1:
-            left_key = (left_row.duration_s is None, left_row.duration_s or 0, left_row.track_id)
-            right_key = (right_row.duration_s is None, right_row.duration_s or 0, right_row.track_id)
-            return left_key < right_key
-        if column == 2:
-            left_key = (self._LYRICS_ORDER.get(left_row.lyrics_state, 99), left_row.title.casefold(), left_row.track_id)
-            right_key = (self._LYRICS_ORDER.get(right_row.lyrics_state, 99), right_row.title.casefold(), right_row.track_id)
-            return left_key < right_key
-
-        return super().lessThan(left, right)
 
 
 class TrackListWidget(QWidget):
@@ -65,6 +33,7 @@ class TrackListWidget(QWidget):
         super().__init__()
         self.app_state = app_state
         self._active = True
+        self._page_size = 250
         self._search = ""
         self._filters = dict(
             synced=True,
@@ -79,6 +48,10 @@ class TrackListWidget(QWidget):
         self._scope_label: str = ""
         self._scope_banner_enabled = True
         self._download_states: dict[int, str] = {}
+        self._sort_column = 0
+        self._sort_order = Qt.SortOrder.AscendingOrder
+        self._has_more_rows = False
+        self._loading_more = False
 
         self.scope_bar = QWidget()
         self.scope_bar.setObjectName("TrackScopeBar")
@@ -97,10 +70,7 @@ class TrackListWidget(QWidget):
         self.stack = QStackedWidget()
         self.table = QTableView()
         self.model = TrackTableModel([])
-        self.proxy_model = TrackSortProxyModel(self)
-        self.proxy_model.setSourceModel(self.model)
-        self.proxy_model.setDynamicSortFilter(True)
-        self.table.setModel(self.proxy_model)
+        self.table.setModel(self.model)
         self.header = SortableHeaderView(
             Qt.Orientation.Horizontal,
             self.table,
@@ -117,8 +87,10 @@ class TrackListWidget(QWidget):
         self.table.setAlternatingRowColors(True)
         self.table.setMouseTracking(True)
         self.table.viewport().setMouseTracking(True)
-        self.table.setSortingEnabled(True)
-        self.table.sortByColumn(0, Qt.SortOrder.AscendingOrder)
+        self.table.setSortingEnabled(False)
+        self.header.setSortIndicator(0, Qt.SortOrder.AscendingOrder)
+        self.header.sortIndicatorChanged.connect(self._on_sort_changed)
+        self.table.verticalScrollBar().valueChanged.connect(self._maybe_load_more)
 
         self.table.setColumnWidth(0, 520)
         self.table.setColumnWidth(1, 90)
@@ -218,10 +190,14 @@ class TrackListWidget(QWidget):
             self.refresh()
 
     def refresh(self):
+        self._load_rows(reset=True)
+
+    def _load_rows(self, *, reset: bool) -> None:
         db = self.app_state.db
         directories = get_directories(db)
         if not directories:
             self.model.set_rows([])
+            self._has_more_rows = False
             self._show_empty_state(
                 icon_name="folder-open.svg",
                 title="No music folders yet",
@@ -238,14 +214,20 @@ class TrackListWidget(QWidget):
             plain_lyrics_tracks=self._filters["plain"],
             instrumental_tracks=self._filters["instrumental"],
             no_lyrics_tracks=self._filters["none"],
+            limit=self._page_size + 1,
+            offset=0 if reset else self.model.rowCount(),
             artist_id=self._artist_id,
             album_id=self._album_id,
             artist_ids=self._artist_ids,
             album_ids=self._album_ids,
+            sort_column=self._sort_column,
+            sort_order="desc" if self._sort_order == Qt.SortOrder.DescendingOrder else "asc",
         )
+        self._has_more_rows = len(rows) > self._page_size
+        visible_rows = rows[: self._page_size]
 
         ui_rows: list[TrackListRow] = []
-        for r in rows:
+        for r in visible_rows:
             instrumental = bool(r["instrumental"])
             lrc = r["lrc_lyrics"]
             txt = r["txt_lyrics"]
@@ -276,8 +258,12 @@ class TrackListWidget(QWidget):
                 )
             )
 
-        self.model.set_rows(ui_rows)
-        if ui_rows:
+        if reset:
+            self.model.set_rows(ui_rows)
+        else:
+            self.model.append_rows(ui_rows)
+        self._loading_more = False
+        if self.model.rowCount():
             self.stack.setCurrentWidget(self.table)
         else:
             self._show_empty_state(
@@ -295,9 +281,8 @@ class TrackListWidget(QWidget):
         idxs = sm.selectedRows()
         if not idxs:
             return None
-        row = self._source_row(idxs[0])
         try:
-            return int(self.model.track_id_at(row))
+            return int(self.model.track_id_at(idxs[0].row()))
         except Exception:
             return None
 
@@ -307,8 +292,7 @@ class TrackListWidget(QWidget):
     def _on_double_click(self, index):
         if not index.isValid():
             return
-        row = self._source_row(index)
-        track_id = self.model.track_id_at(row)
+        track_id = self.model.track_id_at(index.row())
         if track_id is not None:
             self.playTrack.emit(int(track_id))
 
@@ -327,7 +311,7 @@ class TrackListWidget(QWidget):
             return
 
         menu = QMenu(self)
-        current_track_id = self.model.track_id_at(self._source_row(idx))
+        current_track_id = self.model.track_id_at(idx.row())
 
         info = menu.addAction(f"{len(selected_ids)} track selected" if len(selected_ids) == 1 else f"{len(selected_ids)} tracks selected")
         info.setEnabled(False)
@@ -374,9 +358,7 @@ class TrackListWidget(QWidget):
         if row < 0:
             return  # track not in current filtered view
 
-        idx = self.proxy_model.mapFromSource(self.model.index(row, 0))
-        if not idx.isValid():
-            return
+        idx = self.model.index(row, 0)
         sm = self.table.selectionModel()
         if sm is None:
             return
@@ -391,7 +373,7 @@ class TrackListWidget(QWidget):
         idx = self.table.currentIndex()
         if not idx.isValid():
             return None
-        return self.model.track_id_at(self._source_row(idx))
+        return self.model.track_id_at(idx.row())
 
     def setArtistFilter(self, artist_id: int | Sequence[int] | None):
         if isinstance(artist_id, Sequence) and not isinstance(artist_id, (str, bytes)):
@@ -439,7 +421,7 @@ class TrackListWidget(QWidget):
             return []
         ids: list[int] = []
         for idx in sm.selectedRows():
-            tid = self.model.track_id_at(self._source_row(idx))
+            tid = self.model.track_id_at(idx.row())
             if tid is not None:
                 ids.append(int(tid))
         # keep stable order (row order)
@@ -460,9 +442,7 @@ class TrackListWidget(QWidget):
             if tid is None:
                 continue
             if int(tid) in track_ids:
-                idx = self.proxy_model.mapFromSource(self.model.index(row, 0))
-                if not idx.isValid():
-                    continue
+                idx = self.model.index(row, 0)
                 sm.select(idx, QItemSelectionModel.Select | QItemSelectionModel.Rows)
                 if first_idx is None:
                     first_idx = idx
@@ -492,9 +472,6 @@ class TrackListWidget(QWidget):
         detail = self._scope_label.strip() or "Library filter active"
         self.scope_label.setText(f"Showing a filtered view. {detail}")
 
-    def _source_row(self, index) -> int:
-        return self.proxy_model.mapToSource(index).row()
-
     def _show_empty_state(self, *, icon_name: str, title: str, body: str, action_text: str, action_key: str) -> None:
         self._empty_action = action_key
         self.empty_state.configure(
@@ -520,3 +497,20 @@ class TrackListWidget(QWidget):
         self.model._rows[row] = replace(current, download_state=state)
         idx = self.model.index(row, 3)
         self.model.dataChanged.emit(idx, idx, [Qt.DisplayRole, Qt.UserRole])
+
+    def _on_sort_changed(self, column: int, order: Qt.SortOrder) -> None:
+        if column == 3:
+            return
+        self._sort_column = int(column)
+        self._sort_order = order
+        if self._active:
+            self.refresh()
+
+    def _maybe_load_more(self, value: int) -> None:
+        if not self._has_more_rows or self._loading_more:
+            return
+        scroll = self.table.verticalScrollBar()
+        if value < max(0, scroll.maximum() - 120):
+            return
+        self._loading_more = True
+        self._load_rows(reset=False)

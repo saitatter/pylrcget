@@ -216,6 +216,9 @@ class NavigationBucketTests(unittest.TestCase):
 
     def test_album_widget_merges_unknown_album_bucket(self):
         app_state = SimpleNamespace(db=sqlite3.connect(":memory:"))
+        app_state.db.row_factory = sqlite3.Row
+        app_state.db.execute("CREATE TABLE directories (path TEXT)")
+        app_state.db.execute("INSERT INTO directories(path) VALUES ('C:/Music')")
         widget = AlbumListWidget(app_state)
         try:
             rows = [
@@ -240,6 +243,9 @@ class NavigationBucketTests(unittest.TestCase):
 
     def test_artist_widget_merges_unknown_artist_bucket(self):
         app_state = SimpleNamespace(db=sqlite3.connect(":memory:"))
+        app_state.db.row_factory = sqlite3.Row
+        app_state.db.execute("CREATE TABLE directories (path TEXT)")
+        app_state.db.execute("INSERT INTO directories(path) VALUES ('C:/Music')")
         widget = ArtistListWidget(app_state)
         try:
             rows = [

@@ -134,7 +134,15 @@ def add_artist(db: sqlite3.Connection, name: str, *, commit: bool = True) -> int
     return int(cursor.lastrowid)
 
 
-def get_artist_rows(db: sqlite3.Connection, search_query: str = "") -> list[dict]:
+def get_artist_rows(
+    db: sqlite3.Connection,
+    search_query: str = "",
+    *,
+    limit: int | None = None,
+    offset: int = 0,
+    sort_column: int = 0,
+    sort_order: str = "asc",
+) -> list[dict]:
     q = """
     SELECT
         ar.id                AS artist_id,
@@ -151,10 +159,18 @@ def get_artist_rows(db: sqlite3.Connection, search_query: str = "") -> list[dict
         q += " AND ar.name LIKE ?"
         params.append(f"%{search_query}%")
 
-    q += """
+    order = "DESC" if str(sort_order).lower() == "desc" else "ASC"
+    order_map = {
+        0: f"ar.name COLLATE NOCASE {order}",
+        1: f"album_count {order}, ar.name COLLATE NOCASE {order}",
+        2: f"track_count {order}, ar.name COLLATE NOCASE {order}",
+    }
+    q += f"""
     GROUP BY ar.id, ar.name
-    ORDER BY ar.name COLLATE NOCASE
+    ORDER BY {order_map.get(int(sort_column), order_map[0])}
     """
+    if limit:
+        q += f" LIMIT {int(limit)} OFFSET {max(0, int(offset))}"
 
     cur = db.execute(q, params)
     cols = [c[0] for c in cur.description]
@@ -221,6 +237,11 @@ def get_album_rows(
     search_query: str = "",
     artist_id: int | None = None,
     artist_ids: Sequence[int] | None = None,
+    *,
+    limit: int | None = None,
+    offset: int = 0,
+    sort_column: int = 0,
+    sort_order: str = "asc",
 ) -> list[dict]:
     q = """
     SELECT
@@ -248,10 +269,18 @@ def get_album_rows(
         q += " AND t.artist_id = ?"
         params.append(int(artist_id))
 
-    q += """
+    order = "DESC" if str(sort_order).lower() == "desc" else "ASC"
+    order_map = {
+        0: f"a.name COLLATE NOCASE {order}, ar.name COLLATE NOCASE {order}",
+        1: f"ar.name COLLATE NOCASE {order}, a.name COLLATE NOCASE {order}",
+        2: f"track_count {order}, a.name COLLATE NOCASE {order}",
+    }
+    q += f"""
     GROUP BY a.id, a.name, ar.name
-    ORDER BY ar.name COLLATE NOCASE, a.name COLLATE NOCASE
+    ORDER BY {order_map.get(int(sort_column), order_map[0])}
     """
+    if limit:
+        q += f" LIMIT {int(limit)} OFFSET {max(0, int(offset))}"
 
     cur = db.execute(q, params)
     cols = [c[0] for c in cur.description]
@@ -419,10 +448,13 @@ def get_track_rows(
     instrumental_tracks: bool,
     no_lyrics_tracks: bool,
     limit: int | None = None,
+    offset: int = 0,
     artist_id: int | None = None,
     album_id: int | None = None,
     artist_ids: Sequence[int] | None = None,
     album_ids: Sequence[int] | None = None,
+    sort_column: int = 0,
+    sort_order: str = "asc",
 ) -> list[sqlite3.Row]:
     conditions: list[str] = []
     params: list[object] = []
@@ -461,7 +493,22 @@ def get_track_rows(
         params.append(int(album_id))
 
     where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
-    limit_clause = f"LIMIT {int(limit)}" if limit else ""
+    order = "DESC" if str(sort_order).lower() == "desc" else "ASC"
+    order_map = {
+        0: f"artists.name_lower {order}, tracks.title_lower {order}, tracks.id {order}",
+        1: f"tracks.duration IS NULL ASC, tracks.duration {order}, tracks.id {order}",
+        2: (
+            "CASE "
+            "WHEN tracks.lrc_lyrics IS NOT NULL AND tracks.lrc_lyrics != '[au: instrumental]' THEN 0 "
+            "WHEN tracks.txt_lyrics IS NOT NULL THEN 1 "
+            "WHEN tracks.instrumental = 1 THEN 2 "
+            "ELSE 3 END "
+            f"{order}, tracks.title_lower {order}, tracks.id {order}"
+        ),
+        3: f"tracks.title_lower {order}, tracks.id {order}",
+    }
+    order_clause = order_map.get(int(sort_column), order_map[0])
+    limit_clause = f"LIMIT {int(limit)} OFFSET {max(0, int(offset))}" if limit else ""
 
     query = f"""
         SELECT
@@ -479,7 +526,7 @@ def get_track_rows(
         JOIN artists ON tracks.artist_id = artists.id
         JOIN albums ON tracks.album_id = albums.id
         {where_clause}
-        ORDER BY tracks.title_lower ASC
+        ORDER BY {order_clause}
         {limit_clause}
     """
     return db.execute(query, params).fetchall()
