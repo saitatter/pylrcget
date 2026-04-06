@@ -883,16 +883,20 @@ class MainWindow(QMainWindow):
     def _open_current_track_album(self, track_id: int) -> None:
         try:
             track = get_track_by_id(self.app_state.db, int(track_id))
+            if track.album_id is None:
+                return
+            self._on_open_album(int(track.album_id))
         except Exception:
             return
-        self._on_open_album(int(track.album_id))
 
     def _open_current_track_artist(self, track_id: int) -> None:
         try:
             track = get_track_by_id(self.app_state.db, int(track_id))
+            if track.artist_id is None:
+                return
+            self._on_open_artist(int(track.artist_id))
         except Exception:
             return
-        self._on_open_artist(int(track.artist_id))
     
     def _confirm_bulk(self, title: str, text: str, count: int) -> bool:
         # Confirm only when selection is "large"

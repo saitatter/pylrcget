@@ -62,33 +62,23 @@ class TrackInfoDelegate(QStyledItemDelegate):
         artist_clickable = bool(artist_text and row.artist_id is not None)
         album_display = album_text or "N/A"
         artist_display = artist_text or "N/A"
-        separator = " | "
+        album_visible, artist_visible, separator_visible, album_rect, artist_rect = self._metadata_layout(
+            meta_rect, meta_metrics, row
+        )
 
-        x = meta_rect.left()
-        if album_display:
-            album_width = meta_metrics.horizontalAdvance(album_display)
+        if album_visible:
             painter.setPen(link_color if album_clickable else meta_color)
-            painter.drawText(
-                QRect(x, meta_rect.top(), max(0, meta_rect.width() - (x - meta_rect.left())), meta_rect.height()),
-                Qt.AlignLeft | Qt.AlignVCenter,
-                meta_metrics.elidedText(album_display, Qt.ElideRight, meta_rect.width()),
-            )
-            x += min(album_width, meta_rect.width())
+            painter.drawText(album_rect, Qt.AlignLeft | Qt.AlignVCenter, album_visible)
 
-        if x < meta_rect.right():
+        if separator_visible:
             painter.setPen(meta_color)
-            sep_width = meta_metrics.horizontalAdvance(separator)
-            painter.drawText(QRect(x, meta_rect.top(), sep_width, meta_rect.height()), Qt.AlignLeft | Qt.AlignVCenter, separator)
-            x += sep_width
+            sep_x = album_rect.right()
+            sep_width = meta_metrics.horizontalAdvance(separator_visible)
+            painter.drawText(QRect(sep_x, meta_rect.top(), sep_width, meta_rect.height()), Qt.AlignLeft | Qt.AlignVCenter, separator_visible)
 
-        if artist_display and x < meta_rect.right():
+        if artist_visible:
             painter.setPen(link_color if artist_clickable else meta_color)
-            remaining = max(0, meta_rect.right() - x)
-            painter.drawText(
-                QRect(x, meta_rect.top(), remaining, meta_rect.height()),
-                Qt.AlignLeft | Qt.AlignVCenter,
-                meta_metrics.elidedText(artist_display, Qt.ElideRight, remaining),
-            )
+            painter.drawText(artist_rect, Qt.AlignLeft | Qt.AlignVCenter, artist_visible)
 
         painter.restore()
 
@@ -134,20 +124,32 @@ class TrackInfoDelegate(QStyledItemDelegate):
 
         album_text = self._clean_metadata(row.album, kind="album")
         artist_text = self._clean_metadata(row.artist, kind="artist")
-        separator = " | "
-        x = meta_rect.left()
+        _, _, _, album_rect, artist_rect = self._metadata_layout(meta_rect, metrics, row)
 
-        if album_text:
-            album_width = metrics.horizontalAdvance(album_text)
-            if QRect(x, meta_rect.top(), album_width, meta_rect.height()).contains(pos):
-                return "album"
-            x += album_width
-
-        x += metrics.horizontalAdvance(separator)
-
-        if artist_text:
-            artist_width = metrics.horizontalAdvance(artist_text)
-            if QRect(x, meta_rect.top(), artist_width, meta_rect.height()).contains(pos):
-                return "artist"
+        if album_text and row.album_id is not None and album_rect.isValid() and album_rect.contains(pos):
+            return "album"
+        if artist_text and row.artist_id is not None and artist_rect.isValid() and artist_rect.contains(pos):
+            return "artist"
 
         return None
+
+    def _metadata_layout(self, meta_rect: QRect, metrics: QFontMetrics, row) -> tuple[str, str, str, QRect, QRect]:
+        album_display = self._clean_metadata(row.album, kind="album") or "N/A"
+        artist_display = self._clean_metadata(row.artist, kind="artist") or "N/A"
+        separator = " | "
+
+        album_visible = metrics.elidedText(album_display, Qt.ElideRight, meta_rect.width())
+        album_width = min(metrics.horizontalAdvance(album_visible), meta_rect.width())
+        album_rect = QRect(meta_rect.left(), meta_rect.top(), max(0, album_width), meta_rect.height())
+
+        remaining_after_album = max(0, meta_rect.width() - album_width)
+        sep_width = metrics.horizontalAdvance(separator) if remaining_after_album > 0 else 0
+        separator_visible = separator if sep_width > 0 and remaining_after_album >= sep_width else ""
+
+        artist_x = meta_rect.left() + album_width + sep_width
+        artist_width_available = max(0, meta_rect.right() - artist_x)
+        artist_visible = metrics.elidedText(artist_display, Qt.ElideRight, artist_width_available) if artist_width_available > 0 else ""
+        artist_width = metrics.horizontalAdvance(artist_visible) if artist_visible else 0
+        artist_rect = QRect(artist_x, meta_rect.top(), max(0, artist_width), meta_rect.height())
+
+        return album_visible, artist_visible, separator_visible, album_rect, artist_rect
