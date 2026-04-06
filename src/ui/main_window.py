@@ -201,22 +201,10 @@ class MainWindow(QMainWindow):
         self.nav_bar.setObjectName("LibraryNavBar")
         nav_layout = QHBoxLayout(self.nav_bar)
         set_layout_spacing(nav_layout, margins=(SPACE_2, 0, SPACE_2, 0), spacing=SPACE_2)
-        self.btn_nav_back = QToolButton()
-        self.btn_nav_back.setObjectName("LibraryNavButton")
-        self.btn_nav_back.setIcon(load_svg_icon("skip-back.svg", 16))
-        self.btn_nav_back.setToolTip("Back")
-        self.btn_nav_back.clicked.connect(self._navigate_back)
-        self.btn_nav_forward = QToolButton()
-        self.btn_nav_forward.setObjectName("LibraryNavButton")
-        self.btn_nav_forward.setIcon(load_svg_icon("skip-forward.svg", 16))
-        self.btn_nav_forward.setToolTip("Forward")
-        self.btn_nav_forward.clicked.connect(self._navigate_forward)
         self.breadcrumbs = QWidget()
         self.breadcrumbs.setObjectName("LibraryBreadcrumbs")
         self.breadcrumbs_layout = QHBoxLayout(self.breadcrumbs)
         set_layout_spacing(self.breadcrumbs_layout, margins=0, spacing=SPACE_1)
-        nav_layout.addWidget(self.btn_nav_back)
-        nav_layout.addWidget(self.btn_nav_forward)
         nav_layout.addWidget(self.breadcrumbs, 1)
         self.layout.addWidget(self.nav_bar)
 
@@ -955,8 +943,6 @@ class MainWindow(QMainWindow):
         return replace(route, artist_label=artist_label, album_label=album_label)
 
     def _update_nav_controls(self) -> None:
-        self.btn_nav_back.setEnabled(self._nav_index > 0)
-        self.btn_nav_forward.setEnabled(0 <= self._nav_index < len(self._nav_history) - 1)
         while self.breadcrumbs_layout.count():
             item = self.breadcrumbs_layout.takeAt(0)
             widget = item.widget()
