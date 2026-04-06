@@ -92,8 +92,7 @@ class ToastWidget(QFrame):
         self._anim_pos: Optional[QPropertyAnimation] = None
 
     def close_requested(self):
-        # Let the manager handle the removal animation.
-        self.parent()._dismiss_toast(self)  # type: ignore[attr-defined]
+        self.closeRequested.emit(self)
 
     def play_in(self, start_pos: QPoint, end_pos: QPoint):
         self.move(start_pos)
