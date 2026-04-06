@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import base64
-import struct
 from pathlib import Path
 
 from PySide6.QtCore import QSize, Qt
@@ -109,28 +108,11 @@ def _embedded_cover_bytes(audio_path: str | None) -> bytes | None:
         return None
 
     try:
-        if isinstance(audio, ASF) and getattr(audio, "tags", None):
-            for picture in audio.tags.get("WM/Picture", []):
-                raw = getattr(picture, "value", picture)
-                if not raw:
-                    continue
-                try:
-                    _picture_type, size = struct.unpack_from("<bi", raw)
-                    pos = 5
-
-                    while raw[pos:pos + 2] != b"\x00\x00":
-                        pos += 2
-                    pos += 2
-
-                    while raw[pos:pos + 2] != b"\x00\x00":
-                        pos += 2
-                    pos += 2
-
-                    image_data = raw[pos:pos + size]
-                    if image_data:
-                        return bytes(image_data)
-                except Exception:
-                    continue
+        if isinstance(audio, ASF):
+            for picture in audio.get("WM/Picture", []):
+                data = getattr(picture, "data", None)
+                if data:
+                    return bytes(data)
 
         if isinstance(audio, FLAC) and getattr(audio, "pictures", None):
             picture = audio.pictures[0]

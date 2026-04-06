@@ -197,7 +197,7 @@ def read_embedded_lyrics(path: str) -> Tuple[Optional[str], Optional[str]]:
 
             def _first_asf_text(keys: tuple[str, ...]) -> Optional[str]:
                 for key in keys:
-                    values = audio.tags.get(key) if getattr(audio, "tags", None) else None
+                    values = audio.get(key)
                     if not values:
                         continue
                     for value in values:

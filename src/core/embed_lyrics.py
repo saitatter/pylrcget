@@ -185,7 +185,7 @@ def _embed_mp3(path: str, plain: Optional[str], synced: Optional[str]) -> None:
     tags.save(path)
 
 
-def _write_id3_lyrics(tags, plain: Optional[str], synced: Optional[str]) -> None:
+def _write_id3_lyrics(tags: ID3, plain: Optional[str], synced: Optional[str]) -> None:
     tags.delall("USLT")
     tags.delall(f"TXXX:{ID3_SYNCED_DESC}")
     tags.delall(f"TXXX:{ID3_PLAIN_DESC}")
