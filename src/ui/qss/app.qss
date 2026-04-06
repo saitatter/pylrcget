@@ -106,7 +106,7 @@ QCheckBox::indicator:unchecked {
 QCheckBox::indicator:checked {
     background: {{color-accent}};
     border-color: {{color-accent}};
-    image: url({{asset-url}}/assets/icons/check.svg);
+    image: url("{{asset-url}}/assets/icons/check.svg");
 }
 
 QCheckBox::indicator:hover {
