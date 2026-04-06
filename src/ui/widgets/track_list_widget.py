@@ -175,15 +175,27 @@ class TrackListWidget(QWidget):
             self._album_ids = None
             self._scope_label = ""
         elif route.mode == "artist":
-            self.setAlbumFilter(None)
-            self.setArtistFilter(list(route.artist_ids) if len(route.artist_ids) > 1 else (route.artist_ids[0] if route.artist_ids else None))
-            self.setArtistFilterLabel(route.artist_label)
-            return
+            self._album_id = None
+            self._album_ids = None
+            if len(route.artist_ids) > 1:
+                values = [int(v) for v in route.artist_ids]
+                self._artist_ids = values
+                self._artist_id = None
+            else:
+                self._artist_id = int(route.artist_ids[0]) if route.artist_ids else None
+                self._artist_ids = None
+            self._scope_label = f"Artist: {route.artist_label}" if route.artist_label else "Artist filter active"
         elif route.mode == "album":
-            self.setArtistFilter(None)
-            self.setAlbumFilter(list(route.album_ids) if len(route.album_ids) > 1 else (route.album_ids[0] if route.album_ids else None))
-            self.setAlbumFilterLabel(route.album_label)
-            return
+            self._artist_id = None
+            self._artist_ids = None
+            if len(route.album_ids) > 1:
+                values = [int(v) for v in route.album_ids]
+                self._album_ids = values
+                self._album_id = None
+            else:
+                self._album_id = int(route.album_ids[0]) if route.album_ids else None
+                self._album_ids = None
+            self._scope_label = f"Album: {route.album_label}" if route.album_label else "Album filter active"
 
         self._update_scope_banner()
         if self._active:

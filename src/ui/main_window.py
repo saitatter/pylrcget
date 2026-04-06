@@ -59,6 +59,8 @@ class MainWindow(QMainWindow):
         self._nav_history: list[LibraryRoute] = []
         self._nav_index: int = -1
         self._current_route = tracks_all()
+        self._artist_label_cache: dict[int, str] = {}
+        self._album_label_cache: dict[int, str] = {}
         self._nav_apply_in_progress = False
         self._tab_sync_suppressed = False
         self._playback_speed_save_timer = QTimer(self)
@@ -920,20 +922,33 @@ class MainWindow(QMainWindow):
         album_label = route.album_label
 
         if not artist_label and len(route.artist_ids) == 1:
-            try:
-                artist = get_artist_by_id(self.app_state.db, int(route.artist_ids[0]))
-                artist_label = self._display_artist_name(artist.get("artist_name", ""))
-            except Exception:
-                artist_label = artist_label
+            artist_id = int(route.artist_ids[0])
+            artist_label = self._artist_label_cache.get(artist_id, artist_label)
+            if not artist_label:
+                try:
+                    artist = get_artist_by_id(self.app_state.db, artist_id)
+                    artist_label = self._display_artist_name(artist.get("artist_name", ""))
+                    if artist_label:
+                        self._artist_label_cache[artist_id] = artist_label
+                except Exception:
+                    artist_label = artist_label
 
         if not album_label and len(route.album_ids) == 1:
-            try:
-                album = get_album_by_id(self.app_state.db, int(route.album_ids[0]))
-                album_label = self._display_album_name(album.get("album_name", ""))
-                if not artist_label:
-                    artist_label = self._display_artist_name(album.get("artist_name") or album.get("album_artist_name") or "")
-            except Exception:
-                album_label = album_label
+            album_id = int(route.album_ids[0])
+            album_label = self._album_label_cache.get(album_id, album_label)
+            if not album_label:
+                try:
+                    album = get_album_by_id(self.app_state.db, album_id)
+                    album_label = self._display_album_name(album.get("album_name", ""))
+                    if album_label:
+                        self._album_label_cache[album_id] = album_label
+                    if not artist_label:
+                        artist_label = self._display_artist_name(album.get("artist_name") or album.get("album_artist_name") or "")
+                        artist_id = album.get("artist_id")
+                        if artist_label and artist_id is not None:
+                            self._artist_label_cache[int(artist_id)] = artist_label
+                except Exception:
+                    album_label = album_label
 
         if artist_label == route.artist_label and album_label == route.album_label:
             return route

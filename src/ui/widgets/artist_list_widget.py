@@ -46,6 +46,7 @@ class ArtistListWidget(QWidget):
         self._sort_order = Qt.SortOrder.AscendingOrder
         self._has_more_rows = False
         self._loading_more = False
+        self._loaded_db_rows = 0
         self._unknown_artist_ids: list[int] = []
         self._unknown_album_count = 0
         self._unknown_track_count = 0
@@ -171,7 +172,7 @@ class ArtistListWidget(QWidget):
             self.app_state.db,
             self._search,
             limit=self._page_size + 1,
-            offset=0 if reset else self._loaded_real_row_count(),
+            offset=0 if reset else self._loaded_db_rows,
             sort_column=self._sort_column,
             sort_order="desc" if self._sort_order == Qt.SortOrder.DescendingOrder else "asc",
         )
@@ -180,9 +181,11 @@ class ArtistListWidget(QWidget):
         ui_rows: list[ArtistListRow] = []
         if reset:
             self.model.setRowCount(0)
+            self._loaded_db_rows = 0
             self._unknown_artist_ids = []
             self._unknown_album_count = 0
             self._unknown_track_count = 0
+        self._loaded_db_rows += len(visible_rows)
         for r in visible_rows:
             artist_id = int(r["artist_id"])
             artist_name = r["artist_name"] or ""
@@ -336,9 +339,6 @@ class ArtistListWidget(QWidget):
             self.refreshLibraryRequested.emit()
         elif self._empty_action == "clear-search":
             self.clearSearchRequested.emit()
-
-    def _loaded_real_row_count(self) -> int:
-        return self.model.rowCount() - (1 if self._unknown_artist_ids else 0)
 
     def _find_unknown_row(self) -> int:
         for row in range(self.model.rowCount()):
