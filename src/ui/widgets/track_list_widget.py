@@ -525,4 +525,7 @@ class TrackListWidget(QWidget):
         if value < max(0, scroll.maximum() - 120):
             return
         self._loading_more = True
-        self._load_rows(reset=False)
+        try:
+            self._load_rows(reset=False)
+        finally:
+            self._loading_more = False
