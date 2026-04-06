@@ -977,7 +977,7 @@ class MainWindow(QMainWindow):
                     if artist_label:
                         self._artist_label_cache[artist_id] = artist_label
                 except Exception:
-                    artist_label = artist_label
+                    pass
 
         if not album_label and len(route.album_ids) == 1:
             album_id = int(route.album_ids[0])
@@ -994,7 +994,7 @@ class MainWindow(QMainWindow):
                         if artist_label and artist_id is not None:
                             self._artist_label_cache[int(artist_id)] = artist_label
                 except Exception:
-                    album_label = album_label
+                    pass
 
         if artist_label == route.artist_label and album_label == route.album_label:
             return route
