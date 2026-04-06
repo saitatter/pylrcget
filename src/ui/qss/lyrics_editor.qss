@@ -1,6 +1,6 @@
 QLabel#LyricsTitle {
     font-weight: 650;
-    font-size: 14px;
+    font-size: {{font-size-lg}};
 }
 
 QLabel#LyricsMessage {
@@ -8,10 +8,10 @@ QLabel#LyricsMessage {
 }
 
 QLabel#LyricsValidationHint {
-    border-radius: 10px;
-    padding: 6px 10px;
-    background: #0f172a;
-    color: #cbd5e1;
+    border-radius: {{radius-md}};
+    padding: 6px {{space-3}};
+    background: {{color-bg-pressed}};
+    color: {{color-text}};
     border: 1px solid #1e293b;
 }
 

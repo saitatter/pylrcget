@@ -1,6 +1,6 @@
 QWidget#PlayerBar {
-    background-color: #020617;
-    border-top: 1px solid #111827;
+    background-color: {{color-bg-app}};
+    border-top: 1px solid {{color-border-strong}};
 }
 
 QWidget#PlayerBar[compact="true"] QWidget#PlayerExtras {
@@ -18,41 +18,41 @@ QWidget#PlayerBar[compact="true"] QLabel#NowPlayingArtist {
 QWidget#PlayerMeta,
 QWidget#PlayerCenter,
 QWidget#PlayerExtras {
-    background: #040b19;
-    border: 1px solid #111827;
-    border-radius: 14px;
+    background: {{color-bg-panel}};
+    border: 1px solid {{color-border-strong}};
+    border-radius: {{radius-lg}};
 }
 
 QToolButton {
     border: 1px solid transparent;
     background: transparent;
-    padding: 8px;
-    border-radius: 10px;
-    color: #e5e7eb;
+    padding: {{space-2}};
+    border-radius: {{radius-md}};
+    color: {{color-text}};
 }
 
 QToolButton:hover {
-    background: #0b1222;
-    border-color: #1f2937;
-    color: #38bdf8;
+    background: {{color-bg-control}};
+    border-color: {{color-border}};
+    color: {{color-accent}};
 }
 
 QToolButton:pressed {
-    background: #0f172a;
+    background: {{color-bg-pressed}};
 }
 
 QToolButton#BtnPlay {
-    background: #111827;
-    border: 1px solid #1f2937;
-    border-radius: 999px;
+    background: {{color-bg-elevated}};
+    border: 1px solid {{color-border}};
+    border-radius: {{radius-pill}};
     padding: 10px;
-    color: #e5e7eb;
+    color: {{color-text}};
 }
 
 QToolButton#BtnPlay:hover {
-    border-color: #38bdf8;
+    border-color: {{color-accent}};
     background: #08101f;
-    color: #38bdf8;
+    color: {{color-accent}};
 }
 
 QToolButton#BtnPlay:pressed {
@@ -60,42 +60,42 @@ QToolButton#BtnPlay:pressed {
 }
 
 QLabel {
-    color: #9ca3af;
-    font-size: 11px;
+    color: {{color-text-soft}};
+    font-size: {{font-size-sm}};
 }
 
 QLabel#NowPlaying {
-    color: #f8fafc;
-    font-size: 14px;
+    color: {{color-text-strong}};
+    font-size: {{font-size-lg}};
     font-weight: 600;
 }
 
 QLabel#NowPlayingArtist {
-    color: #cbd5e1;
-    font-size: 11px;
+    color: {{color-text}};
+    font-size: {{font-size-sm}};
 }
 
 QLabel#NowPlayingAlbum {
     color: #64748b;
-    font-size: 11px;
+    font-size: {{font-size-sm}};
 }
 
 QLabel#MetaLabel,
 QLabel#TimeLabel {
-    color: #cbd5e1;
-    font-size: 11px;
+    color: {{color-text}};
+    font-size: {{font-size-sm}};
     font-weight: 500;
 }
 
 QLabel#NowPlayingCover {
-    background: #0f172a;
+    background: {{color-bg-pressed}};
     border: 1px solid #1e293b;
     border-radius: 12px;
 }
 
 QSlider#PlayerSlider::groove:horizontal {
     height: 8px;
-    background: #0f172a;
+    background: {{color-bg-pressed}};
     border-radius: 4px;
 }
 
@@ -104,7 +104,7 @@ QSlider#PlayerSlider::handle:horizontal {
     height: 16px;
     margin: -5px 0;
     border-radius: 8px;
-    background: #38bdf8;
+    background: {{color-accent}};
     border: 2px solid #e0f2fe;
 }
 
@@ -123,17 +123,17 @@ QSlider#PlayerSlider::add-page:horizontal {
 }
 
 QComboBox#SpeedCombo {
-    background: #0b1222;
-    border: 1px solid #1f2937;
-    border-radius: 10px;
+    background: {{color-bg-control}};
+    border: 1px solid {{color-border}};
+    border-radius: {{radius-md}};
     padding: 8px 10px;
-    color: #e5e7eb;
+    color: {{color-text}};
     min-width: 84px;
-    font-size: 11px;
+    font-size: {{font-size-sm}};
 }
 
 QComboBox#SpeedCombo:hover {
-    border-color: #38bdf8;
+    border-color: {{color-accent}};
 }
 
 QComboBox#SpeedCombo::drop-down {

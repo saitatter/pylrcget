@@ -3,13 +3,13 @@ QWidget#TopBar {
 }
 
 QWidget#TopBarGroup {
-    background: #08101f;
-    border: 1px solid #111827;
-    border-radius: 14px;
+    background: {{color-bg-panel}};
+    border: 1px solid {{color-border-strong}};
+    border-radius: {{radius-lg}};
 }
 
 QWidget#TopBarGroup:hover {
-    border-color: #1f2937;
+    border-color: {{color-border}};
 }
 
 QWidget#TopBarGroup {
@@ -17,20 +17,20 @@ QWidget#TopBarGroup {
 }
 
 QLabel#TopBarLabel {
-    color: #94a3b8;
-    font-size: 10px;
+    color: {{color-text-muted}};
+    font-size: {{font-size-xs}};
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.14em;
 }
 
 QLineEdit#TopBarSearch {
-    background: #020617;
-    border-color: #1f2937;
+    background: {{color-bg-app}};
+    border-color: {{color-border}};
 }
 
 QLineEdit#TopBarSearch:focus {
-    border-color: #38bdf8;
+    border-color: {{color-accent}};
 }
 
 QToolButton#TopBarAction {
@@ -39,9 +39,9 @@ QToolButton#TopBarAction {
 }
 
 QToolButton#TopBarAction[actionState="loading"] {
-    background: #0f172a;
-    border-color: #38bdf8;
-    color: #38bdf8;
+    background: {{color-bg-pressed}};
+    border-color: {{color-accent}};
+    color: {{color-accent}};
 }
 
 QToolButton#TopBarAction[actionState="success"] {
@@ -57,19 +57,19 @@ QToolButton#TopBarAction[actionState="error"] {
 }
 
 QWidget#ScanRow {
-    background: #020617;
-    border-top: 1px solid #111827;
+    background: {{color-bg-app}};
+    border-top: 1px solid {{color-border-strong}};
 }
 
 QLabel#ScanLabel {
-    color: #9ca3af;
-    font-size: 11px;
+    color: {{color-text-soft}};
+    font-size: {{font-size-sm}};
 }
 
 QProgressBar#ScanProgress {
-    background: #0b1222;
-    border: 1px solid #1f2937;
-    border-radius: 999px;
+    background: {{color-bg-control}};
+    border: 1px solid {{color-border}};
+    border-radius: {{radius-pill}};
     height: 10px;
 }
 
@@ -89,10 +89,10 @@ QToolButton {
 }
 
 QToolButton:hover {
-    background: #0b1222;
-    border-color: #1f2937;
+    background: {{color-bg-control}};
+    border-color: {{color-border}};
 }
 
 QToolButton:pressed {
-    background: #0f172a;
+    background: {{color-bg-pressed}};
 }

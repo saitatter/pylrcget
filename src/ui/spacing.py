@@ -2,11 +2,13 @@ from __future__ import annotations
 
 from PySide6.QtWidgets import QLayout
 
+from ui.theme_tokens import SPACE_TOKENS
 
-SPACE_1 = 4
-SPACE_2 = 8
-SPACE_3 = 12
-SPACE_4 = 16
+
+SPACE_1 = int(SPACE_TOKENS["space-1"].replace("px", ""))
+SPACE_2 = int(SPACE_TOKENS["space-2"].replace("px", ""))
+SPACE_3 = int(SPACE_TOKENS["space-3"].replace("px", ""))
+SPACE_4 = int(SPACE_TOKENS["space-4"].replace("px", ""))
 
 
 def set_layout_spacing(
