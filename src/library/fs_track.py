@@ -122,7 +122,7 @@ def load_tracks_from_directories(directories: List[str], db_add_tracks_callback,
         entry_batch = []
         pattern = os.path.join(directory, "**", "*.*")
         for file_path in glob.glob(pattern, recursive=True):
-            if file_path.lower().endswith(('.mp3', '.m4a', '.flac', '.ogg', '.opus', '.wav')):
+            if file_path.lower().endswith(('.mp3', '.m4a', '.flac', '.ogg', '.opus', '.wav', '.wma', '.asf')):
                 entry_batch.append(file_path)
                 if len(entry_batch) == 100:
                     tracks = load_tracks_from_entry_batch(entry_batch)
@@ -147,6 +147,6 @@ def count_files_from_directories(directories: List[str]) -> int:
         pattern = os.path.join(directory, "**", "*.*")
         files_count += sum(
             1 for f in glob.glob(pattern, recursive=True)
-            if f.lower().endswith(('.mp3', '.m4a', '.flac', '.ogg', '.opus', '.wav'))
+            if f.lower().endswith(('.mp3', '.m4a', '.flac', '.ogg', '.opus', '.wav', '.wma', '.asf'))
         )
     return files_count

@@ -5,6 +5,7 @@ from typing import Optional
 from pathlib import Path
 
 from mutagen import File as MutagenFile
+from mutagen.asf import ASF, ASFUnicodeAttribute
 from mutagen.id3 import ID3, USLT, TXXX, ID3NoHeaderError
 from mutagen.flac import FLAC
 from mutagen.oggvorbis import OggVorbis
@@ -22,6 +23,8 @@ ID3_PLAIN_DESC = "UNSYNCEDLYRICS"
 
 MP4_PLAIN_KEY = "\xa9lyr"
 MP4_SYNCED_KEY = "----:com.lrclib:LYRICS"  # custom atom name; keep stable across app versions
+ASF_PLAIN_KEY = "WM/Lyrics"
+ASF_SYNCED_KEY = "LRCLIB_LRC"
 
 
 def _strip_timestamps(lrc: str) -> str:
@@ -81,6 +84,8 @@ def embed_lyrics_in_file(path: str, plain: Optional[str], synced: Optional[str])
         ".opus": _embed_ogg_opus,
         ".m4a": _embed_mp4,
         ".mp4": _embed_mp4,
+        ".wma": _embed_asf,
+        ".asf": _embed_asf,
     }
 
     ext = Path(path).suffix.lower()
@@ -190,5 +195,21 @@ def _embed_mp4(path: str, plain: Optional[str], synced: Optional[str]) -> None:
         audio[MP4_SYNCED_KEY] = [synced.encode("utf-8")]
     elif MP4_SYNCED_KEY in audio:
         del audio[MP4_SYNCED_KEY]
+
+    audio.save()
+
+
+def _embed_asf(path: str, plain: Optional[str], synced: Optional[str]) -> None:
+    audio = ASF(path)
+
+    if ASF_PLAIN_KEY in audio:
+        del audio[ASF_PLAIN_KEY]
+    if ASF_SYNCED_KEY in audio:
+        del audio[ASF_SYNCED_KEY]
+
+    if plain:
+        audio[ASF_PLAIN_KEY] = [ASFUnicodeAttribute(plain)]
+    if synced:
+        audio[ASF_SYNCED_KEY] = [ASFUnicodeAttribute(synced)]
 
     audio.save()
