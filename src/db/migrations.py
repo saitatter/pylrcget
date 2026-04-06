@@ -105,3 +105,23 @@ def upgrade_database_if_needed(db: sqlite3.Connection, existing_version: int) ->
         db.execute("PRAGMA user_version=7")
         db.execute("ALTER TABLE config_data ADD COLUMN show_line_count BOOLEAN DEFAULT 1")
         db.commit()
+
+    # v8
+    if existing_version <= 7:
+        print("Migrate database version 8...")
+        db.execute("PRAGMA user_version=8")
+        db.executescript("""
+            ALTER TABLE config_data ADD COLUMN lyrics_output_dir TEXT DEFAULT '';
+            ALTER TABLE config_data ADD COLUMN lyrics_file_pattern TEXT DEFAULT '{artist} - {title}';
+        """)
+        db.commit()
+
+    # v9
+    if existing_version <= 8:
+        print("Migrate database version 9...")
+        db.execute("PRAGMA user_version=9")
+        db.executescript("""
+            ALTER TABLE config_data ADD COLUMN save_lyrics_sidecars BOOLEAN DEFAULT 1;
+            UPDATE config_data SET save_lyrics_sidecars = 1;
+        """)
+        db.commit()

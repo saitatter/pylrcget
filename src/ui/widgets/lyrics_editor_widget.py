@@ -262,7 +262,7 @@ class LyricsEditorWidget(QWidget):
     def show_none(self, message: str):
         self._reset_state()
         self.empty_state.configure(
-            icon_name="audio-waveform.svg",
+            icon_name="audio-lines.svg",
             title="No track selected",
             body=message,
             action_text=None,
@@ -275,7 +275,7 @@ class LyricsEditorWidget(QWidget):
         if instrumental:
             self._reset_state()
             self.empty_state.configure(
-                icon_name="audio-waveform.svg",
+                icon_name="audio-lines.svg",
                 title="Instrumental track",
                 body="This track is marked as instrumental, so there are no lyrics to edit or publish.",
                 action_text=None,
@@ -314,7 +314,7 @@ class LyricsEditorWidget(QWidget):
         else:
             self._reset_state()
             self.empty_state.configure(
-                icon_name="audio-waveform.svg",
+                icon_name="audio-lines.svg",
                 title="No lyrics available yet",
                 body="Download lyrics from LRCLIB to start editing, or leave this track lyric-free.",
                 action_text="Download Lyrics",

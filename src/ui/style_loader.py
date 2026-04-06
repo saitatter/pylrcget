@@ -18,6 +18,8 @@ def asset_path(*parts: str) -> Path:
 
 def load_stylesheet(name: str, **replacements: str) -> str:
     content = asset_path("qss", name).read_text(encoding="utf-8")
+    asset_url = asset_path().as_posix()
+    content = content.replace("{{asset-url}}", asset_url)
     for key, value in STYLE_TOKENS.items():
         content = content.replace(f"{{{{{key}}}}}", value)
     for key, value in replacements.items():

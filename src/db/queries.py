@@ -44,9 +44,12 @@ def get_config(db: sqlite3.Connection) -> Config:
         SELECT skip_tracks_with_synced_lyrics,
                skip_tracks_with_plain_lyrics,
                show_line_count,
+               save_lyrics_sidecars,
                try_embed_lyrics,
                theme_mode,
-               lrclib_instance
+               lrclib_instance,
+               lyrics_output_dir,
+               lyrics_file_pattern
         FROM config_data
         LIMIT 1
     """).fetchone()
@@ -55,9 +58,12 @@ def get_config(db: sqlite3.Connection) -> Config:
         skip_tracks_with_synced_lyrics=bool(row["skip_tracks_with_synced_lyrics"]),
         skip_tracks_with_plain_lyrics=bool(row["skip_tracks_with_plain_lyrics"]),
         show_line_count=bool(row["show_line_count"]),
+        save_lyrics_sidecars=bool(row["save_lyrics_sidecars"]),
         try_embed_lyrics=bool(row["try_embed_lyrics"]),
         theme_mode=row["theme_mode"],
         lrclib_instance=row["lrclib_instance"],
+        lyrics_output_dir=row["lyrics_output_dir"] or "",
+        lyrics_file_pattern=row["lyrics_file_pattern"] or "{artist} - {title}",
     )
 
 
@@ -67,17 +73,23 @@ def set_config(db: sqlite3.Connection, config: Config) -> None:
         SET skip_tracks_with_synced_lyrics = ?,
             skip_tracks_with_plain_lyrics = ?,
             show_line_count = ?,
+            save_lyrics_sidecars = ?,
             try_embed_lyrics = ?,
             theme_mode = ?,
-            lrclib_instance = ?
+            lrclib_instance = ?,
+            lyrics_output_dir = ?,
+            lyrics_file_pattern = ?
         WHERE 1
     """, (
         config.skip_tracks_with_synced_lyrics,
         config.skip_tracks_with_plain_lyrics,
         config.show_line_count,
+        config.save_lyrics_sidecars,
         config.try_embed_lyrics,
         config.theme_mode,
         config.lrclib_instance,
+        config.lyrics_output_dir,
+        config.lyrics_file_pattern,
     ))
     db.commit()
 

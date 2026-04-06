@@ -98,9 +98,12 @@ class Config:
     skip_tracks_with_synced_lyrics: bool
     skip_tracks_with_plain_lyrics: bool
     show_line_count: bool
+    save_lyrics_sidecars: bool
     try_embed_lyrics: bool
     theme_mode: str
     lrclib_instance: str
+    lyrics_output_dir: str
+    lyrics_file_pattern: str
 
 
 # Keep FsTrack here too if you already have it in this file.

@@ -6,7 +6,8 @@ from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QShortcut, QKeySequence
 import os
 
-from db.database import get_directories, get_track_by_id
+from db.database import get_config, get_directories, get_track_by_id
+from core.lyrics_sidecar import export_lyrics_sidecars
 from ui.workers.library_scanner import LibraryScanner
 from ui.widgets.track_list_widget import TrackListWidget
 from ui.dialogs.music_folders_dialog import MusicFoldersDialog
@@ -18,11 +19,11 @@ from player.player import NowPlaying
 from core.embed_lyrics import embed_lyrics_for_track
 from ui.widgets.album_list_widget import AlbumListWidget
 from ui.widgets.artist_list_widget import ArtistListWidget
+from ui.icon_loader import load_svg_icon
 from ui.spacing import SPACE_1, SPACE_2, SPACE_3, set_layout_spacing
 from ui.style_loader import load_stylesheet
 from ui.widgets.toast import ToastManager
 from PySide6.QtWidgets import QToolButton
-from PySide6.QtWidgets import QStyle
 
 
 class MainWindow(QMainWindow):
@@ -129,21 +130,21 @@ class MainWindow(QMainWindow):
 
         self.btn_refresh = QToolButton()
         self.btn_refresh.setObjectName("TopBarAction")
-        self.btn_refresh.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_BrowserReload))
+        self.btn_refresh.setIcon(load_svg_icon("refresh-cw.svg", 18))
         self.btn_refresh.setToolTip("Refresh library")
         self.btn_refresh.setAccessibleName("Refresh library")
         self.btn_refresh.clicked.connect(self.refresh_library)
 
         self.btn_config = QToolButton()
         self.btn_config.setObjectName("TopBarAction")
-        self.btn_config.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_FileDialogDetailedView))
+        self.btn_config.setIcon(load_svg_icon("settings-2.svg", 18))
         self.btn_config.setToolTip("Settings")
         self.btn_config.setAccessibleName("Open music folder settings")
         self.btn_config.clicked.connect(self.open_config_modal)
 
         self.btn_about = QToolButton()
         self.btn_about.setObjectName("TopBarAction")
-        self.btn_about.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MessageBoxInformation))
+        self.btn_about.setIcon(load_svg_icon("info.svg", 18))
         self.btn_about.setToolTip("About")
         self.btn_about.setAccessibleName("About LrcGet")
         self.btn_about.clicked.connect(self.open_about_modal)
@@ -186,7 +187,6 @@ class MainWindow(QMainWindow):
 
         self.lyrics_view.publishSyncedRequested.connect(self._publish_synced)
         self.lyrics_view.publishPlainRequested.connect(self._publish_plain)
-        self.lyrics_view.saveRequested.connect(self._on_embed_requested)
 
         splitter.setStretchFactor(0, 3)
         splitter.setStretchFactor(1, 2)
@@ -508,7 +508,8 @@ class MainWindow(QMainWindow):
 
     # ------------------ lyrics download & save ------------------
     def on_download_lyrics(self, track_id: int):
-        lrclib_instance = "https://lrclib.net"
+        config = get_config(self.app_state.db)
+        lrclib_instance = config.lrclib_instance or "https://lrclib.net"
         lrclib_instance = self._normalize_lrclib_base(lrclib_instance)
 
         self.statusBar().showMessage(f"Starting lyrics download... ({lrclib_instance})")
@@ -531,6 +532,8 @@ class MainWindow(QMainWindow):
 
         try:
             track = get_track_by_id(self.app_state.db, track_id)
+            if ok:
+                self._sync_track_lyrics_outputs(track)
             title = f"{track.artist_name} — {track.title}"
             self.lyrics_view.set_track_lyrics(
                 title=title,
@@ -574,6 +577,7 @@ class MainWindow(QMainWindow):
                 update_track_null_lyrics(self.app_state.db, track_id)
 
             track = get_track_by_id(self.app_state.db, track_id)
+            self._sync_track_lyrics_outputs(track)
             title = f"{track.artist_name} - {track.title}"
             self.lyrics_view.set_track_lyrics(
                 title=title,
@@ -633,6 +637,25 @@ class MainWindow(QMainWindow):
         if not u.endswith("/api"):
             u += "/api"
         return u
+
+    def _sync_track_lyrics_outputs(self, track) -> None:
+        config = get_config(self.app_state.db)
+        if config.save_lyrics_sidecars:
+            try:
+                written_paths = export_lyrics_sidecars(track, config)
+            except Exception as exc:
+                self.app_state.notify(f"Failed to export lyrics files: {exc}", "error")
+            else:
+                if written_paths:
+                    self.statusBar().showMessage(f"Lyrics exported to {os.path.dirname(written_paths[0])}", 3000)
+
+        if config.try_embed_lyrics:
+            try:
+                embed_lyrics_for_track(track)
+            except Exception as exc:
+                self.app_state.notify(f"Failed to embed lyrics: {exc}", "error")
+            else:
+                self.statusBar().showMessage("Lyrics embedded into the audio file.", 3000)
 
     def _play_selected_or_current(self):
         tid = self.track_list.selected_track_id()
@@ -695,26 +718,6 @@ class MainWindow(QMainWindow):
 
         if hasattr(self, "player_bar"):
             self.player_bar.set_compact_mode(width < 980)
-
-    def _on_embed_requested(self):
-        # embed doar pentru track-ul care cântă acum (simplu și clar)
-        if not self.app_state.player or not self.app_state.player.track:
-            self.app_state.notify("Start playback or select a track first.", "warning")
-            return
-
-        track_id = self.app_state.player.track.track_id
-
-        try:
-            track = get_track_by_id(self.app_state.db, track_id)
-        except Exception as e:
-            self.app_state.notify(f"Cannot read track from database: {e}", "error")
-            return
-
-        try:
-            embed_lyrics_for_track(track)
-            self.app_state.notify("Lyrics were embedded into the audio file tags.", "success")
-        except Exception as e:
-            self.app_state.notify(f"Failed to embed lyrics: {e}", "error")
 
     def _on_open_album(self, album_id: int):
         self.tabs.setCurrentWidget(self.tracks_tab)

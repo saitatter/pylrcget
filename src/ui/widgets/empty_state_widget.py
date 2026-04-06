@@ -1,25 +1,11 @@
 from __future__ import annotations
 
-from pathlib import Path
-
-from PySide6.QtCore import Qt, QSize, Signal
-from PySide6.QtGui import QPixmap, QPainter
-from PySide6.QtSvg import QSvgRenderer
+from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel, QPushButton
 
+from ui.icon_loader import load_svg_pixmap
 from ui.spacing import SPACE_2, SPACE_3, SPACE_4, set_layout_spacing
-from ui.style_loader import asset_path, load_stylesheet
-
-
-def _svg_pixmap(path: Path, size: int = 56) -> QPixmap:
-    renderer = QSvgRenderer(str(path))
-    pixmap = QPixmap(size, size)
-    pixmap.fill(Qt.GlobalColor.transparent)
-
-    painter = QPainter(pixmap)
-    renderer.render(painter)
-    painter.end()
-    return pixmap
+from ui.style_loader import load_stylesheet
 
 
 class EmptyStateWidget(QWidget):
@@ -68,7 +54,7 @@ class EmptyStateWidget(QWidget):
         body: str,
         action_text: str | None = None,
     ) -> None:
-        self.icon.setPixmap(_svg_pixmap(asset_path("assets", "icons", icon_name)))
+        self.icon.setPixmap(load_svg_pixmap(icon_name, 56))
         self.title.setText(title)
         self.body.setText(body)
 

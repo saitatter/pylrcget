@@ -1,6 +1,6 @@
 # ui/actions_delegate.py
 from __future__ import annotations
-from PySide6.QtCore import Qt, QRect, Signal
+from PySide6.QtCore import QEvent, Qt, QRect, Signal
 from PySide6.QtGui import QPainter
 from PySide6.QtWidgets import QStyledItemDelegate, QStyleOptionButton, QApplication, QStyle
 
@@ -29,7 +29,7 @@ class ActionsDelegate(QStyledItemDelegate):
     def editorEvent(self, event, model, option, index):
         if index.column() != 3:
             return False
-        if event.type() == event.MouseButtonRelease and event.button() == Qt.LeftButton:
+        if event.type() == QEvent.Type.MouseButtonRelease and event.button() == Qt.LeftButton:
             row_obj = index.data(Qt.UserRole)
             if not row_obj:
                 return False

@@ -38,9 +38,10 @@ def _colors(kind: str) -> tuple[str, str, str]:
     return _TOAST_COLORS.get(kind, _TOAST_COLORS["info"])
 
 class ToastWidget(QFrame):
-    def __init__(self, data: ToastData, parent: QWidget):
+    def __init__(self, data: ToastData, parent: QWidget, manager: "ToastManager"):
         super().__init__(parent)
         self.data = data
+        self._manager = manager
 
         bg, border, text = _colors(data.notify_type)
 
@@ -73,7 +74,7 @@ class ToastWidget(QFrame):
 
     def close_requested(self):
         # Let the manager handle the removal animation.
-        self.parent()._dismiss_toast(self)  # type: ignore[attr-defined]
+        self._manager._dismiss_toast(self)
 
     def play_in(self, start_pos: QPoint, end_pos: QPoint):
         self.move(start_pos)
@@ -150,8 +151,9 @@ class ToastManager(QWidget):
         self.raise_()
 
         data = ToastData(message=message, notify_type=notify_type, timeout_ms=timeout_ms)
-        toast = ToastWidget(data, parent=self)
+        toast = ToastWidget(data, parent=self.host, manager=self)
         toast.setFixedWidth(min(420, max(260, self.width() // 2)))
+        toast.raise_()
 
         # Insert newest at top
         self._toasts.insert(0, toast)
