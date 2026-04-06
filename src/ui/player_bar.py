@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import base64
+from pathlib import Path
+
 from PySide6.QtCore import QByteArray, QSize, Qt
 from PySide6.QtGui import QColor, QFont, QIcon, QLinearGradient, QPainter, QPixmap
 from PySide6.QtSvg import QSvgRenderer
@@ -13,6 +16,12 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+from mutagen import File as MutagenFile
+from mutagen.flac import FLAC, Picture
+from mutagen.id3 import APIC
+from mutagen.mp4 import MP4, MP4Cover
+from mutagen.oggopus import OggOpus
+from mutagen.oggvorbis import OggVorbis
 
 from ui.spacing import SPACE_2, SPACE_3, set_layout_spacing
 from ui.style_loader import load_stylesheet
@@ -72,6 +81,106 @@ def _cover_pixmap(title: str, artist: str | None, size: int = 56) -> QPixmap:
     return pixmap
 
 
+def _sidecar_cover_path(audio_path: str | None) -> Path | None:
+    if not audio_path:
+        return None
+
+    folder = Path(audio_path).resolve().parent
+    candidate_names = (
+        "cover.jpg",
+        "cover.jpeg",
+        "cover.png",
+        "folder.jpg",
+        "folder.jpeg",
+        "folder.png",
+        "front.jpg",
+        "front.jpeg",
+        "front.png",
+        "album.jpg",
+        "album.jpeg",
+        "album.png",
+        "artwork.jpg",
+        "artwork.jpeg",
+        "artwork.png",
+    )
+    for name in candidate_names:
+        candidate = folder / name
+        if candidate.exists() and candidate.is_file():
+            return candidate
+    return None
+
+
+def _embedded_cover_bytes(audio_path: str | None) -> bytes | None:
+    if not audio_path:
+        return None
+
+    try:
+        audio = MutagenFile(audio_path, easy=False)
+    except Exception:
+        return None
+
+    if audio is None:
+        return None
+
+    try:
+        if isinstance(audio, FLAC) and getattr(audio, "pictures", None):
+            picture = audio.pictures[0]
+            return bytes(getattr(picture, "data", b"") or b"")
+
+        if isinstance(audio, MP4):
+            covers = audio.tags.get("covr", []) if audio.tags else []
+            if covers:
+                cover = covers[0]
+                if isinstance(cover, MP4Cover):
+                    return bytes(cover)
+                return bytes(cover)
+
+        if hasattr(audio, "tags") and audio.tags:
+            for tag in audio.tags.values():
+                if isinstance(tag, APIC):
+                    return bytes(tag.data or b"")
+
+        if isinstance(audio, (OggVorbis, OggOpus)):
+            if audio.tags:
+                metadata_blocks = audio.tags.get("metadata_block_picture", [])
+                for raw in metadata_blocks:
+                    try:
+                        picture = Picture(base64.b64decode(raw))
+                        if picture.data:
+                            return bytes(picture.data)
+                    except Exception:
+                        continue
+
+                coverart_blocks = audio.tags.get("coverart", [])
+                for raw in coverart_blocks:
+                    try:
+                        data = base64.b64decode(raw)
+                        if data:
+                            return data
+                    except Exception:
+                        continue
+    except Exception:
+        return None
+
+    return None
+
+
+def _artwork_pixmap(title: str, artist: str | None, audio_path: str | None, size: int = 56) -> QPixmap:
+    sidecar = _sidecar_cover_path(audio_path)
+    if sidecar is not None:
+        pixmap = QPixmap(str(sidecar))
+        if not pixmap.isNull():
+            return pixmap.scaled(size, size, Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation)
+
+    embedded = _embedded_cover_bytes(audio_path)
+    if embedded:
+        pixmap = QPixmap()
+        if pixmap.loadFromData(embedded):
+            return pixmap.scaled(size, size, Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation)
+
+    return _cover_pixmap(title, artist, size)
+
+
 SVG_PREV = "M6 18V6h2v12H6zm3.5-6L18 6v12l-8.5-6z"
 SVG_NEXT = "M16 6v12h2V6h-2zM6 18l8.5-6L6 6v12z"
 SVG_PLAY = "M8 5v14l11-7L8 5z"
@@ -113,7 +222,7 @@ class PlayerBar(QWidget):
         self.lbl_cover = QLabel()
         self.lbl_cover.setObjectName("NowPlayingCover")
         self.lbl_cover.setFixedSize(56, 56)
-        self.lbl_cover.setPixmap(_cover_pixmap("?", None, 56))
+        self.lbl_cover.setPixmap(_artwork_pixmap("?", None, None, 56))
 
         text_stack = QVBoxLayout()
         set_layout_spacing(text_stack, spacing=2)
@@ -284,12 +393,12 @@ class PlayerBar(QWidget):
             self.lbl_title.setText(title)
             self.lbl_artist.setText(artist)
             self.lbl_album.setText(album)
-            self.lbl_cover.setPixmap(_cover_pixmap(title, artist, 56))
+            self.lbl_cover.setPixmap(_artwork_pixmap(title, artist, getattr(now_playing, "path", None), 56))
         else:
             self.lbl_title.setText("Nothing playing")
             self.lbl_artist.setText("Choose a track to start playback")
             self.lbl_album.setText("")
-            self.lbl_cover.setPixmap(_cover_pixmap("?", None, 56))
+            self.lbl_cover.setPixmap(_artwork_pixmap("?", None, None, 56))
             self.slider.setValue(0)
             self.lbl_time.setText("0:00")
             self.lbl_dur.setText("0:00")
