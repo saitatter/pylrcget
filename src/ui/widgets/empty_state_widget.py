@@ -44,7 +44,7 @@ class EmptyStateWidget(QWidget):
         layout.addWidget(self.body)
         layout.addWidget(self.action, 0, Qt.AlignmentFlag.AlignCenter)
 
-        self.setStyleSheet(load_stylesheet("empty_state.qss"))
+        self._apply_styles()
 
     def configure(
         self,
@@ -63,3 +63,6 @@ class EmptyStateWidget(QWidget):
             self.action.show()
         else:
             self.action.hide()
+
+    def _apply_styles(self):
+        self.setStyleSheet(load_stylesheet("empty_state.qss"))

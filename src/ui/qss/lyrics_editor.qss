@@ -4,25 +4,25 @@ QLabel#LyricsTitle {
 }
 
 QLabel#LyricsMessage {
-    color: rgba(229, 231, 235, 0.75);
+    color: {{color-empty-body}};
 }
 
 QLabel#LyricsValidationHint {
     border-radius: {{radius-md}};
     padding: 6px {{space-3}};
-    background: {{color-bg-pressed}};
+    background: {{color-validation-bg}};
     color: {{color-text}};
-    border: 1px solid #1e293b;
+    border: 1px solid {{color-validation-border}};
 }
 
 QLabel#LyricsValidationHint[validationState="error"] {
-    background: rgba(127, 29, 29, 0.35);
-    color: #fecaca;
-    border-color: rgba(248, 113, 113, 0.35);
+    background: {{color-error-bg}};
+    color: {{color-error-text}};
+    border-color: {{color-error-border}};
 }
 
 QLabel#LyricsValidationHint[validationState="success"] {
-    background: rgba(20, 83, 45, 0.35);
-    color: #bbf7d0;
-    border-color: rgba(74, 222, 128, 0.35);
+    background: {{color-success-bg}};
+    color: {{color-success-text}};
+    border-color: {{color-success-border}};
 }

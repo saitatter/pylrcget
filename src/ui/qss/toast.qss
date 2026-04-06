@@ -17,6 +17,6 @@ QToolButton {
 }
 
 QToolButton:hover {
-    background: rgba(255, 255, 255, 0.06);
+    background: {{hover_bg}};
     border-radius: 8px;
 }

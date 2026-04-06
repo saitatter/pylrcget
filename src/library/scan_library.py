@@ -7,6 +7,9 @@ from pathlib import Path
 from typing import Optional, Tuple
 
 from mutagen import File as MutagenFile
+from mutagen.asf import ASF
+from mutagen.dsf import DSF
+from mutagen.dsdiff import DSDIFF
 from mutagen.id3 import ID3, USLT, TXXX, ID3NoHeaderError
 from mutagen.flac import FLAC
 from mutagen.oggvorbis import OggVorbis
@@ -24,7 +27,10 @@ from core.embed_lyrics import (
 
 logger = logging.getLogger(__name__)
 
-AUDIO_EXTS = {".mp3", ".m4a", ".flac", ".ogg", ".opus", ".wav"}
+AUDIO_EXTS = {".mp3", ".m4a", ".flac", ".ogg", ".opus", ".wav", ".wma", ".asf", ".dsf", ".dff"}
+
+ASF_PLAIN_KEYS = ("WM/Lyrics", "LYRICS", "UNSYNCEDLYRICS")
+ASF_SYNCED_KEYS = ("LRCLIB_LRC", "SYNCEDLYRICS")
 
 def iter_audio_paths(directories: list[str]) -> list[str]:
     paths: list[str] = []
@@ -86,9 +92,11 @@ def read_embedded_lyrics(path: str) -> Tuple[Optional[str], Optional[str]]:
     Returns (plain_lyrics_or_None, synced_lrc_or_None).
 
     Implementation notes:
-      - MP3: reads ID3 USLT for plain lyrics and a TXXX with desc 'LRCLIB_LRC' for synced.
+      - MP3: reads ID3 USLT for plain lyrics and a TXXX with desc 'LYRICS' for synced.
       - FLAC/Vorbis/Ogg: reads 'LYRICS' and 'LRCLIB_LRC' vorbis comments.
       - MP4/M4A: reads '\xa9lyr' and '----:com.lrclib:lrc' (custom atom, bytes).
+      - WMA/ASF: reads ASF string attributes for plain and synced lyrics.
+      - DSF/DSDIFF (.dff): reads ID3 lyrics frames.
       - Fallback: tries MutagenFile() and some common keys.
     """
     p = Path(path)
@@ -120,6 +128,25 @@ def read_embedded_lyrics(path: str) -> Tuple[Optional[str], Optional[str]]:
                     elif isinstance(txt, str):
                         synced = txt
                     break
+
+        elif ext in {".dsf", ".dff"}:
+            audio = DSF(path) if ext == ".dsf" else DSDIFF(path)
+            tags = getattr(audio, "tags", None)
+
+            if tags:
+                uslt_frames = tags.getall("USLT")
+                if uslt_frames:
+                    plain = uslt_frames[0].text if getattr(uslt_frames[0], "text", None) else None
+
+                txxx_frames = tags.getall("TXXX")
+                for t in txxx_frames:
+                    if getattr(t, "desc", "") == ID3_SYNCED_DESC:
+                        txt = getattr(t, "text", None)
+                        if isinstance(txt, (list, tuple)) and txt:
+                            synced = str(txt[0])
+                        elif isinstance(txt, str):
+                            synced = txt
+                        break
 
         elif ext in {".flac"}:
             audio = FLAC(path)
@@ -165,12 +192,32 @@ def read_embedded_lyrics(path: str) -> Tuple[Optional[str], Optional[str]]:
                 else:
                     synced = str(first)
 
+        elif ext in {".wma", ".asf"}:
+            audio = ASF(path)
+
+            def _first_asf_text(keys: tuple[str, ...]) -> Optional[str]:
+                for key in keys:
+                    values = audio.get(key)
+                    if not values:
+                        continue
+                    for value in values:
+                        text = getattr(value, "value", value)
+                        if text is None:
+                            continue
+                        rendered = str(text).strip()
+                        if rendered:
+                            return rendered
+                return None
+
+            plain = _first_asf_text(ASF_PLAIN_KEYS)
+            synced = _first_asf_text(ASF_SYNCED_KEYS)
+
         else:
             # Fallback generic MutagenFile with common keys
             audio = MutagenFile(path, easy=False)
             if audio is not None:
                 # Try common keys (case-sensitive and lowercase)
-                for key in (VORBIS_SYNCED_KEY, VORBIS_PLAIN_KEY, "USLT", MP4_PLAIN_KEY, MP4_SYNCED_KEY, "lyrics", "LYRICS", "LYRICS_SYNCD"):
+                for key in (VORBIS_SYNCED_KEY, VORBIS_PLAIN_KEY, "USLT", MP4_PLAIN_KEY, MP4_SYNCED_KEY, *ASF_PLAIN_KEYS, *ASF_SYNCED_KEYS, "lyrics", "LYRICS", "LYRICS_SYNCD"):
                     val = audio.tags.get(key) if getattr(audio, "tags", None) else None
                     if val:
                         # val could be list or frame; handle politely

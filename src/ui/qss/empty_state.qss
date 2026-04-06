@@ -7,13 +7,13 @@ QLabel#EmptyStateIcon {
 }
 
 QLabel#EmptyStateTitle {
-    color: #e5e7eb;
+    color: {{color-empty-title}};
     font-size: 18px;
     font-weight: 650;
 }
 
 QLabel#EmptyStateBody {
-    color: #94a3b8;
+    color: {{color-empty-body}};
     font-size: 12px;
     line-height: 1.4;
 }

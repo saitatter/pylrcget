@@ -91,6 +91,8 @@ class TrackListWidget(QWidget):
         self.table.verticalHeader().setVisible(False)
         self.table.setShowGrid(False)
         self.table.setAlternatingRowColors(True)
+        self.table.setMouseTracking(True)
+        self.table.viewport().setMouseTracking(True)
         self.table.setSortingEnabled(True)
         self.table.sortByColumn(0, Qt.SortOrder.AscendingOrder)
 

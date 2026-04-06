@@ -3,30 +3,35 @@ QWidget#PlayerBar {
     border-top: 1px solid {{color-border-strong}};
 }
 
+QWidget#PlayerShell {
+    background: {{color-bg-panel}};
+    border: 1px solid {{color-border-strong}};
+    border-radius: {{radius-xl}};
+}
+
+QWidget#PlayerBar[compact="true"] QWidget#PlayerShell {
+    border-radius: {{radius-lg}};
+}
+
 QWidget#PlayerBar[compact="true"] QWidget#PlayerExtras {
     min-width: 84px;
-}
-
-QWidget#PlayerBar[compact="true"] QLabel#NowPlaying {
-    font-size: 13px;
-}
-
-QWidget#PlayerBar[compact="true"] QLabel#NowPlayingArtist {
-    font-size: 10px;
 }
 
 QWidget#PlayerMeta,
 QWidget#PlayerCenter,
 QWidget#PlayerExtras {
-    background: {{color-bg-panel}};
-    border: 1px solid {{color-border-strong}};
-    border-radius: {{radius-lg}};
+    background: transparent;
+    border: none;
+}
+
+QWidget#PlayerCenter {
+    min-height: 72px;
 }
 
 QToolButton {
     border: 1px solid transparent;
     background: transparent;
-    padding: {{space-2}};
+    padding: 6px;
     border-radius: {{radius-md}};
     color: {{color-text}};
 }
@@ -45,18 +50,20 @@ QToolButton#BtnPlay {
     background: {{color-bg-elevated}};
     border: 1px solid {{color-border}};
     border-radius: {{radius-pill}};
-    padding: 10px;
+    padding: 14px;
+    min-width: 54px;
+    min-height: 54px;
     color: {{color-text}};
 }
 
 QToolButton#BtnPlay:hover {
     border-color: {{color-accent}};
-    background: #08101f;
+    background: {{color-bg-control}};
     color: {{color-accent}};
 }
 
 QToolButton#BtnPlay:pressed {
-    background: #0f172a;
+    background: {{color-bg-pressed}};
 }
 
 QLabel {
@@ -76,8 +83,17 @@ QLabel#NowPlayingArtist {
 }
 
 QLabel#NowPlayingAlbum {
-    color: #64748b;
+    color: {{color-text-muted}};
     font-size: {{font-size-sm}};
+}
+
+QWidget#PlayerBar[compact="true"] QLabel#NowPlaying {
+    font-size: 13px;
+}
+
+QWidget#PlayerBar[compact="true"] QLabel#NowPlayingArtist,
+QWidget#PlayerBar[compact="true"] QLabel#NowPlayingAlbum {
+    font-size: 10px;
 }
 
 QLabel#MetaLabel,
@@ -89,7 +105,7 @@ QLabel#TimeLabel {
 
 QLabel#NowPlayingCover {
     background: {{color-bg-pressed}};
-    border: 1px solid #1e293b;
+    border: 1px solid {{color-cover-border}};
     border-radius: 12px;
 }
 
@@ -97,6 +113,7 @@ QSlider#PlayerSlider::groove:horizontal {
     height: 8px;
     background: {{color-bg-pressed}};
     border-radius: 4px;
+    margin: 2px 0;
 }
 
 QSlider#PlayerSlider::handle:horizontal {
@@ -105,20 +122,24 @@ QSlider#PlayerSlider::handle:horizontal {
     margin: -5px 0;
     border-radius: 8px;
     background: {{color-accent}};
-    border: 2px solid #e0f2fe;
+    border: 2px solid {{color-slider-handle-border}};
 }
 
 QSlider#PlayerSlider::handle:horizontal:hover {
-    background: #7dd3fc;
+    background: {{color-accent-alt}};
 }
 
 QSlider#PlayerSlider::sub-page:horizontal {
-    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #38bdf8, stop:1 #0ea5e9);
+    background: qlineargradient(
+        x1:0, y1:0, x2:1, y2:0,
+        stop:0 {{color-slider-fill-start}},
+        stop:1 {{color-slider-fill-end}}
+    );
     border-radius: 4px;
 }
 
 QSlider#PlayerSlider::add-page:horizontal {
-    background: #0f172a;
+    background: {{color-bg-pressed}};
     border-radius: 4px;
 }
 
@@ -126,9 +147,9 @@ QComboBox#SpeedCombo {
     background: {{color-bg-control}};
     border: 1px solid {{color-border}};
     border-radius: {{radius-md}};
-    padding: 8px 10px;
+    padding: 6px 10px;
     color: {{color-text}};
-    min-width: 84px;
+    min-width: 88px;
     font-size: {{font-size-sm}};
 }
 

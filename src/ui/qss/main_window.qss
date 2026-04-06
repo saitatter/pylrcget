@@ -45,15 +45,15 @@ QToolButton#TopBarAction[actionState="loading"] {
 }
 
 QToolButton#TopBarAction[actionState="success"] {
-    background: #052e1a;
-    border-color: #16a34a;
-    color: #86efac;
+    background: {{color-success-bg}};
+    border-color: {{color-success-border}};
+    color: {{color-success-text}};
 }
 
 QToolButton#TopBarAction[actionState="error"] {
-    background: #2a0a0a;
-    border-color: #ef4444;
-    color: #fca5a5;
+    background: {{color-error-bg}};
+    border-color: {{color-error-border}};
+    color: {{color-error-text}};
 }
 
 QWidget#ScanRow {
@@ -86,7 +86,7 @@ QProgressBar#ScanProgress::chunk {
     border-radius: 999px;
     background: qlineargradient(
         x1: 0, y1: 0, x2: 1, y2: 0,
-        stop: 0 #38bdf8, stop: 1 #22c55e
+        stop: 0 {{color-slider-fill-start}}, stop: 1 {{color-slider-fill-end}}
     );
 }
 

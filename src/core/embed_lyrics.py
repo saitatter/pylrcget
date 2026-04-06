@@ -5,6 +5,9 @@ from typing import Optional
 from pathlib import Path
 
 from mutagen import File as MutagenFile
+from mutagen.asf import ASF, ASFUnicodeAttribute
+from mutagen.dsf import DSF
+from mutagen.dsdiff import DSDIFF
 from mutagen.id3 import ID3, USLT, TXXX, ID3NoHeaderError
 from mutagen.flac import FLAC
 from mutagen.oggvorbis import OggVorbis
@@ -22,6 +25,8 @@ ID3_PLAIN_DESC = "UNSYNCEDLYRICS"
 
 MP4_PLAIN_KEY = "\xa9lyr"
 MP4_SYNCED_KEY = "----:com.lrclib:LYRICS"  # custom atom name; keep stable across app versions
+ASF_PLAIN_KEY = "WM/Lyrics"
+ASF_SYNCED_KEY = "LRCLIB_LRC"
 
 
 def _strip_timestamps(lrc: str) -> str:
@@ -81,6 +86,10 @@ def embed_lyrics_in_file(path: str, plain: Optional[str], synced: Optional[str])
         ".opus": _embed_ogg_opus,
         ".m4a": _embed_mp4,
         ".mp4": _embed_mp4,
+        ".wma": _embed_asf,
+        ".asf": _embed_asf,
+        ".dsf": _embed_dsf,
+        ".dff": _embed_dsdiff,
     }
 
     ext = Path(path).suffix.lower()
@@ -176,6 +185,38 @@ def _embed_mp3(path: str, plain: Optional[str], synced: Optional[str]) -> None:
     tags.save(path)
 
 
+def _write_id3_lyrics(tags: ID3, plain: Optional[str], synced: Optional[str]) -> None:
+    tags.delall("USLT")
+    tags.delall(f"TXXX:{ID3_SYNCED_DESC}")
+    tags.delall(f"TXXX:{ID3_PLAIN_DESC}")
+
+    if plain:
+        tags.add(
+            USLT(
+                encoding=3,
+                lang="und",
+                desc="",
+                text=plain,
+            )
+        )
+        tags.add(
+            TXXX(
+                encoding=3,
+                desc=ID3_PLAIN_DESC,
+                text=plain,
+            )
+        )
+
+    if synced:
+        tags.add(
+            TXXX(
+                encoding=3,
+                desc=ID3_SYNCED_DESC,
+                text=synced,
+            )
+        )
+
+
 def _embed_mp4(path: str, plain: Optional[str], synced: Optional[str]) -> None:
     audio = MP4(path)
 
@@ -191,4 +232,36 @@ def _embed_mp4(path: str, plain: Optional[str], synced: Optional[str]) -> None:
     elif MP4_SYNCED_KEY in audio:
         del audio[MP4_SYNCED_KEY]
 
+    audio.save()
+
+
+def _embed_asf(path: str, plain: Optional[str], synced: Optional[str]) -> None:
+    audio = ASF(path)
+
+    if ASF_PLAIN_KEY in audio:
+        del audio[ASF_PLAIN_KEY]
+    if ASF_SYNCED_KEY in audio:
+        del audio[ASF_SYNCED_KEY]
+
+    if plain:
+        audio[ASF_PLAIN_KEY] = [ASFUnicodeAttribute(plain)]
+    if synced:
+        audio[ASF_SYNCED_KEY] = [ASFUnicodeAttribute(synced)]
+
+    audio.save()
+
+
+def _embed_dsf(path: str, plain: Optional[str], synced: Optional[str]) -> None:
+    audio = DSF(path)
+    if getattr(audio, "tags", None) is None:
+        audio.add_tags()
+    _write_id3_lyrics(audio.tags, plain, synced)
+    audio.save()
+
+
+def _embed_dsdiff(path: str, plain: Optional[str], synced: Optional[str]) -> None:
+    audio = DSDIFF(path)
+    if getattr(audio, "tags", None) is None:
+        audio.add_tags()
+    _write_id3_lyrics(audio.tags, plain, synced)
     audio.save()

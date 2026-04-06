@@ -7,9 +7,11 @@ from PySide6.QtCore import QSize, Qt
 from PySide6.QtGui import QColor, QFont, QLinearGradient, QPainter, QPixmap
 from PySide6.QtWidgets import (
     QComboBox,
+    QGridLayout,
     QHBoxLayout,
     QLabel,
     QSlider,
+    QSizePolicy,
     QStyle,
     QToolButton,
     QVBoxLayout,
@@ -19,6 +21,7 @@ from mutagen import File as MutagenFile
 from mutagen.flac import FLAC, Picture
 from mutagen.id3 import APIC
 from mutagen.mp4 import MP4, MP4Cover
+from mutagen.asf import ASF
 from mutagen.oggopus import OggOpus
 from mutagen.oggvorbis import OggVorbis
 
@@ -105,6 +108,12 @@ def _embedded_cover_bytes(audio_path: str | None) -> bytes | None:
         return None
 
     try:
+        if isinstance(audio, ASF):
+            for picture in audio.get("WM/Picture", []):
+                data = getattr(picture, "data", None)
+                if data:
+                    return bytes(data)
+
         if isinstance(audio, FLAC) and getattr(audio, "pictures", None):
             picture = audio.pictures[0]
             return bytes(getattr(picture, "data", b"") or b"")
@@ -186,14 +195,21 @@ class PlayerBar(QWidget):
         self._duration_ms = 0
         self._is_playing = False
         self.setObjectName("PlayerBar")
+        self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
 
         root = QHBoxLayout(self)
-        set_layout_spacing(root, margins=(SPACE_3, SPACE_2, SPACE_3, SPACE_2), spacing=SPACE_2)
+        set_layout_spacing(root, margins=(SPACE_3, SPACE_2, SPACE_3, SPACE_2), spacing=0)
+
+        shell = QWidget()
+        shell.setObjectName("PlayerShell")
+        shell_layout = QGridLayout(shell)
+        set_layout_spacing(shell_layout, margins=(SPACE_3, SPACE_2, SPACE_3, SPACE_2), spacing=SPACE_3)
+        root.addWidget(shell)
 
         left_panel = QWidget()
         left_panel.setObjectName("PlayerMeta")
         left_layout = QHBoxLayout(left_panel)
-        set_layout_spacing(left_layout, margins=SPACE_2, spacing=4)
+        set_layout_spacing(left_layout, margins=0, spacing=SPACE_2)
 
         self.lbl_cover = QLabel()
         self.lbl_cover.setObjectName("NowPlayingCover")
@@ -226,7 +242,7 @@ class PlayerBar(QWidget):
         center_panel = QWidget()
         center_panel.setObjectName("PlayerCenter")
         center_layout = QVBoxLayout(center_panel)
-        set_layout_spacing(center_layout, margins=SPACE_2, spacing=SPACE_2)
+        set_layout_spacing(center_layout, margins=0, spacing=4)
 
         controls_row = QHBoxLayout()
         set_layout_spacing(controls_row, spacing=SPACE_2)
@@ -250,15 +266,15 @@ class PlayerBar(QWidget):
         self._icons = {
             "prev": load_svg_icon("skip-back.svg", 20, "#e5e7eb"),
             "next": load_svg_icon("skip-forward.svg", 20, "#e5e7eb"),
-            "play": load_svg_icon("play.svg", 22, "#e5e7eb"),
-            "pause": load_svg_icon("pause.svg", 22, "#e5e7eb"),
+            "play": load_svg_icon("play.svg", 28, "#e5e7eb"),
+            "pause": load_svg_icon("pause.svg", 28, "#e5e7eb"),
         }
         self.btn_prev.setIcon(self._icons["prev"])
         self.btn_next.setIcon(self._icons["next"])
         self.btn_play.setIcon(self._icons["play"])
         self.btn_prev.setIconSize(QSize(20, 20))
         self.btn_next.setIconSize(QSize(20, 20))
-        self.btn_play.setIconSize(QSize(22, 22))
+        self.btn_play.setIconSize(QSize(28, 28))
 
         controls_row.addWidget(self.btn_prev)
         controls_row.addWidget(self.btn_play)
@@ -289,7 +305,7 @@ class PlayerBar(QWidget):
         right_panel = QWidget()
         right_panel.setObjectName("PlayerExtras")
         right_layout = QVBoxLayout(right_panel)
-        set_layout_spacing(right_layout, margins=SPACE_2, spacing=SPACE_2)
+        set_layout_spacing(right_layout, margins=0, spacing=4)
 
         self.lbl_speed = QLabel("Speed")
         self.lbl_speed.setObjectName("MetaLabel")
@@ -305,11 +321,34 @@ class PlayerBar(QWidget):
 
         right_layout.addWidget(self.lbl_speed)
         right_layout.addWidget(self.cmb_speed)
-        right_layout.addStretch(1)
 
-        root.addWidget(left_panel, 3)
-        root.addWidget(center_panel, 4)
-        root.addWidget(right_panel, 0)
+        left_slot = QWidget()
+        left_slot_layout = QHBoxLayout(left_slot)
+        set_layout_spacing(left_slot_layout, margins=0, spacing=0)
+        left_slot_layout.addWidget(left_panel)
+
+        center_slot = QWidget()
+        center_slot_layout = QHBoxLayout(center_slot)
+        set_layout_spacing(center_slot_layout, margins=0, spacing=0)
+        center_slot_layout.addStretch(1)
+        center_slot_layout.addWidget(center_panel, 0, Qt.AlignHCenter | Qt.AlignVCenter)
+        center_slot_layout.addStretch(1)
+
+        right_slot = QWidget()
+        right_slot_layout = QHBoxLayout(right_slot)
+        set_layout_spacing(right_slot_layout, margins=0, spacing=0)
+        right_slot_layout.addStretch(1)
+        right_slot_layout.addWidget(right_panel, 0, Qt.AlignRight | Qt.AlignVCenter)
+
+        shell_layout.addWidget(left_slot, 0, 0)
+        shell_layout.addWidget(center_slot, 0, 1)
+        shell_layout.addWidget(right_slot, 0, 2)
+        shell_layout.setColumnStretch(0, 4)
+        shell_layout.setColumnStretch(1, 5)
+        shell_layout.setColumnStretch(2, 4)
+        shell_layout.setColumnMinimumWidth(2, 120)
+
+        center_panel.setMinimumWidth(420)
 
         self.slider.sliderPressed.connect(self._on_slider_pressed)
         self.slider.sliderReleased.connect(self._on_slider_released)
@@ -326,6 +365,7 @@ class PlayerBar(QWidget):
 
         self._apply_styles()
         self._sync_speed_from_player()
+        self.set_compact_mode(False)
 
     def set_prev_next_handlers(self, prev_fn, next_fn):
         self.btn_prev.clicked.connect(prev_fn)
@@ -340,15 +380,19 @@ class PlayerBar(QWidget):
         self.lbl_album.setVisible(not compact)
         self.lbl_speed.setVisible(not compact)
         self.lbl_title.setMinimumWidth(160 if compact else 220)
-        self.lbl_cover.setFixedSize(48 if compact else 56, 48 if compact else 56)
+        cover_size = 48 if compact else 56
+        bar_height = 98 if compact else 112
+        self.lbl_cover.setFixedSize(cover_size, cover_size)
+        self.setMinimumHeight(bar_height)
+        self.setMaximumHeight(bar_height)
 
         now_playing = None
         if self.player:
             now_playing = getattr(self.player, "track", None)
         if now_playing:
-            self.lbl_cover.setPixmap(_artwork_pixmap(now_playing.title or "?", now_playing.artist, getattr(now_playing, "path", None), 48 if compact else 56))
+            self.lbl_cover.setPixmap(_artwork_pixmap(now_playing.title or "?", now_playing.artist, getattr(now_playing, "path", None), cover_size))
         else:
-            self.lbl_cover.setPixmap(_artwork_pixmap("?", None, None, 48 if compact else 56))
+            self.lbl_cover.setPixmap(_artwork_pixmap("?", None, None, cover_size))
 
     def _on_speed_changed(self, _index: int):
         if not self.player:
@@ -385,6 +429,7 @@ class PlayerBar(QWidget):
             self.player.seek_ms(int(self.slider.value()), exact=True)
 
     def _on_track_changed(self, now_playing):
+        cover_size = self.lbl_cover.width() or 56
         if now_playing:
             artist = now_playing.artist or "Unknown Artist"
             title = now_playing.title or "Unknown"
@@ -392,12 +437,12 @@ class PlayerBar(QWidget):
             self.lbl_title.setText(title)
             self.lbl_artist.setText(artist)
             self.lbl_album.setText(album)
-            self.lbl_cover.setPixmap(_artwork_pixmap(title, artist, getattr(now_playing, "path", None), 56))
+            self.lbl_cover.setPixmap(_artwork_pixmap(title, artist, getattr(now_playing, "path", None), cover_size))
         else:
             self.lbl_title.setText("Nothing playing")
             self.lbl_artist.setText("Choose a track to start playback")
             self.lbl_album.setText("")
-            self.lbl_cover.setPixmap(_artwork_pixmap("?", None, None, 56))
+            self.lbl_cover.setPixmap(_artwork_pixmap("?", None, None, cover_size))
             self.slider.setValue(0)
             self.lbl_time.setText("0:00")
             self.lbl_dur.setText("0:00")

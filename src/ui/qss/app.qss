@@ -1,6 +1,7 @@
 QWidget {
     background-color: {{color-bg-app}};
     color: {{color-text}};
+    font-family: {{font-family-base}};
 }
 
 QMainWindow, QMenuBar, QStatusBar, QSplitter::handle {
@@ -29,7 +30,7 @@ QLineEdit:focus, QTextEdit:focus, QPlainTextEdit:focus, QComboBox:focus {
 }
 
 QLineEdit:hover, QTextEdit:hover, QPlainTextEdit:hover, QComboBox:hover {
-    border-color: #334155;
+    border-color: {{color-border-hover}};
 }
 
 QLineEdit:focus, QTextEdit:focus, QPlainTextEdit:focus, QComboBox:focus,
@@ -56,21 +57,21 @@ QPushButton:hover {
 }
 
 QPushButton[actionState="loading"] {
-    background-color: #0f172a;
-    border-color: #38bdf8;
-    color: #e0f2fe;
+    background-color: {{color-bg-pressed}};
+    border-color: {{color-accent}};
+    color: {{color-text-strong}};
 }
 
 QPushButton[actionState="success"] {
-    background-color: #052e1a;
-    border-color: #16a34a;
-    color: #dcfce7;
+    background-color: {{color-success-bg}};
+    border-color: {{color-success-border}};
+    color: {{color-success-text}};
 }
 
 QPushButton[actionState="error"] {
-    background-color: #2a0a0a;
-    border-color: #ef4444;
-    color: #fee2e2;
+    background-color: {{color-error-bg}};
+    border-color: {{color-error-border}};
+    color: {{color-error-text}};
 }
 
 QPushButton:pressed {
@@ -78,9 +79,9 @@ QPushButton:pressed {
 }
 
 QPushButton:disabled, QLineEdit:disabled, QTextEdit:disabled, QComboBox:disabled {
-    color: #6b7280;
-    border-color: #172033;
-    background: #08101f;
+    color: {{color-disabled-text}};
+    border-color: {{color-disabled-border}};
+    background: {{color-disabled-bg}};
 }
 
 QCheckBox {
@@ -100,7 +101,7 @@ QCheckBox::indicator {
 
 QCheckBox::indicator:unchecked {
     background: {{color-bg-control}};
-    border-color: #475569;
+    border-color: {{color-border}};
 }
 
 QCheckBox::indicator:checked {
@@ -124,17 +125,17 @@ QCheckBox::indicator:focus {
 }
 
 QCheckBox:disabled {
-    color: #6b7280;
+    color: {{color-disabled-text}};
 }
 
 QCheckBox::indicator:disabled {
-    background: #0f172a;
-    border-color: #1e293b;
+    background: {{color-disabled-bg}};
+    border-color: {{color-disabled-border}};
 }
 
 QCheckBox::indicator:checked:disabled {
-    background: #334155;
-    border-color: #334155;
+    background: {{color-disabled-border}};
+    border-color: {{color-disabled-border}};
 }
 
 QComboBox {
@@ -216,24 +217,24 @@ QMenu::item {
 }
 
 QMenu::item:selected {
-    background: #111827;
+    background: {{color-menu-hover}};
 }
 
 QScrollBar:vertical, QScrollBar:horizontal {
-    background: #020617;
+    background: {{color-scrollbar-track}};
     border: none;
     margin: 0px;
 }
 
 QScrollBar::handle:vertical, QScrollBar::handle:horizontal {
-    background: #1f2937;
+    background: {{color-scrollbar-handle}};
     border-radius: 6px;
     min-height: 24px;
     min-width: 24px;
 }
 
 QScrollBar::handle:vertical:hover, QScrollBar::handle:horizontal:hover {
-    background: #38bdf8;
+    background: {{color-scrollbar-hover}};
 }
 
 QScrollBar::add-line, QScrollBar::sub-line, QScrollBar::add-page, QScrollBar::sub-page {

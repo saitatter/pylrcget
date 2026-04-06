@@ -1,27 +1,31 @@
 QTableView#{{table_name}} {
-    background-color: #020617;
-    alternate-background-color: #030712;
+    background-color: {{color-table-bg}};
+    alternate-background-color: {{color-table-alt}};
     border: none;
-    color: #e5e7eb;
-    gridline-color: #020617;
-    selection-background-color: rgba(56, 189, 248, 0.2);
-    selection-color: #e5e7eb;
+    color: {{color-text}};
+    gridline-color: {{color-table-grid}};
+    selection-background-color: {{color-selection-bg}};
+    selection-color: {{color-selection-text}};
+}
+
+QTableView#{{table_name}}::item:hover {
+    background-color: {{color-table-row-hover}};
 }
 
 QHeaderView::section {
-    background-color: #020617;
-    color: #9ca3af;
+    background-color: {{color-table-header}};
+    color: {{color-table-header-text}};
     padding: 4px 24px 4px 6px;
     border: none;
-    border-bottom: 1px solid #111827;
+    border-bottom: 1px solid {{color-border-strong}};
     font-size: 11px;
     text-transform: uppercase;
     letter-spacing: 0.08em;
 }
 
 QHeaderView::section:hover {
-    background-color: #0b1222;
-    color: #d1d5db;
+    background-color: {{color-table-header-hover}};
+    color: {{color-table-header-text-hover}};
 }
 
 QTableView::item {
