@@ -344,6 +344,8 @@ class MainWindow(QMainWindow):
         except ValueError:
             self._queue_index = -1
 
+        track = get_track_by_id(self.app_state.db, track_id)
+
 
         path = track.file_path
         if os.path.isdir(path):
