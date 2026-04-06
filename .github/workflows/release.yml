@@ -29,7 +29,7 @@ jobs:
         uses: python-semantic-release/python-semantic-release@v10.5.3
         with:
           changelog: false
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+          github_token: ${{ secrets.RELEASE_PAT }}
           git_committer_name: github-actions[bot]
           git_committer_email: 41898282+github-actions[bot]@users.noreply.github.com
           build: false
@@ -84,5 +84,5 @@ jobs:
 
       - name: Upload release asset
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.RELEASE_PAT }}
         run: gh release upload "${{ needs.release.outputs.tag }}" "${{ matrix.archive_name }}" --clobber
