@@ -3,11 +3,11 @@ QWidget {
     color: #e5e7eb;
 }
 
-QMainWindow, QMenuBar, QStatusBar, QTabWidget::pane, QSplitter::handle {
+QMainWindow, QMenuBar, QStatusBar, QSplitter::handle {
     background-color: #020617;
 }
 
-QLineEdit, QTextEdit, QPlainTextEdit, QTableWidget, QAbstractItemView, QComboBox, QMenu, QMessageBox, QProgressBar, QTabBar::tab {
+QLineEdit, QTextEdit, QPlainTextEdit, QTableWidget, QAbstractItemView, QComboBox, QMenu, QMessageBox, QProgressBar {
     background-color: #0b1222;
     color: #e5e7eb;
     border: 1px solid #1f2937;
@@ -80,17 +80,42 @@ QCheckBox::indicator:checked {
     border-color: #38bdf8;
 }
 
-QTabBar::tab {
-    padding: 8px 12px;
-    border-top-left-radius: 10px;
-    border-top-right-radius: 10px;
-    margin-right: 4px;
+QTabWidget#MainTabs::pane {
+    border: 1px solid #111827;
+    border-radius: 16px;
+    margin-top: 12px;
+    background: #040b19;
 }
 
-QTabBar::tab:selected {
-    background-color: #111827;
+QTabWidget#MainTabs QTabBar {
+    left: 10px;
+}
+
+QTabWidget#MainTabs QTabBar::tab {
+    background: #08101f;
+    color: #94a3b8;
+    border: 1px solid #111827;
+    border-radius: 14px;
+    padding: 10px 16px;
+    margin-right: 8px;
+    min-width: 92px;
+    font-weight: 600;
+}
+
+QTabWidget#MainTabs QTabBar::tab:hover {
+    color: #e2e8f0;
+    border-color: #1f2937;
+    background: #0b1222;
+}
+
+QTabWidget#MainTabs QTabBar::tab:selected {
+    background: #111827;
+    color: #f8fafc;
     border-color: #38bdf8;
-    color: #e5e7eb;
+}
+
+QTabWidget#MainTabs QTabBar::tab:!selected {
+    margin-top: 4px;
 }
 
 QMenu {

@@ -149,6 +149,10 @@ class MainWindow(QMainWindow):
 
         # --- Tabs ---
         self.tabs = QTabWidget()
+        self.tabs.setObjectName("MainTabs")
+        self.tabs.setDocumentMode(True)
+        self.tabs.tabBar().setExpanding(False)
+        self.tabs.tabBar().setDrawBase(False)
 
         # Tracks tab
         self.tracks_tab = QWidget()
