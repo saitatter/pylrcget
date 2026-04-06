@@ -19,11 +19,11 @@ from player.player import NowPlaying
 from core.embed_lyrics import embed_lyrics_for_track
 from ui.widgets.album_list_widget import AlbumListWidget
 from ui.widgets.artist_list_widget import ArtistListWidget
+from ui.icon_loader import load_svg_icon
 from ui.spacing import SPACE_1, SPACE_2, SPACE_3, set_layout_spacing
 from ui.style_loader import load_stylesheet
 from ui.widgets.toast import ToastManager
 from PySide6.QtWidgets import QToolButton
-from PySide6.QtWidgets import QStyle
 
 
 class MainWindow(QMainWindow):
@@ -130,21 +130,21 @@ class MainWindow(QMainWindow):
 
         self.btn_refresh = QToolButton()
         self.btn_refresh.setObjectName("TopBarAction")
-        self.btn_refresh.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_BrowserReload))
+        self.btn_refresh.setIcon(load_svg_icon("refresh-cw.svg", 18))
         self.btn_refresh.setToolTip("Refresh library")
         self.btn_refresh.setAccessibleName("Refresh library")
         self.btn_refresh.clicked.connect(self.refresh_library)
 
         self.btn_config = QToolButton()
         self.btn_config.setObjectName("TopBarAction")
-        self.btn_config.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_FileDialogDetailedView))
+        self.btn_config.setIcon(load_svg_icon("settings-2.svg", 18))
         self.btn_config.setToolTip("Settings")
         self.btn_config.setAccessibleName("Open music folder settings")
         self.btn_config.clicked.connect(self.open_config_modal)
 
         self.btn_about = QToolButton()
         self.btn_about.setObjectName("TopBarAction")
-        self.btn_about.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MessageBoxInformation))
+        self.btn_about.setIcon(load_svg_icon("info.svg", 18))
         self.btn_about.setToolTip("About")
         self.btn_about.setAccessibleName("About LrcGet")
         self.btn_about.clicked.connect(self.open_about_modal)

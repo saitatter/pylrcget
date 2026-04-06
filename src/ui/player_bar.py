@@ -3,9 +3,8 @@ from __future__ import annotations
 import base64
 from pathlib import Path
 
-from PySide6.QtCore import QByteArray, QSize, Qt
-from PySide6.QtGui import QColor, QFont, QIcon, QLinearGradient, QPainter, QPixmap
-from PySide6.QtSvg import QSvgRenderer
+from PySide6.QtCore import QSize, Qt
+from PySide6.QtGui import QColor, QFont, QLinearGradient, QPainter, QPixmap
 from PySide6.QtWidgets import (
     QComboBox,
     QHBoxLayout,
@@ -23,6 +22,7 @@ from mutagen.mp4 import MP4, MP4Cover
 from mutagen.oggopus import OggOpus
 from mutagen.oggvorbis import OggVorbis
 
+from ui.icon_loader import load_svg_icon
 from ui.spacing import SPACE_2, SPACE_3, set_layout_spacing
 from ui.style_loader import load_stylesheet
 
@@ -33,24 +33,6 @@ def _fmt(ms: int) -> str:
     m = s // 60
     s = s % 60
     return f"{m}:{s:02d}"
-
-
-def _svg_icon(path_d: str, size: int = 20, color: str = "#e5e7eb") -> QIcon:
-    svg = f"""
-    <svg xmlns="http://www.w3.org/2000/svg" width="{size}" height="{size}" viewBox="0 0 24 24">
-      <path d="{path_d}" fill="{color}"/>
-    </svg>
-    """.strip()
-
-    renderer = QSvgRenderer(QByteArray(svg.encode("utf-8")))
-    pm = QPixmap(size, size)
-    pm.fill(Qt.transparent)
-
-    painter = QPainter(pm)
-    renderer.render(painter)
-    painter.end()
-
-    return QIcon(pm)
 
 
 def _cover_pixmap(title: str, artist: str | None, size: int = 56) -> QPixmap:
@@ -181,12 +163,6 @@ def _artwork_pixmap(title: str, artist: str | None, audio_path: str | None, size
     return _cover_pixmap(title, artist, size)
 
 
-SVG_PREV = "M6 18V6h2v12H6zm3.5-6L18 6v12l-8.5-6z"
-SVG_NEXT = "M16 6v12h2V6h-2zM6 18l8.5-6L6 6v12z"
-SVG_PLAY = "M8 5v14l11-7L8 5z"
-SVG_PAUSE = "M6 5h4v14H6V5zm8 0h4v14h-4V5z"
-
-
 class SeekSlider(QSlider):
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:
@@ -272,10 +248,10 @@ class PlayerBar(QWidget):
         self.btn_next.setAccessibleName("Next track")
 
         self._icons = {
-            "prev": _svg_icon(SVG_PREV, 20, "#e5e7eb"),
-            "next": _svg_icon(SVG_NEXT, 20, "#e5e7eb"),
-            "play": _svg_icon(SVG_PLAY, 22, "#e5e7eb"),
-            "pause": _svg_icon(SVG_PAUSE, 22, "#e5e7eb"),
+            "prev": load_svg_icon("skip-back.svg", 20, "#e5e7eb"),
+            "next": load_svg_icon("skip-forward.svg", 20, "#e5e7eb"),
+            "play": load_svg_icon("play.svg", 22, "#e5e7eb"),
+            "pause": load_svg_icon("pause.svg", 22, "#e5e7eb"),
         }
         self.btn_prev.setIcon(self._icons["prev"])
         self.btn_next.setIcon(self._icons["next"])
