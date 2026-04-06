@@ -13,6 +13,7 @@ from ui.dialogs.music_folders_dialog import MusicFoldersDialog
 from ui.player_bar import PlayerBar
 from ui.widgets.lyrics_editor_widget import LyricsEditorWidget
 from ui.dialogs.publish_lyrics_dialog import PublishLyricsDialog
+from ui.dialogs.first_run_dialog import FirstRunDialog
 from player.player import NowPlaying
 from core.embed_lyrics import embed_lyrics_for_track
 from ui.widgets.album_list_widget import AlbumListWidget
@@ -259,6 +260,7 @@ class MainWindow(QMainWindow):
         self._apply_track_filters()
         self.show_queued_notifications()
         self._update_responsive_layout()
+        QTimer.singleShot(0, self._maybe_show_first_run_onboarding)
 
         self.setStyleSheet(self.styleSheet() + load_stylesheet("main_window.qss"))
 
@@ -286,6 +288,17 @@ class MainWindow(QMainWindow):
 
     def open_about_modal(self):
         self.app_state.notify("LrcGet Python — about modal TBD", "info")
+
+    def _maybe_show_first_run_onboarding(self):
+        if get_directories(self.app_state.db):
+            return
+
+        self.tabs.setCurrentWidget(self.tracks_tab)
+        dlg = FirstRunDialog(self)
+        if dlg.exec():
+            self.open_config_modal()
+            if get_directories(self.app_state.db):
+                self.refresh_library()
 
     # ------------------ scanning ------------------
     def refresh_library(self):

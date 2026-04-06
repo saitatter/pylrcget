@@ -111,6 +111,17 @@ QComboBox QAbstractItemView {
     outline: 0;
 }
 
+QLabel#OnboardingTitle {
+    font-size: {{font-size-lg}};
+    font-weight: 700;
+    color: {{color-text-strong}};
+}
+
+QLabel#OnboardingBody,
+QLabel#OnboardingSteps {
+    color: {{color-text}};
+}
+
 QTabWidget#MainTabs::pane {
     border: 1px solid {{color-border-strong}};
     border-radius: {{radius-xl}};
