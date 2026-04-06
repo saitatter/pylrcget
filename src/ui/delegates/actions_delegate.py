@@ -23,7 +23,9 @@ class ActionsDelegate(QStyledItemDelegate):
             "success": "Done",
             "error": "Retry",
         }.get(state, "Download")
-        opt.state = QStyle.State_Enabled if state != "loading" else QStyle.State_None
+        opt.state = QStyle.State_None if state == "loading" else QStyle.State_Enabled
+        if option.state & QStyle.State_MouseOver and state != "loading":
+            opt.state |= QStyle.State_MouseOver
         QApplication.style().drawControl(QStyle.CE_PushButton, opt, painter)
 
     def editorEvent(self, event, model, option, index):

@@ -1,6 +1,6 @@
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QLabel,
-    QTabWidget, QProgressBar, QMessageBox, QLineEdit, QHBoxLayout, QCheckBox, QSplitter, QBoxLayout, QPushButton
+    QTabWidget, QProgressBar, QMessageBox, QLineEdit, QHBoxLayout, QCheckBox, QSplitter, QBoxLayout, QPushButton, QApplication
 )
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QShortcut, QKeySequence
@@ -17,6 +17,7 @@ from ui.dialogs.publish_lyrics_dialog import PublishLyricsDialog
 from ui.dialogs.first_run_dialog import FirstRunDialog
 from player.player import NowPlaying
 from core.embed_lyrics import embed_lyrics_for_track
+from ui.app_theme import apply_app_theme
 from ui.widgets.album_list_widget import AlbumListWidget
 from ui.widgets.artist_list_widget import ArtistListWidget
 from ui.icon_loader import load_svg_icon
@@ -280,7 +281,7 @@ class MainWindow(QMainWindow):
         self._update_responsive_layout()
         QTimer.singleShot(0, self._maybe_show_first_run_onboarding)
 
-        self.setStyleSheet(self.styleSheet() + load_stylesheet("main_window.qss"))
+        self._apply_styles()
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
@@ -300,8 +301,12 @@ class MainWindow(QMainWindow):
 
     # ------------------ modals ------------------
     def open_config_modal(self):
+        before = get_config(self.app_state.db).theme_mode
         dlg = MusicFoldersDialog(self.app_state, self)
         if dlg.exec():
+            after = get_config(self.app_state.db).theme_mode
+            if after != before:
+                self._apply_theme(after)
             self._apply_track_filters()
 
     def open_about_modal(self):
@@ -718,6 +723,27 @@ class MainWindow(QMainWindow):
 
         if hasattr(self, "player_bar"):
             self.player_bar.set_compact_mode(width < 980)
+
+    def _apply_styles(self):
+        self.setStyleSheet(load_stylesheet("main_window.qss"))
+
+    def _apply_theme(self, theme_mode: str):
+        app = QApplication.instance()
+        if app is not None:
+            apply_app_theme(app, theme_mode)
+
+        self._apply_styles()
+        if hasattr(self, "player_bar"):
+            self.player_bar._apply_styles()
+        if hasattr(self, "track_list"):
+            self.track_list._apply_styles()
+            self.track_list.empty_state._apply_styles()
+        if hasattr(self, "albums_tab"):
+            self.albums_tab._apply_styles()
+        if hasattr(self, "artists_tab"):
+            self.artists_tab._apply_styles()
+        if hasattr(self, "lyrics_view"):
+            self.lyrics_view._apply_styles()
 
     def _on_open_album(self, album_id: int):
         self.tabs.setCurrentWidget(self.tracks_tab)

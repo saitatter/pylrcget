@@ -12,7 +12,7 @@ if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
 from core.state import AppState, Notify
-from db.database import initialize_database
+from db.database import get_config, initialize_database
 from player.player import Player
 from ui.app_theme import apply_app_theme
 from ui.main_window import MainWindow
@@ -53,9 +53,8 @@ def init_app_state() -> AppState:
 
 def main() -> int:
     qt_app = QApplication(sys.argv)
-    apply_app_theme(qt_app)
-
     app_state = init_app_state()
+    apply_app_theme(qt_app, get_config(app_state.db).theme_mode)
     main_window = MainWindow(app_state)
     main_window.show()
 

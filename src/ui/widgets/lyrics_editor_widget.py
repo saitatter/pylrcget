@@ -233,7 +233,7 @@ class LyricsEditorWidget(QWidget):
             self.btn_publish_plain: "Publish Plain",
         }
 
-        self.setStyleSheet(load_stylesheet("lyrics_editor.qss"))
+        self._apply_styles()
         self.show_none("Choose a track to review or edit its lyrics.")
 
     # --- public API ---
@@ -258,6 +258,11 @@ class LyricsEditorWidget(QWidget):
         self._refresh_row_styles()
 
         self.table.scrollToItem(self.table.item(idx, 1), self.table.ScrollHint.PositionAtCenter)
+
+    def _apply_styles(self):
+        self.setStyleSheet(load_stylesheet("lyrics_editor.qss"))
+        if hasattr(self, "empty_state") and self.empty_state:
+            self.empty_state._apply_styles()
 
     def show_none(self, message: str):
         self._reset_state()

@@ -4,6 +4,7 @@ from dataclasses import replace
 
 from PySide6.QtWidgets import (
     QCheckBox,
+    QComboBox,
     QDialog,
     QFileDialog,
     QGridLayout,
@@ -20,6 +21,7 @@ from PySide6.QtWidgets import (
 from core.lyrics_sidecar import DEFAULT_LYRICS_FILE_PATTERN
 from db.database import get_config, get_directories, set_config, set_directories
 from db.models import Config
+from ui.theme_tokens import get_available_themes
 
 
 class MusicFoldersDialog(QDialog):
@@ -43,6 +45,15 @@ class MusicFoldersDialog(QDialog):
         btn_layout.addWidget(self.remove_btn)
         folders_layout.addLayout(btn_layout)
         layout.addWidget(folders_box)
+
+        appearance_box = QGroupBox("Appearance")
+        appearance_layout = QGridLayout(appearance_box)
+        self.theme_combo = QComboBox()
+        for theme_key, theme_name in get_available_themes():
+            self.theme_combo.addItem(theme_name, theme_key)
+        appearance_layout.addWidget(QLabel("Theme"), 0, 0)
+        appearance_layout.addWidget(self.theme_combo, 0, 1)
+        layout.addWidget(appearance_box)
 
         lyrics_box = QGroupBox("Lyrics Export")
         lyrics_layout = QGridLayout(lyrics_box)
@@ -100,6 +111,8 @@ class MusicFoldersDialog(QDialog):
             self.list_widget.addItem(directory)
 
         config = get_config(self.app_state.db)
+        theme_idx = self.theme_combo.findData(config.theme_mode or "auto")
+        self.theme_combo.setCurrentIndex(max(0, theme_idx))
         self.save_sidecars_chk.setChecked(config.save_lyrics_sidecars)
         self.output_dir_edit.setText(config.lyrics_output_dir)
         self.pattern_edit.setText(config.lyrics_file_pattern or DEFAULT_LYRICS_FILE_PATTERN)
@@ -142,6 +155,7 @@ class MusicFoldersDialog(QDialog):
         config = get_config(self.app_state.db)
         new_config = replace(
             config,
+            theme_mode=str(self.theme_combo.currentData() or "auto"),
             save_lyrics_sidecars=self.save_sidecars_chk.isChecked(),
             try_embed_lyrics=self.embed_chk.isChecked(),
             lyrics_output_dir=self.output_dir_edit.text().strip(),

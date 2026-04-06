@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
 
 from ui.spacing import SPACE_2, SPACE_3, set_layout_spacing
 from ui.style_loader import load_stylesheet
+from ui.theme_tokens import STYLE_TOKENS
 
 
 @dataclass(frozen=True)
@@ -23,19 +24,53 @@ class ToastData:
     notify_type: str = "info"  # "info" | "success" | "warning" | "error"
     timeout_ms: int = 3000
 
-_TOAST_COLORS = {
-    "success": ("#052e1a", "#16a34a", "#e5e7eb"),
-    "warning": ("#2a1a05", "#f59e0b", "#e5e7eb"),
-    "error": ("#2a0a0a", "#ef4444", "#e5e7eb"),
-    "info": ("#0b1222", "#38bdf8", "#e5e7eb"),
-}
+def _hex_to_rgb(hex_color: str) -> tuple[int, int, int]:
+    value = hex_color.lstrip("#")
+    if len(value) == 3:
+        value = "".join(ch * 2 for ch in value)
+    return int(value[0:2], 16), int(value[2:4], 16), int(value[4:6], 16)
 
-def _colors(kind: str) -> tuple[str, str, str]:
+
+def _rgba(hex_color: str, alpha: float) -> str:
+    r, g, b = _hex_to_rgb(hex_color)
+    return f"rgba({r}, {g}, {b}, {alpha:.3f})"
+
+
+def _colors(kind: str) -> tuple[str, str, str, str]:
     """
-    Returns (bg, border, text).
+    Returns (bg, border, text, hover_bg).
     """
     kind = (kind or "info").lower()
-    return _TOAST_COLORS.get(kind, _TOAST_COLORS["info"])
+    palette_mode = STYLE_TOKENS.get("palette-mode", "dark")
+    hover_bg = _rgba(STYLE_TOKENS.get("color-text-strong", "#ffffff"), 0.08 if palette_mode == "dark" else 0.06)
+
+    if kind == "success":
+        return (
+            STYLE_TOKENS.get("color-success-bg", "#052e1a"),
+            STYLE_TOKENS.get("color-success-border", "#16a34a"),
+            STYLE_TOKENS.get("color-success-text", "#e5e7eb"),
+            hover_bg,
+        )
+    if kind == "warning":
+        return (
+            STYLE_TOKENS.get("color-warning-bg", "#2a1a05"),
+            STYLE_TOKENS.get("color-warning-border", "#f59e0b"),
+            STYLE_TOKENS.get("color-warning-text", "#e5e7eb"),
+            hover_bg,
+        )
+    if kind == "error":
+        return (
+            STYLE_TOKENS.get("color-error-bg", "#2a0a0a"),
+            STYLE_TOKENS.get("color-error-border", "#ef4444"),
+            STYLE_TOKENS.get("color-error-text", "#e5e7eb"),
+            hover_bg,
+        )
+    return (
+        STYLE_TOKENS.get("color-bg-control", "#0b1222"),
+        STYLE_TOKENS.get("color-accent", "#38bdf8"),
+        STYLE_TOKENS.get("color-text", "#e5e7eb"),
+        hover_bg,
+    )
 
 class ToastWidget(QFrame):
     def __init__(self, data: ToastData, parent: QWidget, manager: "ToastManager"):
@@ -43,10 +78,10 @@ class ToastWidget(QFrame):
         self.data = data
         self._manager = manager
 
-        bg, border, text = _colors(data.notify_type)
+        bg, border, text, hover_bg = _colors(data.notify_type)
 
         self.setObjectName("Toast")
-        self.setStyleSheet(load_stylesheet("toast.qss", bg=bg, border=border, text=text))
+        self.setStyleSheet(load_stylesheet("toast.qss", bg=bg, border=border, text=text, hover_bg=hover_bg))
 
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
 
