@@ -8,6 +8,7 @@ from PySide6.QtGui import QStandardItem, QStandardItemModel
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QTableView, QMenu
 
 from ui.style_loader import load_stylesheet
+from ui.widgets.sortable_header_view import SortableHeaderView
 
 
 @dataclass(frozen=True)
@@ -31,6 +32,13 @@ class ArtistListWidget(QWidget):
         self.model = QStandardItemModel(0, 3, self)
         self.model.setHorizontalHeaderLabels(["Artist", "Albums", "Tracks"])
         self.table.setModel(self.model)
+        self.header = SortableHeaderView(
+            Qt.Orientation.Horizontal,
+            self.table,
+            default_sort_column=0,
+            default_sort_order=Qt.SortOrder.AscendingOrder,
+        )
+        self.table.setHorizontalHeader(self.header)
 
         self.table.setSelectionBehavior(QTableView.SelectionBehavior.SelectRows)
         self.table.setSelectionMode(QTableView.SelectionMode.SingleSelection)
@@ -43,7 +51,7 @@ class ArtistListWidget(QWidget):
         self.table.setColumnWidth(0, 520)
         self.table.setColumnWidth(1, 90)
         self.table.setColumnWidth(2, 90)
-        self.table.horizontalHeader().setStretchLastSection(True)
+        self.header.setStretchLastSection(True)
 
         self._apply_styles()
 

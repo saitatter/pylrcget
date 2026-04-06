@@ -11,12 +11,17 @@ QTableView#{{table_name}} {
 QHeaderView::section {
     background-color: #020617;
     color: #9ca3af;
-    padding: 4px 6px;
+    padding: 4px 24px 4px 6px;
     border: none;
     border-bottom: 1px solid #111827;
     font-size: 11px;
     text-transform: uppercase;
     letter-spacing: 0.08em;
+}
+
+QHeaderView::section:hover {
+    background-color: #0b1222;
+    color: #d1d5db;
 }
 
 QTableView::item {

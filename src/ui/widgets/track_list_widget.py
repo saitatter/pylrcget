@@ -7,6 +7,7 @@ from PySide6.QtWidgets import QWidget, QVBoxLayout, QTableView, QMenu
 from ui.models.track_table_model import TrackTableModel
 from ui.delegates.actions_delegate import ActionsDelegate
 from ui.style_loader import load_stylesheet
+from ui.widgets.sortable_header_view import SortableHeaderView
 from core.tracklist_models import TrackListRow
 from db.database import get_track_rows
 
@@ -69,6 +70,14 @@ class TrackListWidget(QWidget):
         self.proxy_model.setSourceModel(self.model)
         self.proxy_model.setDynamicSortFilter(True)
         self.table.setModel(self.proxy_model)
+        self.header = SortableHeaderView(
+            Qt.Orientation.Horizontal,
+            self.table,
+            default_sort_column=0,
+            default_sort_order=Qt.SortOrder.AscendingOrder,
+            non_sortable_columns={3},
+        )
+        self.table.setHorizontalHeader(self.header)
 
         self.table.setSelectionBehavior(QTableView.SelectionBehavior.SelectRows)
         self.table.setSelectionMode(QTableView.SelectionMode.ExtendedSelection)
@@ -82,7 +91,7 @@ class TrackListWidget(QWidget):
         self.table.setColumnWidth(1, 90)
         self.table.setColumnWidth(2, 110)
         self.table.setColumnWidth(3, 140)
-        self.table.horizontalHeader().setStretchLastSection(True)
+        self.header.setStretchLastSection(True)
         self.table.setObjectName("TrackTable")
 
         self.table.verticalHeader().setDefaultSectionSize(24)
