@@ -92,7 +92,7 @@ def read_embedded_lyrics(path: str) -> Tuple[Optional[str], Optional[str]]:
     Returns (plain_lyrics_or_None, synced_lrc_or_None).
 
     Implementation notes:
-      - MP3: reads ID3 USLT for plain lyrics and a TXXX with desc 'LRCLIB_LRC' for synced.
+      - MP3: reads ID3 USLT for plain lyrics and a TXXX with desc 'LYRICS' for synced.
       - FLAC/Vorbis/Ogg: reads 'LYRICS' and 'LRCLIB_LRC' vorbis comments.
       - MP4/M4A: reads '\xa9lyr' and '----:com.lrclib:lrc' (custom atom, bytes).
       - WMA/ASF: reads ASF string attributes for plain and synced lyrics.

@@ -15,7 +15,7 @@ from PySide6.QtWidgets import (
 
 from ui.spacing import SPACE_2, SPACE_3, set_layout_spacing
 from ui.style_loader import load_stylesheet
-from ui.theme_tokens import STYLE_TOKENS
+from ui.theme_tokens import STYLE_TOKENS, rgba
 
 
 @dataclass(frozen=True)
@@ -24,25 +24,13 @@ class ToastData:
     notify_type: str = "info"  # "info" | "success" | "warning" | "error"
     timeout_ms: int = 3000
 
-def _hex_to_rgb(hex_color: str) -> tuple[int, int, int]:
-    value = hex_color.lstrip("#")
-    if len(value) == 3:
-        value = "".join(ch * 2 for ch in value)
-    return int(value[0:2], 16), int(value[2:4], 16), int(value[4:6], 16)
-
-
-def _rgba(hex_color: str, alpha: float) -> str:
-    r, g, b = _hex_to_rgb(hex_color)
-    return f"rgba({r}, {g}, {b}, {alpha:.3f})"
-
-
 def _colors(kind: str) -> tuple[str, str, str, str]:
     """
     Returns (bg, border, text, hover_bg).
     """
     kind = (kind or "info").lower()
     palette_mode = STYLE_TOKENS.get("palette-mode", "dark")
-    hover_bg = _rgba(STYLE_TOKENS.get("color-text-strong", "#ffffff"), 0.08 if palette_mode == "dark" else 0.06)
+    hover_bg = rgba(STYLE_TOKENS.get("color-text-strong", "#ffffff"), 0.08 if palette_mode == "dark" else 0.06)
 
     if kind == "success":
         return (

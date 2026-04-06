@@ -15,6 +15,10 @@ def _rgba(hex_color: str, alpha: float) -> str:
     return f"rgba({r}, {g}, {b}, {alpha:.3f})"
 
 
+def rgba(hex_color: str, alpha: float) -> str:
+    return _rgba(hex_color, alpha)
+
+
 def _theme(
     *,
     name: str,

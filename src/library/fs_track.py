@@ -1,17 +1,14 @@
 import os
 import glob
 from pathlib import Path
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Optional, List
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from mutagen import File as MutagenFile
-from mutagen.mp3 import MP3
-from mutagen.flac import FLAC
-from mutagen.mp4 import MP4
-from mutagen.oggvorbis import OggVorbis
-from mutagen.oggopus import OggOpus
+
+from library.scan_library import AUDIO_EXTS
 
 # ---- Structuri ----
 @dataclass
@@ -122,7 +119,7 @@ def load_tracks_from_directories(directories: List[str], db_add_tracks_callback,
         entry_batch = []
         pattern = os.path.join(directory, "**", "*.*")
         for file_path in glob.glob(pattern, recursive=True):
-            if file_path.lower().endswith(('.mp3', '.m4a', '.flac', '.ogg', '.opus', '.wav', '.wma', '.asf', '.dsf', '.dff')):
+            if Path(file_path).suffix.lower() in AUDIO_EXTS:
                 entry_batch.append(file_path)
                 if len(entry_batch) == 100:
                     tracks = load_tracks_from_entry_batch(entry_batch)
@@ -147,6 +144,6 @@ def count_files_from_directories(directories: List[str]) -> int:
         pattern = os.path.join(directory, "**", "*.*")
         files_count += sum(
             1 for f in glob.glob(pattern, recursive=True)
-            if f.lower().endswith(('.mp3', '.m4a', '.flac', '.ogg', '.opus', '.wav', '.wma', '.asf', '.dsf', '.dff'))
+            if Path(f).suffix.lower() in AUDIO_EXTS
         )
     return files_count
