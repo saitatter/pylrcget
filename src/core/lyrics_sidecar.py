@@ -57,7 +57,7 @@ def _render_pattern(pattern: str, track: Track) -> str:
     }
     try:
         rendered = pattern.format(**values).strip()
-    except KeyError:
+    except Exception:
         rendered = ""
 
     return _safe_component(rendered) or _safe_component(f"{track.artist_name} - {track.title}") or "lyrics"

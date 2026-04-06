@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataclasses import replace
+
 from PySide6.QtWidgets import (
     QCheckBox,
     QDialog,
@@ -138,14 +140,10 @@ class MusicFoldersDialog(QDialog):
             return
 
         config = get_config(self.app_state.db)
-        new_config = Config(
-            skip_tracks_with_synced_lyrics=config.skip_tracks_with_synced_lyrics,
-            skip_tracks_with_plain_lyrics=config.skip_tracks_with_plain_lyrics,
-            show_line_count=config.show_line_count,
+        new_config = replace(
+            config,
             save_lyrics_sidecars=self.save_sidecars_chk.isChecked(),
             try_embed_lyrics=self.embed_chk.isChecked(),
-            theme_mode=config.theme_mode,
-            lrclib_instance=config.lrclib_instance,
             lyrics_output_dir=self.output_dir_edit.text().strip(),
             lyrics_file_pattern=self.pattern_edit.text().strip() or DEFAULT_LYRICS_FILE_PATTERN,
         )

@@ -123,6 +123,5 @@ def upgrade_database_if_needed(db: sqlite3.Connection, existing_version: int) ->
         db.executescript("""
             ALTER TABLE config_data ADD COLUMN save_lyrics_sidecars BOOLEAN DEFAULT 1;
             UPDATE config_data SET save_lyrics_sidecars = 1;
-            UPDATE config_data SET try_embed_lyrics = 1;
         """)
         db.commit()
