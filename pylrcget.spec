@@ -1,7 +1,8 @@
 from pathlib import Path
 
 
-ROOT = Path(__file__).resolve().parent
+SPEC_PATH = Path(globals().get("__file__", "pylrcget.spec")).resolve()
+ROOT = SPEC_PATH.parent if SPEC_PATH.exists() else Path.cwd()
 
 
 a = Analysis(
