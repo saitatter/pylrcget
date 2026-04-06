@@ -216,9 +216,6 @@ class NavigationBucketTests(unittest.TestCase):
 
     def test_album_widget_merges_unknown_album_bucket(self):
         app_state = SimpleNamespace(db=sqlite3.connect(":memory:"))
-        app_state.db.row_factory = sqlite3.Row
-        app_state.db.execute("CREATE TABLE directories (path TEXT)")
-        app_state.db.execute("INSERT INTO directories(path) VALUES ('C:/Music')")
         widget = AlbumListWidget(app_state)
         try:
             rows = [
@@ -226,7 +223,9 @@ class NavigationBucketTests(unittest.TestCase):
                 {"album_id": 2, "album_name": "Album", "artist_name": "Artist B", "track_count": 3},
                 {"album_id": 3, "album_name": "Real Album", "artist_name": "Artist C", "track_count": 1},
             ]
-            with patch("db.database.get_album_rows", return_value=rows):
+            with patch("ui.widgets.album_list_widget.get_directories", return_value=["C:/Music"]), patch(
+                "db.database.get_album_rows", return_value=rows
+            ):
                 widget.refresh()
 
             self.assertEqual(widget.model.rowCount(), 2)
@@ -243,9 +242,6 @@ class NavigationBucketTests(unittest.TestCase):
 
     def test_artist_widget_merges_unknown_artist_bucket(self):
         app_state = SimpleNamespace(db=sqlite3.connect(":memory:"))
-        app_state.db.row_factory = sqlite3.Row
-        app_state.db.execute("CREATE TABLE directories (path TEXT)")
-        app_state.db.execute("INSERT INTO directories(path) VALUES ('C:/Music')")
         widget = ArtistListWidget(app_state)
         try:
             rows = [
@@ -253,7 +249,9 @@ class NavigationBucketTests(unittest.TestCase):
                 {"artist_id": 2, "artist_name": "Artist", "album_count": 1, "track_count": 3},
                 {"artist_id": 3, "artist_name": "Real Artist", "album_count": 1, "track_count": 2},
             ]
-            with patch("db.database.get_artist_rows", return_value=rows):
+            with patch("ui.widgets.artist_list_widget.get_directories", return_value=["C:/Music"]), patch(
+                "db.database.get_artist_rows", return_value=rows
+            ):
                 widget.refresh()
 
             self.assertEqual(widget.model.rowCount(), 2)
