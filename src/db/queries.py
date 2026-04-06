@@ -679,8 +679,8 @@ def delete_tracks_by_paths(db: sqlite3.Connection, paths: list[str], *, commit: 
 
 
 def prune_library(db: sqlite3.Connection) -> None:
-    db.execute("DELETE FROM albums WHERE id NOT IN (SELECT DISTINCT album_id FROM tracks)")
-    db.execute("DELETE FROM artists WHERE id NOT IN (SELECT DISTINCT artist_id FROM tracks)")
+    db.execute("DELETE FROM albums WHERE NOT EXISTS (SELECT 1 FROM tracks WHERE tracks.album_id = albums.id)")
+    db.execute("DELETE FROM artists WHERE NOT EXISTS (SELECT 1 FROM tracks WHERE tracks.artist_id = artists.id)")
     db.commit()
 
 

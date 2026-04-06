@@ -63,6 +63,8 @@ class LibraryScanner(QThread):
                 if self.isInterruptionRequested():
                     if db is not None:
                         db.rollback()
+                        db.close()
+                        db = None
                     self.finished_signal.emit(False, "Library scan cancelled.")
                     return
 
