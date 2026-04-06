@@ -66,11 +66,20 @@ QLabel#ScanLabel {
     font-size: {{font-size-sm}};
 }
 
+QLabel#ScanDetails {
+    color: {{color-text-muted}};
+    font-size: {{font-size-sm}};
+}
+
 QProgressBar#ScanProgress {
     background: {{color-bg-control}};
     border: 1px solid {{color-border}};
     border-radius: {{radius-pill}};
     height: 10px;
+}
+
+QPushButton#ScanCancelButton {
+    min-width: 96px;
 }
 
 QProgressBar#ScanProgress::chunk {

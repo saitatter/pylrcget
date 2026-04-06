@@ -1,6 +1,6 @@
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QLabel,
-    QTabWidget, QProgressBar, QMessageBox, QLineEdit, QHBoxLayout, QCheckBox, QSplitter, QBoxLayout
+    QTabWidget, QProgressBar, QMessageBox, QLineEdit, QHBoxLayout, QCheckBox, QSplitter, QBoxLayout, QPushButton
 )
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QShortcut, QKeySequence
@@ -212,6 +212,8 @@ class MainWindow(QMainWindow):
 
         self.scan_label = QLabel("Scanning…")
         self.scan_label.setObjectName("ScanLabel")
+        self.scan_details = QLabel("Preparing scan…")
+        self.scan_details.setObjectName("ScanDetails")
 
         self.progress_bar = QProgressBar()
         self.progress_bar.setObjectName("ScanProgress")
@@ -219,8 +221,19 @@ class MainWindow(QMainWindow):
         self.progress_bar.setRange(0, 100)
         self.progress_bar.setValue(0)
 
-        scan_layout.addWidget(self.scan_label)
+        scan_text = QVBoxLayout()
+        set_layout_spacing(scan_text, spacing=SPACE_1)
+        scan_text.addWidget(self.scan_label)
+        scan_text.addWidget(self.scan_details)
+
+        self.btn_cancel_scan = QPushButton("Cancel")
+        self.btn_cancel_scan.setObjectName("ScanCancelButton")
+        self.btn_cancel_scan.clicked.connect(self._cancel_scan)
+        self.btn_cancel_scan.setEnabled(False)
+
+        scan_layout.addLayout(scan_text)
         scan_layout.addWidget(self.progress_bar, 1)
+        scan_layout.addWidget(self.btn_cancel_scan)
 
         self.layout.addWidget(self.scan_row)
         self.scan_row.setVisible(False)
@@ -288,6 +301,8 @@ class MainWindow(QMainWindow):
         self.actions_label.setText("Scanning Library")
         self._set_tool_feedback(self.btn_refresh, "loading")
         self.scan_label.setText("Scanning…")
+        self.scan_details.setText(f"Scanning {len(directories)} folder(s)…")
+        self.btn_cancel_scan.setEnabled(True)
 
         self.scanner = LibraryScanner(self.app_state.db_path, directories)
         self.scanner.progress_signal.connect(self._update_scan_progress)
@@ -296,14 +311,17 @@ class MainWindow(QMainWindow):
         self.btn_refresh.setEnabled(False)
         self.statusBar().showMessage("Scanning library…")
 
-    def _update_scan_progress(self, scanned: int, total: int):
+    def _update_scan_progress(self, scanned: int, total: int, current_path: str, elapsed_s: float):
         total = max(int(total), 0)
         scanned = max(int(scanned), 0)
+        current_name = os.path.basename(current_path) if current_path else ""
+        elapsed_s = max(0.0, float(elapsed_s or 0.0))
 
         if total <= 0:
             # unknown total -> show indeterminate animation
             self.progress_bar.setRange(0, 0)
             self.scan_label.setText("Scanning…")
+            self.scan_details.setText("Counting tracks in selected folders…")
             return
 
         # determinate
@@ -315,6 +333,9 @@ class MainWindow(QMainWindow):
 
         self.progress_bar.setValue(percent)
         self.scan_label.setText(f"Scanning… {scanned}/{total} ({percent}%)")
+        self.scan_details.setText(
+            f"Current file: {current_name or 'Preparing next file…'}  •  Elapsed: {elapsed_s:.1f}s"
+        )
 
     def _on_notify(self, n):
         # n is core.state.Notify
@@ -334,18 +355,30 @@ class MainWindow(QMainWindow):
         self.progress_bar.setRange(0, 100)  # reset from indeterminate if needed
         self.progress_bar.setValue(0)
         self.scan_row.setVisible(False)
+        self.btn_cancel_scan.setEnabled(False)
 
         if ok:
             self._apply_track_filters()
             self.app_state.notify("Library scanning complete!", "success")
             self._set_tool_feedback(self.btn_refresh, "success")
         else:
-            self.app_state.notify(f"Library scanning failed: {msg}", "error")
-            self._set_tool_feedback(self.btn_refresh, "error")
+            if "cancel" in (msg or "").lower():
+                self.app_state.notify(msg, "warning")
+                self._set_tool_feedback(self.btn_refresh, "idle")
+            else:
+                self.app_state.notify(f"Library scanning failed: {msg}", "error")
+                self._set_tool_feedback(self.btn_refresh, "error")
 
         self.btn_refresh.setEnabled(True)
         QTimer.singleShot(1800, self._reset_refresh_feedback)
         self.statusBar().showMessage(msg, 4000)
+
+    def _cancel_scan(self):
+        if not hasattr(self, "scanner") or self.scanner is None:
+            return
+        self.btn_cancel_scan.setEnabled(False)
+        self.scan_details.setText("Cancelling scan after the current batch…")
+        self.scanner.requestInterruption()
 
     # ------------------ track actions ------------------
     def on_play_track(self, track_id: int):

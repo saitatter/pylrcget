@@ -1,12 +1,13 @@
 # ui/library_scanner.py (or wherever LibraryScanner is defined)
 import sqlite3
+import time
 from PySide6.QtCore import QThread, Signal
 
 from library.scan_library import iter_audio_paths, new_fs_track_from_path
 from db.database import clean_library, add_tracks  # or add_tracks_bulk
 
 class LibraryScanner(QThread):
-    progress_signal = Signal(int, int)     # scanned, total
+    progress_signal = Signal(int, int, str, float)     # scanned, total, current path, elapsed seconds
     finished_signal = Signal(bool, str)    # ok, message
 
     def __init__(self, db_path: str, directories: list[str]):
@@ -15,6 +16,8 @@ class LibraryScanner(QThread):
         self.directories = directories
 
     def run(self):
+        db = None
+        started_at = time.perf_counter()
         try:
             paths = iter_audio_paths(self.directories)
             total = len(paths)
@@ -28,6 +31,12 @@ class LibraryScanner(QThread):
 
             batch = []
             for p in paths:
+                if self.isInterruptionRequested():
+                    if db is not None:
+                        db.rollback()
+                    self.finished_signal.emit(False, "Library scan cancelled.")
+                    return
+
                 t = new_fs_track_from_path(p)
                 scanned += 1
 
@@ -37,16 +46,18 @@ class LibraryScanner(QThread):
                 if len(batch) >= 100:
                     add_tracks(db, batch)   # later replace with add_tracks_bulk
                     batch.clear()
-                    self.progress_signal.emit(scanned, total)
+                    self.progress_signal.emit(scanned, total, p, time.perf_counter() - started_at)
 
                 if scanned % 200 == 0:
-                    self.progress_signal.emit(scanned, total)
+                    self.progress_signal.emit(scanned, total, p, time.perf_counter() - started_at)
 
             if batch:
                 add_tracks(db, batch)
 
             db.close()
-            self.progress_signal.emit(scanned, total)
+            self.progress_signal.emit(scanned, total, "", time.perf_counter() - started_at)
             self.finished_signal.emit(True, "Library scanning complete!")
         except Exception as e:
+            if db is not None:
+                db.close()
             self.finished_signal.emit(False, f"Scan failed: {e}")
