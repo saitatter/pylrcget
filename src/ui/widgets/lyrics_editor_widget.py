@@ -6,6 +6,7 @@ from bisect import bisect_right
 from typing import List, Optional, Tuple
 
 from PySide6.QtCore import Qt, Signal, QTimer
+from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QStackedWidget,
     QTextEdit, QTableWidget, QTableWidgetItem,
@@ -17,6 +18,8 @@ from ui.style_loader import load_stylesheet
 from ui.widgets.empty_state_widget import EmptyStateWidget
 
 _TS_RE = re.compile(r"\[(\d+):(\d+)(?:\.(\d+))?\]")
+TIMESTAMP_MS_ROLE = Qt.ItemDataRole.UserRole
+TIMESTAMP_VALID_ROLE = Qt.ItemDataRole.UserRole + 1
 
 
 def _ts_to_ms(mm: str, ss: str, frac: str | None) -> int:
@@ -140,6 +143,7 @@ class LyricsEditorWidget(QWidget):
         self._current_pos_ms: int = 0
         self._times: List[int] = []
         self._current_index: int = -1
+        self._invalid_rows: set[int] = set()
         self._default_button_text: dict[QPushButton, str] = {}
         self._publish_synced_available = False
         self._publish_plain_available = False
@@ -187,6 +191,11 @@ class LyricsEditorWidget(QWidget):
         header.addWidget(self.btn_publish_plain)
 
         root.addLayout(header)
+
+        self.validation_hint = QLabel("")
+        self.validation_hint.setObjectName("LyricsValidationHint")
+        self.validation_hint.hide()
+        root.addWidget(self.validation_hint)
 
         # --- stack: msg / plain / synced ---
         self.stack = QStackedWidget()
@@ -246,10 +255,7 @@ class LyricsEditorWidget(QWidget):
 
         self._current_index = idx
 
-        # highlight row without breaking editing too aggressively
-        self.table.blockSignals(True)
-        self.table.selectRow(idx)
-        self.table.blockSignals(False)
+        self._refresh_row_styles()
 
         self.table.scrollToItem(self.table.item(idx, 1), self.table.ScrollHint.PositionAtCenter)
 
@@ -321,9 +327,11 @@ class LyricsEditorWidget(QWidget):
         self._current_index = -1
         self._publish_synced_available = False
         self._publish_plain_available = False
+        self._invalid_rows.clear()
         self.table.blockSignals(True)
         self.table.setRowCount(0)
         self.table.blockSignals(False)
+        self._set_validation_message("")
         self.btn_snap.setEnabled(False)
         self.btn_add.setEnabled(False)
         self.btn_del.setEnabled(False)
@@ -354,7 +362,8 @@ class LyricsEditorWidget(QWidget):
             self._times.append(int(ms))
 
             it_time = QTableWidgetItem(_ms_to_ts(int(ms)))
-            it_time.setData(Qt.ItemDataRole.UserRole, int(ms))  # store ms raw
+            it_time.setData(TIMESTAMP_MS_ROLE, int(ms))
+            it_time.setData(TIMESTAMP_VALID_ROLE, True)
             it_time.setFlags(it_time.flags() | Qt.ItemIsEditable)
 
             it_text = QTableWidgetItem(text)
@@ -364,37 +373,89 @@ class LyricsEditorWidget(QWidget):
             self.table.setItem(row, 1, it_text)
 
         self.table.blockSignals(False)
+        self._refresh_row_styles()
 
         # enable editing controls
         self.btn_add.setEnabled(True)
         self.btn_del.setEnabled(self.table.currentRow() >= 0)
         self.btn_snap.setEnabled(self.table.currentRow() >= 0)
-        self.btn_save.setEnabled(True)
+        self.btn_save.setEnabled(not self._invalid_rows)
 
     def _rebuild_times_cache(self):
         times: List[int] = []
         for r in range(self.table.rowCount()):
             it_time = self.table.item(r, 0)
-            ms = int(it_time.data(Qt.ItemDataRole.UserRole) or 0) if it_time else 0
+            ms = int(it_time.data(TIMESTAMP_MS_ROLE) or 0) if it_time else 0
             times.append(ms)
         self._times = times
+
+    def _refresh_row_styles(self):
+        current_row = self._current_index if self.stack.currentWidget() is self.table else -1
+        selected_row = self.table.currentRow()
+
+        for row in range(self.table.rowCount()):
+            is_current = row == current_row
+            is_selected = row == selected_row
+            is_invalid = row in self._invalid_rows
+
+            bg = None
+            fg = QColor("#e5e7eb")
+            if is_invalid:
+                bg = QColor("#3f1418")
+                fg = QColor("#fecaca")
+            elif is_current and is_selected:
+                bg = QColor("#0b2942")
+                fg = QColor("#e0f2fe")
+            elif is_current:
+                bg = QColor("#0f2235")
+                fg = QColor("#bae6fd")
+            elif is_selected:
+                bg = QColor("#172554")
+                fg = QColor("#dbeafe")
+
+            for col in range(self.table.columnCount()):
+                item = self.table.item(row, col)
+                if not item:
+                    continue
+                if bg is None:
+                    item.setBackground(Qt.GlobalColor.transparent)
+                else:
+                    item.setBackground(bg)
+                item.setForeground(fg)
+
+    def _update_save_enabled(self):
+        if self.stack.currentWidget() is self.table:
+            self.btn_save.setEnabled(not self._invalid_rows)
+        elif self.stack.currentWidget() is self.plain:
+            self.btn_save.setEnabled(True)
+        else:
+            self.btn_save.setEnabled(False)
+
+    def _set_validation_message(self, message: str, *, state: str = "idle"):
+        self.validation_hint.setText(message)
+        self.validation_hint.setProperty("validationState", state if message else "")
+        self.validation_hint.style().unpolish(self.validation_hint)
+        self.validation_hint.style().polish(self.validation_hint)
+        self.validation_hint.update()
+        self.validation_hint.setVisible(bool(message))
 
     def _on_any_edit(self):
         # Any edit in plain view keeps save enabled
         if self.stack.currentWidget() is self.plain:
-            self.btn_save.setEnabled(True)
+            self._update_save_enabled()
 
     def _on_table_selection_changed(self):
         row = self.table.currentRow()
         has = row >= 0
         self.btn_del.setEnabled(has)
         self.btn_snap.setEnabled(has)
+        self._refresh_row_styles()
 
     def _on_table_clicked_seek(self, row: int, col: int):
         it_time = self.table.item(row, 0)
         if not it_time:
             return
-        ms = it_time.data(Qt.ItemDataRole.UserRole)
+        ms = it_time.data(TIMESTAMP_MS_ROLE)
         if ms is None:
             return
         self.seekRequested.emit(int(ms))
@@ -404,16 +465,36 @@ class LyricsEditorWidget(QWidget):
         if item.column() != 0:
             return
 
+        row = item.row()
         new_ms = _parse_ts_str(item.text())
         if new_ms is None:
-            # revert to stored ms
-            old_ms = int(item.data(Qt.ItemDataRole.UserRole) or 0)
-            item.setText(_ms_to_ts(old_ms))
+            item.setData(TIMESTAMP_VALID_ROLE, False)
+            item.setToolTip("Use mm:ss, mm:ss.xx or mm:ss.xxx")
+            self._invalid_rows.add(row)
+            self._set_validation_message(
+                f"Line {row + 1}: timestamp must use mm:ss, mm:ss.xx or mm:ss.xxx.",
+                state="error",
+            )
+            self._update_save_enabled()
+            self._refresh_row_styles()
             return
 
-        item.setData(Qt.ItemDataRole.UserRole, int(new_ms))
+        item.setData(TIMESTAMP_MS_ROLE, int(new_ms))
+        item.setData(TIMESTAMP_VALID_ROLE, True)
+        item.setToolTip("Timestamp is valid")
         item.setText(_ms_to_ts(int(new_ms)))  # normalize format
+        self._invalid_rows.discard(row)
+        if self._invalid_rows:
+            next_row = min(self._invalid_rows)
+            self._set_validation_message(
+                f"Line {next_row + 1}: timestamp must use mm:ss, mm:ss.xx or mm:ss.xxx.",
+                state="error",
+            )
+        else:
+            self._set_validation_message("Timestamps look good.", state="success")
         self._rebuild_times_cache()
+        self._update_save_enabled()
+        self._refresh_row_styles()
 
     def _add_line_after_selection(self):
         row = self.table.currentRow()
@@ -426,7 +507,8 @@ class LyricsEditorWidget(QWidget):
         self.table.insertRow(insert_at)
 
         it_time = QTableWidgetItem(_ms_to_ts(ms))
-        it_time.setData(Qt.ItemDataRole.UserRole, ms)
+        it_time.setData(TIMESTAMP_MS_ROLE, ms)
+        it_time.setData(TIMESTAMP_VALID_ROLE, True)
         it_time.setFlags(it_time.flags() | Qt.ItemIsEditable)
 
         it_text = QTableWidgetItem("")
@@ -437,6 +519,7 @@ class LyricsEditorWidget(QWidget):
         self.table.blockSignals(False)
 
         self._rebuild_times_cache()
+        self._refresh_row_styles()
         self.table.selectRow(insert_at)
         self.table.setCurrentCell(insert_at, 1)
         self.table.editItem(self.table.item(insert_at, 1))
@@ -448,7 +531,18 @@ class LyricsEditorWidget(QWidget):
         self.table.blockSignals(True)
         self.table.removeRow(row)
         self.table.blockSignals(False)
+        self._invalid_rows = {idx - 1 if idx > row else idx for idx in self._invalid_rows if idx != row}
         self._rebuild_times_cache()
+        if self._invalid_rows:
+            next_row = min(self._invalid_rows)
+            self._set_validation_message(
+                f"Line {next_row + 1}: timestamp must use mm:ss, mm:ss.xx or mm:ss.xxx.",
+                state="error",
+            )
+        else:
+            self._set_validation_message("")
+        self._update_save_enabled()
+        self._refresh_row_styles()
 
     def _snap_selected_line_to_current_time(self):
         row = self.table.currentRow()
@@ -461,20 +555,39 @@ class LyricsEditorWidget(QWidget):
 
         ms = int(self._current_pos_ms)
         self.table.blockSignals(True)
-        it_time.setData(Qt.ItemDataRole.UserRole, ms)
+        it_time.setData(TIMESTAMP_MS_ROLE, ms)
+        it_time.setData(TIMESTAMP_VALID_ROLE, True)
         it_time.setText(_ms_to_ts(ms))
         self.table.blockSignals(False)
+        self._invalid_rows.discard(row)
 
         self._rebuild_times_cache()
+        if self._invalid_rows:
+            next_row = min(self._invalid_rows)
+            self._set_validation_message(
+                f"Line {next_row + 1}: timestamp must use mm:ss, mm:ss.xx or mm:ss.xxx.",
+                state="error",
+            )
+        else:
+            self._set_validation_message("Snapped selected line to current playback time.", state="success")
+        self._update_save_enabled()
+        self._refresh_row_styles()
 
     def _emit_save(self):
         # Synced view: build LRC + plain
         if self.stack.currentWidget() is self.table:
+            if self._invalid_rows:
+                next_row = min(self._invalid_rows)
+                self._set_validation_message(
+                    f"Fix the timestamp on line {next_row + 1} before saving.",
+                    state="error",
+                )
+                return
             pairs: List[Tuple[int, str]] = []
             for r in range(self.table.rowCount()):
                 it_time = self.table.item(r, 0)
                 it_text = self.table.item(r, 1)
-                ms = int(it_time.data(Qt.ItemDataRole.UserRole) or 0) if it_time else 0
+                ms = int(it_time.data(TIMESTAMP_MS_ROLE) or 0) if it_time else 0
                 text = it_text.text() if it_text else ""
                 # Keep empty lines (timestamp-only)
                 pairs.append((ms, text.rstrip()))
@@ -536,7 +649,7 @@ class LyricsEditorWidget(QWidget):
         button.style().polish(button)
         button.update()
         if button is self.btn_save:
-            button.setEnabled(self.stack.currentWidget() in {self.table, self.plain})
+            self._update_save_enabled()
         elif button is self.btn_publish_synced:
             button.setEnabled(self._publish_synced_available)
         elif button is self.btn_publish_plain:

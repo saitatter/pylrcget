@@ -6,3 +6,23 @@ QLabel#LyricsTitle {
 QLabel#LyricsMessage {
     color: rgba(229, 231, 235, 0.75);
 }
+
+QLabel#LyricsValidationHint {
+    border-radius: 10px;
+    padding: 6px 10px;
+    background: #0f172a;
+    color: #cbd5e1;
+    border: 1px solid #1e293b;
+}
+
+QLabel#LyricsValidationHint[validationState="error"] {
+    background: rgba(127, 29, 29, 0.35);
+    color: #fecaca;
+    border-color: rgba(248, 113, 113, 0.35);
+}
+
+QLabel#LyricsValidationHint[validationState="success"] {
+    background: rgba(20, 83, 45, 0.35);
+    color: #bbf7d0;
+    border-color: rgba(74, 222, 128, 0.35);
+}
