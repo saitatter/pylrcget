@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import os
 import logging
+import re
 from pathlib import Path
 from typing import Optional, Tuple
 
@@ -32,17 +33,164 @@ AUDIO_EXTS = {".mp3", ".m4a", ".flac", ".ogg", ".opus", ".wav", ".wma", ".asf", 
 ASF_PLAIN_KEYS = ("WM/Lyrics", "LYRICS", "UNSYNCEDLYRICS")
 ASF_SYNCED_KEYS = ("LRCLIB_LRC", "SYNCEDLYRICS")
 
-def iter_audio_paths(directories: list[str]) -> list[str]:
+
+def _split_lines(block: str | None) -> list[str]:
+    return [line.strip() for line in (block or "").splitlines() if line.strip()]
+
+
+def _path_variants(path: str) -> tuple[str, str]:
+    normalized = os.path.normcase(os.path.abspath(os.path.expanduser(path)))
+    posix = normalized.replace("\\", "/")
+    return normalized, posix
+
+
+def _join_normalized_path(dir_normalized: str, filename: str) -> tuple[str, str]:
+    normalized = os.path.normcase(os.path.join(dir_normalized, filename))
+    return normalized, normalized.replace("\\", "/")
+
+
+def _normalize_excluded_paths(excluded_paths: str | None) -> list[tuple[str, str]]:
+    normalized: list[tuple[str, str]] = []
+    for entry in _split_lines(excluded_paths):
+        native, posix = _path_variants(entry)
+        normalized.append((native.rstrip("/\\"), posix.rstrip("/")))
+    return normalized
+
+
+def _compile_excluded_patterns(excluded_patterns: str | None) -> list[re.Pattern[str]]:
+    compiled: list[re.Pattern[str]] = []
+    for pattern in _split_lines(excluded_patterns):
+        try:
+            compiled.append(re.compile(pattern, re.IGNORECASE))
+        except re.error:
+            logger.warning("Ignoring invalid scan exclusion regex: %s", pattern)
+    return compiled
+
+
+def _is_path_excluded_variants(
+    path: str,
+    normalized_path: str,
+    posix_path: str,
+    excluded_roots: list[tuple[str, str]],
+    excluded_patterns: list[re.Pattern[str]],
+) -> bool:
+    for root_native, root_posix in excluded_roots:
+        if normalized_path == root_native or normalized_path.startswith(root_native + os.sep):
+            return True
+        if posix_path == root_posix or posix_path.startswith(root_posix + "/"):
+            return True
+
+    for pattern in excluded_patterns:
+        if pattern.search(path) or pattern.search(posix_path):
+            return True
+
+    return False
+
+
+def iter_audio_paths(
+    directories: list[str],
+    *,
+    excluded_paths: str | None = None,
+    excluded_patterns: str | None = None,
+) -> list[str]:
+    excluded_roots = _normalize_excluded_paths(excluded_paths)
+    compiled_patterns = _compile_excluded_patterns(excluded_patterns)
     paths: list[str] = []
+    seen: set[str] = set()
     for root in directories:
         if not root or not os.path.isdir(root):
             continue
-        for dirpath, _, filenames in os.walk(root):
+        for dirpath, dirnames, filenames in os.walk(root):
+            normalized_dir, posix_dir = _path_variants(dirpath)
+            if _is_path_excluded_variants(dirpath, normalized_dir, posix_dir, excluded_roots, compiled_patterns):
+                dirnames[:] = []
+                continue
+
+            kept_dirnames: list[str] = []
+            for dirname in dirnames:
+                child_path = os.path.join(dirpath, dirname)
+                child_normalized, child_posix = _join_normalized_path(normalized_dir, dirname)
+                if _is_path_excluded_variants(child_path, child_normalized, child_posix, excluded_roots, compiled_patterns):
+                    continue
+                kept_dirnames.append(dirname)
+            dirnames[:] = kept_dirnames
+
             for fn in filenames:
                 ext = os.path.splitext(fn)[1].lower()
-                if ext in AUDIO_EXTS:
-                    paths.append(os.path.join(dirpath, fn))
+                if ext not in AUDIO_EXTS:
+                    continue
+                file_path = os.path.join(dirpath, fn)
+                normalized, posix_path = _join_normalized_path(normalized_dir, fn)
+                if normalized in seen:
+                    continue
+                if not _is_path_excluded_variants(file_path, normalized, posix_path, excluded_roots, compiled_patterns):
+                    seen.add(normalized)
+                    paths.append(file_path)
     return paths
+
+
+def preview_audio_path_exclusions(
+    directories: list[str],
+    *,
+    excluded_paths: str | None = None,
+    excluded_patterns: str | None = None,
+) -> tuple[list[str], list[str]]:
+    excluded_roots = _normalize_excluded_paths(excluded_paths)
+    compiled_patterns = _compile_excluded_patterns(excluded_patterns)
+    included: list[str] = []
+    excluded: list[str] = []
+    seen: set[str] = set()
+
+    for root in directories:
+        if not root or not os.path.isdir(root):
+            continue
+        for dirpath, dirnames, filenames in os.walk(root):
+            normalized_dir, posix_dir = _path_variants(dirpath)
+            if _is_path_excluded_variants(dirpath, normalized_dir, posix_dir, excluded_roots, compiled_patterns):
+                dirnames[:] = []
+                continue
+
+            kept_dirnames: list[str] = []
+            for dirname in dirnames:
+                child_path = os.path.join(dirpath, dirname)
+                child_normalized, child_posix = _join_normalized_path(normalized_dir, dirname)
+                if _is_path_excluded_variants(child_path, child_normalized, child_posix, excluded_roots, compiled_patterns):
+                    continue
+                kept_dirnames.append(dirname)
+            dirnames[:] = kept_dirnames
+
+            for fn in filenames:
+                ext = os.path.splitext(fn)[1].lower()
+                if ext not in AUDIO_EXTS:
+                    continue
+                file_path = os.path.join(dirpath, fn)
+                normalized, posix_path = _join_normalized_path(normalized_dir, fn)
+                if normalized in seen:
+                    continue
+                seen.add(normalized)
+                if _is_path_excluded_variants(file_path, normalized, posix_path, excluded_roots, compiled_patterns):
+                    excluded.append(file_path)
+                else:
+                    included.append(file_path)
+
+    return included, excluded
+
+
+def get_audio_file_signature(path: str) -> tuple[float | None, int | None]:
+    newest_mtime: float | None = None
+    total_size = 0
+    base, _ = os.path.splitext(path)
+
+    for candidate in (path, base + ".txt", base + ".lrc"):
+        try:
+            stat = os.stat(candidate)
+        except OSError:
+            continue
+        candidate_mtime = float(stat.st_mtime)
+        newest_mtime = candidate_mtime if newest_mtime is None else max(newest_mtime, candidate_mtime)
+        total_size += int(stat.st_size)
+
+    return newest_mtime, total_size if newest_mtime is not None else None
 
 def _first(easy, key: str) -> str | None:
     v = easy.get(key)
@@ -269,60 +417,72 @@ def _read_sidecar(path: str) -> tuple[Optional[str], Optional[str]]:
     return txt, lrc
 
 
-def new_fs_track_from_path(path: str) -> FsTrack | None:
-    audio = MutagenFile(path, easy=True)
-    if audio is None:
-        return None
-
-    # title/album/artist extraction
-    def _first(easy, key: str) -> str | None:
-        v = easy.get(key)
-        if not v:
-            return None
-        if isinstance(v, list):
-            return (str(v[0]).strip() if v else None) or None
-        s = str(v).strip()
-        return s or None
-
-    title = _first(audio, "title")
-    album = _first(audio, "album")
-    artist = _first(audio, "artist")
-
-    title = title or os.path.splitext(os.path.basename(path))[0]
-    album = album or "Unknown Album"
-    artist = artist or "Unknown Artist"
-
-    album_artist = (
-        _first(audio, "albumartist")
-        or _first(audio, "album artist")
-        or artist
-    )
-
-    track_number = _parse_track_number(_first(audio, "tracknumber"))
-
-    duration = 0.0
+def new_fs_track_from_path(
+    path: str,
+    *,
+    signature: tuple[float | None, int | None] | None = None,
+) -> FsTrack | None:
     try:
-        if getattr(audio, "info", None) and getattr(audio.info, "length", None):
-            duration = float(audio.info.length)
-    except Exception:
+        audio = MutagenFile(path, easy=True)
+        if audio is None:
+            return None
+
+        # title/album/artist extraction
+        def _first(easy, key: str) -> str | None:
+            v = easy.get(key)
+            if not v:
+                return None
+            if isinstance(v, list):
+                return (str(v[0]).strip() if v else None) or None
+            s = str(v).strip()
+            return s or None
+
+        title = _first(audio, "title")
+        album = _first(audio, "album")
+        artist = _first(audio, "artist")
+
+        title = title or os.path.splitext(os.path.basename(path))[0]
+        album = album or "Unknown Album"
+        artist = artist or "Unknown Artist"
+
+        album_artist = (
+            _first(audio, "albumartist")
+            or _first(audio, "album artist")
+            or artist
+        )
+
+        track_number = _parse_track_number(_first(audio, "tracknumber"))
+
         duration = 0.0
+        try:
+            if getattr(audio, "info", None) and getattr(audio.info, "length", None):
+                duration = float(audio.info.length)
+        except Exception:
+            duration = 0.0
 
-    # SIDE-CAR (preferred) then EMBEDDED
-    txt_sidecar, lrc_sidecar = _read_sidecar(path)
-    txt_embedded, lrc_embedded = read_embedded_lyrics(path)
+        # SIDE-CAR (preferred) then EMBEDDED
+        txt_sidecar, lrc_sidecar = _read_sidecar(path)
+        txt_embedded, lrc_embedded = read_embedded_lyrics(path)
 
-    txt_lyrics = txt_sidecar or txt_embedded
-    lrc_lyrics = lrc_sidecar or lrc_embedded
+        txt_lyrics = txt_sidecar or txt_embedded
+        lrc_lyrics = lrc_sidecar or lrc_embedded
 
-    return FsTrack(
-        file_path=path,
-        file_name=os.path.basename(path),
-        title=title,
-        album=album,
-        artist=artist,
-        album_artist=album_artist,
-        duration=duration,
-        txt_lyrics=txt_lyrics,
-        lrc_lyrics=lrc_lyrics,
-        track_number=track_number,
-    )
+        modified_time, file_size = signature if signature is not None else get_audio_file_signature(path)
+
+        return FsTrack(
+            file_path=path,
+            file_name=os.path.basename(path),
+            title=title,
+            album=album,
+            artist=artist,
+            album_artist=album_artist,
+            duration=duration,
+            txt_lyrics=txt_lyrics,
+            lrc_lyrics=lrc_lyrics,
+            track_number=track_number,
+            modified_time=modified_time,
+            file_size=file_size,
+        )
+    except (MutagenError, Exception) as exc:
+        logger.warning("Skipping unreadable audio file during scan: %s (%s)", path, exc)
+        return None

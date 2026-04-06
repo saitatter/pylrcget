@@ -147,6 +147,7 @@ class LyricsEditorWidget(QWidget):
         self._default_button_text: dict[QPushButton, str] = {}
         self._publish_synced_available = False
         self._publish_plain_available = False
+        self._reaction_delay_ms: int = 0
 
         root = QVBoxLayout(self)
         set_layout_spacing(root, margins=SPACE_3, spacing=SPACE_2)
@@ -258,6 +259,9 @@ class LyricsEditorWidget(QWidget):
         self._refresh_row_styles()
 
         self.table.scrollToItem(self.table.item(idx, 1), self.table.ScrollHint.PositionAtCenter)
+
+    def set_reaction_delay_ms(self, reaction_delay_ms: int) -> None:
+        self._reaction_delay_ms = int(reaction_delay_ms or 0)
 
     def _apply_styles(self):
         self.setStyleSheet(load_stylesheet("lyrics_editor.qss"))
@@ -558,7 +562,7 @@ class LyricsEditorWidget(QWidget):
         if not it_time:
             return
 
-        ms = int(self._current_pos_ms)
+        ms = max(0, int(self._current_pos_ms) + int(self._reaction_delay_ms))
         self.table.blockSignals(True)
         it_time.setData(TIMESTAMP_MS_ROLE, ms)
         it_time.setData(TIMESTAMP_VALID_ROLE, True)
@@ -574,7 +578,14 @@ class LyricsEditorWidget(QWidget):
                 state="error",
             )
         else:
-            self._set_validation_message("Snapped selected line to current playback time.", state="success")
+            if self._reaction_delay_ms:
+                direction = "earlier" if self._reaction_delay_ms < 0 else "later"
+                self._set_validation_message(
+                    f"Snapped line using {abs(self._reaction_delay_ms)} ms reaction delay ({direction}).",
+                    state="success",
+                )
+            else:
+                self._set_validation_message("Snapped selected line to current playback time.", state="success")
         self._update_save_enabled()
         self._refresh_row_styles()
 

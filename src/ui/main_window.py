@@ -3,10 +3,12 @@ from PySide6.QtWidgets import (
     QTabWidget, QProgressBar, QMessageBox, QLineEdit, QHBoxLayout, QCheckBox, QSplitter, QBoxLayout, QPushButton, QApplication
 )
 from PySide6.QtCore import Qt, QTimer
-from PySide6.QtGui import QShortcut, QKeySequence
+from PySide6.QtGui import QCloseEvent, QShortcut, QKeySequence
 import os
 
-from db.database import get_config, get_directories, get_track_by_id
+from dataclasses import replace
+
+from db.database import get_config, get_directories, get_track_by_id, set_config
 from core.lyrics_sidecar import export_lyrics_sidecars
 from ui.workers.library_scanner import LibraryScanner
 from ui.widgets.track_list_widget import TrackListWidget
@@ -37,6 +39,11 @@ class MainWindow(QMainWindow):
         self._queue_ids: list[int] = []
         self._queue_index: int = -1
         self._refresh_default_label = "Global Actions"
+        self._pending_playback_speed: float | None = None
+        self._playback_speed_save_timer = QTimer(self)
+        self._playback_speed_save_timer.setSingleShot(True)
+        self._playback_speed_save_timer.setInterval(350)
+        self._playback_speed_save_timer.timeout.connect(self._flush_playback_speed)
 
         # --- Player signals ---
         if self.app_state.player:
@@ -215,6 +222,9 @@ class MainWindow(QMainWindow):
         self.player_bar = PlayerBar(self.app_state.player, self)
         self.layout.addWidget(self.player_bar)
         self.player_bar.set_prev_next_handlers(self.play_prev, self.play_next)
+        self.player_bar.playbackSpeedChanged.connect(self._persist_playback_speed)
+        self.lyrics_view.set_reaction_delay_ms(get_config(self.app_state.db).reaction_delay_ms)
+        self._apply_saved_playback_speed()
 
         # --- Scan progress (pretty + hidden when idle) ---
         self.scan_row = QWidget()
@@ -287,6 +297,10 @@ class MainWindow(QMainWindow):
         super().resizeEvent(event)
         self._update_responsive_layout()
 
+    def closeEvent(self, event: QCloseEvent) -> None:
+        self._flush_playback_speed()
+        super().closeEvent(event)
+
     # ------------------ filters ------------------
     def _apply_track_filters(self):
         self.track_list.setSearchValue(self.search_box.text())
@@ -304,9 +318,11 @@ class MainWindow(QMainWindow):
         before = get_config(self.app_state.db).theme_mode
         dlg = MusicFoldersDialog(self.app_state, self)
         if dlg.exec():
-            after = get_config(self.app_state.db).theme_mode
+            updated_config = get_config(self.app_state.db)
+            after = updated_config.theme_mode
             if after != before:
                 self._apply_theme(after)
+            self.lyrics_view.set_reaction_delay_ms(updated_config.reaction_delay_ms)
             self._apply_track_filters()
 
     def open_about_modal(self):
@@ -340,7 +356,13 @@ class MainWindow(QMainWindow):
         self.scan_details.setText(f"Preparing a scan across {len(directories)} folder(s)…")
         self.btn_cancel_scan.setEnabled(True)
 
-        self.scanner = LibraryScanner(self.app_state.db_path, directories)
+        config = get_config(self.app_state.db)
+        self.scanner = LibraryScanner(
+            self.app_state.db_path,
+            directories,
+            excluded_paths=config.scan_excluded_paths,
+            excluded_patterns=config.scan_excluded_patterns,
+        )
         self.scanner.progress_signal.connect(self._update_scan_progress)
         self.scanner.finished_signal.connect(self._scan_finished)
         self.scanner.start()
@@ -395,7 +417,7 @@ class MainWindow(QMainWindow):
 
         if ok:
             self._apply_track_filters()
-            self.app_state.notify("Library scan finished successfully.", "success")
+            self.app_state.notify(msg or "Library scan finished successfully.", "success")
             self._set_tool_feedback(self.btn_refresh, "success")
         else:
             if "cancel" in (msg or "").lower():
@@ -661,6 +683,27 @@ class MainWindow(QMainWindow):
                 self.app_state.notify(f"Failed to embed lyrics: {exc}", "error")
             else:
                 self.statusBar().showMessage("Lyrics embedded into the audio file.", 3000)
+
+    def _apply_saved_playback_speed(self) -> None:
+        config = get_config(self.app_state.db)
+        speed = float(config.playback_speed or 1.0)
+        if self.app_state.player and hasattr(self.app_state.player, "set_playback_speed"):
+            try:
+                self.app_state.player.set_playback_speed(speed)
+            except Exception:
+                speed = 1.0
+        self.player_bar.set_playback_speed_value(speed)
+
+    def _persist_playback_speed(self, speed: float) -> None:
+        self._pending_playback_speed = float(speed)
+        self._playback_speed_save_timer.start()
+
+    def _flush_playback_speed(self) -> None:
+        if self._pending_playback_speed is None:
+            return
+        config = get_config(self.app_state.db)
+        set_config(self.app_state.db, replace(config, playback_speed=float(self._pending_playback_speed)))
+        self._pending_playback_speed = None
 
     def _play_selected_or_current(self):
         tid = self.track_list.selected_track_id()

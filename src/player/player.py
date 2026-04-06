@@ -50,6 +50,7 @@ class Player(QObject):
         # Default volume (0.0 - 1.0)
         self._volume_0_to_1: float = 0.7
         self.audio.setVolume(self._volume_0_to_1)
+        self._playback_speed: float = 1.0
 
         # Qt signal forwarding
         self.media.positionChanged.connect(self.positionChanged.emit)
@@ -281,6 +282,7 @@ class Player(QObject):
 
     def set_playback_speed(self, speed: float):
         speed = max(0.25, min(2.0, float(speed)))
+        self._playback_speed = speed
 
         if self._use_mpv and self._mpv:
             self._mpv.set_property("speed", speed)
@@ -295,4 +297,7 @@ class Player(QObject):
     def playback_speed(self) -> float:
         if self._use_mpv and self._mpv:
             return float(self._mpv.get_property("speed") or 1.0)
-        return 1.0
+        try:
+            return float(self.media.playbackRate())
+        except Exception:
+            return float(self._playback_speed)

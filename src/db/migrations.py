@@ -125,3 +125,58 @@ def upgrade_database_if_needed(db: sqlite3.Connection, existing_version: int) ->
             UPDATE config_data SET save_lyrics_sidecars = 1;
         """)
         db.commit()
+
+    # v10
+    if existing_version <= 9:
+        print("Migrate database version 10...")
+        db.executescript("""
+            ALTER TABLE config_data ADD COLUMN scan_excluded_paths TEXT DEFAULT '';
+            ALTER TABLE config_data ADD COLUMN scan_excluded_patterns TEXT DEFAULT '';
+        """)
+        db.commit()
+        db.execute("PRAGMA user_version=10")
+
+    # v11
+    if existing_version <= 10:
+        print("Migrate database version 11...")
+        db.executescript("""
+            ALTER TABLE tracks ADD COLUMN modified_time REAL;
+            ALTER TABLE tracks ADD COLUMN file_size INTEGER;
+            CREATE INDEX idx_tracks_file_path ON tracks(file_path);
+        """)
+        db.commit()
+        db.execute("PRAGMA user_version=11")
+
+    # v12
+    if existing_version <= 11:
+        print("Migrate database version 12...")
+        # Reserved migration slot kept for compatibility with pre-merge development databases.
+        db.execute("PRAGMA user_version=12")
+
+    # v13
+    if existing_version <= 12:
+        print("Migrate database version 13...")
+        db.executescript("""
+            ALTER TABLE config_data ADD COLUMN reaction_delay_ms INTEGER DEFAULT 0;
+        """)
+        db.commit()
+        db.execute("PRAGMA user_version=13")
+
+    # v14
+    if existing_version <= 13:
+        print("Migrate database version 14...")
+        db.executescript("""
+            ALTER TABLE config_data ADD COLUMN playback_speed REAL DEFAULT 1.0;
+        """)
+        db.commit()
+        db.execute("PRAGMA user_version=14")
+
+    # v15
+    if existing_version <= 14:
+        print("Migrate database version 15...")
+        db.executescript("""
+            DROP TABLE IF EXISTS scan_directory_state;
+            DROP TABLE IF EXISTS scan_cache_meta;
+        """)
+        db.commit()
+        db.execute("PRAGMA user_version=15")

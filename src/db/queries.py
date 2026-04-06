@@ -49,7 +49,11 @@ def get_config(db: sqlite3.Connection) -> Config:
                theme_mode,
                lrclib_instance,
                lyrics_output_dir,
-               lyrics_file_pattern
+               lyrics_file_pattern,
+               scan_excluded_paths,
+               scan_excluded_patterns,
+               reaction_delay_ms,
+               playback_speed
         FROM config_data
         LIMIT 1
     """).fetchone()
@@ -64,6 +68,10 @@ def get_config(db: sqlite3.Connection) -> Config:
         lrclib_instance=row["lrclib_instance"],
         lyrics_output_dir=row["lyrics_output_dir"] or "",
         lyrics_file_pattern=row["lyrics_file_pattern"] or "{artist} - {title}",
+        scan_excluded_paths=row["scan_excluded_paths"] or "",
+        scan_excluded_patterns=row["scan_excluded_patterns"] or "",
+        reaction_delay_ms=int(row["reaction_delay_ms"] or 0),
+        playback_speed=float(row["playback_speed"] or 1.0),
     )
 
 
@@ -78,7 +86,11 @@ def set_config(db: sqlite3.Connection, config: Config) -> None:
             theme_mode = ?,
             lrclib_instance = ?,
             lyrics_output_dir = ?,
-            lyrics_file_pattern = ?
+            lyrics_file_pattern = ?,
+            scan_excluded_paths = ?,
+            scan_excluded_patterns = ?,
+            reaction_delay_ms = ?,
+            playback_speed = ?
         WHERE 1
     """, (
         config.skip_tracks_with_synced_lyrics,
@@ -90,6 +102,10 @@ def set_config(db: sqlite3.Connection, config: Config) -> None:
         config.lrclib_instance,
         config.lyrics_output_dir,
         config.lyrics_file_pattern,
+        config.scan_excluded_paths,
+        config.scan_excluded_patterns,
+        config.reaction_delay_ms,
+        config.playback_speed,
     ))
     db.commit()
 
@@ -104,12 +120,13 @@ def find_artist(db: sqlite3.Connection, name: str) -> int:
     raise ValueError("Artist not found")
 
 
-def add_artist(db: sqlite3.Connection, name: str) -> int:
+def add_artist(db: sqlite3.Connection, name: str, *, commit: bool = True) -> int:
     cursor = db.execute(
         "INSERT INTO artists (name, name_lower) VALUES (?, ?)",
         (name, prepare_input(name)),
     )
-    db.commit()
+    if commit:
+        db.commit()
     return int(cursor.lastrowid)
 
 
@@ -182,7 +199,7 @@ def find_album(db: sqlite3.Connection, name: str, album_artist_name: str) -> int
     raise ValueError("Album not found")
 
 
-def add_album(db: sqlite3.Connection, name: str, album_artist_name: str) -> int:
+def add_album(db: sqlite3.Connection, name: str, album_artist_name: str, *, commit: bool = True) -> int:
     cursor = db.execute(
         """
         INSERT INTO albums (name, name_lower, album_artist_name, album_artist_name_lower)
@@ -190,7 +207,8 @@ def add_album(db: sqlite3.Connection, name: str, album_artist_name: str) -> int:
         """,
         (name, prepare_input(name), album_artist_name, prepare_input(album_artist_name)),
     )
-    db.commit()
+    if commit:
+        db.commit()
     return int(cursor.lastrowid)
 
 
@@ -304,18 +322,18 @@ def get_track_by_id(db: sqlite3.Connection, track_id: int) -> Track:
     )
 
 
-def add_track(db: sqlite3.Connection, track: FsTrack) -> None:
+def add_track(db: sqlite3.Connection, track: FsTrack, *, commit: bool = True) -> None:
     # Artist
     try:
         artist_id = find_artist(db, track.artist)
     except ValueError:
-        artist_id = add_artist(db, track.artist)
+        artist_id = add_artist(db, track.artist, commit=False)
 
     # Album
     try:
         album_id = find_album(db, track.album, track.album_artist)
     except ValueError:
-        album_id = add_album(db, track.album, track.album_artist)
+        album_id = add_album(db, track.album, track.album_artist, commit=False)
 
     # Detect instrumental
     is_instrumental = bool(track.lrc_lyrics and re.search(r"\[au:\s*instrumental\]", track.lrc_lyrics))
@@ -324,8 +342,8 @@ def add_track(db: sqlite3.Connection, track: FsTrack) -> None:
         INSERT INTO tracks (
             file_path, file_name, title, title_lower,
             album_id, artist_id, duration, track_number,
-            txt_lyrics, lrc_lyrics, instrumental
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            txt_lyrics, lrc_lyrics, instrumental, modified_time, file_size
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         track.file_path,
         track.file_name,
@@ -338,13 +356,26 @@ def add_track(db: sqlite3.Connection, track: FsTrack) -> None:
         track.txt_lyrics,
         track.lrc_lyrics,
         is_instrumental,
+        track.modified_time,
+        track.file_size,
     ))
-    db.commit()
+    if commit:
+        db.commit()
 
 
-def add_tracks(db: sqlite3.Connection, tracks: List[FsTrack]) -> None:
-    for t in tracks:
-        add_track(db, t)
+def add_tracks(db: sqlite3.Connection, tracks: List[FsTrack], *, commit: bool = True) -> None:
+    if not tracks:
+        return
+
+    def _do_add() -> None:
+        for t in tracks:
+            add_track(db, t, commit=False)
+
+    if commit:
+        with db:
+            _do_add()
+    else:
+        _do_add()
 
 
 def get_tracks(db: sqlite3.Connection) -> List[Track]:
@@ -353,7 +384,7 @@ def get_tracks(db: sqlite3.Connection) -> List[Track]:
             tracks.id, file_path, file_name, title,
             artists.name AS artist_name, tracks.artist_id,
             albums.name AS album_name, albums.album_artist_name,
-            album_id, duration, track_number,
+            album_id, duration, track_number, modified_time, file_size,
             albums.image_path, txt_lyrics, lrc_lyrics, instrumental
         FROM tracks
         JOIN albums ON tracks.album_id = albums.id
@@ -590,6 +621,31 @@ def clean_library(db: sqlite3.Connection) -> None:
     db.execute("DELETE FROM tracks")
     db.execute("DELETE FROM albums")
     db.execute("DELETE FROM artists")
+    db.commit()
+
+
+def get_library_file_index(db: sqlite3.Connection) -> dict[str, tuple[float | None, int | None]]:
+    rows = db.execute("SELECT file_path, modified_time, file_size FROM tracks").fetchall()
+    return {
+        row["file_path"]: (
+            float(row["modified_time"]) if row["modified_time"] is not None else None,
+            int(row["file_size"]) if row["file_size"] is not None else None,
+        )
+        for row in rows
+    }
+
+
+def delete_tracks_by_paths(db: sqlite3.Connection, paths: list[str], *, commit: bool = True) -> None:
+    if not paths:
+        return
+    db.executemany("DELETE FROM tracks WHERE file_path = ?", [(path,) for path in paths])
+    if commit:
+        db.commit()
+
+
+def prune_library(db: sqlite3.Connection) -> None:
+    db.execute("DELETE FROM albums WHERE NOT EXISTS (SELECT 1 FROM tracks WHERE tracks.album_id = albums.id)")
+    db.execute("DELETE FROM artists WHERE NOT EXISTS (SELECT 1 FROM tracks WHERE tracks.artist_id = artists.id)")
     db.commit()
 
 

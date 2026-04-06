@@ -3,7 +3,7 @@ from __future__ import annotations
 import base64
 from pathlib import Path
 
-from PySide6.QtCore import QSize, Qt
+from PySide6.QtCore import QSize, Qt, Signal
 from PySide6.QtGui import QColor, QFont, QLinearGradient, QPainter, QPixmap
 from PySide6.QtWidgets import (
     QComboBox,
@@ -187,6 +187,8 @@ class SeekSlider(QSlider):
 
 
 class PlayerBar(QWidget):
+    playbackSpeedChanged = Signal(float)
+
     def __init__(self, player, parent=None):
         super().__init__(parent)
         self.player = player
@@ -194,6 +196,7 @@ class PlayerBar(QWidget):
         self._dragging = False
         self._duration_ms = 0
         self._is_playing = False
+        self._speed_step = 0.05
         self.setObjectName("PlayerBar")
         self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
 
@@ -310,17 +313,44 @@ class PlayerBar(QWidget):
         self.lbl_speed = QLabel("Speed")
         self.lbl_speed.setObjectName("MetaLabel")
 
+        speed_row = QHBoxLayout()
+        set_layout_spacing(speed_row, margins=0, spacing=SPACE_2)
+
+        self.btn_speed_down = QToolButton()
+        self.btn_speed_down.setObjectName("SpeedAdjustButton")
+        self.btn_speed_down.setText("-")
+        self.btn_speed_down.setToolTip("Decrease playback speed by 0.05x")
+
         self.cmb_speed = QComboBox()
         self.cmb_speed.setObjectName("SpeedCombo")
         self.cmb_speed.setToolTip("Playback speed")
         self.cmb_speed.setAccessibleName("Playback speed")
-        self._speed_items = [("1.0x", 1.0), ("0.75x", 0.75), ("0.5x", 0.5), ("0.25x", 0.25)]
+        self.cmb_speed.setEditable(True)
+        self.cmb_speed.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
+        self._speed_items = [
+            ("1.0x", 1.0),
+            ("0.9x", 0.9),
+            ("0.8x", 0.8),
+            ("0.75x", 0.75),
+            ("0.5x", 0.5),
+            ("0.25x", 0.25),
+        ]
         for label, speed in self._speed_items:
             self.cmb_speed.addItem(label, speed)
         self.cmb_speed.setCurrentIndex(0)
+        self.cmb_speed.lineEdit().setPlaceholderText("Custom")
+
+        self.btn_speed_up = QToolButton()
+        self.btn_speed_up.setObjectName("SpeedAdjustButton")
+        self.btn_speed_up.setText("+")
+        self.btn_speed_up.setToolTip("Increase playback speed by 0.05x")
+
+        speed_row.addWidget(self.btn_speed_down)
+        speed_row.addWidget(self.cmb_speed, 1)
+        speed_row.addWidget(self.btn_speed_up)
 
         right_layout.addWidget(self.lbl_speed)
-        right_layout.addWidget(self.cmb_speed)
+        right_layout.addLayout(speed_row)
 
         left_slot = QWidget()
         left_slot_layout = QHBoxLayout(left_slot)
@@ -353,7 +383,10 @@ class PlayerBar(QWidget):
         self.slider.sliderPressed.connect(self._on_slider_pressed)
         self.slider.sliderReleased.connect(self._on_slider_released)
         self.slider.sliderMoved.connect(self._on_slider_moved)
-        self.cmb_speed.currentIndexChanged.connect(self._on_speed_changed)
+        self.cmb_speed.activated.connect(self._on_speed_preset_selected)
+        self.cmb_speed.lineEdit().editingFinished.connect(self._on_custom_speed_committed)
+        self.btn_speed_down.clicked.connect(lambda: self._step_speed(-self._speed_step))
+        self.btn_speed_up.clicked.connect(lambda: self._step_speed(self._speed_step))
 
         if self.player:
             self.player.trackChanged.connect(self._on_track_changed)
@@ -370,6 +403,9 @@ class PlayerBar(QWidget):
     def set_prev_next_handlers(self, prev_fn, next_fn):
         self.btn_prev.clicked.connect(prev_fn)
         self.btn_next.clicked.connect(next_fn)
+
+    def set_playback_speed_value(self, speed: float) -> None:
+        self._set_speed_combo_value(self._normalize_speed(speed))
 
     def set_compact_mode(self, compact: bool):
         self.setProperty("compact", compact)
@@ -394,15 +430,54 @@ class PlayerBar(QWidget):
         else:
             self.lbl_cover.setPixmap(_artwork_pixmap("?", None, None, cover_size))
 
-    def _on_speed_changed(self, _index: int):
-        if not self.player:
-            return
-        speed = float(self.cmb_speed.currentData() or 1.0)
-        if hasattr(self.player, "set_playback_speed"):
+    def _format_speed_label(self, speed: float) -> str:
+        rendered = f"{float(speed):.2f}".rstrip("0").rstrip(".")
+        if "." not in rendered:
+            rendered += ".0"
+        return f"{rendered}x"
+
+    def _normalize_speed(self, speed: float) -> float:
+        return max(0.25, min(2.0, round(float(speed), 2)))
+
+    def _apply_speed(self, speed: float) -> None:
+        normalized = self._normalize_speed(speed)
+        if self.player and hasattr(self.player, "set_playback_speed"):
             try:
-                self.player.set_playback_speed(speed)
+                self.player.set_playback_speed(normalized)
             except Exception:
-                pass
+                self._sync_speed_from_player()
+                return
+        self._set_speed_combo_value(normalized)
+        self.playbackSpeedChanged.emit(normalized)
+
+    def _on_speed_preset_selected(self, index: int):
+        speed = self.cmb_speed.itemData(index)
+        if speed is None:
+            return
+        self._apply_speed(float(speed))
+
+    def _on_custom_speed_committed(self):
+        raw = (self.cmb_speed.currentText() or "").strip().lower().replace("x", "")
+        if not raw:
+            self._sync_speed_from_player()
+            return
+
+        try:
+            speed = float(raw)
+        except ValueError:
+            self._sync_speed_from_player()
+            return
+
+        self._apply_speed(speed)
+
+    def _step_speed(self, delta: float) -> None:
+        current = 1.0
+        if self.player and hasattr(self.player, "playback_speed"):
+            try:
+                current = float(self.player.playback_speed() or 1.0)
+            except Exception:
+                current = 1.0
+        self._apply_speed(current + delta)
 
     def _sync_speed_from_player(self):
         if not self.player or not hasattr(self.player, "playback_speed"):
@@ -412,10 +487,21 @@ class PlayerBar(QWidget):
         except Exception:
             speed = 1.0
 
+        self._set_speed_combo_value(speed)
+
+    def _set_speed_combo_value(self, speed: float):
         for idx in range(self.cmb_speed.count()):
             if abs(float(self.cmb_speed.itemData(idx)) - speed) < 0.001:
+                self.cmb_speed.blockSignals(True)
                 self.cmb_speed.setCurrentIndex(idx)
+                self.cmb_speed.lineEdit().setText(self.cmb_speed.itemText(idx))
+                self.cmb_speed.blockSignals(False)
                 return
+
+        self.cmb_speed.blockSignals(True)
+        self.cmb_speed.setCurrentIndex(-1)
+        self.cmb_speed.lineEdit().setText(self._format_speed_label(speed))
+        self.cmb_speed.blockSignals(False)
 
     def _on_slider_pressed(self):
         self._dragging = True
