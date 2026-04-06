@@ -73,6 +73,7 @@ class LibraryScanner(QThread):
                 removed = len(removed_paths)
 
             batch = []
+            pending_replacements: list[str] = []
             for p in paths:
                 if self.isInterruptionRequested():
                     if db is not None:
@@ -89,7 +90,7 @@ class LibraryScanner(QThread):
                     continue
 
                 if p in existing_index:
-                    delete_tracks_by_paths(db, [p])
+                    pending_replacements.append(p)
 
                 t = new_fs_track_from_path(p)
 
@@ -98,15 +99,30 @@ class LibraryScanner(QThread):
                     updated += 1
 
                 if len(batch) >= 100:
-                    add_tracks(db, batch)   # later replace with add_tracks_bulk
+                    db.execute("BEGIN")
+                    try:
+                        delete_tracks_by_paths(db, pending_replacements, commit=False)
+                        add_tracks(db, batch, commit=False)
+                        db.commit()
+                    except Exception:
+                        db.rollback()
+                        raise
                     batch.clear()
+                    pending_replacements.clear()
                     self.progress_signal.emit(scanned, total, p, time.perf_counter() - started_at)
 
                 if scanned % 200 == 0:
                     self.progress_signal.emit(scanned, total, p, time.perf_counter() - started_at)
 
-            if batch:
-                add_tracks(db, batch)
+            if batch or pending_replacements:
+                db.execute("BEGIN")
+                try:
+                    delete_tracks_by_paths(db, pending_replacements, commit=False)
+                    add_tracks(db, batch, commit=False)
+                    db.commit()
+                except Exception:
+                    db.rollback()
+                    raise
 
             prune_library(db)
             replace_scan_directory_index(db, directory_mtimes)

@@ -120,12 +120,13 @@ def find_artist(db: sqlite3.Connection, name: str) -> int:
     raise ValueError("Artist not found")
 
 
-def add_artist(db: sqlite3.Connection, name: str) -> int:
+def add_artist(db: sqlite3.Connection, name: str, *, commit: bool = True) -> int:
     cursor = db.execute(
         "INSERT INTO artists (name, name_lower) VALUES (?, ?)",
         (name, prepare_input(name)),
     )
-    db.commit()
+    if commit:
+        db.commit()
     return int(cursor.lastrowid)
 
 
@@ -198,7 +199,7 @@ def find_album(db: sqlite3.Connection, name: str, album_artist_name: str) -> int
     raise ValueError("Album not found")
 
 
-def add_album(db: sqlite3.Connection, name: str, album_artist_name: str) -> int:
+def add_album(db: sqlite3.Connection, name: str, album_artist_name: str, *, commit: bool = True) -> int:
     cursor = db.execute(
         """
         INSERT INTO albums (name, name_lower, album_artist_name, album_artist_name_lower)
@@ -206,7 +207,8 @@ def add_album(db: sqlite3.Connection, name: str, album_artist_name: str) -> int:
         """,
         (name, prepare_input(name), album_artist_name, prepare_input(album_artist_name)),
     )
-    db.commit()
+    if commit:
+        db.commit()
     return int(cursor.lastrowid)
 
 
@@ -322,18 +324,18 @@ def get_track_by_id(db: sqlite3.Connection, track_id: int) -> Track:
     )
 
 
-def add_track(db: sqlite3.Connection, track: FsTrack) -> None:
+def add_track(db: sqlite3.Connection, track: FsTrack, *, commit: bool = True) -> None:
     # Artist
     try:
         artist_id = find_artist(db, track.artist)
     except ValueError:
-        artist_id = add_artist(db, track.artist)
+        artist_id = add_artist(db, track.artist, commit=False)
 
     # Album
     try:
         album_id = find_album(db, track.album, track.album_artist)
     except ValueError:
-        album_id = add_album(db, track.album, track.album_artist)
+        album_id = add_album(db, track.album, track.album_artist, commit=False)
 
     # Detect instrumental
     is_instrumental = bool(track.lrc_lyrics and re.search(r"\[au:\s*instrumental\]", track.lrc_lyrics))
@@ -359,12 +361,24 @@ def add_track(db: sqlite3.Connection, track: FsTrack) -> None:
         getattr(track, "modified_time", None),
         getattr(track, "file_size", None),
     ))
-    db.commit()
+    if commit:
+        db.commit()
 
 
-def add_tracks(db: sqlite3.Connection, tracks: List[FsTrack]) -> None:
-    for t in tracks:
-        add_track(db, t)
+def add_tracks(db: sqlite3.Connection, tracks: List[FsTrack], *, commit: bool = True) -> None:
+    if not tracks:
+        return
+    if commit:
+        db.execute("BEGIN")
+    try:
+        for t in tracks:
+            add_track(db, t, commit=False)
+        if commit:
+            db.commit()
+    except Exception:
+        if commit:
+            db.rollback()
+        raise
 
 
 def get_tracks(db: sqlite3.Connection) -> List[Track]:
@@ -656,11 +670,12 @@ def set_scan_cache_meta(db: sqlite3.Connection, key: str, value: str) -> None:
     db.commit()
 
 
-def delete_tracks_by_paths(db: sqlite3.Connection, paths: list[str]) -> None:
+def delete_tracks_by_paths(db: sqlite3.Connection, paths: list[str], *, commit: bool = True) -> None:
     if not paths:
         return
     db.executemany("DELETE FROM tracks WHERE file_path = ?", [(path,) for path in paths])
-    db.commit()
+    if commit:
+        db.commit()
 
 
 def prune_library(db: sqlite3.Connection) -> None:

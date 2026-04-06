@@ -42,9 +42,10 @@ def _normalize_excluded_paths(excluded_paths: str | None) -> list[str]:
     normalized: list[str] = []
     for entry in _split_lines(excluded_paths):
         try:
-            normalized.append(str(Path(entry).expanduser().resolve()).casefold())
+            resolved_path = Path(entry).expanduser().resolve(strict=False)
+            normalized.append(str(resolved_path).casefold())
         except Exception:
-            normalized.append(str(Path(entry).expanduser()).resolve().as_posix().casefold())
+            normalized.append(Path(entry).expanduser().as_posix().casefold())
     return normalized
 
 
@@ -59,8 +60,9 @@ def _compile_excluded_patterns(excluded_patterns: str | None) -> list[re.Pattern
 
 
 def _is_path_excluded(path: str, excluded_roots: list[str], excluded_patterns: list[re.Pattern[str]]) -> bool:
-    resolved = str(Path(path).resolve()).casefold()
-    resolved_posix = Path(path).resolve().as_posix().casefold()
+    resolved_path = Path(path).resolve(strict=False)
+    resolved = str(resolved_path).casefold()
+    resolved_posix = resolved_path.as_posix().casefold()
 
     for root in excluded_roots:
         root_clean = root.rstrip("/\\")
@@ -117,24 +119,24 @@ def iter_audio_paths_with_directory_cache(
     collected_paths: list[str] = []
     directory_mtimes: dict[str, float] = {}
 
-    known_descendants: list[tuple[str, str, str]] = []
+    subtree_index: dict[str, list[str]] = {}
     for original in existing_paths:
         try:
-            resolved = str(Path(original).resolve())
-            resolved_posix = Path(original).resolve().as_posix().casefold()
+            resolved_path = Path(original).resolve(strict=False)
         except Exception:
             continue
-        known_descendants.append((original, resolved.casefold(), resolved_posix))
+        current_parent = resolved_path.parent
+        while True:
+            subtree_index.setdefault(str(current_parent), []).append(original)
+            next_parent = current_parent.parent
+            if next_parent == current_parent:
+                break
+            current_parent = next_parent
 
     def _collect_known_subtree(dir_path: str) -> None:
-        resolved_dir = str(Path(dir_path).resolve())
-        resolved_cf = resolved_dir.casefold().rstrip("/\\")
-        resolved_posix = Path(dir_path).resolve().as_posix().casefold().rstrip("/")
-        for original, file_cf, file_posix in known_descendants:
-            in_win_tree = file_cf == resolved_cf or file_cf.startswith(resolved_cf + os.sep.casefold())
-            in_posix_tree = file_posix == resolved_posix or file_posix.startswith(resolved_posix + "/")
-            if not in_win_tree and not in_posix_tree:
-                continue
+        resolved_dir_path = Path(dir_path).resolve(strict=False)
+        resolved_dir = str(resolved_dir_path)
+        for original in subtree_index.get(resolved_dir, []):
             if original in seen_paths:
                 continue
             if _is_path_excluded(original, excluded_roots, compiled_patterns):
@@ -144,7 +146,8 @@ def iter_audio_paths_with_directory_cache(
 
     def _walk_dir(dir_path: str) -> None:
         try:
-            resolved_dir = str(Path(dir_path).resolve())
+            resolved_dir_path = Path(dir_path).resolve(strict=False)
+            resolved_dir = str(resolved_dir_path)
             dir_mtime = float(os.path.getmtime(resolved_dir))
         except OSError:
             return
@@ -170,7 +173,7 @@ def iter_audio_paths_with_directory_cache(
                     ext = os.path.splitext(entry.name)[1].lower()
                     if ext not in AUDIO_EXTS:
                         continue
-                    normalized = str(Path(entry_path).resolve())
+                    normalized = str(Path(entry_path).resolve(strict=False))
                     if normalized in seen_paths:
                         continue
                     if _is_path_excluded(entry_path, excluded_roots, compiled_patterns):
