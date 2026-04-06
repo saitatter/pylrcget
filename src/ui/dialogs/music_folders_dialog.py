@@ -18,8 +18,10 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QSpinBox,
+    QTabWidget,
     QTextEdit,
     QVBoxLayout,
+    QWidget,
 )
 
 from core.lyrics_sidecar import DEFAULT_LYRICS_FILE_PATTERN
@@ -38,6 +40,18 @@ class MusicFoldersDialog(QDialog):
         self._last_browse_dir = os.path.expanduser("~")
 
         layout = QVBoxLayout(self)
+        self.tabs = QTabWidget()
+        self.tabs.setObjectName("SettingsTabs")
+        layout.addWidget(self.tabs, 1)
+
+        library_tab = QWidget()
+        library_layout = QVBoxLayout(library_tab)
+
+        lyrics_tab = QWidget()
+        lyrics_tab_layout = QVBoxLayout(lyrics_tab)
+
+        appearance_tab = QWidget()
+        appearance_layout_root = QVBoxLayout(appearance_tab)
 
         folders_box = QGroupBox("Music Folders")
         folders_layout = QVBoxLayout(folders_box)
@@ -50,65 +64,7 @@ class MusicFoldersDialog(QDialog):
         btn_layout.addWidget(self.add_btn)
         btn_layout.addWidget(self.remove_btn)
         folders_layout.addLayout(btn_layout)
-        layout.addWidget(folders_box)
-
-        appearance_box = QGroupBox("Appearance")
-        appearance_layout = QGridLayout(appearance_box)
-        self.theme_combo = QComboBox()
-        for theme_key, theme_name in get_available_themes():
-            self.theme_combo.addItem(theme_name, theme_key)
-        appearance_layout.addWidget(QLabel("Theme"), 0, 0)
-        appearance_layout.addWidget(self.theme_combo, 0, 1)
-        layout.addWidget(appearance_box)
-
-        lyrics_box = QGroupBox("Lyrics Export")
-        lyrics_layout = QGridLayout(lyrics_box)
-
-        self.save_sidecars_chk = QCheckBox("Save lyrics files")
-        self.save_sidecars_chk.setChecked(True)
-        lyrics_layout.addWidget(self.save_sidecars_chk, 0, 0, 1, 4)
-
-        self.output_dir_edit = QLineEdit()
-        self.output_dir_edit.setPlaceholderText("Leave empty to save next to the audio file")
-        self.browse_output_btn = QPushButton("Browse")
-        self.clear_output_btn = QPushButton("Use Track Folder")
-
-        lyrics_layout.addWidget(QLabel("Download directory"), 1, 0)
-        lyrics_layout.addWidget(self.output_dir_edit, 1, 1)
-        lyrics_layout.addWidget(self.browse_output_btn, 1, 2)
-        lyrics_layout.addWidget(self.clear_output_btn, 1, 3)
-
-        self.pattern_edit = QLineEdit()
-        self.pattern_edit.setPlaceholderText(DEFAULT_LYRICS_FILE_PATTERN)
-        lyrics_layout.addWidget(QLabel("Filename pattern"), 2, 0)
-        lyrics_layout.addWidget(self.pattern_edit, 2, 1, 1, 3)
-
-        hint = QLabel(
-            "Available placeholders: {artist}, {title}, {album}, {track}. "
-            "Extensions are added automatically as .lrc and .txt."
-        )
-        hint.setWordWrap(True)
-        lyrics_layout.addWidget(hint, 3, 0, 1, 4)
-
-        layout.addWidget(lyrics_box)
-
-        embed_box = QGroupBox("Audio File")
-        embed_layout = QGridLayout(embed_box)
-        self.embed_chk = QCheckBox("Embed lyrics into the audio file")
-        self.embed_chk.setChecked(True)
-        embed_layout.addWidget(self.embed_chk, 0, 0, 1, 2)
-
-        self.reaction_delay_spin = QSpinBox()
-        self.reaction_delay_spin.setRange(-2000, 2000)
-        self.reaction_delay_spin.setSingleStep(10)
-        self.reaction_delay_spin.setSuffix(" ms")
-        embed_layout.addWidget(QLabel("Reaction delay"), 1, 0)
-        embed_layout.addWidget(self.reaction_delay_spin, 1, 1)
-
-        reaction_hint = QLabel("Negative values stamp earlier. Positive values stamp later.")
-        reaction_hint.setWordWrap(True)
-        embed_layout.addWidget(reaction_hint, 2, 0, 1, 2)
-        layout.addWidget(embed_box)
+        library_layout.addWidget(folders_box)
 
         scan_box = QGroupBox("Library Scan")
         scan_layout = QGridLayout(scan_box)
@@ -154,7 +110,72 @@ class MusicFoldersDialog(QDialog):
         )
         scan_hint.setWordWrap(True)
         scan_layout.addWidget(scan_hint, 3, 0, 1, 2)
-        layout.addWidget(scan_box)
+        library_layout.addWidget(scan_box)
+        library_layout.addStretch(1)
+
+        appearance_box = QGroupBox("Appearance")
+        appearance_layout = QGridLayout(appearance_box)
+        self.theme_combo = QComboBox()
+        for theme_key, theme_name in get_available_themes():
+            self.theme_combo.addItem(theme_name, theme_key)
+        appearance_layout.addWidget(QLabel("Theme"), 0, 0)
+        appearance_layout.addWidget(self.theme_combo, 0, 1)
+        appearance_layout_root.addWidget(appearance_box)
+        appearance_layout_root.addStretch(1)
+
+        lyrics_box = QGroupBox("Lyrics Export")
+        lyrics_layout = QGridLayout(lyrics_box)
+
+        self.save_sidecars_chk = QCheckBox("Save lyrics files")
+        self.save_sidecars_chk.setChecked(True)
+        lyrics_layout.addWidget(self.save_sidecars_chk, 0, 0, 1, 4)
+
+        self.output_dir_edit = QLineEdit()
+        self.output_dir_edit.setPlaceholderText("Leave empty to save next to the audio file")
+        self.browse_output_btn = QPushButton("Browse")
+        self.clear_output_btn = QPushButton("Use Track Folder")
+
+        lyrics_layout.addWidget(QLabel("Download directory"), 1, 0)
+        lyrics_layout.addWidget(self.output_dir_edit, 1, 1)
+        lyrics_layout.addWidget(self.browse_output_btn, 1, 2)
+        lyrics_layout.addWidget(self.clear_output_btn, 1, 3)
+
+        self.pattern_edit = QLineEdit()
+        self.pattern_edit.setPlaceholderText(DEFAULT_LYRICS_FILE_PATTERN)
+        lyrics_layout.addWidget(QLabel("Filename pattern"), 2, 0)
+        lyrics_layout.addWidget(self.pattern_edit, 2, 1, 1, 3)
+
+        hint = QLabel(
+            "Available placeholders: {artist}, {title}, {album}, {track}. "
+            "Extensions are added automatically as .lrc and .txt."
+        )
+        hint.setWordWrap(True)
+        lyrics_layout.addWidget(hint, 3, 0, 1, 4)
+        lyrics_tab_layout.addWidget(lyrics_box)
+        lyrics_tab_layout.addStretch(1)
+
+        embed_box = QGroupBox("Audio File")
+        embed_layout = QGridLayout(embed_box)
+        self.embed_chk = QCheckBox("Embed lyrics into the audio file")
+        self.embed_chk.setChecked(True)
+        embed_layout.addWidget(self.embed_chk, 0, 0, 1, 2)
+
+        self.reaction_delay_spin = QSpinBox()
+        self.reaction_delay_spin.setRange(-2000, 2000)
+        self.reaction_delay_spin.setSingleStep(10)
+        self.reaction_delay_spin.setSuffix(" ms")
+        embed_layout.addWidget(QLabel("Reaction delay"), 1, 0)
+        embed_layout.addWidget(self.reaction_delay_spin, 1, 1)
+
+        reaction_hint = QLabel("Negative values stamp earlier. Positive values stamp later.")
+        reaction_hint.setWordWrap(True)
+        embed_layout.addWidget(reaction_hint, 2, 0, 1, 2)
+        lyrics_tab_layout.addWidget(embed_box)
+        lyrics_tab_layout.addStretch(1)
+
+        self.tabs.addTab(library_tab, "Library")
+        self.tabs.addTab(lyrics_tab, "Lyrics")
+        self.tabs.addTab(appearance_tab, "Appearance")
 
         self.save_btn = QPushButton("Save")
         layout.addWidget(self.save_btn)
