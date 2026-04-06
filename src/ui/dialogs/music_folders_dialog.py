@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
+import os
 import re
 
 from PySide6.QtWidgets import (
@@ -34,6 +35,7 @@ class MusicFoldersDialog(QDialog):
         self.setWindowTitle("Settings")
         self.resize(700, 700)
         self.app_state = app_state
+        self._last_browse_dir = os.path.expanduser("~")
 
         layout = QVBoxLayout(self)
 
@@ -186,11 +188,18 @@ class MusicFoldersDialog(QDialog):
         self.reaction_delay_spin.setValue(int(config.reaction_delay_ms or 0))
         self.excluded_paths_edit.setPlainText(config.scan_excluded_paths)
         self.excluded_patterns_edit.setPlainText(config.scan_excluded_patterns)
+        directories = get_directories(self.app_state.db)
+        if config.lyrics_output_dir and os.path.isdir(config.lyrics_output_dir):
+            self._last_browse_dir = config.lyrics_output_dir
+        elif directories:
+            first_directory = directories[0]
+            if os.path.isdir(first_directory):
+                self._last_browse_dir = first_directory
         self._update_export_fields_enabled()
         self._validate_regex_patterns()
 
     def add_folder(self):
-        path = QFileDialog.getExistingDirectory(self, "Select Music Folder")
+        path = self._pick_directory("Select Music Folder")
         if not path:
             return
 
@@ -205,22 +214,61 @@ class MusicFoldersDialog(QDialog):
             self.list_widget.takeItem(self.list_widget.row(item))
 
     def _browse_output_dir(self):
-        path = QFileDialog.getExistingDirectory(self, "Select Lyrics Download Directory")
+        path = self._pick_directory("Select Lyrics Download Directory", self.output_dir_edit.text().strip())
         if path:
             self.output_dir_edit.setText(path)
 
     def _add_excluded_path(self):
-        path = QFileDialog.getExistingDirectory(self, "Select Excluded Folder")
+        path = self._pick_directory("Select Excluded Folder")
         if not path:
             return
 
         self._append_excluded_path(path)
 
     def _add_excluded_file(self):
-        path, _ = QFileDialog.getOpenFileName(self, "Select Excluded File")
+        path = self._pick_file("Select Excluded File")
         if not path:
             return
         self._append_excluded_path(path)
+
+    def _dialog_start_dir(self, preferred: str = "") -> str:
+        preferred = (preferred or "").strip()
+        if preferred:
+            if os.path.isdir(preferred):
+                return preferred
+            parent = os.path.dirname(preferred)
+            if parent and os.path.isdir(parent):
+                return parent
+        if os.path.isdir(self._last_browse_dir):
+            return self._last_browse_dir
+        return os.path.expanduser("~")
+
+    def _pick_directory(self, title: str, preferred: str = "") -> str:
+        dialog = QFileDialog(self, title, self._dialog_start_dir(preferred))
+        dialog.setFileMode(QFileDialog.FileMode.Directory)
+        dialog.setOption(QFileDialog.Option.ShowDirsOnly, True)
+        dialog.setOption(QFileDialog.Option.DontUseNativeDialog, True)
+        dialog.setOption(QFileDialog.Option.DontUseCustomDirectoryIcons, True)
+        if dialog.exec():
+            selected = dialog.selectedFiles()
+            if selected:
+                path = selected[0]
+                self._last_browse_dir = path
+                return path
+        return ""
+
+    def _pick_file(self, title: str, preferred: str = "") -> str:
+        dialog = QFileDialog(self, title, self._dialog_start_dir(preferred))
+        dialog.setFileMode(QFileDialog.FileMode.ExistingFile)
+        dialog.setOption(QFileDialog.Option.DontUseNativeDialog, True)
+        dialog.setOption(QFileDialog.Option.DontUseCustomDirectoryIcons, True)
+        if dialog.exec():
+            selected = dialog.selectedFiles()
+            if selected:
+                path = selected[0]
+                self._last_browse_dir = os.path.dirname(path) or self._last_browse_dir
+                return path
+        return ""
 
     def _append_excluded_path(self, path: str):
         existing = [line.strip() for line in self.excluded_paths_edit.toPlainText().splitlines() if line.strip()]

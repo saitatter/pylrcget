@@ -292,8 +292,6 @@ def get_track_by_id(db: sqlite3.Connection, track_id: int) -> Track:
             album_id,
             duration,
             track_number,
-            modified_time,
-            file_size,
             albums.image_path,
             txt_lyrics,
             lrc_lyrics,
