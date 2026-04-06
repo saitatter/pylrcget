@@ -12,12 +12,15 @@ from ui.workers.library_scanner import LibraryScanner
 from ui.widgets.track_list_widget import TrackListWidget
 from ui.dialogs.music_folders_dialog import MusicFoldersDialog
 from ui.player_bar import PlayerBar
-from ui.lyrics_view import LyricsView
+from ui.widgets.lyrics_editor_widget import LyricsEditorWidget
 from ui.dialogs.publish_lyrics_dialog import PublishLyricsDialog
 from player.player import NowPlaying
 from core.embed_lyrics import embed_lyrics_for_track
 from ui.widgets.album_list_widget import AlbumListWidget
 from ui.widgets.artist_list_widget import ArtistListWidget
+from ui.widgets.toast import ToastManager
+from PySide6.QtWidgets import QToolButton
+from PySide6.QtWidgets import QStyle
 
 @dataclass
 class ScanProgress:
@@ -51,6 +54,9 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(self.central_widget)
         self.layout = QVBoxLayout(self.central_widget)
 
+        self.toasts = ToastManager(self)
+        self.app_state.notification.connect(self._on_notify)
+
         # --- Top controls (search + filters) ---
         top_bar = QHBoxLayout()
 
@@ -73,6 +79,27 @@ class MainWindow(QMainWindow):
         self.chk_none = QCheckBox("No lyrics")
         self.chk_none.setChecked(True)
         top_bar.addWidget(self.chk_none)
+        top_bar.addStretch(1)  # pushes icons to the right
+
+        # --- Action icons (top-right) ---
+        self.btn_refresh = QToolButton()
+        self.btn_refresh.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_BrowserReload))
+        self.btn_refresh.setToolTip("Refresh library")
+        self.btn_refresh.clicked.connect(self.refresh_library)
+
+        self.btn_config = QToolButton()
+        self.btn_config.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_FileDialogDetailedView))
+        self.btn_config.setToolTip("Settings")
+        self.btn_config.clicked.connect(self.open_config_modal)
+
+        self.btn_about = QToolButton()
+        self.btn_about.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MessageBoxInformation))
+        self.btn_about.setToolTip("About")
+        self.btn_about.clicked.connect(self.open_about_modal)
+
+        top_bar.addWidget(self.btn_refresh)
+        top_bar.addWidget(self.btn_config)
+        top_bar.addWidget(self.btn_about)
 
         self.layout.addLayout(top_bar)
 
@@ -89,7 +116,7 @@ class MainWindow(QMainWindow):
         self.track_list = TrackListWidget(self.app_state)
         splitter.addWidget(self.track_list)
 
-        self.lyrics_view = LyricsView()
+        self.lyrics_view = LyricsEditorWidget()
         self.lyrics_view.show_none("Select a track to see lyrics")
         self.lyrics_view.saveRequested.connect(self._on_lyrics_save_requested)
 
@@ -128,22 +155,27 @@ class MainWindow(QMainWindow):
         self.layout.addWidget(self.player_bar)
         self.player_bar.set_prev_next_handlers(self.play_prev, self.play_next)
 
-        # --- Progress bar ---
+        # --- Scan progress (pretty + hidden when idle) ---
+        self.scan_row = QWidget()
+        scan_layout = QHBoxLayout(self.scan_row)
+        scan_layout.setContentsMargins(8, 6, 8, 6)
+        scan_layout.setSpacing(10)
+
+        self.scan_label = QLabel("Scanning…")
+        self.scan_label.setObjectName("ScanLabel")
+
         self.progress_bar = QProgressBar()
-        self.layout.addWidget(self.progress_bar)
+        self.progress_bar.setObjectName("ScanProgress")
+        self.progress_bar.setTextVisible(False)
+        self.progress_bar.setRange(0, 100)
+        self.progress_bar.setValue(0)
 
-        # --- Bottom buttons ---
-        self.config_button = QPushButton("Open Config")
-        self.about_button = QPushButton("Open About")
-        self.refresh_button = QPushButton("Refresh Library")
+        scan_layout.addWidget(self.scan_label)
+        scan_layout.addWidget(self.progress_bar, 1)
 
-        self.layout.addWidget(self.config_button)
-        self.layout.addWidget(self.about_button)
-        self.layout.addWidget(self.refresh_button)
-
-        self.config_button.clicked.connect(self.open_config_modal)
-        self.about_button.clicked.connect(self.open_about_modal)
-        self.refresh_button.clicked.connect(self.refresh_library)
+        self.layout.addWidget(self.scan_row)
+        self.scan_row.setVisible(False)
+        self.scan_row.setObjectName("ScanRow")
 
         # --- Signals from track list ---
         self.track_list.playTrack.connect(self.on_play_track)
@@ -161,6 +193,48 @@ class MainWindow(QMainWindow):
         # initial load
         self._apply_track_filters()
         self.show_queued_notifications()
+
+        self.setStyleSheet(self.styleSheet() + """
+            QWidget#ScanRow {
+                background: #020617;
+                border-top: 1px solid #111827;
+            }
+
+            QLabel#ScanLabel {
+                color: #9ca3af;
+                font-size: 11px;
+            }
+
+            QProgressBar#ScanProgress {
+                background: #0b1222;
+                border: 1px solid #1f2937;
+                border-radius: 999px;
+                height: 10px;
+            }
+
+            QProgressBar#ScanProgress::chunk {
+                border-radius: 999px;
+                background: qlineargradient(
+                    x1:0, y1:0, x2:1, y2:0,
+                    stop:0 #38bdf8, stop:1 #22c55e
+                );
+            }
+            QToolButton {
+                border: 1px solid transparent;
+                background: transparent;
+                padding: 6px;
+                border-radius: 10px;
+            }
+
+            QToolButton:hover {
+                background: #0b1222;
+                border-color: #1f2937;
+            }
+
+            QToolButton:pressed {
+                background: #0f172a;
+            }
+            """)
 
     # ------------------ filters ------------------
     def _apply_track_filters(self):
@@ -180,40 +254,77 @@ class MainWindow(QMainWindow):
         dlg.exec()
 
     def open_about_modal(self):
-        QMessageBox.information(self, "About", "About modal here")
+        self.app_state.notify("LrcGet Python — about modal TBD", "info")
 
     # ------------------ scanning ------------------
-    def update_progress(self, progress: ScanProgress):
-        percent = int(progress.files_scanned / progress.files_count * 100)
-        self.progress_bar.setValue(percent)
-
     def scanning_finished(self):
         self._apply_track_filters()
-        QMessageBox.information(self, "Scan Finished", "Library scanning complete!")
+        self.app_state.notify("Library scanning complete!", "success")
 
     def refresh_library(self):
-        self.progress_bar.setValue(0)
-
         directories = get_directories(self.app_state.db)
         if not directories:
-            QMessageBox.warning(self, "No directories", "No music folders configured.")
+            self.app_state.notify("No music folders configured.", "warning")
             return
+
+        self.scan_row.setVisible(True)
+        self.progress_bar.setValue(0)
+        self.scan_label.setText("Scanning…")
 
         self.scanner = LibraryScanner(self.app_state.db_path, directories)
         self.scanner.progress_signal.connect(self._update_scan_progress)
         self.scanner.finished_signal.connect(self._scan_finished)
         self.scanner.start()
+        self.btn_refresh.setEnabled(False)
+        self.statusBar().showMessage("Scanning library…")
 
     def _update_scan_progress(self, scanned: int, total: int):
-        percent = int((scanned / max(total, 1)) * 100)
+        total = max(int(total), 0)
+        scanned = max(int(scanned), 0)
+
+        if total <= 0:
+            # unknown total -> show indeterminate animation
+            self.progress_bar.setRange(0, 0)
+            self.scan_label.setText("Scanning…")
+            return
+
+        # determinate
+        if self.progress_bar.maximum() == 0:
+            self.progress_bar.setRange(0, 100)
+
+        percent = int((scanned / total) * 100)
+        percent = max(0, min(100, percent))
+
         self.progress_bar.setValue(percent)
+        self.scan_label.setText(f"Scanning… {scanned}/{total} ({percent}%)")
+
+    def _on_notify(self, n):
+        # n is core.state.Notify
+        kind = (getattr(n, "notify_type", "info") or "info").lower()
+        # your enum uses "warn"; toast supports "warning"
+        if kind == "warn":
+            kind = "warning"
+
+        msg = getattr(n, "message", "") or ""
+        if not msg:
+            return
+
+        self.toasts.show_toast(msg, notify_type=kind, timeout_ms=3000)
 
     def _scan_finished(self, ok: bool, msg: str):
+        # hide progress strip
+        self.progress_bar.setRange(0, 100)  # reset from indeterminate if needed
+        self.progress_bar.setValue(0)
+        self.scan_row.setVisible(False)
+
         if ok:
             self._apply_track_filters()
-            QMessageBox.information(self, "Scan Finished", msg)
+            self.app_state.notify("Library scanning complete!", "success")
         else:
-            QMessageBox.critical(self, "Scan Failed", msg)
+            self.app_state.notify(f"Library scanning failed: {msg}", "error")
+
+        self.btn_refresh.setEnabled(True)
+        self.statusBar().showMessage(msg, 4000)
 
     # ------------------ track actions ------------------
     def on_play_track(self, track_id: int):
@@ -282,8 +393,8 @@ class MainWindow(QMainWindow):
 
     # ------------------ player + notifications ------------------
     def show_queued_notifications(self):
-        for notify in getattr(self.app_state, "queued_notifications", []):
-            self.show_toast(notify)  # TODO: implement
+        for n in getattr(self.app_state, "queued_notifications", []):
+            self._on_notify(n)
         if hasattr(self.app_state, "queued_notifications"):
             self.app_state.queued_notifications.clear()
 
@@ -343,13 +454,13 @@ class MainWindow(QMainWindow):
             pass
 
         if ok:
-            QMessageBox.information(self, "Lyrics", msg)
+            self.app_state.notify("Lyrics downloaded successfully!", "success")
         else:
-            QMessageBox.warning(self, "Lyrics", msg)
+            self.app_state.notify(f"Failed to download lyrics: {msg}", "error")
 
     def _on_lyrics_save_requested(self, lrc: str, txt: str):
         if not self.app_state.player or not self.app_state.player.track:
-            QMessageBox.information(self, "Lyrics", "No track playing.")
+            self.app_state.notify("No track playing.", "warning")
             return
 
         track_id = self.app_state.player.track.track_id
@@ -380,7 +491,7 @@ class MainWindow(QMainWindow):
     # ------------------ publish dialogs ------------------
     def open_publish_dialog_for_current_track(self, is_synced: bool):
         if not self.app_state.player or not self.app_state.player.track:
-            QMessageBox.information(self, "Publish", "No track playing.")
+            self.app_state.notify("No track playing.", "warning")
             return
 
         track_id = self.app_state.player.track.track_id
@@ -407,7 +518,7 @@ class MainWindow(QMainWindow):
 
     def _open_publish_dialog(self, is_synced: bool):
         if not self.app_state.player or not self.app_state.player.track:
-            QMessageBox.information(self, "Publish", "No track playing.")
+            self.app_state.notify("No track playing.", "warning")
             return
 
         track_id = self.app_state.player.track.track_id
@@ -443,7 +554,7 @@ class MainWindow(QMainWindow):
     def _on_embed_requested(self):
         # embed doar pentru track-ul care cântă acum (simplu și clar)
         if not self.app_state.player or not self.app_state.player.track:
-            QMessageBox.information(self, "Embed lyrics", "No track playing.")
+            self.app_state.notify("No track playing.", "warning")
             return
 
         track_id = self.app_state.player.track.track_id
@@ -451,47 +562,22 @@ class MainWindow(QMainWindow):
         try:
             track = get_track_by_id(self.app_state.db, track_id)
         except Exception as e:
-            QMessageBox.warning(self, "Embed lyrics", f"Cannot read track from database: {e}")
+            self.app_state.notify(f"Cannot read track from database: {e}", "error")
             return
 
         try:
             embed_lyrics_for_track(track)
-            QMessageBox.information(
-                self,
-                "Embed lyrics",
-                "Lyrics have been embedded into the audio file tags."
-            )
+            self.app_state.notify("Lyrics have been embedded into the audio file tags.", "success")
         except Exception as e:
-            QMessageBox.warning(
-                self,
-                "Embed lyrics",
-                f"Failed to embed lyrics: {e}"
-            )
+            self.app_state.notify(f"Failed to embed lyrics: {e}", "error")
 
     def _on_open_album(self, album_id: int):
-        # Get album details from DB so we can build a search query.
-        # You can replace this with a richer "filter by album_id" later.
-        from db.database import get_album_by_id
-
-        try:
-            alb = get_album_by_id(self.app_state.db, int(album_id))
-        except Exception:
-            return
-
-        album_name = (alb.get("album_name") or "").strip()
-        artist_name = (alb.get("artist_name") or "").strip()
-
-        # Switch to Tracks tab
         self.tabs.setCurrentWidget(self.tracks_tab)
+        self.search_box.blockSignals(True)
+        self.search_box.setText("")
+        self.search_box.blockSignals(False)
 
-        # Cheap-but-effective: push album into search box.
-        # You can do album-only or "artist album" depending on your search semantics.
-        query = album_name
-        if artist_name and album_name:
-            query = f'{artist_name} {album_name}'
-
-        self.search_box.setText(query)
-        self._apply_track_filters()
+        self.track_list.setAlbumFilter(int(album_id))
     
     def _on_open_artist(self, artist_id: int):
         self.tabs.setCurrentWidget(self.tracks_tab)
@@ -531,7 +617,7 @@ class MainWindow(QMainWindow):
             self._apply_track_filters()
             self.track_list.restore_selection(selected_before)
         except Exception as e:
-            QMessageBox.warning(self, "Instrumental", f"Failed to update tracks: {e}")
+            self.app_state.notify(f"Failed to update tracks: {e}", "error")
 
 
     def _on_unmark_instrumental(self, track_ids: list[int]):
@@ -552,4 +638,4 @@ class MainWindow(QMainWindow):
             self._apply_track_filters()
             self.track_list.restore_selection(selected_before)
         except Exception as e:
-            QMessageBox.warning(self, "Instrumental", f"Failed to update tracks: {e}")
+            self.app_state.notify(f"Failed to update tracks: {e}", "error")

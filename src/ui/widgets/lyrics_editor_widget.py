@@ -83,8 +83,10 @@ def parse_lrc(lrc_text: str) -> List[Tuple[int, str]]:
         return out
 
     for raw_line in lrc_text.splitlines():
-        line = raw_line.strip()
-        if not line:
+        line = raw_line.rstrip("\n")
+        # Keep truly empty raw lines only if you want blank rows with no timestamp.
+        # For synced LRC, blank lines without timestamp can't be placed on a timeline, so we ignore them.
+        if not line.strip():
             continue
 
         # ignore metadata
@@ -95,9 +97,10 @@ def parse_lrc(lrc_text: str) -> List[Tuple[int, str]]:
         if not matches:
             continue
 
-        text = _TS_RE.sub("", line).strip()
-        if not text:
-            continue
+        text = _TS_RE.sub("", line)
+        # Keep empty lyrics lines (timestamp-only lines).
+        # Don't .strip() here if you want to preserve intentional spaces; usually not needed.
+        text = text.strip()
 
         for m in matches:
             t = _ts_to_ms(m.group(1), m.group(2), m.group(3))
@@ -107,7 +110,7 @@ def parse_lrc(lrc_text: str) -> List[Tuple[int, str]]:
     return out
 
 
-class LyricsView(QWidget):
+class LyricsEditorWidget(QWidget):
     """
     Right-side lyrics panel:
       - Synced editor: table (Time | Text), editable
@@ -271,7 +274,7 @@ class LyricsView(QWidget):
                 else:
                     # derive plain from table text (not timestamps)
                     self.plain.blockSignals(True)
-                    self.plain.setPlainText("\n".join([t for _, t in pairs]))
+                    self.plain.setPlainText("\n".join([t.rstrip() for _, t in pairs]).rstrip())
                     self.plain.blockSignals(False)
                 return
 
@@ -439,18 +442,25 @@ class LyricsView(QWidget):
                 it_time = self.table.item(r, 0)
                 it_text = self.table.item(r, 1)
                 ms = int(it_time.data(Qt.ItemDataRole.UserRole) or 0) if it_time else 0
-                text = (it_text.text() if it_text else "").strip()
-                if not text:
-                    continue
-                pairs.append((ms, text))
+                text = it_text.text() if it_text else ""
+                # Keep empty lines (timestamp-only)
+                pairs.append((ms, text.rstrip()))
 
             # sort by time
             pairs.sort(key=lambda x: x[0])
 
-            lrc_lines = [f"[{_ms_to_ts(ms)}] {text}" for ms, text in pairs]
+            lrc_lines: list[str] = []
+            for ms, text in pairs:
+                t = _ms_to_ts(ms)
+                if text.strip():
+                    lrc_lines.append(f"[{t}] {text.strip()}")
+                else:
+                    # Timestamp-only line (blank lyric line)
+                    lrc_lines.append(f"[{t}]")
             lrc = "\n".join(lrc_lines).strip()
 
-            plain = "\n".join([text for _, text in pairs]).strip()
+            # Preserve blank lines in plain view
+            plain = "\n".join([text.rstrip() for _, text in pairs]).rstrip()
 
             self.saveRequested.emit(lrc, plain)
             return
