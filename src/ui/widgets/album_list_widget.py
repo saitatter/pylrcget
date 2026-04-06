@@ -7,8 +7,10 @@ from PySide6.QtCore import Qt, Signal, QItemSelectionModel, QModelIndex
 from PySide6.QtGui import QStandardItem, QStandardItemModel
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QTableView, QHeaderView, QMenu, QHBoxLayout, QLabel, QPushButton, QStackedWidget
 
+from db.database import get_directories
 from ui.style_loader import load_stylesheet
 from ui.library_routes import LibraryRoute, albums_detail, artists_album, artists_detail
+from ui.widgets.empty_state_widget import EmptyStateWidget
 from ui.widgets.sortable_header_view import SortableHeaderView
 from ui.widgets.track_list_widget import TrackListWidget
 
@@ -29,6 +31,8 @@ class AlbumListWidget(QWidget):
     markInstrumental = Signal(list)
     unmarkInstrumental = Signal(list)
     clearFiltersRequested = Signal()
+    clearSearchRequested = Signal()
+    refreshLibraryRequested = Signal()
     configureFoldersRequested = Signal()
     backRequested = Signal()
     navigateRequested = Signal(object)
@@ -95,6 +99,11 @@ class AlbumListWidget(QWidget):
         self.header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
         self.table.setSortingEnabled(True)
         browser_layout.addWidget(self.table)
+
+        self.empty_state = EmptyStateWidget()
+        self.empty_state.actionTriggered.connect(self._on_empty_state_action)
+        browser_layout.addWidget(self.empty_state)
+        self.empty_state.hide()
         self.stack.addWidget(self.browser_page)
 
         self.track_list = TrackListWidget(self.app_state)
@@ -116,6 +125,7 @@ class AlbumListWidget(QWidget):
         self.back_btn.clicked.connect(self._go_back)
 
         self._apply_styles()
+        self._empty_action = ""
 
     @staticmethod
     def _display_album(value: str | None) -> str:
@@ -186,6 +196,18 @@ class AlbumListWidget(QWidget):
     def refresh(self):
         from db.database import get_album_rows
 
+        directories = get_directories(self.app_state.db)
+        if not directories:
+            self.model.setRowCount(0)
+            self._show_empty_state(
+                icon_name="folder-open.svg",
+                title="No music folders yet",
+                body="Add one or more folders to build your library and start browsing albums.",
+                action_text="Open Settings",
+                action_key="configure-folders",
+            )
+            return
+
         rows = get_album_rows(
             db=self.app_state.db,
             search_query=self._search,
@@ -230,6 +252,32 @@ class AlbumListWidget(QWidget):
             )
         self.set_rows(ui_rows)
         self._update_header()
+        if ui_rows:
+            self._show_table()
+        elif self._artist_id is not None or self._artist_ids:
+            self._show_empty_state(
+                icon_name="audio-lines.svg",
+                title="No albums for this artist",
+                body="This artist scope does not contain any albums with the current library metadata.",
+                action_text="Back",
+                action_key="back",
+            )
+        elif self._search.strip():
+            self._show_empty_state(
+                icon_name="search-x.svg",
+                title="No albums match your search",
+                body="Try a different search term or clear the current search to show more albums.",
+                action_text="Clear Search",
+                action_key="clear-search",
+            )
+        else:
+            self._show_empty_state(
+                icon_name="audio-lines.svg",
+                title="No albums found",
+                body="Try refreshing the library or reviewing your scan exclusions.",
+                action_text="Refresh Library",
+                action_key="refresh-library",
+            )
 
     def set_rows(self, rows: Iterable[AlbumListRow]):
         self.model.setRowCount(0)
@@ -342,3 +390,28 @@ class AlbumListWidget(QWidget):
                 self.navigateRequested.emit(self._album_route(route.album_ids, route.album_label))
                 return
         self.navigateRequested.emit(route)
+
+    def _show_table(self) -> None:
+        self.table.show()
+        self.empty_state.hide()
+
+    def _show_empty_state(self, *, icon_name: str, title: str, body: str, action_text: str, action_key: str) -> None:
+        self._empty_action = action_key
+        self.empty_state.configure(
+            icon_name=icon_name,
+            title=title,
+            body=body,
+            action_text=action_text,
+        )
+        self.table.hide()
+        self.empty_state.show()
+
+    def _on_empty_state_action(self) -> None:
+        if self._empty_action == "configure-folders":
+            self.configureFoldersRequested.emit()
+        elif self._empty_action == "refresh-library":
+            self.refreshLibraryRequested.emit()
+        elif self._empty_action == "clear-search":
+            self.clearSearchRequested.emit()
+        elif self._empty_action == "back":
+            self._go_back()

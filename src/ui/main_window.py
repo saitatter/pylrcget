@@ -323,6 +323,8 @@ class MainWindow(QMainWindow):
         self.albums_tab.markInstrumental.connect(self._on_mark_instrumental)
         self.albums_tab.unmarkInstrumental.connect(self._on_unmark_instrumental)
         self.albums_tab.clearFiltersRequested.connect(self._reset_track_filters)
+        self.albums_tab.clearSearchRequested.connect(self._clear_library_search)
+        self.albums_tab.refreshLibraryRequested.connect(self.refresh_library)
         self.albums_tab.configureFoldersRequested.connect(self.open_config_modal)
         self.artists_tab.playTrack.connect(self.on_play_track)
         self.artists_tab.downloadLyrics.connect(self.on_download_lyrics)
@@ -330,6 +332,8 @@ class MainWindow(QMainWindow):
         self.artists_tab.markInstrumental.connect(self._on_mark_instrumental)
         self.artists_tab.unmarkInstrumental.connect(self._on_unmark_instrumental)
         self.artists_tab.clearFiltersRequested.connect(self._reset_track_filters)
+        self.artists_tab.clearSearchRequested.connect(self._clear_library_search)
+        self.artists_tab.refreshLibraryRequested.connect(self.refresh_library)
         self.artists_tab.configureFoldersRequested.connect(self.open_config_modal)
 
         # --- Filters wiring ---
@@ -807,6 +811,18 @@ class MainWindow(QMainWindow):
             checkbox.blockSignals(False)
 
         self._apply_track_filters()
+
+    def _clear_library_search(self) -> None:
+        self.search_box.blockSignals(True)
+        self.search_box.setText("")
+        self.search_box.blockSignals(False)
+        current = self.tabs.currentWidget()
+        if current is self.tracks_tab:
+            self._apply_track_filters()
+        elif current is self.albums_tab:
+            self.albums_tab.setSearchValue("")
+        elif current is self.artists_tab:
+            self.artists_tab.setSearchValue("")
 
     def _download_current_track_lyrics(self):
         if not self.app_state.player or not self.app_state.player.track:
