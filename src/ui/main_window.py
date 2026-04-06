@@ -356,6 +356,7 @@ class MainWindow(QMainWindow):
             title=track.title,
             artist=track.artist_name,
             path=path,
+            album=track.album_name,
         )
 
         self.app_state.player.play_file(path, meta)

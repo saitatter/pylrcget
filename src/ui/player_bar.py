@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from PySide6.QtCore import QByteArray, QSize, Qt
-from PySide6.QtGui import QIcon, QPainter, QPixmap
+from PySide6.QtGui import QColor, QFont, QIcon, QLinearGradient, QPainter, QPixmap
 from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtWidgets import (
     QComboBox,
@@ -44,6 +44,34 @@ def _svg_icon(path_d: str, size: int = 20, color: str = "#e5e7eb") -> QIcon:
     return QIcon(pm)
 
 
+def _cover_pixmap(title: str, artist: str | None, size: int = 56) -> QPixmap:
+    key = (artist or title or "?").strip() or "?"
+    glyph = key[0].upper()
+
+    pixmap = QPixmap(size, size)
+    pixmap.fill(Qt.transparent)
+
+    painter = QPainter(pixmap)
+    painter.setRenderHint(QPainter.Antialiasing, True)
+
+    gradient = QLinearGradient(0, 0, size, size)
+    gradient.setColorAt(0.0, QColor("#1e293b"))
+    gradient.setColorAt(1.0, QColor("#0f172a"))
+    painter.setBrush(gradient)
+    painter.setPen(Qt.NoPen)
+    painter.drawRoundedRect(0, 0, size, size, 12, 12)
+
+    font = QFont()
+    font.setPointSize(max(14, size // 3))
+    font.setBold(True)
+    painter.setFont(font)
+    painter.setPen(QColor("#e2e8f0"))
+    painter.drawText(pixmap.rect(), Qt.AlignCenter, glyph)
+    painter.end()
+
+    return pixmap
+
+
 SVG_PREV = "M6 18V6h2v12H6zm3.5-6L18 6v12l-8.5-6z"
 SVG_NEXT = "M16 6v12h2V6h-2zM6 18l8.5-6L6 6v12z"
 SVG_PLAY = "M8 5v14l11-7L8 5z"
@@ -72,8 +100,6 @@ class PlayerBar(QWidget):
         self._dragging = False
         self._duration_ms = 0
         self._is_playing = False
-        self._backend_name = self.player.backend_name() if self.player and hasattr(self.player, "backend_name") else "unknown"
-
         self.setObjectName("PlayerBar")
 
         root = QHBoxLayout(self)
@@ -81,33 +107,36 @@ class PlayerBar(QWidget):
 
         left_panel = QWidget()
         left_panel.setObjectName("PlayerMeta")
-        left_layout = QVBoxLayout(left_panel)
+        left_layout = QHBoxLayout(left_panel)
         set_layout_spacing(left_layout, margins=SPACE_2, spacing=4)
 
-        badges = QHBoxLayout()
-        set_layout_spacing(badges, spacing=SPACE_2)
+        self.lbl_cover = QLabel()
+        self.lbl_cover.setObjectName("NowPlayingCover")
+        self.lbl_cover.setFixedSize(56, 56)
+        self.lbl_cover.setPixmap(_cover_pixmap("?", None, 56))
 
-        self.lbl_status = QLabel("Stopped")
-        self.lbl_status.setObjectName("PlaybackStatus")
-        badges.addWidget(self.lbl_status)
-
-        self.lbl_backend = QLabel(self._backend_name.upper())
-        self.lbl_backend.setObjectName("BackendBadge")
-        badges.addWidget(self.lbl_backend)
-        badges.addStretch(1)
+        text_stack = QVBoxLayout()
+        set_layout_spacing(text_stack, spacing=2)
 
         self.lbl_title = QLabel("Nothing playing")
         self.lbl_title.setObjectName("NowPlaying")
-        self.lbl_title.setMinimumWidth(240)
+        self.lbl_title.setMinimumWidth(220)
         self.lbl_title.setTextInteractionFlags(Qt.TextSelectableByMouse)
         self.lbl_title.setWordWrap(False)
 
-        self.lbl_subtitle = QLabel("Choose a track to start playback")
-        self.lbl_subtitle.setObjectName("NowPlayingMeta")
+        self.lbl_artist = QLabel("Choose a track to start playback")
+        self.lbl_artist.setObjectName("NowPlayingArtist")
 
-        left_layout.addLayout(badges)
-        left_layout.addWidget(self.lbl_title)
-        left_layout.addWidget(self.lbl_subtitle)
+        self.lbl_album = QLabel("")
+        self.lbl_album.setObjectName("NowPlayingAlbum")
+
+        text_stack.addWidget(self.lbl_title)
+        text_stack.addWidget(self.lbl_artist)
+        text_stack.addWidget(self.lbl_album)
+        text_stack.addStretch(1)
+
+        left_layout.addWidget(self.lbl_cover, 0, Qt.AlignVCenter)
+        left_layout.addLayout(text_stack, 1)
 
         center_panel = QWidget()
         center_panel.setObjectName("PlayerCenter")
@@ -208,7 +237,6 @@ class PlayerBar(QWidget):
 
         self._apply_styles()
         self._sync_speed_from_player()
-        self._update_status_badge("stopped")
 
     def set_prev_next_handlers(self, prev_fn, next_fn):
         self.btn_prev.clicked.connect(prev_fn)
@@ -252,21 +280,24 @@ class PlayerBar(QWidget):
         if now_playing:
             artist = now_playing.artist or "Unknown Artist"
             title = now_playing.title or "Unknown"
+            album = getattr(now_playing, "album", None) or ""
             self.lbl_title.setText(title)
-            self.lbl_subtitle.setText(artist)
+            self.lbl_artist.setText(artist)
+            self.lbl_album.setText(album)
+            self.lbl_cover.setPixmap(_cover_pixmap(title, artist, 56))
         else:
             self.lbl_title.setText("Nothing playing")
-            self.lbl_subtitle.setText("Choose a track to start playback")
+            self.lbl_artist.setText("Choose a track to start playback")
+            self.lbl_album.setText("")
+            self.lbl_cover.setPixmap(_cover_pixmap("?", None, 56))
             self.slider.setValue(0)
             self.lbl_time.setText("0:00")
             self.lbl_dur.setText("0:00")
             self._set_playing(False)
-            self._update_status_badge("stopped")
 
     def _on_status_changed(self, status):
         name = getattr(status, "name", str(status)).lower()
         self._set_playing("play" in name)
-        self._update_status_badge(name)
 
     def _set_playing(self, playing: bool):
         self._is_playing = bool(playing)
@@ -287,15 +318,6 @@ class PlayerBar(QWidget):
             return
         self.lbl_time.setText(_fmt(int(ms)))
         self.slider.setValue(int(ms))
-
-    def _update_status_badge(self, status_name: str):
-        status_name = (status_name or "stopped").lower()
-        label = "Playing" if "play" in status_name else "Paused" if "pause" in status_name else "Stopped"
-        self.lbl_status.setText(label)
-        self.lbl_status.setProperty("playbackState", status_name)
-        self.lbl_status.style().unpolish(self.lbl_status)
-        self.lbl_status.style().polish(self.lbl_status)
-        self.lbl_status.update()
 
     def _apply_styles(self):
         self.setStyleSheet(load_stylesheet("player_bar.qss"))

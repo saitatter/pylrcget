@@ -58,43 +58,14 @@ QLabel#NowPlaying {
     font-weight: 600;
 }
 
-QLabel#NowPlayingMeta {
-    color: #94a3b8;
+QLabel#NowPlayingArtist {
+    color: #cbd5e1;
     font-size: 11px;
 }
 
-QLabel#PlaybackStatus,
-QLabel#BackendBadge {
-    border-radius: 999px;
-    padding: 4px 8px;
-    font-size: 10px;
-    font-weight: 600;
-}
-
-QLabel#PlaybackStatus {
-    background: #172033;
-    color: #cbd5e1;
-}
-
-QLabel#PlaybackStatus[playbackState="playing"] {
-    background: rgba(34, 197, 94, 0.18);
-    color: #86efac;
-}
-
-QLabel#PlaybackStatus[playbackState="paused"] {
-    background: rgba(245, 158, 11, 0.16);
-    color: #fcd34d;
-}
-
-QLabel#PlaybackStatus[playbackState="stopped"] {
-    background: #172033;
-    color: #cbd5e1;
-}
-
-QLabel#BackendBadge {
-    background: #0f172a;
-    color: #7dd3fc;
-    border: 1px solid #1e293b;
+QLabel#NowPlayingAlbum {
+    color: #64748b;
+    font-size: 11px;
 }
 
 QLabel#MetaLabel,
@@ -102,6 +73,12 @@ QLabel#TimeLabel {
     color: #cbd5e1;
     font-size: 11px;
     font-weight: 500;
+}
+
+QLabel#NowPlayingCover {
+    background: #0f172a;
+    border: 1px solid #1e293b;
+    border-radius: 12px;
 }
 
 QSlider#PlayerSlider::groove:horizontal {
