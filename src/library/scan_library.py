@@ -44,6 +44,11 @@ def _path_variants(path: str) -> tuple[str, str]:
     return normalized, posix
 
 
+def _join_normalized_path(dir_normalized: str, filename: str) -> tuple[str, str]:
+    normalized = os.path.normcase(os.path.join(dir_normalized, filename))
+    return normalized, normalized.replace("\\", "/")
+
+
 def _normalize_excluded_paths(excluded_paths: str | None) -> list[tuple[str, str]]:
     normalized: list[tuple[str, str]] = []
     for entry in _split_lines(excluded_paths):
@@ -95,13 +100,27 @@ def iter_audio_paths(
     for root in directories:
         if not root or not os.path.isdir(root):
             continue
-        for dirpath, _, filenames in os.walk(root):
+        for dirpath, dirnames, filenames in os.walk(root):
+            normalized_dir, posix_dir = _path_variants(dirpath)
+            if _is_path_excluded_variants(dirpath, normalized_dir, posix_dir, excluded_roots, compiled_patterns):
+                dirnames[:] = []
+                continue
+
+            kept_dirnames: list[str] = []
+            for dirname in dirnames:
+                child_path = os.path.join(dirpath, dirname)
+                child_normalized, child_posix = _join_normalized_path(normalized_dir, dirname)
+                if _is_path_excluded_variants(child_path, child_normalized, child_posix, excluded_roots, compiled_patterns):
+                    continue
+                kept_dirnames.append(dirname)
+            dirnames[:] = kept_dirnames
+
             for fn in filenames:
                 ext = os.path.splitext(fn)[1].lower()
                 if ext not in AUDIO_EXTS:
                     continue
                 file_path = os.path.join(dirpath, fn)
-                normalized, posix_path = _path_variants(file_path)
+                normalized, posix_path = _join_normalized_path(normalized_dir, fn)
                 if normalized in seen:
                     continue
                 if not _is_path_excluded_variants(file_path, normalized, posix_path, excluded_roots, compiled_patterns):
@@ -125,13 +144,27 @@ def preview_audio_path_exclusions(
     for root in directories:
         if not root or not os.path.isdir(root):
             continue
-        for dirpath, _, filenames in os.walk(root):
+        for dirpath, dirnames, filenames in os.walk(root):
+            normalized_dir, posix_dir = _path_variants(dirpath)
+            if _is_path_excluded_variants(dirpath, normalized_dir, posix_dir, excluded_roots, compiled_patterns):
+                dirnames[:] = []
+                continue
+
+            kept_dirnames: list[str] = []
+            for dirname in dirnames:
+                child_path = os.path.join(dirpath, dirname)
+                child_normalized, child_posix = _join_normalized_path(normalized_dir, dirname)
+                if _is_path_excluded_variants(child_path, child_normalized, child_posix, excluded_roots, compiled_patterns):
+                    continue
+                kept_dirnames.append(dirname)
+            dirnames[:] = kept_dirnames
+
             for fn in filenames:
                 ext = os.path.splitext(fn)[1].lower()
                 if ext not in AUDIO_EXTS:
                     continue
                 file_path = os.path.join(dirpath, fn)
-                normalized, posix_path = _path_variants(file_path)
+                normalized, posix_path = _join_normalized_path(normalized_dir, fn)
                 if normalized in seen:
                     continue
                 seen.add(normalized)
