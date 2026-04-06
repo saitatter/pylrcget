@@ -247,7 +247,7 @@ def get_album_rows(
     SELECT
         a.id                    AS album_id,
         a.name                  AS album_name,
-        COALESCE(ar.name, '')   AS artist_name,
+        COALESCE(NULLIF(a.album_artist_name, ''), ar.name, '') AS artist_name,
         COUNT(t.id)             AS track_count
     FROM albums a
     LEFT JOIN artists ar ON ar.id = a.artist_id
@@ -257,7 +257,7 @@ def get_album_rows(
     params: list[object] = []
 
     if search_query:
-        q += " AND (a.name LIKE ? OR ar.name LIKE ? OR a.album_artist_name LIKE ?)"
+        q += " AND (a.name LIKE ? OR COALESCE(NULLIF(a.album_artist_name, ''), ar.name, '') LIKE ? OR a.album_artist_name LIKE ?)"
         like = f"%{search_query}%"
         params += [like, like, like]
 
@@ -271,12 +271,12 @@ def get_album_rows(
 
     order = "DESC" if str(sort_order).lower() == "desc" else "ASC"
     order_map = {
-        0: f"a.name COLLATE NOCASE {order}, ar.name COLLATE NOCASE {order}",
-        1: f"ar.name COLLATE NOCASE {order}, a.name COLLATE NOCASE {order}",
+        0: f"a.name COLLATE NOCASE {order}, COALESCE(NULLIF(a.album_artist_name, ''), ar.name, '') COLLATE NOCASE {order}",
+        1: f"COALESCE(NULLIF(a.album_artist_name, ''), ar.name, '') COLLATE NOCASE {order}, a.name COLLATE NOCASE {order}",
         2: f"track_count {order}, a.name COLLATE NOCASE {order}",
     }
     q += f"""
-    GROUP BY a.id, a.name, ar.name
+    GROUP BY a.id, a.name, a.album_artist_name, ar.name
     ORDER BY {order_map.get(int(sort_column), order_map[0])}
     """
     if limit:
@@ -305,7 +305,7 @@ def get_album_by_id(db: sqlite3.Connection, album_id: int) -> dict:
     SELECT
         a.id                  AS album_id,
         a.name                AS album_name,
-        COALESCE(ar.name, '') AS artist_name,
+        COALESCE(NULLIF(a.album_artist_name, ''), ar.name, '') AS artist_name,
         COALESCE(a.album_artist_name, '') AS album_artist_name,
         a.artist_id           AS artist_id
     FROM albums a
