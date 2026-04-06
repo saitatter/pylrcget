@@ -3,9 +3,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Iterable
 
-from PySide6.QtCore import Qt, Signal, QItemSelectionModel, QModelIndex
+from PySide6.QtCore import Qt, Signal, QModelIndex, QItemSelectionModel
 from PySide6.QtGui import QStandardItem, QStandardItemModel
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QTableView, QMenu
+
+from ui.style_loader import load_stylesheet
+from ui.widgets.sortable_header_view import SortableHeaderView
 
 
 @dataclass(frozen=True)
@@ -29,6 +32,13 @@ class ArtistListWidget(QWidget):
         self.model = QStandardItemModel(0, 3, self)
         self.model.setHorizontalHeaderLabels(["Artist", "Albums", "Tracks"])
         self.table.setModel(self.model)
+        self.header = SortableHeaderView(
+            Qt.Orientation.Horizontal,
+            self.table,
+            default_sort_column=0,
+            default_sort_order=Qt.SortOrder.AscendingOrder,
+        )
+        self.table.setHorizontalHeader(self.header)
 
         self.table.setSelectionBehavior(QTableView.SelectionBehavior.SelectRows)
         self.table.setSelectionMode(QTableView.SelectionMode.SingleSelection)
@@ -36,12 +46,12 @@ class ArtistListWidget(QWidget):
         self.table.setShowGrid(False)
         self.table.setAlternatingRowColors(True)
         self.table.setObjectName("ArtistTable")
-        self.table.verticalHeader().setDefaultSectionSize(24)
+        self.table.verticalHeader().setDefaultSectionSize(30)
 
         self.table.setColumnWidth(0, 520)
         self.table.setColumnWidth(1, 90)
         self.table.setColumnWidth(2, 90)
-        self.table.horizontalHeader().setStretchLastSection(True)
+        self.header.setStretchLastSection(True)
 
         self._apply_styles()
 
@@ -129,13 +139,24 @@ class ArtistListWidget(QWidget):
         if not idx.isValid():
             return
 
+        sm = self.table.selectionModel()
+        if sm is not None and not sm.isRowSelected(idx.row(), idx.parent()):
+            sm.setCurrentIndex(idx, QItemSelectionModel.ClearAndSelect | QItemSelectionModel.Rows)
+
         artist_id = self.model.index(idx.row(), 0).data(Qt.ItemDataRole.UserRole)
         if artist_id is None:
             return
         artist_id = int(artist_id)
+        artist_name = self.model.index(idx.row(), 0).data(Qt.ItemDataRole.DisplayRole) or "Artist"
 
         menu = QMenu(self)
-        act_open = menu.addAction("Open artist")
+        info = menu.addAction(str(artist_name))
+        info.setEnabled(False)
+
+        menu.addSeparator()
+        browse = menu.addAction("Browse")
+        browse.setEnabled(False)
+        act_open = menu.addAction("Open artist in tracks")
 
         chosen = menu.exec(self.table.viewport().mapToGlobal(pos))
         if chosen == act_open:
@@ -153,29 +174,4 @@ class ArtistListWidget(QWidget):
         return it
 
     def _apply_styles(self):
-        self.setStyleSheet("""
-        QTableView#ArtistTable {
-            background-color: #020617;
-            alternate-background-color: #030712;
-            border: none;
-            color: #e5e7eb;
-            gridline-color: #020617;
-            selection-background-color: rgba(56, 189, 248, 0.2);
-            selection-color: #e5e7eb;
-        }
-
-        QHeaderView::section {
-            background-color: #020617;
-            color: #9ca3af;
-            padding: 4px 6px;
-            border: none;
-            border-bottom: 1px solid #111827;
-            font-size: 11px;
-            text-transform: uppercase;
-            letter-spacing: 0.08em;
-        }
-
-        QTableView::item {
-            padding: 4px 6px;
-        }
-        """)
+        self.setStyleSheet(load_stylesheet("data_table.qss", table_name="ArtistTable"))

@@ -1,0 +1,107 @@
+QWidget#TopBar {
+    background: transparent;
+}
+
+QWidget#TopBarGroup {
+    background: {{color-bg-panel}};
+    border: 1px solid {{color-border-strong}};
+    border-radius: {{radius-lg}};
+}
+
+QWidget#TopBarGroup:hover {
+    border-color: {{color-border}};
+}
+
+QWidget#TopBarGroup {
+    min-height: 72px;
+}
+
+QLabel#TopBarLabel {
+    color: {{color-text-muted}};
+    font-size: {{font-size-xs}};
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+}
+
+QLineEdit#TopBarSearch {
+    background: {{color-bg-app}};
+    border-color: {{color-border}};
+}
+
+QLineEdit#TopBarSearch:focus {
+    border-color: {{color-accent}};
+}
+
+QToolButton#TopBarAction {
+    min-width: 36px;
+    min-height: 36px;
+}
+
+QToolButton#TopBarAction[actionState="loading"] {
+    background: {{color-bg-pressed}};
+    border-color: {{color-accent}};
+    color: {{color-accent}};
+}
+
+QToolButton#TopBarAction[actionState="success"] {
+    background: #052e1a;
+    border-color: #16a34a;
+    color: #86efac;
+}
+
+QToolButton#TopBarAction[actionState="error"] {
+    background: #2a0a0a;
+    border-color: #ef4444;
+    color: #fca5a5;
+}
+
+QWidget#ScanRow {
+    background: {{color-bg-app}};
+    border-top: 1px solid {{color-border-strong}};
+}
+
+QLabel#ScanLabel {
+    color: {{color-text-soft}};
+    font-size: {{font-size-sm}};
+}
+
+QLabel#ScanDetails {
+    color: {{color-text-muted}};
+    font-size: {{font-size-sm}};
+}
+
+QProgressBar#ScanProgress {
+    background: {{color-bg-control}};
+    border: 1px solid {{color-border}};
+    border-radius: {{radius-pill}};
+    height: 10px;
+}
+
+QPushButton#ScanCancelButton {
+    min-width: 96px;
+}
+
+QProgressBar#ScanProgress::chunk {
+    border-radius: 999px;
+    background: qlineargradient(
+        x1: 0, y1: 0, x2: 1, y2: 0,
+        stop: 0 #38bdf8, stop: 1 #22c55e
+    );
+}
+
+QToolButton {
+    border: 1px solid transparent;
+    background: transparent;
+    padding: 8px;
+    border-radius: 10px;
+}
+
+QToolButton:hover {
+    background: {{color-bg-control}};
+    border-color: {{color-border}};
+}
+
+QToolButton:pressed {
+    background: {{color-bg-pressed}};
+}

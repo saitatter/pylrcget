@@ -3,12 +3,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import List, Optional
 
-from PySide6.QtCore import Qt, QThread, Signal
+from PySide6.QtCore import Qt, QThread, Signal, QTimer
 from PySide6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QTableWidget, QTableWidgetItem, QWidget, QStackedWidget
 )
 import re
+
+from ui.spacing import SPACE_2, SPACE_3, SPACE_4, set_layout_spacing
 
 @dataclass(frozen=True)
 class LintProblem:
@@ -43,7 +45,7 @@ class PublishWorker(QThread):
             self.progress.emit(PublishProgress("Done", "Done", "Done"))
             self.msleep(300)
 
-            self.finished.emit(True, "Published successfully (stub).")
+            self.finished.emit(True, "Lyrics were published successfully (stub).")
         except Exception as e:
             self.finished.emit(False, f"Publish failed: {e}")
 
@@ -69,16 +71,17 @@ class PublishLyricsDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle("Publish Lyrics")
         self.setModal(True)
+        self.setObjectName("PublishLyricsDialog")
 
         self._is_publishing = False
+        self.publish_result: bool | None = None
         self._lint = lint_result or []
         self._is_synced = is_synced
 
         self.resize(650, 420)
 
         root = QVBoxLayout(self)
-        root.setContentsMargins(14, 14, 14, 14)
-        root.setSpacing(10)
+        set_layout_spacing(root, margins=SPACE_4, spacing=SPACE_3)
 
         self.stack = QStackedWidget()
         root.addWidget(self.stack, 1)
@@ -86,9 +89,9 @@ class PublishLyricsDialog(QDialog):
         # --- page 0: lint table
         lint_page = QWidget()
         lint_layout = QVBoxLayout(lint_page)
-        lint_layout.setSpacing(8)
+        set_layout_spacing(lint_layout, spacing=SPACE_2)
 
-        self.lint_header = QLabel("Please fix the following problem(s) before publishing")
+        self.lint_header = QLabel("Fix the following issues before publishing")
         lint_layout.addWidget(self.lint_header)
 
         self.lint_table = QTableWidget(0, 3)
@@ -104,7 +107,7 @@ class PublishLyricsDialog(QDialog):
         # --- page 1: confirm/progress
         pub_page = QWidget()
         pub_layout = QVBoxLayout(pub_page)
-        pub_layout.setSpacing(12)
+        set_layout_spacing(pub_layout, spacing=SPACE_3)
         pub_layout.setAlignment(Qt.AlignTop)
 
         self.info_label = QLabel()
@@ -129,6 +132,7 @@ class PublishLyricsDialog(QDialog):
 
         # --- footer buttons
         footer = QHBoxLayout()
+        set_layout_spacing(footer, spacing=SPACE_2)
         footer.addStretch(1)
 
         self.btn_primary = QPushButton()
@@ -152,8 +156,7 @@ class PublishLyricsDialog(QDialog):
             self.stack.setCurrentIndex(1)
             kind = "synchronized" if is_synced else "unsynchronized"
             self.info_label.setText(
-                f"Do you want to publish your {kind} lyrics of the song "
-                f"<b>{title} - {artist_name}</b> to your current LRCLIB instance?"
+                f"Publish the {kind} lyrics for <b>{title} - {artist_name}</b> to the current LRCLIB instance?"
             )
             self.btn_primary.setText("Publish Now")
             self.btn_secondary.show()
@@ -193,13 +196,15 @@ class PublishLyricsDialog(QDialog):
 
     def _start_publish(self):
         self._is_publishing = True
+        self.publish_result = None
         self.btn_primary.setEnabled(False)
         self.btn_secondary.setEnabled(False)
+        self._set_primary_feedback("loading", "Publishing...")
 
         # update text like Vue "Publishing..."
         kind = "synchronized" if self._is_synced else "unsynchronized"
         self.info_label.setText(
-            f"Publishing your {kind} lyrics of the song "
+            f"Publishing the {kind} lyrics for "
             f"<b>{self._payload['title']} - {self._payload['artistName']}</b>..."
         )
         self._set_progress(PublishProgress())
@@ -230,5 +235,23 @@ class PublishLyricsDialog(QDialog):
 
     def _publish_done(self, ok: bool, msg: str):
         self._is_publishing = False
-        # close dialog like Vue finally { close() }
-        self.accept() if ok else self.reject()
+        if ok:
+            self.publish_result = True
+            self._set_primary_feedback("success", "Published")
+            self.info_label.setText(f"<b>{msg}</b>")
+            QTimer.singleShot(1000, self.accept)
+            return
+
+        self.publish_result = False
+        self._set_primary_feedback("error", "Retry Publish")
+        self.info_label.setText(f"<b>Publishing failed.</b><br>{msg}")
+        self.btn_primary.setEnabled(True)
+        self.btn_secondary.setEnabled(True)
+
+    def _set_primary_feedback(self, state: str, text: str):
+        self.btn_primary.setText(text)
+        self.btn_primary.setProperty("actionState", state if state != "idle" else "")
+        self.btn_primary.style().unpolish(self.btn_primary)
+        self.btn_primary.style().polish(self.btn_primary)
+        self.btn_primary.update()
+        self.btn_primary.setEnabled(state != "loading")

@@ -1,0 +1,22 @@
+QFrame#Toast {
+    background: {{bg}};
+    border: 1px solid {{border}};
+    border-radius: 14px;
+}
+
+QLabel {
+    color: {{text}};
+    font-size: 12px;
+}
+
+QToolButton {
+    border: none;
+    background: transparent;
+    color: {{text}};
+    padding: 4px 8px;
+}
+
+QToolButton:hover {
+    background: rgba(255, 255, 255, 0.06);
+    border-radius: 8px;
+}

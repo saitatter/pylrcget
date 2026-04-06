@@ -4,16 +4,17 @@ from dataclasses import dataclass
 from typing import Optional
 
 from PySide6.QtCore import Qt, QTimer, QEasingCurve, QPoint, QPropertyAnimation
-from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QWidget,
     QFrame,
     QLabel,
     QHBoxLayout,
-    QVBoxLayout,
     QToolButton,
     QGraphicsOpacityEffect,
 )
+
+from ui.spacing import SPACE_2, SPACE_3, set_layout_spacing
+from ui.style_loader import load_stylesheet
 
 
 @dataclass(frozen=True)
@@ -44,33 +45,12 @@ class ToastWidget(QFrame):
         bg, border, text = _colors(data.notify_type)
 
         self.setObjectName("Toast")
-        self.setStyleSheet(f"""
-        QFrame#Toast {{
-            background: {bg};
-            border: 1px solid {border};
-            border-radius: 14px;
-        }}
-        QLabel {{
-            color: {text};
-            font-size: 12px;
-        }}
-        QToolButton {{
-            border: none;
-            background: transparent;
-            color: {text};
-            padding: 2px 6px;
-        }}
-        QToolButton:hover {{
-            background: rgba(255,255,255,0.06);
-            border-radius: 8px;
-        }}
-        """)
+        self.setStyleSheet(load_stylesheet("toast.qss", bg=bg, border=border, text=text))
 
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
 
         root = QHBoxLayout(self)
-        root.setContentsMargins(12, 10, 10, 10)
-        root.setSpacing(10)
+        set_layout_spacing(root, margins=(SPACE_3, SPACE_2, SPACE_3, SPACE_2), spacing=SPACE_2)
 
         self.lbl = QLabel(data.message)
         self.lbl.setWordWrap(True)
@@ -92,7 +72,8 @@ class ToastWidget(QFrame):
         self._anim_pos: Optional[QPropertyAnimation] = None
 
     def close_requested(self):
-        self.closeRequested.emit(self)
+        # Let the manager handle the removal animation.
+        self.parent()._dismiss_toast(self)  # type: ignore[attr-defined]
 
     def play_in(self, start_pos: QPoint, end_pos: QPoint):
         self.move(start_pos)

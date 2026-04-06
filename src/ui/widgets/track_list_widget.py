@@ -1,13 +1,50 @@
 # ui/track_list_widget.py
 from __future__ import annotations
 
-from PySide6.QtCore import Signal, Qt, QItemSelectionModel
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QTableView, QMenu
+from dataclasses import replace
 
+from PySide6.QtCore import Signal, Qt, QItemSelectionModel, QSortFilterProxyModel
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QTableView, QMenu, QStackedWidget
+
+from db.database import get_directories, get_track_rows
+from ui.widgets.empty_state_widget import EmptyStateWidget
 from ui.models.track_table_model import TrackTableModel
 from ui.delegates.actions_delegate import ActionsDelegate
+from ui.style_loader import load_stylesheet
+from ui.widgets.sortable_header_view import SortableHeaderView
 from core.tracklist_models import TrackListRow
-from db.database import get_track_rows
+
+
+class TrackSortProxyModel(QSortFilterProxyModel):
+    _LYRICS_ORDER = {
+        "synced": 0,
+        "plain": 1,
+        "instrumental": 2,
+        "none": 3,
+    }
+
+    def lessThan(self, left, right) -> bool:
+        left_row = self.sourceModel().data(left, Qt.ItemDataRole.UserRole)
+        right_row = self.sourceModel().data(right, Qt.ItemDataRole.UserRole)
+
+        if left_row is None or right_row is None:
+            return super().lessThan(left, right)
+
+        column = left.column()
+        if column == 0:
+            left_key = ((left_row.artist or "").casefold(), left_row.title.casefold(), left_row.track_id)
+            right_key = ((right_row.artist or "").casefold(), right_row.title.casefold(), right_row.track_id)
+            return left_key < right_key
+        if column == 1:
+            left_key = (left_row.duration_s is None, left_row.duration_s or 0, left_row.track_id)
+            right_key = (right_row.duration_s is None, right_row.duration_s or 0, right_row.track_id)
+            return left_key < right_key
+        if column == 2:
+            left_key = (self._LYRICS_ORDER.get(left_row.lyrics_state, 99), left_row.title.casefold(), left_row.track_id)
+            right_key = (self._LYRICS_ORDER.get(right_row.lyrics_state, 99), right_row.title.casefold(), right_row.track_id)
+            return left_key < right_key
+
+        return super().lessThan(left, right)
 
 
 class TrackListWidget(QWidget):
@@ -15,6 +52,8 @@ class TrackListWidget(QWidget):
     downloadLyrics = Signal(int)  # track_id
     markInstrumental = Signal(list)        # list[int]
     unmarkInstrumental = Signal(list)      # list[int]
+    clearFiltersRequested = Signal()
+    configureFoldersRequested = Signal()
 
     def __init__(self, app_state):
         super().__init__()
@@ -29,25 +68,40 @@ class TrackListWidget(QWidget):
         )
         self._artist_id: int | None = None
         self._album_id: int | None = None
+        self._download_states: dict[int, str] = {}
 
+        self.stack = QStackedWidget()
         self.table = QTableView()
         self.model = TrackTableModel([])
-        self.table.setModel(self.model)
+        self.proxy_model = TrackSortProxyModel(self)
+        self.proxy_model.setSourceModel(self.model)
+        self.proxy_model.setDynamicSortFilter(True)
+        self.table.setModel(self.proxy_model)
+        self.header = SortableHeaderView(
+            Qt.Orientation.Horizontal,
+            self.table,
+            default_sort_column=0,
+            default_sort_order=Qt.SortOrder.AscendingOrder,
+            non_sortable_columns={3},
+        )
+        self.table.setHorizontalHeader(self.header)
 
         self.table.setSelectionBehavior(QTableView.SelectionBehavior.SelectRows)
         self.table.setSelectionMode(QTableView.SelectionMode.ExtendedSelection)
         self.table.verticalHeader().setVisible(False)
         self.table.setShowGrid(False)
         self.table.setAlternatingRowColors(True)
+        self.table.setSortingEnabled(True)
+        self.table.sortByColumn(0, Qt.SortOrder.AscendingOrder)
 
         self.table.setColumnWidth(0, 520)
         self.table.setColumnWidth(1, 90)
         self.table.setColumnWidth(2, 110)
         self.table.setColumnWidth(3, 140)
-        self.table.horizontalHeader().setStretchLastSection(True)
+        self.header.setStretchLastSection(True)
         self.table.setObjectName("TrackTable")
 
-        self.table.verticalHeader().setDefaultSectionSize(24)
+        self.table.verticalHeader().setDefaultSectionSize(30)
 
         self._apply_styles()
 
@@ -63,9 +117,17 @@ class TrackListWidget(QWidget):
         self.table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.table.customContextMenuRequested.connect(self._on_context_menu)
 
+        self.empty_state = EmptyStateWidget()
+        self.empty_state.actionTriggered.connect(self._on_empty_state_action)
+
+        self.stack.addWidget(self.table)
+        self.stack.addWidget(self.empty_state)
+
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.addWidget(self.table)
+        layout.addWidget(self.stack)
+
+        self._empty_action = ""
 
     # -------------------------
     # External API
@@ -91,6 +153,18 @@ class TrackListWidget(QWidget):
 
     def refresh(self):
         db = self.app_state.db
+        directories = get_directories(db)
+        if not directories:
+            self.model.set_rows([])
+            self._show_empty_state(
+                icon_name="folder-open.svg",
+                title="No music folders yet",
+                body="Add one or more folders to build your library and start browsing tracks.",
+                action_text="Open Music Folders",
+                action_key="configure-folders",
+            )
+            return
+
         rows = get_track_rows(
             db=db,
             search_query=self._search,
@@ -127,10 +201,21 @@ class TrackListWidget(QWidget):
                     artist=r["artist_name"],
                     duration_s=dur_s,
                     lyrics_state=state,
+                    download_state=self._download_states.get(int(r["id"]), "idle"),
                 )
             )
 
         self.model.set_rows(ui_rows)
+        if ui_rows:
+            self.stack.setCurrentWidget(self.table)
+        else:
+            self._show_empty_state(
+                icon_name="search-x.svg",
+                title="No tracks match the current filters",
+                body="Try clearing the search or relaxing the lyric filters to show more tracks.",
+                action_text="Clear Filters",
+                action_key="clear-filters",
+            )
 
     def current_track_id(self) -> int | None:
         sm = self.table.selectionModel()
@@ -139,7 +224,7 @@ class TrackListWidget(QWidget):
         idxs = sm.selectedRows()
         if not idxs:
             return None
-        row = idxs[0].row()
+        row = self._source_row(idxs[0])
         try:
             return int(self.model.track_id_at(row))
         except Exception:
@@ -151,7 +236,7 @@ class TrackListWidget(QWidget):
     def _on_double_click(self, index):
         if not index.isValid():
             return
-        row = index.row()
+        row = self._source_row(index)
         track_id = self.model.track_id_at(row)
         if track_id is not None:
             self.playTrack.emit(int(track_id))
@@ -171,22 +256,31 @@ class TrackListWidget(QWidget):
             return
 
         menu = QMenu(self)
-        act_play = menu.addAction("Play")
-        act_dl = menu.addAction("Download lyrics")
+        current_track_id = self.model.track_id_at(self._source_row(idx))
+
+        info = menu.addAction(f"{len(selected_ids)} track selected" if len(selected_ids) == 1 else f"{len(selected_ids)} tracks selected")
+        info.setEnabled(False)
 
         menu.addSeparator()
-        act_instr = menu.addAction(f"Mark as instrumental ({len(selected_ids)})")
-        act_uninstr = menu.addAction(f"Unmark instrumental ({len(selected_ids)})")
+        quick = menu.addAction("Quick Actions")
+        quick.setEnabled(False)
+        act_play = menu.addAction("Play now")
+        act_dl = menu.addAction("Download lyrics for this track")
+
+        menu.addSeparator()
+        bulk = menu.addAction("Selection Actions")
+        bulk.setEnabled(False)
+        count_suffix = f"({len(selected_ids)})"
+        act_instr = menu.addAction(f"Mark selection as instrumental {count_suffix}")
+        act_uninstr = menu.addAction(f"Unmark instrumental on selection {count_suffix}")
 
         chosen = menu.exec(self.table.viewport().mapToGlobal(pos))
         if chosen == act_play:
-            track_id = self.model.track_id_at(idx.row())
-            if track_id is not None:
-                self.playTrack.emit(int(track_id))
+            if current_track_id is not None:
+                self.playTrack.emit(int(current_track_id))
         elif chosen == act_dl:
-            track_id = self.model.track_id_at(idx.row())
-            if track_id is not None:
-                self.downloadLyrics.emit(int(track_id))
+            if current_track_id is not None:
+                self.downloadLyrics.emit(int(current_track_id))
         elif chosen == act_instr:
             self.markInstrumental.emit(selected_ids)
         elif chosen == act_uninstr:
@@ -201,7 +295,9 @@ class TrackListWidget(QWidget):
         if row < 0:
             return  # track not in current filtered view
 
-        idx = self.model.index(row, 0)
+        idx = self.proxy_model.mapFromSource(self.model.index(row, 0))
+        if not idx.isValid():
+            return
         sm = self.table.selectionModel()
         if sm is None:
             return
@@ -216,7 +312,7 @@ class TrackListWidget(QWidget):
         idx = self.table.currentIndex()
         if not idx.isValid():
             return None
-        return self.model.track_id_at(idx.row())
+        return self.model.track_id_at(self._source_row(idx))
 
     def setArtistFilter(self, artist_id: int | None):
         self._artist_id = artist_id
@@ -234,14 +330,11 @@ class TrackListWidget(QWidget):
             return []
         ids: list[int] = []
         for idx in sm.selectedRows():
-            tid = self.model.track_id_at(idx.row())
+            tid = self.model.track_id_at(self._source_row(idx))
             if tid is not None:
                 ids.append(int(tid))
         # keep stable order (row order)
         return ids
-
-    def _selected_track_ids_set(self) -> set[int]:
-        return set(self.selected_track_ids())
 
     def restore_selection(self, track_ids: set[int]):
         if not track_ids:
@@ -258,7 +351,9 @@ class TrackListWidget(QWidget):
             if tid is None:
                 continue
             if int(tid) in track_ids:
-                idx = self.model.index(row, 0)
+                idx = self.proxy_model.mapFromSource(self.model.index(row, 0))
+                if not idx.isValid():
+                    continue
                 sm.select(idx, QItemSelectionModel.Select | QItemSelectionModel.Rows)
                 if first_idx is None:
                     first_idx = idx
@@ -268,29 +363,33 @@ class TrackListWidget(QWidget):
             self.table.scrollTo(first_idx, QTableView.ScrollHint.PositionAtCenter)
 
     def _apply_styles(self):
-        self.setStyleSheet("""
-        QTableView#TrackTable {
-            background-color: #020617;
-            alternate-background-color: #030712;
-            border: none;
-            color: #e5e7eb;
-            gridline-color: #020617;
-            selection-background-color: rgba(56, 189, 248, 0.2);
-            selection-color: #e5e7eb;
-        }
+        self.setStyleSheet(load_stylesheet("data_table.qss", table_name="TrackTable"))
 
-        QHeaderView::section {
-            background-color: #020617;
-            color: #9ca3af;
-            padding: 4px 6px;
-            border: none;
-            border-bottom: 1px solid #111827;
-            font-size: 11px;
-            text-transform: uppercase;
-            letter-spacing: 0.08em;
-        }
+    def _source_row(self, index) -> int:
+        return self.proxy_model.mapToSource(index).row()
 
-        QTableView::item {
-            padding: 4px 6px;
-        }
-        """)
+    def _show_empty_state(self, *, icon_name: str, title: str, body: str, action_text: str, action_key: str) -> None:
+        self._empty_action = action_key
+        self.empty_state.configure(
+            icon_name=icon_name,
+            title=title,
+            body=body,
+            action_text=action_text,
+        )
+        self.stack.setCurrentWidget(self.empty_state)
+
+    def _on_empty_state_action(self) -> None:
+        if self._empty_action == "clear-filters":
+            self.clearFiltersRequested.emit()
+        elif self._empty_action == "configure-folders":
+            self.configureFoldersRequested.emit()
+
+    def set_download_state(self, track_id: int, state: str) -> None:
+        self._download_states[int(track_id)] = state
+        row = self.model.row_for_track_id(int(track_id))
+        if row < 0:
+            return
+        current = self.model._rows[row]
+        self.model._rows[row] = replace(current, download_state=state)
+        idx = self.model.index(row, 3)
+        self.model.dataChanged.emit(idx, idx, [Qt.DisplayRole, Qt.UserRole])

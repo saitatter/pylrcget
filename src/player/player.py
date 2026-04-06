@@ -22,6 +22,7 @@ class NowPlaying:
     title: str
     artist: str | None
     path: str
+    album: str | None = None
 
 class Player(QObject):
     # Optional signals if you want to update UI without polling

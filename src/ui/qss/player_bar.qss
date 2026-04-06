@@ -1,0 +1,142 @@
+QWidget#PlayerBar {
+    background-color: {{color-bg-app}};
+    border-top: 1px solid {{color-border-strong}};
+}
+
+QWidget#PlayerBar[compact="true"] QWidget#PlayerExtras {
+    min-width: 84px;
+}
+
+QWidget#PlayerBar[compact="true"] QLabel#NowPlaying {
+    font-size: 13px;
+}
+
+QWidget#PlayerBar[compact="true"] QLabel#NowPlayingArtist {
+    font-size: 10px;
+}
+
+QWidget#PlayerMeta,
+QWidget#PlayerCenter,
+QWidget#PlayerExtras {
+    background: {{color-bg-panel}};
+    border: 1px solid {{color-border-strong}};
+    border-radius: {{radius-lg}};
+}
+
+QToolButton {
+    border: 1px solid transparent;
+    background: transparent;
+    padding: {{space-2}};
+    border-radius: {{radius-md}};
+    color: {{color-text}};
+}
+
+QToolButton:hover {
+    background: {{color-bg-control}};
+    border-color: {{color-border}};
+    color: {{color-accent}};
+}
+
+QToolButton:pressed {
+    background: {{color-bg-pressed}};
+}
+
+QToolButton#BtnPlay {
+    background: {{color-bg-elevated}};
+    border: 1px solid {{color-border}};
+    border-radius: {{radius-pill}};
+    padding: 10px;
+    color: {{color-text}};
+}
+
+QToolButton#BtnPlay:hover {
+    border-color: {{color-accent}};
+    background: #08101f;
+    color: {{color-accent}};
+}
+
+QToolButton#BtnPlay:pressed {
+    background: #0f172a;
+}
+
+QLabel {
+    color: {{color-text-soft}};
+    font-size: {{font-size-sm}};
+}
+
+QLabel#NowPlaying {
+    color: {{color-text-strong}};
+    font-size: {{font-size-lg}};
+    font-weight: 600;
+}
+
+QLabel#NowPlayingArtist {
+    color: {{color-text}};
+    font-size: {{font-size-sm}};
+}
+
+QLabel#NowPlayingAlbum {
+    color: #64748b;
+    font-size: {{font-size-sm}};
+}
+
+QLabel#MetaLabel,
+QLabel#TimeLabel {
+    color: {{color-text}};
+    font-size: {{font-size-sm}};
+    font-weight: 500;
+}
+
+QLabel#NowPlayingCover {
+    background: {{color-bg-pressed}};
+    border: 1px solid #1e293b;
+    border-radius: 12px;
+}
+
+QSlider#PlayerSlider::groove:horizontal {
+    height: 8px;
+    background: {{color-bg-pressed}};
+    border-radius: 4px;
+}
+
+QSlider#PlayerSlider::handle:horizontal {
+    width: 16px;
+    height: 16px;
+    margin: -5px 0;
+    border-radius: 8px;
+    background: {{color-accent}};
+    border: 2px solid #e0f2fe;
+}
+
+QSlider#PlayerSlider::handle:horizontal:hover {
+    background: #7dd3fc;
+}
+
+QSlider#PlayerSlider::sub-page:horizontal {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #38bdf8, stop:1 #0ea5e9);
+    border-radius: 4px;
+}
+
+QSlider#PlayerSlider::add-page:horizontal {
+    background: #0f172a;
+    border-radius: 4px;
+}
+
+QComboBox#SpeedCombo {
+    background: {{color-bg-control}};
+    border: 1px solid {{color-border}};
+    border-radius: {{radius-md}};
+    padding: 8px 10px;
+    color: {{color-text}};
+    min-width: 84px;
+    font-size: {{font-size-sm}};
+}
+
+QComboBox#SpeedCombo:hover {
+    border-color: {{color-accent}};
+}
+
+QComboBox#SpeedCombo::drop-down {
+    border: none;
+    width: 18px;
+}

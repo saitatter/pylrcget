@@ -9,6 +9,8 @@ class ActionsDelegate(QStyledItemDelegate):
 
     def paint(self, painter: QPainter, option, index):
         super().paint(painter, option, index)
+        row_obj = index.data(Qt.UserRole)
+        state = getattr(row_obj, "download_state", "idle") if row_obj else "idle"
 
         rect = option.rect
         btn_w, btn_h = 90, 26
@@ -16,8 +18,12 @@ class ActionsDelegate(QStyledItemDelegate):
 
         opt = QStyleOptionButton()
         opt.rect = btn_rect
-        opt.text = "Download"
-        opt.state = QStyle.State_Enabled
+        opt.text = {
+            "loading": "Working...",
+            "success": "Done",
+            "error": "Retry",
+        }.get(state, "Download")
+        opt.state = QStyle.State_Enabled if state != "loading" else QStyle.State_None
         QApplication.style().drawControl(QStyle.CE_PushButton, opt, painter)
 
     def editorEvent(self, event, model, option, index):
@@ -26,6 +32,8 @@ class ActionsDelegate(QStyledItemDelegate):
         if event.type() == event.MouseButtonRelease and event.button() == Qt.LeftButton:
             row_obj = index.data(Qt.UserRole)
             if not row_obj:
+                return False
+            if getattr(row_obj, "download_state", "idle") == "loading":
                 return False
 
             rect = option.rect

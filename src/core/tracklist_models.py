@@ -9,3 +9,4 @@ class TrackListRow:
     artist: str | None
     duration_s: int | None
     lyrics_state: str  # synced/plain/instrumental/none
+    download_state: str = "idle"  # idle/loading/success/error
