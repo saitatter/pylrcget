@@ -41,7 +41,7 @@ class FirstRunDialog(QDialog):
         set_layout_spacing(buttons, spacing=SPACE_2)
         buttons.addStretch(1)
 
-        self.btn_later = QPushButton("Maybe Later")
+        self.btn_later = QPushButton("Set Up Later")
         self.btn_start = QPushButton("Choose Music Folders")
         self.btn_start.setDefault(True)
 

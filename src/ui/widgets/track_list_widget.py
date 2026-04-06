@@ -158,8 +158,8 @@ class TrackListWidget(QWidget):
             self.model.set_rows([])
             self._show_empty_state(
                 icon_name="folder-open.svg",
-                title="No music folders configured",
-                body="Add one or more folders to scan your library and start browsing tracks.",
+                title="No music folders yet",
+                body="Add one or more folders to build your library and start browsing tracks.",
                 action_text="Open Music Folders",
                 action_key="configure-folders",
             )
@@ -211,8 +211,8 @@ class TrackListWidget(QWidget):
         else:
             self._show_empty_state(
                 icon_name="search-x.svg",
-                title="No tracks match these filters",
-                body="Try clearing the search query or loosening the lyric filters to see more tracks.",
+                title="No tracks match the current filters",
+                body="Try clearing the search or relaxing the lyric filters to show more tracks.",
                 action_text="Clear Filters",
                 action_key="clear-filters",
             )

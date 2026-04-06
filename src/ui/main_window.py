@@ -28,7 +28,7 @@ from PySide6.QtWidgets import QStyle
 class MainWindow(QMainWindow):
     def __init__(self, app_state):
         super().__init__()
-        self.setWindowTitle("LrcGet Python")
+        self.setWindowTitle("LrcGet")
         self.resize(900, 600)
         self.app_state = app_state
 
@@ -202,7 +202,7 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(self.tracks_tab, "Tracks")
         self.tabs.addTab(self.albums_tab, "Albums")
         self.tabs.addTab(self.artists_tab, "Artists")
-        self.tabs.addTab(self.mylrclib_tab, "My Lrclib")
+        self.tabs.addTab(self.mylrclib_tab, "My LRCLIB")
         self.tabs.setAccessibleName("Library navigation tabs")
 
         self.layout.addWidget(self.tabs)
@@ -305,7 +305,7 @@ class MainWindow(QMainWindow):
             self._apply_track_filters()
 
     def open_about_modal(self):
-        self.app_state.notify("LrcGet Python — about modal TBD", "info")
+        self.app_state.notify("LrcGet helps you scan your library, edit lyrics, and publish them to LRCLIB.", "info")
 
     def _maybe_show_first_run_onboarding(self):
         if get_directories(self.app_state.db):
@@ -322,7 +322,7 @@ class MainWindow(QMainWindow):
     def refresh_library(self):
         directories = get_directories(self.app_state.db)
         if not directories:
-            self.app_state.notify("No music folders configured.", "warning")
+            self.app_state.notify("Add at least one music folder before starting a library scan.", "warning")
             self._set_tool_feedback(self.btn_refresh, "error")
             QTimer.singleShot(1800, self._reset_refresh_feedback)
             return
@@ -332,7 +332,7 @@ class MainWindow(QMainWindow):
         self.actions_label.setText("Scanning Library")
         self._set_tool_feedback(self.btn_refresh, "loading")
         self.scan_label.setText("Scanning…")
-        self.scan_details.setText(f"Scanning {len(directories)} folder(s)…")
+        self.scan_details.setText(f"Preparing a scan across {len(directories)} folder(s)…")
         self.btn_cancel_scan.setEnabled(True)
 
         self.scanner = LibraryScanner(self.app_state.db_path, directories)
@@ -390,7 +390,7 @@ class MainWindow(QMainWindow):
 
         if ok:
             self._apply_track_filters()
-            self.app_state.notify("Library scanning complete!", "success")
+            self.app_state.notify("Library scan finished successfully.", "success")
             self._set_tool_feedback(self.btn_refresh, "success")
         else:
             if "cancel" in (msg or "").lower():
@@ -542,7 +542,7 @@ class MainWindow(QMainWindow):
             pass
 
         if ok:
-            self.app_state.notify("Lyrics downloaded successfully!", "success")
+            self.app_state.notify("Lyrics downloaded successfully.", "success")
             self.track_list.set_download_state(int(track_id), "success")
         else:
             self.app_state.notify(f"Failed to download lyrics: {msg}", "error")
@@ -552,7 +552,7 @@ class MainWindow(QMainWindow):
 
     def _on_lyrics_save_requested(self, lrc: str, txt: str):
         if not self.app_state.player or not self.app_state.player.track:
-            self.app_state.notify("No track playing.", "warning")
+            self.app_state.notify("Start playback or select a track first.", "warning")
             self.lyrics_view.set_save_feedback("error", "No Track")
             return
 
@@ -597,7 +597,7 @@ class MainWindow(QMainWindow):
 
     def _open_publish_dialog(self, is_synced: bool):
         if not self.app_state.player or not self.app_state.player.track:
-            self.app_state.notify("No track playing.", "warning")
+            self.app_state.notify("Start playback or select a track first.", "warning")
             self.lyrics_view.set_publish_feedback(is_synced=is_synced, state="error", message="No Track")
             return
 
@@ -619,7 +619,7 @@ class MainWindow(QMainWindow):
         dlg.exec()
         if dlg.publish_result is True:
             self.lyrics_view.set_publish_feedback(is_synced=is_synced, state="success", message="Published")
-            self.app_state.notify("Lyrics published successfully!", "success")
+            self.app_state.notify("Lyrics published successfully.", "success")
         elif dlg.publish_result is False:
             self.lyrics_view.set_publish_feedback(is_synced=is_synced, state="error", message="Publish Failed")
         else:
@@ -658,7 +658,7 @@ class MainWindow(QMainWindow):
 
     def _download_current_track_lyrics(self):
         if not self.app_state.player or not self.app_state.player.track:
-            self.app_state.notify("No track selected.", "warning")
+            self.app_state.notify("Select a track before downloading lyrics.", "warning")
             return
         self.on_download_lyrics(int(self.app_state.player.track.track_id))
 
@@ -699,7 +699,7 @@ class MainWindow(QMainWindow):
     def _on_embed_requested(self):
         # embed doar pentru track-ul care cântă acum (simplu și clar)
         if not self.app_state.player or not self.app_state.player.track:
-            self.app_state.notify("No track playing.", "warning")
+            self.app_state.notify("Start playback or select a track first.", "warning")
             return
 
         track_id = self.app_state.player.track.track_id
@@ -712,7 +712,7 @@ class MainWindow(QMainWindow):
 
         try:
             embed_lyrics_for_track(track)
-            self.app_state.notify("Lyrics have been embedded into the audio file tags.", "success")
+            self.app_state.notify("Lyrics were embedded into the audio file tags.", "success")
         except Exception as e:
             self.app_state.notify(f"Failed to embed lyrics: {e}", "error")
 

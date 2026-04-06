@@ -45,7 +45,7 @@ class PublishWorker(QThread):
             self.progress.emit(PublishProgress("Done", "Done", "Done"))
             self.msleep(300)
 
-            self.finished.emit(True, "Published successfully (stub).")
+            self.finished.emit(True, "Lyrics were published successfully (stub).")
         except Exception as e:
             self.finished.emit(False, f"Publish failed: {e}")
 
@@ -91,7 +91,7 @@ class PublishLyricsDialog(QDialog):
         lint_layout = QVBoxLayout(lint_page)
         set_layout_spacing(lint_layout, spacing=SPACE_2)
 
-        self.lint_header = QLabel("Please fix the following problem(s) before publishing")
+        self.lint_header = QLabel("Fix the following issues before publishing")
         lint_layout.addWidget(self.lint_header)
 
         self.lint_table = QTableWidget(0, 3)
@@ -156,8 +156,7 @@ class PublishLyricsDialog(QDialog):
             self.stack.setCurrentIndex(1)
             kind = "synchronized" if is_synced else "unsynchronized"
             self.info_label.setText(
-                f"Do you want to publish your {kind} lyrics of the song "
-                f"<b>{title} - {artist_name}</b> to your current LRCLIB instance?"
+                f"Publish the {kind} lyrics for <b>{title} - {artist_name}</b> to the current LRCLIB instance?"
             )
             self.btn_primary.setText("Publish Now")
             self.btn_secondary.show()
@@ -205,7 +204,7 @@ class PublishLyricsDialog(QDialog):
         # update text like Vue "Publishing..."
         kind = "synchronized" if self._is_synced else "unsynchronized"
         self.info_label.setText(
-            f"Publishing your {kind} lyrics of the song "
+            f"Publishing the {kind} lyrics for "
             f"<b>{self._payload['title']} - {self._payload['artistName']}</b>..."
         )
         self._set_progress(PublishProgress())
@@ -245,7 +244,7 @@ class PublishLyricsDialog(QDialog):
 
         self.publish_result = False
         self._set_primary_feedback("error", "Retry Publish")
-        self.info_label.setText(f"<b>Publish failed.</b><br>{msg}")
+        self.info_label.setText(f"<b>Publishing failed.</b><br>{msg}")
         self.btn_primary.setEnabled(True)
         self.btn_secondary.setEnabled(True)
 

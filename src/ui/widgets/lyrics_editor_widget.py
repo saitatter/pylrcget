@@ -207,7 +207,7 @@ class LyricsEditorWidget(QWidget):
 
         # Plain editor (editable if you want)
         self.plain = QTextEdit()
-        self.plain.setPlaceholderText("No lyrics")
+        self.plain.setPlaceholderText("Lyrics will appear here")
         self.plain.textChanged.connect(self._on_any_edit)
         self.stack.addWidget(self.plain)
 
@@ -234,7 +234,7 @@ class LyricsEditorWidget(QWidget):
         }
 
         self.setStyleSheet(load_stylesheet("lyrics_editor.qss"))
-        self.show_none("No track selected")
+        self.show_none("Choose a track to review or edit its lyrics.")
 
     # --- public API ---
     def on_player_position(self, ms: int):
@@ -263,7 +263,7 @@ class LyricsEditorWidget(QWidget):
         self._reset_state()
         self.empty_state.configure(
             icon_name="audio-waveform.svg",
-            title="Nothing selected",
+            title="No track selected",
             body=message,
             action_text=None,
         )
@@ -315,8 +315,8 @@ class LyricsEditorWidget(QWidget):
             self._reset_state()
             self.empty_state.configure(
                 icon_name="audio-waveform.svg",
-                title="No lyrics yet",
-                body="Download lyrics from LRCLIB to start editing or keep this track lyric-free.",
+                title="No lyrics available yet",
+                body="Download lyrics from LRCLIB to start editing, or leave this track lyric-free.",
                 action_text="Download Lyrics",
             )
             self.stack.setCurrentWidget(self.empty_state)
