@@ -48,7 +48,7 @@ class AlbumListWidget(QWidget):
         self.table.setShowGrid(False)
         self.table.setAlternatingRowColors(True)
         self.table.setObjectName("AlbumTable")
-        self.table.verticalHeader().setDefaultSectionSize(24)
+        self.table.verticalHeader().setDefaultSectionSize(30)
 
         # Column sizing similar to your TrackListWidget
         self.table.setColumnWidth(0, 520)

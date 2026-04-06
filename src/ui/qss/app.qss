@@ -32,6 +32,16 @@ QLineEdit:hover, QTextEdit:hover, QPlainTextEdit:hover, QComboBox:hover {
     border-color: #334155;
 }
 
+QLineEdit:focus, QTextEdit:focus, QPlainTextEdit:focus, QComboBox:focus,
+QPushButton:focus, QToolButton:focus {
+    outline: none;
+    border-color: {{color-accent}};
+}
+
+QPushButton:focus, QToolButton:focus {
+    background: {{color-bg-elevated}};
+}
+
 QPushButton {
     background-color: {{color-bg-control}};
     color: {{color-text}};
@@ -96,6 +106,11 @@ QCheckBox::indicator:hover {
     border-color: {{color-accent}};
 }
 
+QCheckBox::indicator:focus {
+    border-color: {{color-accent}};
+    background: {{color-bg-elevated}};
+}
+
 QComboBox {
     padding-right: 32px;
 }
@@ -154,6 +169,11 @@ QTabWidget#MainTabs QTabBar::tab:selected {
     background: {{color-bg-elevated}};
     color: {{color-text-strong}};
     border-color: {{color-accent}};
+}
+
+QTabWidget#MainTabs QTabBar::tab:focus {
+    border-color: {{color-accent}};
+    color: {{color-text-strong}};
 }
 
 QTabWidget#MainTabs QTabBar::tab:!selected {

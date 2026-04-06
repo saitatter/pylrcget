@@ -259,14 +259,17 @@ class PlayerBar(QWidget):
         self.btn_prev = QToolButton()
         self.btn_prev.setObjectName("BtnPrev")
         self.btn_prev.setToolTip("Previous")
+        self.btn_prev.setAccessibleName("Previous track")
 
         self.btn_play = QToolButton()
         self.btn_play.setObjectName("BtnPlay")
         self.btn_play.setToolTip("Play/Pause")
+        self.btn_play.setAccessibleName("Play or pause")
 
         self.btn_next = QToolButton()
         self.btn_next.setObjectName("BtnNext")
         self.btn_next.setToolTip("Next")
+        self.btn_next.setAccessibleName("Next track")
 
         self._icons = {
             "prev": _svg_icon(SVG_PREV, 20, "#e5e7eb"),
@@ -318,6 +321,7 @@ class PlayerBar(QWidget):
         self.cmb_speed = QComboBox()
         self.cmb_speed.setObjectName("SpeedCombo")
         self.cmb_speed.setToolTip("Playback speed")
+        self.cmb_speed.setAccessibleName("Playback speed")
         self._speed_items = [("1.0x", 1.0), ("0.75x", 0.75), ("0.5x", 0.5), ("0.25x", 0.25)]
         for label, speed in self._speed_items:
             self.cmb_speed.addItem(label, speed)

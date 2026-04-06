@@ -46,7 +46,7 @@ class ArtistListWidget(QWidget):
         self.table.setShowGrid(False)
         self.table.setAlternatingRowColors(True)
         self.table.setObjectName("ArtistTable")
-        self.table.verticalHeader().setDefaultSectionSize(24)
+        self.table.verticalHeader().setDefaultSectionSize(30)
 
         self.table.setColumnWidth(0, 520)
         self.table.setColumnWidth(1, 90)

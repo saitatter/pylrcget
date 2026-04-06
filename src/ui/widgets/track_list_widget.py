@@ -101,7 +101,7 @@ class TrackListWidget(QWidget):
         self.header.setStretchLastSection(True)
         self.table.setObjectName("TrackTable")
 
-        self.table.verticalHeader().setDefaultSectionSize(24)
+        self.table.verticalHeader().setDefaultSectionSize(30)
 
         self._apply_styles()
 

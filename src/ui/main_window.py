@@ -75,6 +75,7 @@ class MainWindow(QMainWindow):
         self.search_box = QLineEdit()
         self.search_box.setPlaceholderText("Search tracks / artists / albums...")
         self.search_box.setObjectName("TopBarSearch")
+        self.search_box.setAccessibleName("Library search")
         search_layout.addWidget(self.search_box)
         top_bar.addWidget(self.search_group, stretch=3)
 
@@ -92,18 +93,22 @@ class MainWindow(QMainWindow):
 
         self.chk_synced = QCheckBox("Synced")
         self.chk_synced.setChecked(True)
+        self.chk_synced.setAccessibleName("Filter synced lyrics")
         filters_row.addWidget(self.chk_synced)
 
         self.chk_plain = QCheckBox("Plain")
         self.chk_plain.setChecked(True)
+        self.chk_plain.setAccessibleName("Filter plain lyrics")
         filters_row.addWidget(self.chk_plain)
 
         self.chk_instr = QCheckBox("Instrumental")
         self.chk_instr.setChecked(False)
+        self.chk_instr.setAccessibleName("Filter instrumental tracks")
         filters_row.addWidget(self.chk_instr)
 
         self.chk_none = QCheckBox("No lyrics")
         self.chk_none.setChecked(True)
+        self.chk_none.setAccessibleName("Filter tracks without lyrics")
         filters_row.addWidget(self.chk_none)
         filters_row.addStretch(1)
         filters_layout.addLayout(filters_row)
@@ -126,18 +131,21 @@ class MainWindow(QMainWindow):
         self.btn_refresh.setObjectName("TopBarAction")
         self.btn_refresh.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_BrowserReload))
         self.btn_refresh.setToolTip("Refresh library")
+        self.btn_refresh.setAccessibleName("Refresh library")
         self.btn_refresh.clicked.connect(self.refresh_library)
 
         self.btn_config = QToolButton()
         self.btn_config.setObjectName("TopBarAction")
         self.btn_config.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_FileDialogDetailedView))
         self.btn_config.setToolTip("Settings")
+        self.btn_config.setAccessibleName("Open music folder settings")
         self.btn_config.clicked.connect(self.open_config_modal)
 
         self.btn_about = QToolButton()
         self.btn_about.setObjectName("TopBarAction")
         self.btn_about.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_MessageBoxInformation))
         self.btn_about.setToolTip("About")
+        self.btn_about.setAccessibleName("About LrcGet")
         self.btn_about.clicked.connect(self.open_about_modal)
 
         actions_row.addWidget(self.btn_refresh)
@@ -195,6 +203,7 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(self.albums_tab, "Albums")
         self.tabs.addTab(self.artists_tab, "Artists")
         self.tabs.addTab(self.mylrclib_tab, "My Lrclib")
+        self.tabs.setAccessibleName("Library navigation tabs")
 
         self.layout.addWidget(self.tabs)
         self.tabs.currentChanged.connect(self._on_tab_changed)
@@ -255,6 +264,15 @@ class MainWindow(QMainWindow):
         self.chk_plain.toggled.connect(self._apply_track_filters)
         self.chk_instr.toggled.connect(self._apply_track_filters)
         self.chk_none.toggled.connect(self._apply_track_filters)
+
+        self.setTabOrder(self.search_box, self.chk_synced)
+        self.setTabOrder(self.chk_synced, self.chk_plain)
+        self.setTabOrder(self.chk_plain, self.chk_instr)
+        self.setTabOrder(self.chk_instr, self.chk_none)
+        self.setTabOrder(self.chk_none, self.btn_refresh)
+        self.setTabOrder(self.btn_refresh, self.btn_config)
+        self.setTabOrder(self.btn_config, self.btn_about)
+        self.setTabOrder(self.btn_about, self.tabs)
 
         # initial load
         self._apply_track_filters()
