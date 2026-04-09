@@ -106,6 +106,7 @@ class LibraryScanner(QThread):
 
             prune_library(db)
             db.close()
+            db = None
             self.progress_signal.emit(scanned, total, "", time.perf_counter() - started_at)
             self.finished_signal.emit(
                 True,
@@ -114,4 +115,5 @@ class LibraryScanner(QThread):
         except Exception as e:
             if db is not None:
                 db.close()
+                db = None
             self.finished_signal.emit(False, f"Scan failed: {e}")

@@ -114,7 +114,10 @@ def set_config(db: sqlite3.Connection, config: Config) -> None:
 # ARTISTS
 # -------------------------------
 def find_artist(db: sqlite3.Connection, name: str) -> int:
-    row = db.execute("SELECT id FROM artists WHERE name = ?", (name,)).fetchone()
+    row = db.execute(
+        "SELECT id FROM artists WHERE name_lower = ?",
+        (prepare_input(name),),
+    ).fetchone()
     if row:
         return int(row["id"])
     raise ValueError("Artist not found")
@@ -191,8 +194,13 @@ def get_artists(db: sqlite3.Connection) -> List[Artist]:
 # -------------------------------
 def find_album(db: sqlite3.Connection, name: str, album_artist_name: str) -> int:
     row = db.execute(
-        "SELECT id FROM albums WHERE name = ? AND album_artist_name = ?",
-        (name, album_artist_name),
+        """
+        SELECT id
+        FROM albums
+        WHERE name_lower = ?
+          AND album_artist_name_lower = ?
+        """,
+        (prepare_input(name), prepare_input(album_artist_name)),
     ).fetchone()
     if row:
         return int(row["id"])
