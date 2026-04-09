@@ -108,6 +108,7 @@ class Config:
     scan_excluded_patterns: str
     reaction_delay_ms: int
     playback_speed: float
+    playback_volume: float
     last_library_route: str
 
 

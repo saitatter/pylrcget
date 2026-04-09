@@ -200,3 +200,12 @@ def upgrade_database_if_needed(db: sqlite3.Connection, existing_version: int) ->
         """)
         db.commit()
         db.execute("PRAGMA user_version=17")
+
+    # v18
+    if existing_version <= 17:
+        print("Migrate database version 18...")
+        db.executescript("""
+            ALTER TABLE config_data ADD COLUMN playback_volume REAL DEFAULT 0.7;
+        """)
+        db.commit()
+        db.execute("PRAGMA user_version=18")

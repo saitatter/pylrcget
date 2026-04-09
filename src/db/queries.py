@@ -54,6 +54,7 @@ def get_config(db: sqlite3.Connection) -> Config:
                scan_excluded_patterns,
                reaction_delay_ms,
                playback_speed,
+               playback_volume,
                last_library_route
         FROM config_data
         LIMIT 1
@@ -73,6 +74,7 @@ def get_config(db: sqlite3.Connection) -> Config:
         scan_excluded_patterns=row["scan_excluded_patterns"] or "",
         reaction_delay_ms=int(row["reaction_delay_ms"] or 0),
         playback_speed=float(row["playback_speed"] or 1.0),
+        playback_volume=float(row["playback_volume"] or 0.7),
         last_library_route=row["last_library_route"] or "",
     )
 
@@ -93,6 +95,7 @@ def set_config(db: sqlite3.Connection, config: Config) -> None:
             scan_excluded_patterns = ?,
             reaction_delay_ms = ?,
             playback_speed = ?,
+            playback_volume = ?,
             last_library_route = ?
         WHERE 1
     """, (
@@ -109,6 +112,7 @@ def set_config(db: sqlite3.Connection, config: Config) -> None:
         config.scan_excluded_patterns,
         config.reaction_delay_ms,
         config.playback_speed,
+        config.playback_volume,
         config.last_library_route,
     ))
     db.commit()

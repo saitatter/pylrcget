@@ -265,6 +265,9 @@ class Player(QObject):
         else:
             self.audio.setVolume(v)
 
+    def volume(self) -> float:
+        return float(self._volume_0_to_1)
+
     # convenient getters for UI
     def position_ms(self) -> int:
         if self._use_mpv and self._mpv:

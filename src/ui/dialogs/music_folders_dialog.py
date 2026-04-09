@@ -40,6 +40,7 @@ class MusicFoldersDialog(QDialog):
         self.resize(700, 700)
         self.app_state = app_state
         self._last_browse_dir = os.path.expanduser("~")
+        self.directories_changed = False
 
         layout = QVBoxLayout(self)
         self.tabs = QTabWidget()
@@ -447,6 +448,7 @@ class MusicFoldersDialog(QDialog):
         self.pattern_preview_label.update()
 
     def save(self):
+        previous_folders = get_directories(self.app_state.db)
         folders = [self.list_widget.item(i).text() for i in range(self.list_widget.count())]
         if not folders:
             QMessageBox.warning(self, "No folders", "Please add at least one music folder.")
@@ -467,4 +469,5 @@ class MusicFoldersDialog(QDialog):
 
         set_directories(self.app_state.db, folders)
         set_config(self.app_state.db, new_config)
+        self.directories_changed = folders != previous_folders
         self.accept()

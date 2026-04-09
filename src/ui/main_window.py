@@ -55,6 +55,7 @@ class MainWindow(QMainWindow):
         self._queue_index: int = -1
         self._refresh_default_label = "Global Actions"
         self._pending_playback_speed: float | None = None
+        self._pending_playback_volume: float | None = None
         self._pending_library_route: str | None = None
         self._nav_history: list[LibraryRoute] = []
         self._nav_index: int = -1
@@ -67,6 +68,10 @@ class MainWindow(QMainWindow):
         self._playback_speed_save_timer.setSingleShot(True)
         self._playback_speed_save_timer.setInterval(350)
         self._playback_speed_save_timer.timeout.connect(self._flush_playback_speed)
+        self._playback_volume_save_timer = QTimer(self)
+        self._playback_volume_save_timer.setSingleShot(True)
+        self._playback_volume_save_timer.setInterval(250)
+        self._playback_volume_save_timer.timeout.connect(self._flush_playback_volume)
         self._search_apply_timer = QTimer(self)
         self._search_apply_timer.setSingleShot(True)
         self._search_apply_timer.setInterval(180)
@@ -299,11 +304,13 @@ class MainWindow(QMainWindow):
         self.layout.addWidget(self.player_bar)
         self.player_bar.set_prev_next_handlers(self.play_prev, self.play_next)
         self.player_bar.playbackSpeedChanged.connect(self._persist_playback_speed)
+        self.player_bar.volumeChanged.connect(self._persist_playback_volume)
         self.player_bar.artistNavigationRequested.connect(self._navigate_current_track_artist)
         self.player_bar.albumNavigationRequested.connect(self._navigate_current_track_album)
         for view in self._all_lyrics_views():
             view.set_reaction_delay_ms(get_config(self.app_state.db).reaction_delay_ms)
         self._apply_saved_playback_speed()
+        self._apply_saved_playback_volume()
 
         # --- Scan progress (pretty + hidden when idle) ---
         self.scan_row = QWidget()
@@ -400,6 +407,7 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event: QCloseEvent) -> None:
         self._flush_playback_speed()
+        self._flush_playback_volume()
         self._flush_library_route()
         super().closeEvent(event)
 
@@ -431,6 +439,7 @@ class MainWindow(QMainWindow):
     # ------------------ modals ------------------
     def open_config_modal(self):
         before = get_config(self.app_state.db).theme_mode
+        before_dirs = get_directories(self.app_state.db)
         dlg = MusicFoldersDialog(self.app_state, self)
         if dlg.exec():
             updated_config = get_config(self.app_state.db)
@@ -440,6 +449,9 @@ class MainWindow(QMainWindow):
             for view in self._all_lyrics_views():
                 view.set_reaction_delay_ms(updated_config.reaction_delay_ms)
             self._apply_track_filters()
+            after_dirs = get_directories(self.app_state.db)
+            if dlg.directories_changed and after_dirs:
+                self.refresh_library()
 
     def open_about_modal(self):
         self.app_state.notify("LrcGet helps you scan your library, edit lyrics, and publish them to LRCLIB.", "info")
@@ -457,6 +469,8 @@ class MainWindow(QMainWindow):
 
     # ------------------ scanning ------------------
     def refresh_library(self):
+        if getattr(self, "scanner", None) is not None and self.scanner.isRunning():
+            return
         directories = get_directories(self.app_state.db)
         if not directories:
             self.app_state.notify("Add at least one music folder before starting a library scan.", "warning")
@@ -546,6 +560,7 @@ class MainWindow(QMainWindow):
         self.btn_refresh.setEnabled(True)
         QTimer.singleShot(1800, self._reset_refresh_feedback)
         self.statusBar().showMessage(msg, 4000)
+        self.scanner = None
 
     def _cancel_scan(self):
         if not hasattr(self, "scanner") or self.scanner is None:
@@ -807,9 +822,23 @@ class MainWindow(QMainWindow):
                 speed = 1.0
         self.player_bar.set_playback_speed_value(speed)
 
+    def _apply_saved_playback_volume(self) -> None:
+        config = get_config(self.app_state.db)
+        volume = float(config.playback_volume or 0.7)
+        if self.app_state.player and hasattr(self.app_state.player, "set_volume"):
+            try:
+                self.app_state.player.set_volume(volume)
+            except Exception:
+                volume = 0.7
+        self.player_bar.set_volume_value(volume)
+
     def _persist_playback_speed(self, speed: float) -> None:
         self._pending_playback_speed = float(speed)
         self._playback_speed_save_timer.start()
+
+    def _persist_playback_volume(self, volume: float) -> None:
+        self._pending_playback_volume = float(volume)
+        self._playback_volume_save_timer.start()
 
     def _flush_playback_speed(self) -> None:
         if self._pending_playback_speed is None:
@@ -817,6 +846,13 @@ class MainWindow(QMainWindow):
         config = get_config(self.app_state.db)
         set_config(self.app_state.db, replace(config, playback_speed=float(self._pending_playback_speed)))
         self._pending_playback_speed = None
+
+    def _flush_playback_volume(self) -> None:
+        if self._pending_playback_volume is None:
+            return
+        config = get_config(self.app_state.db)
+        set_config(self.app_state.db, replace(config, playback_volume=float(self._pending_playback_volume)))
+        self._pending_playback_volume = None
 
     def _persist_library_route(self, route: LibraryRoute) -> None:
         self._pending_library_route = serialize_route(route)
