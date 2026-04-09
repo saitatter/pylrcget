@@ -106,7 +106,6 @@ class ArtistListWidget(QWidget):
         self.album_browser.unmarkInstrumental.connect(self.unmarkInstrumental.emit)
         self.album_browser.clearFiltersRequested.connect(self.clearFiltersRequested.emit)
         self.album_browser.configureFoldersRequested.connect(self.configureFoldersRequested.emit)
-        self.album_browser.backRequested.connect(self._return_to_artists)
         self.stack.addWidget(self.album_browser)
 
         self.table.doubleClicked.connect(self._on_double_click)

@@ -5,7 +5,7 @@ from typing import Iterable
 
 from PySide6.QtCore import Qt, Signal, QItemSelectionModel, QModelIndex
 from PySide6.QtGui import QStandardItem, QStandardItemModel
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QTableView, QHeaderView, QMenu, QHBoxLayout, QLabel, QPushButton, QStackedWidget
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QTableView, QHeaderView, QMenu, QHBoxLayout, QLabel, QStackedWidget
 
 from db.database import get_directories
 from ui.style_loader import load_stylesheet
@@ -34,7 +34,6 @@ class AlbumListWidget(QWidget):
     clearSearchRequested = Signal()
     refreshLibraryRequested = Signal()
     configureFoldersRequested = Signal()
-    backRequested = Signal()
     navigateRequested = Signal(object)
 
     def __init__(self, app_state):
@@ -67,11 +66,8 @@ class AlbumListWidget(QWidget):
         header_layout = QHBoxLayout(self.header_bar)
         header_layout.setContentsMargins(10, 6, 10, 6)
         header_layout.setSpacing(8)
-        self.back_btn = QPushButton("Back")
-        self.back_btn.setObjectName("TrackScopeClearButton")
         self.header_label = QLabel("")
         self.header_label.setObjectName("TrackScopeLabel")
-        header_layout.addWidget(self.back_btn)
         header_layout.addWidget(self.header_label, 1)
         root.addWidget(self.header_bar)
         self.header_bar.hide()
@@ -134,7 +130,6 @@ class AlbumListWidget(QWidget):
         self.table.doubleClicked.connect(self._on_double_click)
         self.table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.table.customContextMenuRequested.connect(self._on_context_menu)
-        self.back_btn.clicked.connect(self._go_back)
 
         self._apply_styles()
         self._empty_action = ""
@@ -277,8 +272,8 @@ class AlbumListWidget(QWidget):
                 icon_name="audio-lines.svg",
                 title="No albums for this artist",
                 body="This artist scope does not contain any albums with the current library metadata.",
-                action_text="Back",
-                action_key="back",
+                action_text=None,
+                action_key="",
             )
         elif self._search.strip():
             self._show_empty_state(
@@ -328,20 +323,6 @@ class AlbumListWidget(QWidget):
         self.track_list.setAlbumFilter(album_ids if len(album_ids) > 1 else album_ids[0])
         self.stack.setCurrentWidget(self.track_list)
         self._update_header()
-
-    def _go_back(self) -> None:
-        if self.stack.currentWidget() is self.track_list:
-            self.track_list.setAlbumFilter(None)
-            self.track_list.setAlbumFilterLabel("")
-            self._detail_album_id = None
-            self._detail_album_name = ""
-            self.stack.setCurrentWidget(self.browser_page)
-            self._update_header()
-            if self._active:
-                self.refresh()
-            return
-        if self._artist_id is not None or self._artist_ids:
-            self.backRequested.emit()
 
     def _update_header(self) -> None:
         if self.stack.currentWidget() is self.track_list:
@@ -442,8 +423,6 @@ class AlbumListWidget(QWidget):
             self.refreshLibraryRequested.emit()
         elif self._empty_action == "clear-search":
             self.clearSearchRequested.emit()
-        elif self._empty_action == "back":
-            self._go_back()
 
     def _find_unknown_row(self) -> int:
         for row in range(self.model.rowCount()):
