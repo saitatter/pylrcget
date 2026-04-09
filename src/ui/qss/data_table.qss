@@ -31,3 +31,19 @@ QHeaderView::section:hover {
 QTableView::item {
     padding: 4px 6px;
 }
+
+QWidget#TrackScopeBar {
+    background-color: {{color-bg-control}};
+    border: 1px solid {{color-border}};
+    border-radius: {{radius-md}};
+}
+
+QLabel#TrackScopeLabel {
+    color: {{color-text}};
+    font-size: {{font-size-sm}};
+    font-weight: 500;
+}
+
+QPushButton#TrackScopeClearButton {
+    padding: 4px 10px;
+}

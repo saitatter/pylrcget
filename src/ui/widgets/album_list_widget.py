@@ -1,4 +1,3 @@
-# ui/album_list_widget.py
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -6,29 +5,83 @@ from typing import Iterable
 
 from PySide6.QtCore import Qt, Signal, QItemSelectionModel, QModelIndex
 from PySide6.QtGui import QStandardItem, QStandardItemModel
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QTableView, QHeaderView, QMenu
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QTableView, QHeaderView, QMenu, QHBoxLayout, QLabel, QPushButton, QStackedWidget
 
+from db.database import get_directories
 from ui.style_loader import load_stylesheet
+from ui.library_routes import LibraryRoute, albums_detail, artists_album, artists_detail
+from ui.widgets.empty_state_widget import EmptyStateWidget
 from ui.widgets.sortable_header_view import SortableHeaderView
+from ui.widgets.track_list_widget import TrackListWidget
 
 
 @dataclass(frozen=True)
 class AlbumListRow:
-    album_id: int
+    album_ids: tuple[int, ...]
     album: str
     artist: str | None
     track_count: int
 
 
 class AlbumListWidget(QWidget):
-    # Emit album_id when user wants to view/open an album
+    playTrack = Signal(int)
+    downloadLyrics = Signal(int)
+    openArtist = Signal(int)
     openAlbum = Signal(int)
+    markInstrumental = Signal(list)
+    unmarkInstrumental = Signal(list)
+    clearFiltersRequested = Signal()
+    clearSearchRequested = Signal()
+    refreshLibraryRequested = Signal()
+    configureFoldersRequested = Signal()
+    backRequested = Signal()
+    navigateRequested = Signal(object)
 
     def __init__(self, app_state):
         super().__init__()
         self.app_state = app_state
         self._active = True
         self._search = ""
+        self._artist_id: int | None = None
+        self._artist_ids: list[int] | None = None
+        self._artist_name: str = ""
+        self._detail_album_id: int | None = None
+        self._detail_album_name: str = ""
+        self._route_tab = "albums"
+        self._page_size = 200
+        self._sort_column = 0
+        self._sort_order = Qt.SortOrder.AscendingOrder
+        self._has_more_rows = False
+        self._loading_more = False
+        self._loaded_db_rows = 0
+        self._unknown_album_ids: list[int] = []
+        self._unknown_track_count = 0
+        self._unknown_artist_names: set[str] = set()
+
+        root = QVBoxLayout(self)
+        root.setContentsMargins(0, 0, 0, 0)
+        root.setSpacing(8)
+
+        self.header_bar = QWidget()
+        self.header_bar.setObjectName("TrackScopeBar")
+        header_layout = QHBoxLayout(self.header_bar)
+        header_layout.setContentsMargins(10, 6, 10, 6)
+        header_layout.setSpacing(8)
+        self.back_btn = QPushButton("Back")
+        self.back_btn.setObjectName("TrackScopeClearButton")
+        self.header_label = QLabel("")
+        self.header_label.setObjectName("TrackScopeLabel")
+        header_layout.addWidget(self.back_btn)
+        header_layout.addWidget(self.header_label, 1)
+        root.addWidget(self.header_bar)
+        self.header_bar.hide()
+
+        self.stack = QStackedWidget()
+        root.addWidget(self.stack)
+
+        self.browser_page = QWidget()
+        browser_layout = QVBoxLayout(self.browser_page)
+        browser_layout.setContentsMargins(0, 0, 0, 0)
 
         self.table = QTableView()
         self.model = QStandardItemModel(0, 3, self)
@@ -41,7 +94,6 @@ class AlbumListWidget(QWidget):
             default_sort_order=Qt.SortOrder.AscendingOrder,
         )
         self.table.setHorizontalHeader(self.header)
-
         self.table.setSelectionBehavior(QTableView.SelectionBehavior.SelectRows)
         self.table.setSelectionMode(QTableView.SelectionMode.SingleSelection)
         self.table.verticalHeader().setVisible(False)
@@ -49,33 +101,57 @@ class AlbumListWidget(QWidget):
         self.table.setAlternatingRowColors(True)
         self.table.setObjectName("AlbumTable")
         self.table.verticalHeader().setDefaultSectionSize(30)
-
-        # Column sizing similar to your TrackListWidget
         self.table.setColumnWidth(0, 520)
         self.table.setColumnWidth(1, 220)
         self.table.setColumnWidth(2, 70)
         self.header.setStretchLastSection(True)
         self.header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        self.table.setSortingEnabled(False)
+        self.header.setSortIndicator(0, Qt.SortOrder.AscendingOrder)
+        self.header.sortIndicatorChanged.connect(self._on_sort_changed)
+        self.table.verticalScrollBar().valueChanged.connect(self._maybe_load_more)
+        browser_layout.addWidget(self.table)
 
-        self._apply_styles()
+        self.empty_state = EmptyStateWidget()
+        self.empty_state.actionTriggered.connect(self._on_empty_state_action)
+        browser_layout.addWidget(self.empty_state)
+        self.empty_state.hide()
+        self.stack.addWidget(self.browser_page)
 
-        # Double click -> open album
+        self.track_list = TrackListWidget(self.app_state)
+        self.track_list.setScopeBannerEnabled(False)
+        self.track_list.playTrack.connect(self.playTrack.emit)
+        self.track_list.downloadLyrics.connect(self.downloadLyrics.emit)
+        self.track_list.openArtist.connect(self.openArtist.emit)
+        self.track_list.openAlbum.connect(self.openAlbum.emit)
+        self.track_list.navigateRequested.connect(self._handle_track_route)
+        self.track_list.markInstrumental.connect(self.markInstrumental.emit)
+        self.track_list.unmarkInstrumental.connect(self.unmarkInstrumental.emit)
+        self.track_list.clearFiltersRequested.connect(self.clearFiltersRequested.emit)
+        self.track_list.configureFoldersRequested.connect(self.configureFoldersRequested.emit)
+        self.stack.addWidget(self.track_list)
+
         self.table.doubleClicked.connect(self._on_double_click)
-
-        # Right-click context menu
         self.table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.table.customContextMenuRequested.connect(self._on_context_menu)
+        self.back_btn.clicked.connect(self._go_back)
 
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.addWidget(self.table)
+        self._apply_styles()
+        self._empty_action = ""
 
-        # Sorting (optional but nice)
-        self.table.setSortingEnabled(True)
+    @staticmethod
+    def _display_album(value: str | None) -> str:
+        text = (value or "").strip()
+        if text.casefold() in {"", "album", "unknown album"}:
+            return "N/A"
+        return text
 
-    # -------------------------
-    # External API
-    # -------------------------
+    @staticmethod
+    def _display_artist(value: str | None) -> str:
+        text = (value or "").strip()
+        if text.casefold() in {"", "artist", "unknown artist"}:
+            return "N/A"
+        return text
 
     def setActive(self, active: bool):
         self._active = active
@@ -85,93 +161,216 @@ class AlbumListWidget(QWidget):
 
     def setSearchValue(self, text: str):
         self._search = text or ""
+        if self._active and self.stack.currentWidget() is self.browser_page:
+            self.refresh()
+
+    def setRouteTab(self, tab: str) -> None:
+        self._route_tab = tab or "albums"
+
+    def apply_route(self, route: LibraryRoute) -> None:
+        if route.tab != self._route_tab:
+            return
+
+        if route.mode == "root":
+            self.clearArtistScope()
+            return
+        if route.mode == "artist":
+            self.setArtistScope(list(route.artist_ids) if len(route.artist_ids) > 1 else (route.artist_ids[0] if route.artist_ids else None), route.artist_label)
+            return
+        if route.mode == "album":
+            self.clearArtistScope()
+            self.show_album_tracks(list(route.album_ids) if len(route.album_ids) > 1 else (route.album_ids[0] if route.album_ids else None), route.album_label)
+            return
+        if route.mode == "artist_album":
+            self.setArtistScope(list(route.artist_ids) if len(route.artist_ids) > 1 else (route.artist_ids[0] if route.artist_ids else None), route.artist_label)
+            self.show_album_tracks(list(route.album_ids) if len(route.album_ids) > 1 else (route.album_ids[0] if route.album_ids else None), route.album_label)
+            return
+
+    def setArtistScope(self, artist_id: int | list[int] | tuple[int, ...] | None, artist_name: str = "") -> None:
+        if isinstance(artist_id, (list, tuple)):
+            values = [int(v) for v in artist_id]
+            self._artist_ids = values or None
+            self._artist_id = values[0] if len(values) == 1 else None
+        else:
+            self._artist_id = int(artist_id) if artist_id is not None else None
+            self._artist_ids = None
+        self._artist_name = artist_name or ""
+        self._detail_album_id = None
+        self._detail_album_name = ""
+        self.stack.setCurrentWidget(self.browser_page)
+        self._update_header()
         if self._active:
             self.refresh()
 
+    def clearArtistScope(self) -> None:
+        self.setArtistScope(None, "")
+
     def refresh(self):
-        """
-        Expected app_state.db and a function you implement:
-            get_album_rows(db, search_query) -> iterable of dicts with keys:
-              id, album, artist_name, year, track_count
-        """
-        from db.database import get_album_rows  # local import to avoid circulars
+        self._load_rows(reset=True)
 
-        db = self.app_state.db
-        rows = get_album_rows(db=db, search_query=self._search)
+    def _load_rows(self, *, reset: bool) -> None:
+        from db.database import get_album_rows
 
+        directories = get_directories(self.app_state.db)
+        if not directories:
+            self.model.setRowCount(0)
+            self._has_more_rows = False
+            self._show_empty_state(
+                icon_name="folder-open.svg",
+                title="No music folders yet",
+                body="Add one or more folders to build your library and start browsing albums.",
+                action_text="Open Settings",
+                action_key="configure-folders",
+            )
+            return
+
+        rows = get_album_rows(
+            db=self.app_state.db,
+            search_query=self._search,
+            artist_id=self._artist_id,
+            artist_ids=self._artist_ids,
+            limit=self._page_size + 1,
+            offset=0 if reset else self._loaded_db_rows,
+            sort_column=self._sort_column,
+            sort_order="desc" if self._sort_order == Qt.SortOrder.DescendingOrder else "asc",
+        )
+        self._has_more_rows = len(rows) > self._page_size
+        visible_rows = rows[: self._page_size]
         ui_rows: list[AlbumListRow] = []
-        for r in rows:
+        if reset:
+            self.model.setRowCount(0)
+            self._loaded_db_rows = 0
+            self._unknown_album_ids = []
+            self._unknown_track_count = 0
+            self._unknown_artist_names = set()
+        self._loaded_db_rows += len(visible_rows)
+        for r in visible_rows:
+            album_id = int(r["album_id"])
+            album_name = r["album_name"] or ""
+            artist_name = r.get("artist_name") or None
+            display_album = self._display_album(album_name)
+            display_artist = self._display_artist(artist_name)
+
+            if display_album == "N/A":
+                self._unknown_album_ids.append(album_id)
+                self._unknown_track_count += int(r.get("track_count") or 0)
+                if display_artist != "N/A":
+                    self._unknown_artist_names.add(display_artist)
+                continue
+
             ui_rows.append(
                 AlbumListRow(
-                    album_id=int(r["album_id"]),
-                    album=r["album_name"] or "",
-                    artist=r.get("artist_name") or None,
+                    album_ids=(album_id,),
+                    album=display_album,
+                    artist=display_artist,
                     track_count=int(r.get("track_count") or 0),
                 )
             )
-
-        self.set_rows(ui_rows)
+        self._append_rows(ui_rows, reset=reset)
+        self._sync_unknown_bucket()
+        self._loading_more = False
+        self._update_header()
+        if self.model.rowCount():
+            self._show_table()
+        elif self._artist_id is not None or self._artist_ids:
+            self._show_empty_state(
+                icon_name="audio-lines.svg",
+                title="No albums for this artist",
+                body="This artist scope does not contain any albums with the current library metadata.",
+                action_text="Back",
+                action_key="back",
+            )
+        elif self._search.strip():
+            self._show_empty_state(
+                icon_name="search-x.svg",
+                title="No albums match your search",
+                body="Try a different search term or clear the current search to show more albums.",
+                action_text="Clear Search",
+                action_key="clear-search",
+            )
+        else:
+            self._show_empty_state(
+                icon_name="audio-lines.svg",
+                title="No albums found",
+                body="Try refreshing the library or reviewing your scan exclusions.",
+                action_text="Refresh Library",
+                action_key="refresh-library",
+            )
 
     def set_rows(self, rows: Iterable[AlbumListRow]):
         self.model.setRowCount(0)
         for r in rows:
             items = [
-                self._item_text(r.album, r.album_id),
-                self._item_text(r.artist or "", r.album_id),
-                self._item_text(str(r.track_count), r.album_id, align=Qt.AlignmentFlag.AlignCenter),
+                self._item_text(r.album, r.album_ids),
+                self._item_text(self._display_artist(r.artist), r.album_ids),
+                self._item_text(str(r.track_count), r.album_ids, align=Qt.AlignmentFlag.AlignCenter),
+            ]
+            self.model.appendRow(items)
+        self.table.sortByColumn(0, Qt.SortOrder.AscendingOrder)
+
+    def _append_rows(self, rows: Iterable[AlbumListRow], *, reset: bool = False) -> None:
+        if reset:
+            self.model.setRowCount(0)
+        for r in rows:
+            items = [
+                self._item_text(r.album, r.album_ids),
+                self._item_text(self._display_artist(r.artist), r.album_ids),
+                self._item_text(str(r.track_count), r.album_ids, align=Qt.AlignmentFlag.AlignCenter),
             ]
             self.model.appendRow(items)
 
-        # Default sort by album name
-        self.table.sortByColumn(0, Qt.SortOrder.AscendingOrder)
+    def show_album_tracks(self, album_id: int | list[int] | tuple[int, ...], album_name: str = "") -> None:
+        album_ids = [int(v) for v in album_id] if isinstance(album_id, (list, tuple)) else [int(album_id)]
+        self._detail_album_id = album_ids[0] if len(album_ids) == 1 else -1
+        self._detail_album_name = self._display_album(album_name)
+        self.track_list.setArtistFilter(None)
+        self.track_list.setAlbumFilterLabel(self._detail_album_name)
+        self.track_list.setAlbumFilter(album_ids if len(album_ids) > 1 else album_ids[0])
+        self.stack.setCurrentWidget(self.track_list)
+        self._update_header()
 
-    def current_album_id(self) -> int | None:
-        sm = self.table.selectionModel()
-        if sm is None or not sm.hasSelection():
-            return None
-        idxs = sm.selectedRows()
-        if not idxs:
-            return None
-        album_id = idxs[0].data(Qt.ItemDataRole.UserRole)
-        try:
-            return int(album_id)
-        except Exception:
-            return None
-
-    def set_selected_album(self, album_id: int | None):
-        if album_id is None:
-            self.table.clearSelection()
+    def _go_back(self) -> None:
+        if self.stack.currentWidget() is self.track_list:
+            self.track_list.setAlbumFilter(None)
+            self.track_list.setAlbumFilterLabel("")
+            self._detail_album_id = None
+            self._detail_album_name = ""
+            self.stack.setCurrentWidget(self.browser_page)
+            self._update_header()
+            if self._active:
+                self.refresh()
             return
+        if self._artist_id is not None or self._artist_ids:
+            self.backRequested.emit()
 
-        row = self._row_for_album_id(album_id)
-        if row < 0:
+    def _update_header(self) -> None:
+        if self.stack.currentWidget() is self.track_list:
+            self.header_bar.show()
+            self.header_label.setText(f"Album: {self._detail_album_name or 'N/A'}")
             return
-
-        idx = self.model.index(row, 0)
-        sm = self.table.selectionModel()
-        if sm is None:
+        if self._artist_id is not None or self._artist_ids:
+            self.header_bar.show()
+            self.header_label.setText(f"Artist: {self._display_artist(self._artist_name)}")
             return
-
-        sm.setCurrentIndex(idx, QItemSelectionModel.ClearAndSelect | QItemSelectionModel.Rows)
-        self.table.scrollTo(idx, QTableView.ScrollHint.PositionAtCenter)
-
-    # -------------------------
-    # UI Events
-    # -------------------------
+        self.header_bar.hide()
+        self.header_label.setText("")
 
     def _on_double_click(self, index: QModelIndex):
         if not index.isValid():
             return
         album_id = self.model.index(index.row(), 0).data(Qt.ItemDataRole.UserRole)
+        album_name = self.model.index(index.row(), 0).data(Qt.ItemDataRole.DisplayRole) or ""
         if album_id is None:
             return
-        self.openAlbum.emit(int(album_id))
+        if isinstance(album_id, tuple):
+            self.navigateRequested.emit(self._album_route(tuple(int(v) for v in album_id), str(album_name)))
+        else:
+            self.navigateRequested.emit(self._album_route((int(album_id),), str(album_name)))
 
     def _on_context_menu(self, pos):
         idx = self.table.indexAt(pos)
         if not idx.isValid():
             return
-
         sm = self.table.selectionModel()
         if sm is not None and not sm.isRowSelected(idx.row(), idx.parent()):
             sm.setCurrentIndex(idx, QItemSelectionModel.ClearAndSelect | QItemSelectionModel.Rows)
@@ -179,39 +378,120 @@ class AlbumListWidget(QWidget):
         album_id = self.model.index(idx.row(), 0).data(Qt.ItemDataRole.UserRole)
         if album_id is None:
             return
-        album_id = int(album_id)
-        album_name = self.model.index(idx.row(), 0).data(Qt.ItemDataRole.DisplayRole) or "Album"
+        album_name = self.model.index(idx.row(), 0).data(Qt.ItemDataRole.DisplayRole) or "N/A"
 
         menu = QMenu(self)
         info = menu.addAction(str(album_name))
         info.setEnabled(False)
-
         menu.addSeparator()
         browse = menu.addAction("Browse")
         browse.setEnabled(False)
-        act_open = menu.addAction("Open album in tracks")
-
+        act_open = menu.addAction("Open album")
         chosen = menu.exec(self.table.viewport().mapToGlobal(pos))
         if chosen == act_open:
-            self.openAlbum.emit(album_id)
+            if isinstance(album_id, tuple):
+                self.navigateRequested.emit(self._album_route(tuple(int(v) for v in album_id), str(album_name)))
+            else:
+                self.navigateRequested.emit(self._album_route((int(album_id),), str(album_name)))
 
-    # -------------------------
-    # Helpers
-    # -------------------------
-
-    def _row_for_album_id(self, album_id: int) -> int:
-        for row in range(self.model.rowCount()):
-            v = self.model.index(row, 0).data(Qt.ItemDataRole.UserRole)
-            if v is not None and int(v) == int(album_id):
-                return row
-        return -1
-
-    def _item_text(self, text: str, album_id: int, align: Qt.AlignmentFlag = Qt.AlignmentFlag.AlignVCenter):
+    def _item_text(self, text: str, album_id: int | tuple[int, ...], align: Qt.AlignmentFlag = Qt.AlignmentFlag.AlignVCenter):
         it = QStandardItem(text)
         it.setEditable(False)
-        it.setData(int(album_id), Qt.ItemDataRole.UserRole)
+        it.setData(tuple(int(v) for v in album_id) if isinstance(album_id, tuple) else int(album_id), Qt.ItemDataRole.UserRole)
         it.setTextAlignment(align)
         return it
 
     def _apply_styles(self):
         self.setStyleSheet(load_stylesheet("data_table.qss", table_name="AlbumTable"))
+
+    def _album_route(self, album_ids: tuple[int, ...], album_name: str) -> LibraryRoute:
+        if self._route_tab == "artists":
+            artist_ids = tuple(self._artist_ids or ([self._artist_id] if self._artist_id is not None else []))
+            return artists_album(artist_ids, album_ids, artist_label=self._artist_name, album_label=album_name)
+        return albums_detail(album_ids, label=album_name)
+
+    def _handle_track_route(self, route: LibraryRoute) -> None:
+        if route.tab == "tracks":
+            if route.mode == "artist":
+                self.navigateRequested.emit(artists_detail(route.artist_ids, label=route.artist_label))
+                return
+            if route.mode == "album":
+                self.navigateRequested.emit(self._album_route(route.album_ids, route.album_label))
+                return
+        self.navigateRequested.emit(route)
+
+    def _show_table(self) -> None:
+        self.table.show()
+        self.empty_state.hide()
+
+    def _show_empty_state(self, *, icon_name: str, title: str, body: str, action_text: str, action_key: str) -> None:
+        self._empty_action = action_key
+        self.empty_state.configure(
+            icon_name=icon_name,
+            title=title,
+            body=body,
+            action_text=action_text,
+        )
+        self.table.hide()
+        self.empty_state.show()
+
+    def _on_empty_state_action(self) -> None:
+        if self._empty_action == "configure-folders":
+            self.configureFoldersRequested.emit()
+        elif self._empty_action == "refresh-library":
+            self.refreshLibraryRequested.emit()
+        elif self._empty_action == "clear-search":
+            self.clearSearchRequested.emit()
+        elif self._empty_action == "back":
+            self._go_back()
+
+    def _find_unknown_row(self) -> int:
+        for row in range(self.model.rowCount()):
+            if self.model.index(row, 0).data(Qt.ItemDataRole.DisplayRole) == "N/A":
+                return row
+        return -1
+
+    def _sync_unknown_bucket(self) -> None:
+        if not self._unknown_album_ids:
+            row = self._find_unknown_row()
+            if row >= 0:
+                self.model.removeRow(row)
+            return
+
+        bucket_artist = "N/A" if len(self._unknown_artist_names) != 1 else next(iter(self._unknown_artist_names))
+        row = self._find_unknown_row()
+        if row < 0:
+            self.model.appendRow(
+                [
+                    self._item_text("N/A", tuple(self._unknown_album_ids)),
+                    self._item_text(bucket_artist, tuple(self._unknown_album_ids)),
+                    self._item_text(str(self._unknown_track_count), tuple(self._unknown_album_ids), align=Qt.AlignmentFlag.AlignCenter),
+                ]
+            )
+            return
+
+        self.model.item(row, 0).setData(tuple(self._unknown_album_ids), Qt.ItemDataRole.UserRole)
+        self.model.item(row, 1).setData(tuple(self._unknown_album_ids), Qt.ItemDataRole.UserRole)
+        self.model.item(row, 2).setData(tuple(self._unknown_album_ids), Qt.ItemDataRole.UserRole)
+        self.model.item(row, 1).setText(bucket_artist)
+        self.model.item(row, 2).setText(str(self._unknown_track_count))
+
+    def _on_sort_changed(self, column: int, order: Qt.SortOrder) -> None:
+        self._sort_column = int(column)
+        self._sort_order = order
+        if self._active and self.stack.currentWidget() is self.browser_page:
+            self.refresh()
+
+    def _maybe_load_more(self, value: int) -> None:
+        if (
+            not self._has_more_rows
+            or self._loading_more
+            or self.stack.currentWidget() is not self.browser_page
+            or self.table.isHidden()
+        ):
+            return
+        scroll = self.table.verticalScrollBar()
+        if value < max(0, scroll.maximum() - 120):
+            return
+        self._loading_more = True
+        self._load_rows(reset=False)

@@ -4,6 +4,7 @@ from dataclasses import replace
 import os
 import re
 
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -18,9 +19,12 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QSpinBox,
+    QTabWidget,
     QTextEdit,
     QVBoxLayout,
+    QWidget,
 )
+from PySide6.QtGui import QFontDatabase
 
 from core.lyrics_sidecar import DEFAULT_LYRICS_FILE_PATTERN
 from db.database import get_config, get_directories, set_config, set_directories
@@ -38,6 +42,18 @@ class MusicFoldersDialog(QDialog):
         self._last_browse_dir = os.path.expanduser("~")
 
         layout = QVBoxLayout(self)
+        self.tabs = QTabWidget()
+        self.tabs.setObjectName("SettingsTabs")
+        layout.addWidget(self.tabs, 1)
+
+        library_tab = QWidget()
+        library_layout = QVBoxLayout(library_tab)
+
+        lyrics_tab = QWidget()
+        lyrics_tab_layout = QVBoxLayout(lyrics_tab)
+
+        appearance_tab = QWidget()
+        appearance_layout_root = QVBoxLayout(appearance_tab)
 
         folders_box = QGroupBox("Music Folders")
         folders_layout = QVBoxLayout(folders_box)
@@ -50,7 +66,54 @@ class MusicFoldersDialog(QDialog):
         btn_layout.addWidget(self.add_btn)
         btn_layout.addWidget(self.remove_btn)
         folders_layout.addLayout(btn_layout)
-        layout.addWidget(folders_box)
+        library_layout.addWidget(folders_box)
+
+        scan_box = QGroupBox("Library Scan")
+        scan_layout = QGridLayout(scan_box)
+
+        self.excluded_paths_edit = QTextEdit()
+        self.excluded_paths_edit.setPlaceholderText(
+            "One path per line.\n"
+            "Example:\n"
+            "D:\\Music\\Podcasts\n"
+            "D:\\Music\\Temporary"
+        )
+        self.add_excluded_path_btn = QPushButton("Add Excluded Path")
+        self.add_excluded_file_btn = QPushButton("Add Excluded File")
+        self.remove_excluded_path_btn = QPushButton("Remove Selected Lines")
+        self.test_exclusions_btn = QPushButton("Test Exclusions")
+        self.excluded_patterns_edit = QTextEdit()
+        self.excluded_patterns_edit.setPlaceholderText(
+            "One regex per line.\n"
+            "Examples:\n"
+            "\\\\Podcasts\\\\\n"
+            "sample|demo\n"
+            "\\.(cue|log)$"
+        )
+
+        scan_layout.addWidget(QLabel("Excluded paths"), 0, 0)
+        scan_layout.addWidget(self.excluded_paths_edit, 1, 0)
+        excluded_paths_btn_row = QHBoxLayout()
+        excluded_paths_btn_row.addWidget(self.add_excluded_path_btn)
+        excluded_paths_btn_row.addWidget(self.add_excluded_file_btn)
+        excluded_paths_btn_row.addWidget(self.remove_excluded_path_btn)
+        excluded_paths_btn_row.addWidget(self.test_exclusions_btn)
+        excluded_paths_btn_row.addStretch(1)
+        scan_layout.addLayout(excluded_paths_btn_row, 2, 0)
+        scan_layout.addWidget(QLabel("Excluded regex patterns"), 0, 1)
+        scan_layout.addWidget(self.excluded_patterns_edit, 1, 1)
+        self.regex_validation_label = QLabel("")
+        self.regex_validation_label.setObjectName("SettingsValidationHint")
+        self.regex_validation_label.setVisible(False)
+        scan_layout.addWidget(self.regex_validation_label, 2, 1)
+
+        scan_hint = QLabel(
+            "Paths skip exact files or entire folders. Regex patterns are matched against the full file path."
+        )
+        scan_hint.setWordWrap(True)
+        scan_layout.addWidget(scan_hint, 3, 0, 1, 2)
+        library_layout.addWidget(scan_box)
+        library_layout.addStretch(1)
 
         appearance_box = QGroupBox("Appearance")
         appearance_layout = QGridLayout(appearance_box)
@@ -59,7 +122,8 @@ class MusicFoldersDialog(QDialog):
             self.theme_combo.addItem(theme_name, theme_key)
         appearance_layout.addWidget(QLabel("Theme"), 0, 0)
         appearance_layout.addWidget(self.theme_combo, 0, 1)
-        layout.addWidget(appearance_box)
+        appearance_layout_root.addWidget(appearance_box)
+        appearance_layout_root.addStretch(1)
 
         lyrics_box = QGroupBox("Lyrics Export")
         lyrics_layout = QGridLayout(lyrics_box)
@@ -83,14 +147,25 @@ class MusicFoldersDialog(QDialog):
         lyrics_layout.addWidget(QLabel("Filename pattern"), 2, 0)
         lyrics_layout.addWidget(self.pattern_edit, 2, 1, 1, 3)
 
+        self.pattern_preview_label = QLabel("")
+        self.pattern_preview_label.setObjectName("SettingsValidationHint")
+        self.pattern_preview_label.setWordWrap(True)
+        self.pattern_preview_label.setTextInteractionFlags(
+            self.pattern_preview_label.textInteractionFlags()
+            | Qt.TextInteractionFlag.TextSelectableByMouse
+        )
+        mono_font = QFontDatabase.systemFont(QFontDatabase.SystemFont.FixedFont)
+        self.pattern_preview_label.setFont(mono_font)
+        lyrics_layout.addWidget(self.pattern_preview_label, 3, 0, 1, 4)
+
         hint = QLabel(
             "Available placeholders: {artist}, {title}, {album}, {track}. "
             "Extensions are added automatically as .lrc and .txt."
         )
         hint.setWordWrap(True)
-        lyrics_layout.addWidget(hint, 3, 0, 1, 4)
-
-        layout.addWidget(lyrics_box)
+        lyrics_layout.addWidget(hint, 4, 0, 1, 4)
+        lyrics_tab_layout.addWidget(lyrics_box)
+        lyrics_tab_layout.addStretch(1)
 
         embed_box = QGroupBox("Audio File")
         embed_layout = QGridLayout(embed_box)
@@ -108,7 +183,12 @@ class MusicFoldersDialog(QDialog):
         reaction_hint = QLabel("Negative values stamp earlier. Positive values stamp later.")
         reaction_hint.setWordWrap(True)
         embed_layout.addWidget(reaction_hint, 2, 0, 1, 2)
-        layout.addWidget(embed_box)
+        lyrics_tab_layout.addWidget(embed_box)
+        lyrics_tab_layout.addStretch(1)
+
+        self.tabs.addTab(library_tab, "Library")
+        self.tabs.addTab(lyrics_tab, "Lyrics")
+        self.tabs.addTab(appearance_tab, "Appearance")
 
         scan_box = QGroupBox("Library Scan")
         scan_layout = QGridLayout(scan_box)
@@ -167,6 +247,8 @@ class MusicFoldersDialog(QDialog):
         self.browse_output_btn.clicked.connect(self._browse_output_dir)
         self.clear_output_btn.clicked.connect(lambda: self.output_dir_edit.setText(""))
         self.save_sidecars_chk.toggled.connect(self._update_export_fields_enabled)
+        self.pattern_edit.textChanged.connect(self._update_pattern_preview)
+        self.output_dir_edit.textChanged.connect(self._update_pattern_preview)
         self.add_excluded_path_btn.clicked.connect(self._add_excluded_path)
         self.add_excluded_file_btn.clicked.connect(self._add_excluded_file)
         self.remove_excluded_path_btn.clicked.connect(self._remove_selected_excluded_path_lines)
@@ -196,6 +278,7 @@ class MusicFoldersDialog(QDialog):
             if os.path.isdir(first_directory):
                 self._last_browse_dir = first_directory
         self._update_export_fields_enabled()
+        self._update_pattern_preview()
         self._validate_regex_patterns()
 
     def add_folder(self):
@@ -359,6 +442,55 @@ class MusicFoldersDialog(QDialog):
         self.pattern_edit.setEnabled(enabled)
         self.browse_output_btn.setEnabled(enabled)
         self.clear_output_btn.setEnabled(enabled)
+        self._update_pattern_preview()
+
+    def _safe_filename_component(self, value: str) -> str:
+        cleaned = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", (value or "").strip())
+        cleaned = re.sub(r"\s+", " ", cleaned)
+        return cleaned.strip(" .")
+
+    def _render_pattern_preview(self) -> tuple[str, bool]:
+        pattern = (self.pattern_edit.text().strip() or DEFAULT_LYRICS_FILE_PATTERN)
+        values = {
+            "artist": self._safe_filename_component("Radiohead"),
+            "title": self._safe_filename_component("Everything In Its Right Place"),
+            "album": self._safe_filename_component("Kid A"),
+            "track": self._safe_filename_component("01"),
+        }
+        used_fallback = False
+        try:
+            rendered = pattern.format(**values).strip()
+        except Exception:
+            rendered = ""
+            used_fallback = True
+        rendered = self._safe_filename_component(rendered)
+        if not rendered:
+            rendered = "Radiohead - Everything In Its Right Place"
+            used_fallback = True
+
+        output_dir = self.output_dir_edit.text().strip()
+        if output_dir:
+            return os.path.join(output_dir, rendered) + " (.lrc / .txt)", used_fallback
+        return rendered + " (.lrc / .txt next to the audio file)", used_fallback
+
+    def _update_pattern_preview(self) -> None:
+        if not self.save_sidecars_chk.isChecked():
+            self.pattern_preview_label.setProperty("validationState", "")
+            self.pattern_preview_label.setText("Preview: lyric files will be saved next to the audio file when sidecar saving is disabled.")
+        else:
+            preview, used_fallback = self._render_pattern_preview()
+            self.pattern_preview_label.setProperty("validationState", "error" if used_fallback else "success")
+            if used_fallback:
+                self.pattern_preview_label.setText(
+                    "Preview (fallback used due to invalid or empty result):\n"
+                    f"{preview}"
+                )
+            else:
+                self.pattern_preview_label.setText(f"Preview:\n{preview}")
+
+        self.pattern_preview_label.style().unpolish(self.pattern_preview_label)
+        self.pattern_preview_label.style().polish(self.pattern_preview_label)
+        self.pattern_preview_label.update()
 
     def save(self):
         folders = [self.list_widget.item(i).text() for i in range(self.list_widget.count())]

@@ -1,128 +1,175 @@
 # LRCGET (Python / Desktop Edition)
 
-A modern, desktop-native reimplementation of **LRCGET**, focused on **interactive lyrics management**, **real-time playback**, and **advanced synced lyrics editing**.
+A desktop-native reimplementation of **LRCGET** focused on **local library browsing**, **lyrics editing**, **playback**, and **LRCLIB integration**.
 
-This project goes beyond bulk LRC downloading and turns LRCGET into a **full lyrics-centric music companion** for local libraries.
+This version goes beyond bulk lyric downloads and turns the app into a full desktop workflow for:
+
+- scanning local music folders
+- downloading and editing synced or plain lyrics
+- saving sidecar lyric files
+- embedding lyrics into audio files
+- publishing lyrics back to LRCLIB
 
 ---
 
-## What this version adds (compared to original LRCGET)
+## Highlights
 
-### 🎵 Integrated Audio Player
+### Integrated player
 
-- Native desktop audio playback (no WebView)
-- Play / Pause / Seek / Volume
-- Next / Previous track
-- Automatic queue based on current filters
-- Auto-next when track ends
-- Keyboard shortcuts (`Space`, `Enter`, `Ctrl+←/→`)
+- native desktop playback with PySide6 / Qt
+- play / pause / seek
+- previous / next track
+- queue based on the current visible track list
+- adjustable playback speed, including custom values
+- keyboard shortcuts such as `Space`, `Enter`, `Ctrl+Left`, `Ctrl+Right`
 
-### 📝 Advanced Lyrics Panel
+### Lyrics workflow
 
-- Side-by-side **tracklist + lyrics view**
-- Supports:
-  - **Synced lyrics (LRC)**
-  - **Plain lyrics**
-  - Instrumental detection
-- Real-time **highlight of current lyric line**
-- Click any lyric line → seek audio instantly
+- synced lyrics (`.lrc`) and plain lyrics support
+- real-time synced lyrics editor
+- per-line snapping while audio is playing
+- configurable reaction delay for timestamping
+- live lyric highlighting during playback
+- publish synced or plain lyrics to LRCLIB
 
-### ✏️ Real-Time Synced Lyrics Editing
+### Library workflow
 
-- Edit timestamps and text directly in the UI
-- Add / delete lyric lines
-- Shift all timestamps forward/backward
-- Live preview while music plays
-- Save edits back to database instantly
-- No external editor needed
+- recursive library scan into a local SQLite database
+- incremental refresh using per-file signature checks (`mtime` + `size`)
+- scan exclusion rules by path and regex
+- drilldown browsing for `Tracks`, `Albums`, and `Artists`
+- breadcrumb navigation with back / forward history
 
-### 🌐 LRCLIB Integration
+### Export and embedding
 
-- Download synced or plain lyrics from **LRCLIB**
-- Per-track download
-- Smart fallback:
-  - synced → plain
-  - plain → instrumental
-- Lyrics stored locally (offline-first)
+- configurable lyric export directory
+- configurable filename pattern using placeholders
+- opt-in sidecar export (`.lrc` / `.txt`)
+- opt-in embedding into supported audio formats
 
-### 🚀 Publishing Workflow (Extended)
+### Desktop UI
 
-- Publish synced or plain lyrics to LRCLIB
-- Pre-publish linting (structure ready)
-- Publish progress dialog
-- Designed for future challenge/verification flow
-
-### 📚 Library Management
-
-- Scan large music libraries
-- SQLite database (fast, local)
-- Filters:
-  - Synced
-  - Plain
-  - Instrumental
-  - No lyrics
-- Instant search (title / artist / album)
-
-### 🎨 Desktop-Native UI (No WebView)
-
-- PySide6 / Qt
-- Fast startup
-- Low memory usage
-- Keyboard-first workflow
-- Dark, clean, modern layout
-- No Electron / no Tauri / no browser dependency
+- PySide6 / Qt desktop UI
+- multiple built-in themes
+- clickable artist / album navigation from the player bar and track list
+- fast non-native file dialogs on Windows for better browsing performance
 
 ---
 
 ## Supported Audio Formats
 
+The library scanner currently detects these formats:
+
 - MP3
+- M4A
 - FLAC
-- OGG
+- OGG / OGA
 - OPUS
 - WAV
-- M4A
+- WMA
+- ASF
+- DSF
+- DFF
+
+Notes:
+
+- playback support still depends on the active playback backend and codecs available on the system
+- lyric embedding support is broader than playback support for some formats
 
 ---
 
-## Philosophy
+## Lyrics Read / Write Support
 
-The original **LRCGET** is excellent for **bulk downloading lyrics**.
+The app can read lyrics from embedded tags and sidecar files, then save them back as sidecars and, for supported formats, embed them into the audio file.
 
-This project focuses on:
+Embedded lyric handling is implemented for:
 
-- **interactivity**
-- **editing**
-- **verification**
-- **publishing**
-- **daily usage as a lyrics tool**
+- MP3
+- FLAC
+- M4A / MP4
+- OGG Vorbis
+- OPUS
+- WMA / ASF
+- DSF
+- DFF
 
-Think of it as:
+Sidecar lyric export supports:
 
-> _LRCGET + music player + lyrics editor + LRCLIB client_
+- `.lrc`
+- `.txt`
+
+Filename pattern placeholders:
+
+- `{artist}`
+- `{title}`
+- `{album}`
+- `{track}`
 
 ---
 
-## Project Status
+## Settings
 
-- ✅ Core features complete
-- 🔧 Actively evolving
-- 🧠 Designed for extensibility (themes, batch actions, embeds)
+The Settings dialog is organized by category and includes:
+
+### Library
+
+- music folders
+- excluded paths
+- excluded regex patterns
+- exclusion preview / test
+
+### Lyrics
+
+- save lyrics files
+- embed lyrics into audio files
+- download directory
+- filename pattern with live preview
+- reaction delay
+
+### Appearance
+
+- theme selection
+
+---
+
+## Navigation
+
+Library navigation is route-based and supports:
+
+- drilldown browsing inside `Albums` and `Artists`
+- breadcrumb navigation
+- back / forward history
+- restoring the last library route between sessions
+
+Unknown metadata buckets are normalized as `N/A` in the UI.
+
+---
+
+## Performance Notes
+
+Recent performance-focused improvements include:
+
+- incremental library refreshes using stored file signatures
+- batched DB updates during scan
+- path and regex exclusion pruning during scan
+- debounced search input
+- incremental UI loading for large `Tracks`, `Albums`, and `Artists` lists
+- DB indexes for common browsing filters
 
 ---
 
 ## Releases
 
-This repository now includes GitHub Actions automation for:
+This repository includes GitHub Actions automation for:
 
-- building standalone executables for **Windows**, **Linux**, and **macOS** via **PyInstaller**
-- creating semantic versions and GitHub releases with **python-semantic-release**
-- generating GitHub release notes automatically from commit history
-- publishing release assets directly to the GitHub release page
+- building standalone executables for Windows, Linux, and macOS via PyInstaller
+- creating semantic versions and GitHub releases with `python-semantic-release`
+- generating release notes from Conventional Commits
+- uploading built artifacts to GitHub Releases
 
-### Commit format for automatic changelog
+### Commit format
 
-Use **Conventional Commits** so releases and changelog entries are categorized correctly:
+Use Conventional Commits, for example:
 
 - `feat: add lyrics export action`
 - `fix: prevent slider jump while seeking`
@@ -132,10 +179,10 @@ Use `!` or a `BREAKING CHANGE:` footer for breaking changes.
 
 ### Release flow
 
-1. Merge commits into `main` using Conventional Commit messages.
-2. The `Release` workflow runs `semantic-release` on every push to `main`.
-3. If the commits require a new version, it creates the tag and publishes the GitHub release.
-4. The same workflow builds platform-specific executables and uploads them to that release.
+1. Merge Conventional Commits into `main`.
+2. The release workflow runs on pushes to `main`.
+3. If a version bump is needed, semantic-release creates the tag and GitHub release.
+4. Build artifacts are attached to that release.
 
 ### Windows note
 
@@ -144,8 +191,7 @@ Windows release builds are currently unsigned.
 On Windows 11, SmartScreen or Defender may show a warning before launch, especially on newly downloaded builds. If you trust the release source, you can usually continue through `More info` -> `Run anyway`.
 
 ---
-
-### Local executable build
+## Local Build
 
 ```bash
 python -m pip install -r requirements.txt pyinstaller
@@ -154,21 +200,19 @@ pyinstaller --noconfirm pylrcget.spec
 
 The generated executable is placed in `dist/`.
 
-Note: the app already falls back to Qt multimedia when `mpv` is unavailable, so packaged builds remain usable even without an external `mpv` binary.
+Note: the app falls back to Qt Multimedia when `mpv` is unavailable, so packaged builds remain usable without an external `mpv` binary.
 
 ---
 
-## Roadmap (Short)
+## Status
 
-- Embed lyrics into audio files
-- Batch “download missing lyrics”
-- Auto-snap timestamps while editing
-- Karaoke / fade animations
-- Theme customization
+- core desktop workflow is implemented
+- actively evolving
+- designed for extensibility around themes, navigation, scanning, and lyrics workflows
 
 ---
 
 ## Credits
 
-- Original idea & LRCLIB ecosystem: **tranxuanthang / LRCGET**
-- This project is an **independent desktop reimplementation**, not a fork of the codebase.
+- Original idea and LRCLIB ecosystem: **tranxuanthang / LRCGET**
+- This project is an independent desktop reimplementation, not a fork of the original codebase

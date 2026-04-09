@@ -87,6 +87,16 @@ QLabel#NowPlayingAlbum {
     font-size: {{font-size-sm}};
 }
 
+QLabel#NowPlayingArtist,
+QLabel#NowPlayingAlbum {
+    text-decoration: none;
+}
+
+QLabel#NowPlayingArtist:hover,
+QLabel#NowPlayingAlbum:hover {
+    color: {{color-accent}};
+}
+
 QWidget#PlayerBar[compact="true"] QLabel#NowPlaying {
     font-size: 13px;
 }

@@ -20,6 +20,16 @@ class TrackTableModel(QAbstractTableModel):
         self._rows = list(rows)
         self.endResetModel()
 
+    def append_rows(self, rows) -> None:
+        new_rows = list(rows)
+        if not new_rows:
+            return
+        start = len(self._rows)
+        end = start + len(new_rows) - 1
+        self.beginInsertRows(QModelIndex(), start, end)
+        self._rows.extend(new_rows)
+        self.endInsertRows()
+
     def rowCount(self, parent=QModelIndex()) -> int:
         return len(self._rows)
 
