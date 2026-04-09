@@ -148,6 +148,14 @@ class AlbumListWidget(QWidget):
             return "N/A"
         return text
 
+    @staticmethod
+    def _normalize_album_ids(value) -> tuple[int, ...]:
+        if value is None:
+            return ()
+        if isinstance(value, (list, tuple)):
+            return tuple(int(v) for v in value)
+        return (int(value),)
+
     def setActive(self, active: bool):
         self._active = active
         self.setVisible(active)
@@ -341,12 +349,10 @@ class AlbumListWidget(QWidget):
             return
         album_id = self.model.index(index.row(), 0).data(Qt.ItemDataRole.UserRole)
         album_name = self.model.index(index.row(), 0).data(Qt.ItemDataRole.DisplayRole) or ""
-        if album_id is None:
+        album_ids = self._normalize_album_ids(album_id)
+        if not album_ids:
             return
-        if isinstance(album_id, tuple):
-            self.navigateRequested.emit(self._album_route(tuple(int(v) for v in album_id), str(album_name)))
-        else:
-            self.navigateRequested.emit(self._album_route((int(album_id),), str(album_name)))
+        self.navigateRequested.emit(self._album_route(album_ids, str(album_name)))
 
     def _on_context_menu(self, pos):
         idx = self.table.indexAt(pos)
@@ -357,7 +363,8 @@ class AlbumListWidget(QWidget):
             sm.setCurrentIndex(idx, QItemSelectionModel.ClearAndSelect | QItemSelectionModel.Rows)
 
         album_id = self.model.index(idx.row(), 0).data(Qt.ItemDataRole.UserRole)
-        if album_id is None:
+        album_ids = self._normalize_album_ids(album_id)
+        if not album_ids:
             return
         album_name = self.model.index(idx.row(), 0).data(Qt.ItemDataRole.DisplayRole) or "N/A"
 
@@ -370,10 +377,7 @@ class AlbumListWidget(QWidget):
         act_open = menu.addAction("Open album")
         chosen = menu.exec(self.table.viewport().mapToGlobal(pos))
         if chosen == act_open:
-            if isinstance(album_id, tuple):
-                self.navigateRequested.emit(self._album_route(tuple(int(v) for v in album_id), str(album_name)))
-            else:
-                self.navigateRequested.emit(self._album_route((int(album_id),), str(album_name)))
+            self.navigateRequested.emit(self._album_route(album_ids, str(album_name)))
 
     def _item_text(self, text: str, album_id: int | tuple[int, ...], align: Qt.AlignmentFlag = Qt.AlignmentFlag.AlignVCenter):
         it = QStandardItem(text)

@@ -122,6 +122,14 @@ class ArtistListWidget(QWidget):
             return "N/A"
         return text
 
+    @staticmethod
+    def _normalize_artist_ids(value) -> tuple[int, ...]:
+        if value is None:
+            return ()
+        if isinstance(value, (list, tuple)):
+            return tuple(int(v) for v in value)
+        return (int(value),)
+
     def setActive(self, active: bool):
         self._active = active
         self.setVisible(active)
@@ -271,11 +279,9 @@ class ArtistListWidget(QWidget):
             return
         artist_id = self.model.index(index.row(), 0).data(Qt.ItemDataRole.UserRole)
         artist_name = self.model.index(index.row(), 0).data(Qt.ItemDataRole.DisplayRole) or "N/A"
-        if artist_id is not None:
-            if isinstance(artist_id, tuple):
-                self.navigateRequested.emit(artists_detail(tuple(int(v) for v in artist_id), label=str(artist_name)))
-            else:
-                self.navigateRequested.emit(artists_detail((int(artist_id),), label=str(artist_name)))
+        artist_ids = self._normalize_artist_ids(artist_id)
+        if artist_ids:
+            self.navigateRequested.emit(artists_detail(artist_ids, label=str(artist_name)))
 
     def _on_context_menu(self, pos):
         idx = self.table.indexAt(pos)
@@ -287,7 +293,8 @@ class ArtistListWidget(QWidget):
             sm.setCurrentIndex(idx, QItemSelectionModel.ClearAndSelect | QItemSelectionModel.Rows)
 
         artist_id = self.model.index(idx.row(), 0).data(Qt.ItemDataRole.UserRole)
-        if artist_id is None:
+        artist_ids = self._normalize_artist_ids(artist_id)
+        if not artist_ids:
             return
         artist_name = self.model.index(idx.row(), 0).data(Qt.ItemDataRole.DisplayRole) or "N/A"
 
@@ -301,10 +308,7 @@ class ArtistListWidget(QWidget):
 
         chosen = menu.exec(self.table.viewport().mapToGlobal(pos))
         if chosen == act_open:
-            if isinstance(artist_id, tuple):
-                self.navigateRequested.emit(artists_detail(tuple(int(v) for v in artist_id), label=str(artist_name)))
-            else:
-                self.navigateRequested.emit(artists_detail((int(artist_id),), label=str(artist_name)))
+            self.navigateRequested.emit(artists_detail(artist_ids, label=str(artist_name)))
 
     def _item_text(self, text: str, artist_id: int | tuple[int, ...], align: Qt.AlignmentFlag = Qt.AlignmentFlag.AlignVCenter):
         it = QStandardItem(text)
