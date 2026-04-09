@@ -64,6 +64,7 @@ class MainWindow(QMainWindow):
         self._album_label_cache: dict[int, str] = {}
         self._nav_apply_in_progress = False
         self._tab_sync_suppressed = False
+        self.scanner = None
         self._playback_speed_save_timer = QTimer(self)
         self._playback_speed_save_timer.setSingleShot(True)
         self._playback_speed_save_timer.setInterval(350)
@@ -309,6 +310,7 @@ class MainWindow(QMainWindow):
         self.player_bar.albumNavigationRequested.connect(self._navigate_current_track_album)
         for view in self._all_lyrics_views():
             view.set_reaction_delay_ms(get_config(self.app_state.db).reaction_delay_ms)
+            view.set_current_position_provider(self.app_state.player.position_ms if self.app_state.player else None)
         self._apply_saved_playback_speed()
         self._apply_saved_playback_volume()
 
@@ -469,7 +471,7 @@ class MainWindow(QMainWindow):
 
     # ------------------ scanning ------------------
     def refresh_library(self):
-        if getattr(self, "scanner", None) is not None and self.scanner.isRunning():
+        if self.scanner is not None and self.scanner.isRunning():
             return
         directories = get_directories(self.app_state.db)
         if not directories:

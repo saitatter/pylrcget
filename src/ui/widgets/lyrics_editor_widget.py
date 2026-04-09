@@ -148,6 +148,7 @@ class LyricsEditorWidget(QWidget):
         self._publish_synced_available = False
         self._publish_plain_available = False
         self._reaction_delay_ms: int = 0
+        self._current_position_provider = None
 
         root = QVBoxLayout(self)
         set_layout_spacing(root, margins=SPACE_3, spacing=SPACE_2)
@@ -286,6 +287,9 @@ class LyricsEditorWidget(QWidget):
 
     def set_reaction_delay_ms(self, reaction_delay_ms: int) -> None:
         self._reaction_delay_ms = int(reaction_delay_ms or 0)
+
+    def set_current_position_provider(self, provider) -> None:
+        self._current_position_provider = provider
 
     def _apply_styles(self):
         self.setStyleSheet(load_stylesheet("lyrics_editor.qss"))
@@ -565,7 +569,7 @@ class LyricsEditorWidget(QWidget):
         insert_at = row + 1 if row >= 0 else self.table.rowCount()
 
         # default time: current playback time
-        ms = int(self._current_pos_ms)
+        ms = int(self._current_playback_ms())
 
         self.table.blockSignals(True)
         self.table.insertRow(insert_at)
@@ -617,7 +621,7 @@ class LyricsEditorWidget(QWidget):
         if not it_time:
             return
 
-        ms = max(0, int(self._current_pos_ms) + int(self._reaction_delay_ms))
+        ms = max(0, int(self._current_playback_ms()) + int(self._reaction_delay_ms))
         self.table.blockSignals(True)
         it_time.setData(TIMESTAMP_MS_ROLE, ms)
         it_time.setData(TIMESTAMP_VALID_ROLE, True)
@@ -652,7 +656,8 @@ class LyricsEditorWidget(QWidget):
         rows = self._selected_rows()
         if not rows:
             return
-        self._apply_delta_to_rows(rows, int(delta_ms))
+        if not self._apply_delta_to_rows(rows, int(delta_ms)):
+            return
         rendered = f"{int(delta_ms):+d} ms"
         line_word = "line" if len(rows) == 1 else "lines"
         self._set_validation_message(
@@ -667,20 +672,28 @@ class LyricsEditorWidget(QWidget):
         if not first_item:
             return
         first_ms = int(first_item.data(TIMESTAMP_MS_ROLE) or 0)
-        target_ms = max(0, int(self._current_pos_ms) + int(self._reaction_delay_ms))
+        target_ms = max(0, int(self._current_playback_ms()) + int(self._reaction_delay_ms))
         delta_ms = target_ms - first_ms
         if delta_ms == 0:
             self._set_validation_message("First line already matches the current playback time.", state="success")
             return
-        self._apply_delta_to_rows(list(range(self.table.rowCount())), delta_ms)
+        if not self._apply_delta_to_rows(list(range(self.table.rowCount())), delta_ms):
+            return
         self._set_validation_message(
             f"Shifted all lines by {delta_ms:+d} ms using the first line as reference.",
             state="success",
         )
 
-    def _apply_delta_to_rows(self, rows: list[int], delta_ms: int):
+    def _apply_delta_to_rows(self, rows: list[int], delta_ms: int) -> bool:
         if not rows:
-            return
+            return False
+        collapse_rows = self._rows_that_would_collapse_to_zero(rows, delta_ms)
+        if len(collapse_rows) > 1:
+            self._set_validation_message(
+                "Shift cancelled because multiple selected lines would collapse to 00:00.00.",
+                state="error",
+            )
+            return False
         self.table.blockSignals(True)
         for row in rows:
             it_time = self.table.item(row, 0)
@@ -696,6 +709,29 @@ class LyricsEditorWidget(QWidget):
         self._rebuild_times_cache()
         self._update_save_enabled()
         self._refresh_row_styles()
+        return True
+
+    def _rows_that_would_collapse_to_zero(self, rows: list[int], delta_ms: int) -> list[int]:
+        collapse_rows: list[int] = []
+        if delta_ms >= 0:
+            return collapse_rows
+        for row in rows:
+            it_time = self.table.item(row, 0)
+            if not it_time:
+                continue
+            current_ms = int(it_time.data(TIMESTAMP_MS_ROLE) or 0)
+            if current_ms + int(delta_ms) <= 0:
+                collapse_rows.append(row)
+        return collapse_rows
+
+    def _current_playback_ms(self) -> int:
+        provider = self._current_position_provider
+        if provider is not None:
+            try:
+                return int(provider())
+            except Exception:
+                pass
+        return int(self._current_pos_ms)
 
     def _emit_save(self):
         # Synced view: build LRC + plain
