@@ -190,52 +190,6 @@ class MusicFoldersDialog(QDialog):
         self.tabs.addTab(lyrics_tab, "Lyrics")
         self.tabs.addTab(appearance_tab, "Appearance")
 
-        scan_box = QGroupBox("Library Scan")
-        scan_layout = QGridLayout(scan_box)
-
-        self.excluded_paths_edit = QTextEdit()
-        self.excluded_paths_edit.setPlaceholderText(
-            "One path per line.\n"
-            "Example:\n"
-            "D:\\Music\\Podcasts\n"
-            "D:\\Music\\Temporary"
-        )
-        self.add_excluded_path_btn = QPushButton("Add Excluded Path")
-        self.add_excluded_file_btn = QPushButton("Add Excluded File")
-        self.remove_excluded_path_btn = QPushButton("Remove Selected Lines")
-        self.test_exclusions_btn = QPushButton("Test Exclusions")
-        self.excluded_patterns_edit = QTextEdit()
-        self.excluded_patterns_edit.setPlaceholderText(
-            "One regex per line.\n"
-            "Examples:\n"
-            "\\\\Podcasts\\\\\n"
-            "sample|demo\n"
-            "\\.(cue|log)$"
-        )
-
-        scan_layout.addWidget(QLabel("Excluded paths"), 0, 0)
-        scan_layout.addWidget(self.excluded_paths_edit, 1, 0)
-        excluded_paths_btn_row = QHBoxLayout()
-        excluded_paths_btn_row.addWidget(self.add_excluded_path_btn)
-        excluded_paths_btn_row.addWidget(self.add_excluded_file_btn)
-        excluded_paths_btn_row.addWidget(self.remove_excluded_path_btn)
-        excluded_paths_btn_row.addWidget(self.test_exclusions_btn)
-        excluded_paths_btn_row.addStretch(1)
-        scan_layout.addLayout(excluded_paths_btn_row, 2, 0)
-        scan_layout.addWidget(QLabel("Excluded regex patterns"), 0, 1)
-        scan_layout.addWidget(self.excluded_patterns_edit, 1, 1)
-        self.regex_validation_label = QLabel("")
-        self.regex_validation_label.setObjectName("SettingsValidationHint")
-        self.regex_validation_label.setVisible(False)
-        scan_layout.addWidget(self.regex_validation_label, 2, 1)
-
-        scan_hint = QLabel(
-            "Paths skip exact files or entire folders. Regex patterns are matched against the full file path."
-        )
-        scan_hint.setWordWrap(True)
-        scan_layout.addWidget(scan_hint, 3, 0, 1, 2)
-        layout.addWidget(scan_box)
-
         self.save_btn = QPushButton("Save")
         layout.addWidget(self.save_btn)
 

@@ -63,8 +63,6 @@ class LibraryScanner(QThread):
                 if self.isInterruptionRequested():
                     if db is not None:
                         db.rollback()
-                        db.close()
-                        db = None
                     self.finished_signal.emit(False, "Library scan cancelled.")
                     return
 
@@ -105,15 +103,13 @@ class LibraryScanner(QThread):
                 delete_tracks_by_paths(db, removed_paths)
 
             prune_library(db)
-            db.close()
-            db = None
             self.progress_signal.emit(scanned, total, "", time.perf_counter() - started_at)
             self.finished_signal.emit(
                 True,
                 f"Library scanning complete. Updated {updated}, unchanged {unchanged}, removed {removed}.",
             )
         except Exception as e:
+            self.finished_signal.emit(False, f"Scan failed: {e}")
+        finally:
             if db is not None:
                 db.close()
-                db = None
-            self.finished_signal.emit(False, f"Scan failed: {e}")
