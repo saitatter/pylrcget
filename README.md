@@ -137,6 +137,14 @@ Use `!` or a `BREAKING CHANGE:` footer for breaking changes.
 3. If the commits require a new version, it creates the tag and publishes the GitHub release.
 4. The same workflow builds platform-specific executables and uploads them to that release.
 
+### Windows note
+
+Windows release builds are currently unsigned.
+
+On Windows 11, SmartScreen or Defender may show a warning before launch, especially on newly downloaded builds. If you trust the release source, you can usually continue through `More info` -> `Run anyway`.
+
+---
+
 ### Local executable build
 
 ```bash
