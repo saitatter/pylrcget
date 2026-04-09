@@ -219,6 +219,7 @@ class PlayerBar(QWidget):
 
         left_panel = QWidget()
         left_panel.setObjectName("PlayerMeta")
+        left_panel.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Preferred)
         left_layout = QHBoxLayout(left_panel)
         set_layout_spacing(left_layout, margins=0, spacing=SPACE_2)
 
@@ -260,11 +261,12 @@ class PlayerBar(QWidget):
 
         center_panel = QWidget()
         center_panel.setObjectName("PlayerCenter")
+        center_panel.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Preferred)
         center_layout = QVBoxLayout(center_panel)
-        set_layout_spacing(center_layout, margins=0, spacing=4)
+        set_layout_spacing(center_layout, margins=(0, 1, 0, 1), spacing=2)
 
         controls_row = QHBoxLayout()
-        set_layout_spacing(controls_row, spacing=SPACE_2)
+        set_layout_spacing(controls_row, margins=0, spacing=SPACE_2)
         controls_row.addStretch(1)
 
         self.btn_prev = QToolButton()
@@ -273,7 +275,7 @@ class PlayerBar(QWidget):
         self.btn_prev.setAccessibleName("Previous track")
         self.btn_prev.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
         self.btn_prev.setAutoRaise(False)
-        self.btn_prev.setFixedSize(36, 36)
+        self.btn_prev.setFixedSize(28, 28)
 
         self.btn_play = QToolButton()
         self.btn_play.setObjectName("BtnPlay")
@@ -281,7 +283,7 @@ class PlayerBar(QWidget):
         self.btn_play.setAccessibleName("Play or pause")
         self.btn_play.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
         self.btn_play.setAutoRaise(False)
-        self.btn_play.setFixedSize(60, 60)
+        self.btn_play.setFixedSize(44, 44)
 
         self.btn_next = QToolButton()
         self.btn_next.setObjectName("BtnNext")
@@ -289,7 +291,7 @@ class PlayerBar(QWidget):
         self.btn_next.setAccessibleName("Next track")
         self.btn_next.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
         self.btn_next.setAutoRaise(False)
-        self.btn_next.setFixedSize(36, 36)
+        self.btn_next.setFixedSize(28, 28)
 
         self._icons = {
             "prev": load_svg_icon("skip-back.svg", 20, "#e5e7eb"),
@@ -300,9 +302,9 @@ class PlayerBar(QWidget):
         self.btn_prev.setIcon(self._icons["prev"])
         self.btn_next.setIcon(self._icons["next"])
         self.btn_play.setIcon(self._icons["play"])
-        self.btn_prev.setIconSize(QSize(18, 18))
-        self.btn_next.setIconSize(QSize(18, 18))
-        self.btn_play.setIconSize(QSize(26, 26))
+        self.btn_prev.setIconSize(QSize(12, 12))
+        self.btn_next.setIconSize(QSize(12, 12))
+        self.btn_play.setIconSize(QSize(18, 18))
 
         controls_row.addWidget(self.btn_prev)
         controls_row.addWidget(self.btn_play)
@@ -311,7 +313,7 @@ class PlayerBar(QWidget):
         center_layout.addLayout(controls_row)
 
         progress_row = QHBoxLayout()
-        set_layout_spacing(progress_row, spacing=SPACE_2)
+        set_layout_spacing(progress_row, margins=0, spacing=SPACE_2)
 
         self.lbl_time = QLabel("0:00")
         self.lbl_time.setObjectName("TimeLabel")
@@ -323,7 +325,7 @@ class PlayerBar(QWidget):
         self.slider.setRange(0, 0)
         self.slider.setSingleStep(1000)
         self.slider.setPageStep(5000)
-        self.slider.setMinimumHeight(28)
+        self.slider.setMinimumHeight(16)
 
         progress_row.addWidget(self.lbl_time)
         progress_row.addWidget(self.slider, 1)
@@ -332,6 +334,7 @@ class PlayerBar(QWidget):
 
         right_panel = QWidget()
         right_panel.setObjectName("PlayerExtras")
+        right_panel.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Preferred)
         right_layout = QVBoxLayout(right_panel)
         set_layout_spacing(right_layout, margins=0, spacing=4)
 
@@ -379,14 +382,14 @@ class PlayerBar(QWidget):
         right_layout.addLayout(speed_row)
 
         shell_layout.addWidget(left_panel, 0, 0, Qt.AlignLeft | Qt.AlignVCenter)
-        shell_layout.addWidget(center_panel, 0, 1)
+        shell_layout.addWidget(center_panel, 0, 1, Qt.AlignCenter)
         shell_layout.addWidget(right_panel, 0, 2, Qt.AlignRight | Qt.AlignVCenter)
-        shell_layout.setColumnStretch(0, 3)
-        shell_layout.setColumnStretch(1, 8)
-        shell_layout.setColumnStretch(2, 2)
-        shell_layout.setColumnMinimumWidth(2, 132)
+        shell_layout.setColumnStretch(0, 1)
+        shell_layout.setColumnStretch(1, 0)
+        shell_layout.setColumnStretch(2, 1)
 
-        center_panel.setMinimumWidth(560)
+        center_panel.setMinimumWidth(500)
+        center_panel.setMaximumWidth(640)
 
         self.slider.sliderPressed.connect(self._on_slider_pressed)
         self.slider.sliderReleased.connect(self._on_slider_released)
@@ -424,10 +427,16 @@ class PlayerBar(QWidget):
 
         self.lbl_album.setVisible(not compact)
         self.lbl_speed.setVisible(not compact)
-        self.lbl_title.setMinimumWidth(180 if compact else 240)
-        cover_size = 48 if compact else 56
-        bar_height = 106 if compact else 122
+        self.lbl_title.setMinimumWidth(110 if compact else 150)
+        left_width = 240 if compact else 300
+        right_width = 132 if compact else 168
+        center_width = 420 if compact else 560
+        cover_size = 44 if compact else 52
+        bar_height = 92 if compact else 104
         self.lbl_cover.setFixedSize(cover_size, cover_size)
+        self.findChild(QWidget, "PlayerMeta").setFixedWidth(left_width)
+        self.findChild(QWidget, "PlayerExtras").setFixedWidth(right_width)
+        self.findChild(QWidget, "PlayerCenter").setFixedWidth(center_width)
         self.setMinimumHeight(bar_height)
         self.setMaximumHeight(bar_height)
 
