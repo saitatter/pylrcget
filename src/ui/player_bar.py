@@ -271,16 +271,25 @@ class PlayerBar(QWidget):
         self.btn_prev.setObjectName("BtnPrev")
         self.btn_prev.setToolTip("Previous")
         self.btn_prev.setAccessibleName("Previous track")
+        self.btn_prev.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
+        self.btn_prev.setAutoRaise(False)
+        self.btn_prev.setFixedSize(36, 36)
 
         self.btn_play = QToolButton()
         self.btn_play.setObjectName("BtnPlay")
         self.btn_play.setToolTip("Play/Pause")
         self.btn_play.setAccessibleName("Play or pause")
+        self.btn_play.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
+        self.btn_play.setAutoRaise(False)
+        self.btn_play.setFixedSize(60, 60)
 
         self.btn_next = QToolButton()
         self.btn_next.setObjectName("BtnNext")
         self.btn_next.setToolTip("Next")
         self.btn_next.setAccessibleName("Next track")
+        self.btn_next.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
+        self.btn_next.setAutoRaise(False)
+        self.btn_next.setFixedSize(36, 36)
 
         self._icons = {
             "prev": load_svg_icon("skip-back.svg", 20, "#e5e7eb"),
@@ -291,9 +300,9 @@ class PlayerBar(QWidget):
         self.btn_prev.setIcon(self._icons["prev"])
         self.btn_next.setIcon(self._icons["next"])
         self.btn_play.setIcon(self._icons["play"])
-        self.btn_prev.setIconSize(QSize(20, 20))
-        self.btn_next.setIconSize(QSize(20, 20))
-        self.btn_play.setIconSize(QSize(28, 28))
+        self.btn_prev.setIconSize(QSize(18, 18))
+        self.btn_next.setIconSize(QSize(18, 18))
+        self.btn_play.setIconSize(QSize(26, 26))
 
         controls_row.addWidget(self.btn_prev)
         controls_row.addWidget(self.btn_play)
@@ -435,7 +444,7 @@ class PlayerBar(QWidget):
         self.lbl_speed.setVisible(not compact)
         self.lbl_title.setMinimumWidth(160 if compact else 220)
         cover_size = 48 if compact else 56
-        bar_height = 98 if compact else 112
+        bar_height = 106 if compact else 126
         self.lbl_cover.setFixedSize(cover_size, cover_size)
         self.setMinimumHeight(bar_height)
         self.setMaximumHeight(bar_height)

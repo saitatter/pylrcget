@@ -25,7 +25,7 @@ QWidget#PlayerExtras {
 }
 
 QWidget#PlayerCenter {
-    min-height: 72px;
+    min-height: 84px;
 }
 
 QToolButton {
@@ -50,9 +50,11 @@ QToolButton#BtnPlay {
     background: {{color-bg-elevated}};
     border: 1px solid {{color-border}};
     border-radius: {{radius-pill}};
-    padding: 14px;
-    min-width: 54px;
-    min-height: 54px;
+    padding: 0;
+    min-width: 60px;
+    min-height: 60px;
+    max-width: 60px;
+    max-height: 60px;
     color: {{color-text}};
 }
 
@@ -64,6 +66,16 @@ QToolButton#BtnPlay:hover {
 
 QToolButton#BtnPlay:pressed {
     background: {{color-bg-pressed}};
+}
+
+QToolButton#BtnPrev,
+QToolButton#BtnNext {
+    padding: 0;
+    min-width: 36px;
+    min-height: 36px;
+    max-width: 36px;
+    max-height: 36px;
+    border-radius: {{radius-pill}};
 }
 
 QLabel {
