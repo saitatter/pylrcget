@@ -209,12 +209,12 @@ class PlayerBar(QWidget):
         self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
 
         root = QHBoxLayout(self)
-        set_layout_spacing(root, margins=(SPACE_3, SPACE_2, SPACE_3, SPACE_2), spacing=0)
+        set_layout_spacing(root, margins=(SPACE_2, SPACE_2, SPACE_2, SPACE_2), spacing=0)
 
         shell = QWidget()
         shell.setObjectName("PlayerShell")
         shell_layout = QGridLayout(shell)
-        set_layout_spacing(shell_layout, margins=(SPACE_3, SPACE_2, SPACE_3, SPACE_2), spacing=SPACE_3)
+        set_layout_spacing(shell_layout, margins=(SPACE_2, SPACE_2, SPACE_2, SPACE_2), spacing=SPACE_2)
         root.addWidget(shell)
 
         left_panel = QWidget()
@@ -378,33 +378,15 @@ class PlayerBar(QWidget):
         right_layout.addWidget(self.lbl_speed)
         right_layout.addLayout(speed_row)
 
-        left_slot = QWidget()
-        left_slot_layout = QHBoxLayout(left_slot)
-        set_layout_spacing(left_slot_layout, margins=0, spacing=0)
-        left_slot_layout.addWidget(left_panel)
+        shell_layout.addWidget(left_panel, 0, 0, Qt.AlignLeft | Qt.AlignVCenter)
+        shell_layout.addWidget(center_panel, 0, 1)
+        shell_layout.addWidget(right_panel, 0, 2, Qt.AlignRight | Qt.AlignVCenter)
+        shell_layout.setColumnStretch(0, 3)
+        shell_layout.setColumnStretch(1, 8)
+        shell_layout.setColumnStretch(2, 2)
+        shell_layout.setColumnMinimumWidth(2, 132)
 
-        center_slot = QWidget()
-        center_slot_layout = QHBoxLayout(center_slot)
-        set_layout_spacing(center_slot_layout, margins=0, spacing=0)
-        center_slot_layout.addStretch(1)
-        center_slot_layout.addWidget(center_panel, 0, Qt.AlignHCenter | Qt.AlignVCenter)
-        center_slot_layout.addStretch(1)
-
-        right_slot = QWidget()
-        right_slot_layout = QHBoxLayout(right_slot)
-        set_layout_spacing(right_slot_layout, margins=0, spacing=0)
-        right_slot_layout.addStretch(1)
-        right_slot_layout.addWidget(right_panel, 0, Qt.AlignRight | Qt.AlignVCenter)
-
-        shell_layout.addWidget(left_slot, 0, 0)
-        shell_layout.addWidget(center_slot, 0, 1)
-        shell_layout.addWidget(right_slot, 0, 2)
-        shell_layout.setColumnStretch(0, 4)
-        shell_layout.setColumnStretch(1, 5)
-        shell_layout.setColumnStretch(2, 4)
-        shell_layout.setColumnMinimumWidth(2, 120)
-
-        center_panel.setMinimumWidth(420)
+        center_panel.setMinimumWidth(560)
 
         self.slider.sliderPressed.connect(self._on_slider_pressed)
         self.slider.sliderReleased.connect(self._on_slider_released)
@@ -442,9 +424,9 @@ class PlayerBar(QWidget):
 
         self.lbl_album.setVisible(not compact)
         self.lbl_speed.setVisible(not compact)
-        self.lbl_title.setMinimumWidth(160 if compact else 220)
+        self.lbl_title.setMinimumWidth(180 if compact else 240)
         cover_size = 48 if compact else 56
-        bar_height = 106 if compact else 126
+        bar_height = 106 if compact else 122
         self.lbl_cover.setFixedSize(cover_size, cover_size)
         self.setMinimumHeight(bar_height)
         self.setMaximumHeight(bar_height)

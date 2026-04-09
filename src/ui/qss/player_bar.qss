@@ -1,20 +1,20 @@
 QWidget#PlayerBar {
     background-color: {{color-bg-app}};
-    border-top: 1px solid {{color-border-strong}};
+    border-top: 1px solid {{color-border}};
 }
 
 QWidget#PlayerShell {
-    background: {{color-bg-panel}};
-    border: 1px solid {{color-border-strong}};
-    border-radius: {{radius-xl}};
+    background: {{color-bg-elevated}};
+    border: 1px solid {{color-border}};
+    border-radius: 18px;
 }
 
 QWidget#PlayerBar[compact="true"] QWidget#PlayerShell {
-    border-radius: {{radius-lg}};
+    border-radius: 14px;
 }
 
 QWidget#PlayerBar[compact="true"] QWidget#PlayerExtras {
-    min-width: 84px;
+    min-width: 110px;
 }
 
 QWidget#PlayerMeta,
@@ -24,8 +24,18 @@ QWidget#PlayerExtras {
     border: none;
 }
 
+QWidget#PlayerMeta {
+    padding-right: 6px;
+}
+
 QWidget#PlayerCenter {
-    min-height: 84px;
+    min-height: 76px;
+    padding-left: 4px;
+    padding-right: 4px;
+}
+
+QWidget#PlayerExtras {
+    padding-left: 6px;
 }
 
 QToolButton {
