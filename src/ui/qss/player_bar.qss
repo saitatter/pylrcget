@@ -14,7 +14,7 @@ QWidget#PlayerBar[compact="true"] QWidget#PlayerShell {
 }
 
 QWidget#PlayerBar[compact="true"] QWidget#PlayerExtras {
-    min-width: 132px;
+    min-width: 168px;
 }
 
 QWidget#PlayerMeta,
@@ -143,6 +143,10 @@ QLabel#TimeLabel {
     background: transparent;
 }
 
+QWidget#PlayerExtras QLabel#MetaLabel {
+    min-width: 40px;
+}
+
 QLabel#NowPlayingCover {
     background: {{color-bg-pressed}};
     border: 1px solid {{color-cover-border}};
@@ -200,6 +204,7 @@ QSlider#VolumeSlider::groove:horizontal {
     height: 5px;
     background: {{color-bg-pressed}};
     border-radius: 999px;
+    margin: 0;
 }
 
 QSlider#VolumeSlider::sub-page:horizontal {

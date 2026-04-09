@@ -430,14 +430,13 @@ class PlayerBar(QWidget):
         right_layout.addWidget(self.lbl_speed)
         right_layout.addLayout(speed_row)
 
-        self.lbl_volume = QLabel("Volume")
-        self.lbl_volume.setObjectName("MetaLabel")
-        right_layout.addWidget(self.lbl_volume)
-
         volume_row = QHBoxLayout()
         set_layout_spacing(volume_row, margins=0, spacing=SPACE_2)
 
-        self.slider_volume = QSlider(Qt.Orientation.Horizontal)
+        self.lbl_volume = QLabel("Volume")
+        self.lbl_volume.setObjectName("MetaLabel")
+
+        self.slider_volume = SeekSlider(Qt.Orientation.Horizontal)
         self.slider_volume.setObjectName("VolumeSlider")
         self.slider_volume.setRange(0, 100)
         self.slider_volume.setSingleStep(5)
@@ -449,6 +448,7 @@ class PlayerBar(QWidget):
         self.lbl_volume_value.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         self.lbl_volume_value.setMinimumWidth(34)
 
+        volume_row.addWidget(self.lbl_volume)
         volume_row.addWidget(self.slider_volume, 1)
         volume_row.addWidget(self.lbl_volume_value)
         right_layout.addLayout(volume_row)
@@ -504,7 +504,7 @@ class PlayerBar(QWidget):
 
         self.lbl_album.setVisible(not compact)
         self.lbl_speed.setVisible(not compact)
-        self.lbl_volume.setVisible(not compact)
+        self.lbl_volume.setVisible(True)
         self.lbl_title.setMinimumWidth(110 if compact else 150)
         left_width = 240 if compact else 300
         right_width = 150 if compact else 190
