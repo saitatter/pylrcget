@@ -184,8 +184,13 @@ Use `!` or a `BREAKING CHANGE:` footer for breaking changes.
 3. If a version bump is needed, semantic-release creates the tag and GitHub release.
 4. Build artifacts are attached to that release.
 
----
+### Windows note
 
+Windows release builds are currently unsigned.
+
+On Windows 11, SmartScreen or Defender may show a warning before launch, especially on newly downloaded builds. If you trust the release source, you can usually continue through `More info` -> `Run anyway`.
+
+---
 ## Local Build
 
 ```bash

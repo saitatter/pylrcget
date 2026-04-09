@@ -828,7 +828,6 @@ class MainWindow(QMainWindow):
         config = get_config(self.app_state.db)
         set_config(self.app_state.db, replace(config, last_library_route=self._pending_library_route))
         self._pending_library_route = None
-
     def _play_selected_or_current(self):
         tid = self.track_list.selected_track_id()
         if tid is not None:

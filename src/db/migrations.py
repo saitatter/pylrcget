@@ -180,7 +180,6 @@ def upgrade_database_if_needed(db: sqlite3.Connection, existing_version: int) ->
         """)
         db.commit()
         db.execute("PRAGMA user_version=15")
-
     # v16
     if existing_version <= 15:
         print("Migrate database version 16...")

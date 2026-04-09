@@ -4,8 +4,8 @@ import base64
 import html
 from pathlib import Path
 
-from PySide6.QtCore import QSize, Qt, Signal
-from PySide6.QtGui import QColor, QFont, QLinearGradient, QPainter, QPixmap
+from PySide6.QtCore import QEvent, QRectF, QSize, Qt, Signal, QTimer
+from PySide6.QtGui import QColor, QFont, QLinearGradient, QPainter, QPen, QPixmap
 from PySide6.QtWidgets import (
     QComboBox,
     QGridLayout,
@@ -29,6 +29,7 @@ from mutagen.oggvorbis import OggVorbis
 from ui.icon_loader import load_svg_icon
 from ui.spacing import SPACE_2, SPACE_3, set_layout_spacing
 from ui.style_loader import load_stylesheet
+from ui.theme_tokens import STYLE_TOKENS
 
 
 def _fmt(ms: int) -> str:
@@ -174,6 +175,53 @@ def _artwork_pixmap(title: str, artist: str | None, audio_path: str | None, size
 
 
 class SeekSlider(QSlider):
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing, True)
+
+        groove_height = 7.0
+        handle_size = 12.0
+        radius = groove_height / 2.0
+        value_range = max(1, self.maximum() - self.minimum())
+        ratio = (self.value() - self.minimum()) / value_range if self.maximum() > self.minimum() else 0.0
+
+        track_left = handle_size / 2.0
+        track_width = max(1.0, self.width() - handle_size)
+        track_top = (self.height() - groove_height) / 2.0
+        track_rect = QRectF(track_left, track_top, track_width, groove_height)
+
+        fill_width = track_width * max(0.0, min(1.0, ratio))
+        fill_rect = QRectF(track_left, track_top, fill_width, groove_height)
+
+        fill_gradient = QLinearGradient(track_rect.left(), track_rect.top(), track_rect.right(), track_rect.top())
+        fill_gradient.setColorAt(0.0, QColor(STYLE_TOKENS["color-slider-fill-start"]))
+        fill_gradient.setColorAt(1.0, QColor(STYLE_TOKENS["color-slider-fill-end"]))
+
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(QColor(STYLE_TOKENS["color-bg-pressed"]))
+        painter.drawRoundedRect(track_rect, radius, radius)
+
+        if fill_width > 0:
+            painter.setBrush(fill_gradient)
+            painter.drawRoundedRect(fill_rect, radius, radius)
+
+        handle_center_x = track_left + fill_width
+        handle_rect = QRectF(
+            handle_center_x - handle_size / 2.0,
+            (self.height() - handle_size) / 2.0,
+            handle_size,
+            handle_size,
+        )
+        handle_color = (
+            QColor(STYLE_TOKENS["color-accent-alt"])
+            if self.underMouse() or self.isSliderDown()
+            else QColor(STYLE_TOKENS["color-accent"])
+        )
+        painter.setBrush(handle_color)
+        painter.setPen(QPen(QColor(STYLE_TOKENS["color-slider-handle-border"]), 2))
+        painter.drawEllipse(handle_rect)
+        painter.end()
+
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:
             value = QStyle.sliderValueFromPosition(
@@ -201,20 +249,25 @@ class PlayerBar(QWidget):
         self._is_playing = False
         self._speed_step = 0.05
         self._current_track_id: int | None = None
+        self._speed_commit_timer = QTimer(self)
+        self._speed_commit_timer.setSingleShot(True)
+        self._speed_commit_timer.setInterval(450)
+        self._speed_commit_timer.timeout.connect(self._commit_pending_custom_speed)
         self.setObjectName("PlayerBar")
         self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
 
         root = QHBoxLayout(self)
-        set_layout_spacing(root, margins=(SPACE_3, SPACE_2, SPACE_3, SPACE_2), spacing=0)
+        set_layout_spacing(root, margins=(SPACE_2, SPACE_2, SPACE_2, SPACE_2), spacing=0)
 
         shell = QWidget()
         shell.setObjectName("PlayerShell")
         shell_layout = QGridLayout(shell)
-        set_layout_spacing(shell_layout, margins=(SPACE_3, SPACE_2, SPACE_3, SPACE_2), spacing=SPACE_3)
+        set_layout_spacing(shell_layout, margins=(SPACE_2, SPACE_2, SPACE_2, SPACE_2), spacing=SPACE_2)
         root.addWidget(shell)
 
         left_panel = QWidget()
         left_panel.setObjectName("PlayerMeta")
+        left_panel.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Preferred)
         left_layout = QHBoxLayout(left_panel)
         set_layout_spacing(left_layout, margins=0, spacing=SPACE_2)
 
@@ -256,27 +309,37 @@ class PlayerBar(QWidget):
 
         center_panel = QWidget()
         center_panel.setObjectName("PlayerCenter")
+        center_panel.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Preferred)
         center_layout = QVBoxLayout(center_panel)
-        set_layout_spacing(center_layout, margins=0, spacing=4)
+        set_layout_spacing(center_layout, margins=(0, 1, 0, 1), spacing=2)
 
         controls_row = QHBoxLayout()
-        set_layout_spacing(controls_row, spacing=SPACE_2)
+        set_layout_spacing(controls_row, margins=0, spacing=SPACE_2)
         controls_row.addStretch(1)
 
         self.btn_prev = QToolButton()
         self.btn_prev.setObjectName("BtnPrev")
         self.btn_prev.setToolTip("Previous")
         self.btn_prev.setAccessibleName("Previous track")
+        self.btn_prev.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
+        self.btn_prev.setAutoRaise(False)
+        self.btn_prev.setFixedSize(28, 28)
 
         self.btn_play = QToolButton()
         self.btn_play.setObjectName("BtnPlay")
         self.btn_play.setToolTip("Play/Pause")
         self.btn_play.setAccessibleName("Play or pause")
+        self.btn_play.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
+        self.btn_play.setAutoRaise(False)
+        self.btn_play.setFixedSize(44, 44)
 
         self.btn_next = QToolButton()
         self.btn_next.setObjectName("BtnNext")
         self.btn_next.setToolTip("Next")
         self.btn_next.setAccessibleName("Next track")
+        self.btn_next.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
+        self.btn_next.setAutoRaise(False)
+        self.btn_next.setFixedSize(28, 28)
 
         self._icons = {
             "prev": load_svg_icon("skip-back.svg", 20, "#e5e7eb"),
@@ -287,9 +350,9 @@ class PlayerBar(QWidget):
         self.btn_prev.setIcon(self._icons["prev"])
         self.btn_next.setIcon(self._icons["next"])
         self.btn_play.setIcon(self._icons["play"])
-        self.btn_prev.setIconSize(QSize(20, 20))
-        self.btn_next.setIconSize(QSize(20, 20))
-        self.btn_play.setIconSize(QSize(28, 28))
+        self.btn_prev.setIconSize(QSize(12, 12))
+        self.btn_next.setIconSize(QSize(12, 12))
+        self.btn_play.setIconSize(QSize(18, 18))
 
         controls_row.addWidget(self.btn_prev)
         controls_row.addWidget(self.btn_play)
@@ -298,7 +361,7 @@ class PlayerBar(QWidget):
         center_layout.addLayout(controls_row)
 
         progress_row = QHBoxLayout()
-        set_layout_spacing(progress_row, spacing=SPACE_2)
+        set_layout_spacing(progress_row, margins=0, spacing=SPACE_2)
 
         self.lbl_time = QLabel("0:00")
         self.lbl_time.setObjectName("TimeLabel")
@@ -310,7 +373,7 @@ class PlayerBar(QWidget):
         self.slider.setRange(0, 0)
         self.slider.setSingleStep(1000)
         self.slider.setPageStep(5000)
-        self.slider.setMinimumHeight(28)
+        self.slider.setMinimumHeight(16)
 
         progress_row.addWidget(self.lbl_time)
         progress_row.addWidget(self.slider, 1)
@@ -319,6 +382,7 @@ class PlayerBar(QWidget):
 
         right_panel = QWidget()
         right_panel.setObjectName("PlayerExtras")
+        right_panel.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Preferred)
         right_layout = QVBoxLayout(right_panel)
         set_layout_spacing(right_layout, margins=0, spacing=4)
 
@@ -351,6 +415,7 @@ class PlayerBar(QWidget):
             self.cmb_speed.addItem(label, speed)
         self.cmb_speed.setCurrentIndex(0)
         self.cmb_speed.lineEdit().setPlaceholderText("Custom")
+        self.cmb_speed.lineEdit().installEventFilter(self)
 
         self.btn_speed_up = QToolButton()
         self.btn_speed_up.setObjectName("SpeedAdjustButton")
@@ -364,39 +429,22 @@ class PlayerBar(QWidget):
         right_layout.addWidget(self.lbl_speed)
         right_layout.addLayout(speed_row)
 
-        left_slot = QWidget()
-        left_slot_layout = QHBoxLayout(left_slot)
-        set_layout_spacing(left_slot_layout, margins=0, spacing=0)
-        left_slot_layout.addWidget(left_panel)
+        shell_layout.addWidget(left_panel, 0, 0, Qt.AlignLeft | Qt.AlignVCenter)
+        shell_layout.addWidget(center_panel, 0, 1, Qt.AlignCenter)
+        shell_layout.addWidget(right_panel, 0, 2, Qt.AlignRight | Qt.AlignVCenter)
+        shell_layout.setColumnStretch(0, 1)
+        shell_layout.setColumnStretch(1, 0)
+        shell_layout.setColumnStretch(2, 1)
 
-        center_slot = QWidget()
-        center_slot_layout = QHBoxLayout(center_slot)
-        set_layout_spacing(center_slot_layout, margins=0, spacing=0)
-        center_slot_layout.addStretch(1)
-        center_slot_layout.addWidget(center_panel, 0, Qt.AlignHCenter | Qt.AlignVCenter)
-        center_slot_layout.addStretch(1)
-
-        right_slot = QWidget()
-        right_slot_layout = QHBoxLayout(right_slot)
-        set_layout_spacing(right_slot_layout, margins=0, spacing=0)
-        right_slot_layout.addStretch(1)
-        right_slot_layout.addWidget(right_panel, 0, Qt.AlignRight | Qt.AlignVCenter)
-
-        shell_layout.addWidget(left_slot, 0, 0)
-        shell_layout.addWidget(center_slot, 0, 1)
-        shell_layout.addWidget(right_slot, 0, 2)
-        shell_layout.setColumnStretch(0, 4)
-        shell_layout.setColumnStretch(1, 5)
-        shell_layout.setColumnStretch(2, 4)
-        shell_layout.setColumnMinimumWidth(2, 120)
-
-        center_panel.setMinimumWidth(420)
+        center_panel.setMinimumWidth(500)
+        center_panel.setMaximumWidth(640)
 
         self.slider.sliderPressed.connect(self._on_slider_pressed)
         self.slider.sliderReleased.connect(self._on_slider_released)
         self.slider.sliderMoved.connect(self._on_slider_moved)
         self.cmb_speed.activated.connect(self._on_speed_preset_selected)
         self.cmb_speed.lineEdit().editingFinished.connect(self._on_custom_speed_committed)
+        self.cmb_speed.lineEdit().textEdited.connect(self._on_custom_speed_edited)
         self.btn_speed_down.clicked.connect(lambda: self._step_speed(-self._speed_step))
         self.btn_speed_up.clicked.connect(lambda: self._step_speed(self._speed_step))
 
@@ -427,10 +475,16 @@ class PlayerBar(QWidget):
 
         self.lbl_album.setVisible(not compact)
         self.lbl_speed.setVisible(not compact)
-        self.lbl_title.setMinimumWidth(160 if compact else 220)
-        cover_size = 48 if compact else 56
-        bar_height = 98 if compact else 112
+        self.lbl_title.setMinimumWidth(110 if compact else 150)
+        left_width = 240 if compact else 300
+        right_width = 132 if compact else 168
+        center_width = 420 if compact else 560
+        cover_size = 44 if compact else 52
+        bar_height = 92 if compact else 104
         self.lbl_cover.setFixedSize(cover_size, cover_size)
+        self.findChild(QWidget, "PlayerMeta").setFixedWidth(left_width)
+        self.findChild(QWidget, "PlayerExtras").setFixedWidth(right_width)
+        self.findChild(QWidget, "PlayerCenter").setFixedWidth(center_width)
         self.setMinimumHeight(bar_height)
         self.setMaximumHeight(bar_height)
 
@@ -453,6 +507,7 @@ class PlayerBar(QWidget):
 
     def _apply_speed(self, speed: float) -> None:
         normalized = self._normalize_speed(speed)
+        self._speed_commit_timer.stop()
         if self.player and hasattr(self.player, "set_playback_speed"):
             try:
                 self.player.set_playback_speed(normalized)
@@ -481,6 +536,13 @@ class PlayerBar(QWidget):
             return
 
         self._apply_speed(speed)
+
+    def _on_custom_speed_edited(self, _text: str) -> None:
+        self._speed_commit_timer.start()
+
+    def _commit_pending_custom_speed(self) -> None:
+        if self.cmb_speed.lineEdit().hasFocus():
+            self._on_custom_speed_committed()
 
     def _step_speed(self, delta: float) -> None:
         current = 1.0
@@ -514,6 +576,14 @@ class PlayerBar(QWidget):
         self.cmb_speed.setCurrentIndex(-1)
         self.cmb_speed.lineEdit().setText(self._format_speed_label(speed))
         self.cmb_speed.blockSignals(False)
+
+    def eventFilter(self, watched, event):
+        if watched is self.cmb_speed.lineEdit() and event.type() == QEvent.Type.KeyPress:
+            if event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
+                self._on_custom_speed_committed()
+                event.accept()
+                return True
+        return super().eventFilter(watched, event)
 
     def _on_slider_pressed(self):
         self._dragging = True

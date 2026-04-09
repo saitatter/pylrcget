@@ -1,20 +1,20 @@
 QWidget#PlayerBar {
     background-color: {{color-bg-app}};
-    border-top: 1px solid {{color-border-strong}};
+    border-top: 1px solid {{color-border}};
 }
 
 QWidget#PlayerShell {
-    background: {{color-bg-panel}};
-    border: 1px solid {{color-border-strong}};
-    border-radius: {{radius-xl}};
+    background: {{color-bg-elevated}};
+    border: 1px solid {{color-border}};
+    border-radius: 999px;
 }
 
 QWidget#PlayerBar[compact="true"] QWidget#PlayerShell {
-    border-radius: {{radius-lg}};
+    border-radius: 999px;
 }
 
 QWidget#PlayerBar[compact="true"] QWidget#PlayerExtras {
-    min-width: 84px;
+    min-width: 116px;
 }
 
 QWidget#PlayerMeta,
@@ -24,8 +24,19 @@ QWidget#PlayerExtras {
     border: none;
 }
 
+QWidget#PlayerMeta {
+    padding-right: 4px;
+}
+
 QWidget#PlayerCenter {
-    min-height: 72px;
+    min-height: 66px;
+    padding-left: 2px;
+    padding-right: 2px;
+}
+
+QWidget#PlayerExtras {
+    padding-left: 4px;
+    padding-right: 4px;
 }
 
 QToolButton {
@@ -50,9 +61,11 @@ QToolButton#BtnPlay {
     background: {{color-bg-elevated}};
     border: 1px solid {{color-border}};
     border-radius: {{radius-pill}};
-    padding: 14px;
-    min-width: 54px;
-    min-height: 54px;
+    padding: 0;
+    min-width: 44px;
+    min-height: 44px;
+    max-width: 44px;
+    max-height: 44px;
     color: {{color-text}};
 }
 
@@ -66,25 +79,41 @@ QToolButton#BtnPlay:pressed {
     background: {{color-bg-pressed}};
 }
 
+QToolButton#BtnPrev,
+QToolButton#BtnNext {
+    padding: 0;
+    min-width: 28px;
+    min-height: 28px;
+    max-width: 28px;
+    max-height: 28px;
+    border-radius: {{radius-pill}};
+}
+
 QLabel {
     color: {{color-text-soft}};
     font-size: {{font-size-sm}};
+    background: transparent;
+    border: none;
+    padding: 0;
 }
 
 QLabel#NowPlaying {
     color: {{color-text-strong}};
-    font-size: {{font-size-lg}};
+    font-size: 15px;
     font-weight: 600;
+    background: transparent;
 }
 
 QLabel#NowPlayingArtist {
     color: {{color-text}};
-    font-size: {{font-size-sm}};
+    font-size: 12px;
+    background: transparent;
 }
 
 QLabel#NowPlayingAlbum {
     color: {{color-text-muted}};
-    font-size: {{font-size-sm}};
+    font-size: 12px;
+    background: transparent;
 }
 
 QLabel#NowPlayingArtist,
@@ -109,28 +138,29 @@ QWidget#PlayerBar[compact="true"] QLabel#NowPlayingAlbum {
 QLabel#MetaLabel,
 QLabel#TimeLabel {
     color: {{color-text}};
-    font-size: {{font-size-sm}};
+    font-size: 11px;
     font-weight: 500;
+    background: transparent;
 }
 
 QLabel#NowPlayingCover {
     background: {{color-bg-pressed}};
     border: 1px solid {{color-cover-border}};
-    border-radius: 12px;
+    border-radius: 10px;
 }
 
 QSlider#PlayerSlider::groove:horizontal {
-    height: 8px;
+    height: 7px;
     background: {{color-bg-pressed}};
-    border-radius: 4px;
-    margin: 2px 0;
+    border-radius: 999px;
+    margin: 0;
 }
 
 QSlider#PlayerSlider::handle:horizontal {
-    width: 16px;
-    height: 16px;
-    margin: -5px 0;
-    border-radius: 8px;
+    width: 12px;
+    height: 12px;
+    margin: -4px 0;
+    border-radius: 7px;
     background: {{color-accent}};
     border: 2px solid {{color-slider-handle-border}};
 }
@@ -145,22 +175,25 @@ QSlider#PlayerSlider::sub-page:horizontal {
         stop:0 {{color-slider-fill-start}},
         stop:1 {{color-slider-fill-end}}
     );
-    border-radius: 4px;
+    border-radius: 999px;
 }
 
 QSlider#PlayerSlider::add-page:horizontal {
     background: {{color-bg-pressed}};
-    border-radius: 4px;
+    border-radius: 999px;
 }
 
 QComboBox#SpeedCombo {
     background: {{color-bg-control}};
     border: 1px solid {{color-border}};
     border-radius: {{radius-md}};
-    padding: 6px 10px;
+    padding: 2px 10px 3px 10px;
     color: {{color-text}};
-    min-width: 88px;
-    font-size: {{font-size-sm}};
+    min-width: 72px;
+    max-width: 72px;
+    min-height: 28px;
+    max-height: 28px;
+    font-size: 11px;
 }
 
 QComboBox#SpeedCombo:hover {
@@ -176,9 +209,11 @@ QToolButton#SpeedAdjustButton {
     background: {{color-bg-control}};
     border: 1px solid {{color-border}};
     border-radius: {{radius-md}};
-    min-width: 28px;
-    min-height: 28px;
-    font-size: 14px;
+    min-width: 26px;
+    min-height: 26px;
+    max-width: 26px;
+    max-height: 26px;
+    font-size: 12px;
     font-weight: 600;
     padding: 2px;
 }
