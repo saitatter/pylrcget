@@ -4,7 +4,7 @@ import base64
 import html
 from pathlib import Path
 
-from PySide6.QtCore import QSize, Qt, Signal
+from PySide6.QtCore import QEvent, QSize, Qt, Signal, QTimer
 from PySide6.QtGui import QColor, QFont, QLinearGradient, QPainter, QPixmap
 from PySide6.QtWidgets import (
     QComboBox,
@@ -201,6 +201,10 @@ class PlayerBar(QWidget):
         self._is_playing = False
         self._speed_step = 0.05
         self._current_track_id: int | None = None
+        self._speed_commit_timer = QTimer(self)
+        self._speed_commit_timer.setSingleShot(True)
+        self._speed_commit_timer.setInterval(450)
+        self._speed_commit_timer.timeout.connect(self._commit_pending_custom_speed)
         self.setObjectName("PlayerBar")
         self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
 
@@ -351,6 +355,7 @@ class PlayerBar(QWidget):
             self.cmb_speed.addItem(label, speed)
         self.cmb_speed.setCurrentIndex(0)
         self.cmb_speed.lineEdit().setPlaceholderText("Custom")
+        self.cmb_speed.lineEdit().installEventFilter(self)
 
         self.btn_speed_up = QToolButton()
         self.btn_speed_up.setObjectName("SpeedAdjustButton")
@@ -397,6 +402,7 @@ class PlayerBar(QWidget):
         self.slider.sliderMoved.connect(self._on_slider_moved)
         self.cmb_speed.activated.connect(self._on_speed_preset_selected)
         self.cmb_speed.lineEdit().editingFinished.connect(self._on_custom_speed_committed)
+        self.cmb_speed.lineEdit().textEdited.connect(self._on_custom_speed_edited)
         self.btn_speed_down.clicked.connect(lambda: self._step_speed(-self._speed_step))
         self.btn_speed_up.clicked.connect(lambda: self._step_speed(self._speed_step))
 
@@ -453,6 +459,7 @@ class PlayerBar(QWidget):
 
     def _apply_speed(self, speed: float) -> None:
         normalized = self._normalize_speed(speed)
+        self._speed_commit_timer.stop()
         if self.player and hasattr(self.player, "set_playback_speed"):
             try:
                 self.player.set_playback_speed(normalized)
@@ -481,6 +488,13 @@ class PlayerBar(QWidget):
             return
 
         self._apply_speed(speed)
+
+    def _on_custom_speed_edited(self, _text: str) -> None:
+        self._speed_commit_timer.start()
+
+    def _commit_pending_custom_speed(self) -> None:
+        if self.cmb_speed.lineEdit().hasFocus():
+            self._on_custom_speed_committed()
 
     def _step_speed(self, delta: float) -> None:
         current = 1.0
@@ -514,6 +528,14 @@ class PlayerBar(QWidget):
         self.cmb_speed.setCurrentIndex(-1)
         self.cmb_speed.lineEdit().setText(self._format_speed_label(speed))
         self.cmb_speed.blockSignals(False)
+
+    def eventFilter(self, watched, event):
+        if watched is self.cmb_speed.lineEdit() and event.type() == QEvent.Type.KeyPress:
+            if event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
+                self._on_custom_speed_committed()
+                event.accept()
+                return True
+        return super().eventFilter(watched, event)
 
     def _on_slider_pressed(self):
         self._dragging = True
