@@ -4,8 +4,8 @@ import base64
 import html
 from pathlib import Path
 
-from PySide6.QtCore import QEvent, QSize, Qt, Signal, QTimer
-from PySide6.QtGui import QColor, QFont, QLinearGradient, QPainter, QPixmap
+from PySide6.QtCore import QEvent, QRectF, QSize, Qt, Signal, QTimer
+from PySide6.QtGui import QColor, QFont, QLinearGradient, QPainter, QPen, QPixmap
 from PySide6.QtWidgets import (
     QComboBox,
     QGridLayout,
@@ -29,6 +29,7 @@ from mutagen.oggvorbis import OggVorbis
 from ui.icon_loader import load_svg_icon
 from ui.spacing import SPACE_2, SPACE_3, set_layout_spacing
 from ui.style_loader import load_stylesheet
+from ui.theme_tokens import STYLE_TOKENS
 
 
 def _fmt(ms: int) -> str:
@@ -174,6 +175,53 @@ def _artwork_pixmap(title: str, artist: str | None, audio_path: str | None, size
 
 
 class SeekSlider(QSlider):
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing, True)
+
+        groove_height = 7.0
+        handle_size = 12.0
+        radius = groove_height / 2.0
+        value_range = max(1, self.maximum() - self.minimum())
+        ratio = (self.value() - self.minimum()) / value_range if self.maximum() > self.minimum() else 0.0
+
+        track_left = handle_size / 2.0
+        track_width = max(1.0, self.width() - handle_size)
+        track_top = (self.height() - groove_height) / 2.0
+        track_rect = QRectF(track_left, track_top, track_width, groove_height)
+
+        fill_width = track_width * max(0.0, min(1.0, ratio))
+        fill_rect = QRectF(track_left, track_top, fill_width, groove_height)
+
+        fill_gradient = QLinearGradient(track_rect.left(), track_rect.top(), track_rect.right(), track_rect.top())
+        fill_gradient.setColorAt(0.0, QColor(STYLE_TOKENS["color-slider-fill-start"]))
+        fill_gradient.setColorAt(1.0, QColor(STYLE_TOKENS["color-slider-fill-end"]))
+
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(QColor(STYLE_TOKENS["color-bg-pressed"]))
+        painter.drawRoundedRect(track_rect, radius, radius)
+
+        if fill_width > 0:
+            painter.setBrush(fill_gradient)
+            painter.drawRoundedRect(fill_rect, radius, radius)
+
+        handle_center_x = track_left + fill_width
+        handle_rect = QRectF(
+            handle_center_x - handle_size / 2.0,
+            (self.height() - handle_size) / 2.0,
+            handle_size,
+            handle_size,
+        )
+        handle_color = (
+            QColor(STYLE_TOKENS["color-accent-alt"])
+            if self.underMouse() or self.isSliderDown()
+            else QColor(STYLE_TOKENS["color-accent"])
+        )
+        painter.setBrush(handle_color)
+        painter.setPen(QPen(QColor(STYLE_TOKENS["color-slider-handle-border"]), 2))
+        painter.drawEllipse(handle_rect)
+        painter.end()
+
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:
             value = QStyle.sliderValueFromPosition(

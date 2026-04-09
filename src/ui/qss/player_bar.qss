@@ -152,7 +152,7 @@ QLabel#NowPlayingCover {
 QSlider#PlayerSlider::groove:horizontal {
     height: 7px;
     background: {{color-bg-pressed}};
-    border-radius: 4px;
+    border-radius: 999px;
     margin: 0;
 }
 
@@ -175,12 +175,12 @@ QSlider#PlayerSlider::sub-page:horizontal {
         stop:0 {{color-slider-fill-start}},
         stop:1 {{color-slider-fill-end}}
     );
-    border-radius: 4px;
+    border-radius: 999px;
 }
 
 QSlider#PlayerSlider::add-page:horizontal {
     background: {{color-bg-pressed}};
-    border-radius: 4px;
+    border-radius: 999px;
 }
 
 QComboBox#SpeedCombo {
