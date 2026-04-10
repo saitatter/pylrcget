@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import html
+import logging
 from pathlib import Path
 
 from PySide6.QtCore import QEvent, QRectF, QSize, Qt, Signal, QTimer
@@ -30,6 +31,8 @@ from ui.icon_loader import load_svg_icon
 from ui.spacing import SPACE_2, SPACE_3, set_layout_spacing
 from ui.style_loader import load_stylesheet
 from ui.theme_tokens import STYLE_TOKENS
+
+logger = logging.getLogger(__name__)
 
 
 def _fmt(ms: int) -> str:
@@ -561,7 +564,8 @@ class PlayerBar(QWidget):
         if self.player and hasattr(self.player, "set_volume"):
             try:
                 self.player.set_volume(normalized)
-            except Exception:
+            except Exception as exc:
+                logger.warning("Failed to set volume from slider: %s", exc)
                 self._sync_volume_from_player()
                 return
         self.volumeChanged.emit(normalized)
@@ -617,7 +621,8 @@ class PlayerBar(QWidget):
             return
         try:
             volume = float(self.player.volume() or 0.7)
-        except Exception:
+        except Exception as exc:
+            logger.warning("Failed to sync volume from player: %s", exc)
             volume = 0.7
         self._set_volume_slider_value(volume)
 

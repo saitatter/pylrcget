@@ -4,6 +4,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QCloseEvent, QShortcut, QKeySequence
+import logging
 import os
 
 from dataclasses import replace
@@ -28,6 +29,9 @@ from ui.spacing import SPACE_1, SPACE_2, SPACE_3, set_layout_spacing
 from ui.style_loader import load_stylesheet
 from ui.widgets.toast import ToastManager
 from PySide6.QtWidgets import QToolButton
+from ui.widgets.log_panel import LogPanel, QtLogHandler
+
+logger = logging.getLogger(__name__)
 
 
 class MainWindow(QMainWindow):
@@ -101,6 +105,11 @@ class MainWindow(QMainWindow):
 
         self.toasts = ToastManager(self)
         self.app_state.notification.connect(self._on_notify)
+        self._ui_log_handler = QtLogHandler()
+        self._ui_log_handler.setLevel(logging.INFO)
+        self._ui_log_handler.setFormatter(
+            logging.Formatter("%(asctime)s  %(levelname)s  %(name)s: %(message)s", "%H:%M:%S")
+        )
 
         # --- Top controls (search + filters) ---
         self.top_bar = QWidget()
@@ -194,9 +203,18 @@ class MainWindow(QMainWindow):
         self.btn_about.setAccessibleName("About LrcGet")
         self.btn_about.clicked.connect(self.open_about_modal)
 
+        self.btn_logs = QToolButton()
+        self.btn_logs.setObjectName("TopBarAction")
+        self.btn_logs.setIcon(load_svg_icon("audio-lines.svg", 18))
+        self.btn_logs.setToolTip("Logs")
+        self.btn_logs.setAccessibleName("Toggle log panel")
+        self.btn_logs.setCheckable(True)
+        self.btn_logs.clicked.connect(self._toggle_logs_panel)
+
         actions_row.addWidget(self.btn_refresh)
         actions_row.addWidget(self.btn_config)
         actions_row.addWidget(self.btn_about)
+        actions_row.addWidget(self.btn_logs)
         actions_row.addStretch(1)
         actions_layout.addLayout(actions_row)
         top_bar.addWidget(self.actions_group, stretch=1)
@@ -348,6 +366,12 @@ class MainWindow(QMainWindow):
         self.scan_row.setVisible(False)
         self.scan_row.setObjectName("ScanRow")
 
+        self.log_panel = LogPanel(self)
+        self.log_panel.setVisible(False)
+        self.layout.addWidget(self.log_panel)
+        self._ui_log_handler.bridge.messageReady.connect(self.log_panel.append_log)
+        logging.getLogger().addHandler(self._ui_log_handler)
+
         # --- Signals from track list ---
         self.track_list.playTrack.connect(self.on_play_track)
         self.track_list.downloadLyrics.connect(self.on_download_lyrics)
@@ -411,6 +435,7 @@ class MainWindow(QMainWindow):
         self._flush_playback_speed()
         self._flush_playback_volume()
         self._flush_library_route()
+        logging.getLogger().removeHandler(self._ui_log_handler)
         super().closeEvent(event)
 
     # ------------------ filters ------------------
@@ -479,6 +504,8 @@ class MainWindow(QMainWindow):
             self._set_tool_feedback(self.btn_refresh, "error")
             QTimer.singleShot(1800, self._reset_refresh_feedback)
             return
+
+        logger.info("Starting library scan across %d folder(s).", len(directories))
 
         self.scan_row.setVisible(True)
         self.progress_bar.setValue(0)
@@ -551,13 +578,16 @@ class MainWindow(QMainWindow):
             self._apply_track_filters()
             self.app_state.notify(msg or "Library scan finished successfully.", "success")
             self._set_tool_feedback(self.btn_refresh, "success")
+            logger.info("Library scan finished successfully: %s", msg or "ok")
         else:
             if "cancel" in (msg or "").lower():
                 self.app_state.notify(msg, "warning")
                 self._set_tool_feedback(self.btn_refresh, "idle")
+                logger.warning("Library scan cancelled: %s", msg)
             else:
                 self.app_state.notify(f"Library scanning failed: {msg}", "error")
                 self._set_tool_feedback(self.btn_refresh, "error")
+                logger.error("Library scan failed: %s", msg)
 
         self.btn_refresh.setEnabled(True)
         QTimer.singleShot(1800, self._reset_refresh_feedback)
@@ -569,7 +599,11 @@ class MainWindow(QMainWindow):
             return
         self.btn_cancel_scan.setEnabled(False)
         self.scan_details.setText("Cancelling scan after the current batch…")
+        logger.info("Cancellation requested for library scan.")
         self.scanner.requestInterruption()
+
+    def _toggle_logs_panel(self, checked: bool) -> None:
+        self.log_panel.setVisible(bool(checked))
 
     # ------------------ track actions ------------------
     def on_play_track(self, track_id: int):
@@ -830,7 +864,8 @@ class MainWindow(QMainWindow):
         if self.app_state.player and hasattr(self.app_state.player, "set_volume"):
             try:
                 self.app_state.player.set_volume(volume)
-            except Exception:
+            except Exception as exc:
+                logger.warning("Failed to apply saved volume: %s", exc)
                 volume = 0.7
         self.player_bar.set_volume_value(volume)
 

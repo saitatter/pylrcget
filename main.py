@@ -1,5 +1,6 @@
 import os
 import sys
+import logging
 from pathlib import Path
 
 from PySide6.QtCore import QStandardPaths
@@ -52,6 +53,11 @@ def init_app_state() -> AppState:
     return app_state
 
 def main() -> int:
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s  %(levelname)s  %(name)s: %(message)s",
+        datefmt="%H:%M:%S",
+    )
     qt_app = QApplication(sys.argv)
     app_state = init_app_state()
     apply_app_theme(qt_app, get_config(app_state.db).theme_mode)

@@ -1,6 +1,7 @@
 # ui/lyrics_view.py
 from __future__ import annotations
 
+import logging
 import re
 from bisect import bisect_right
 from typing import List, Optional, Tuple
@@ -20,6 +21,7 @@ from ui.widgets.empty_state_widget import EmptyStateWidget
 _TS_RE = re.compile(r"\[(\d+):(\d+)(?:\.(\d+))?\]")
 TIMESTAMP_MS_ROLE = Qt.ItemDataRole.UserRole
 TIMESTAMP_VALID_ROLE = Qt.ItemDataRole.UserRole + 1
+logger = logging.getLogger(__name__)
 
 
 def _ts_to_ms(mm: str, ss: str, frac: str | None) -> int:
@@ -510,14 +512,9 @@ class LyricsEditorWidget(QWidget):
 
     def _selected_rows(self) -> list[int]:
         model = self.table.selectionModel()
-        if model is None:
-            row = self.table.currentRow()
-            return [row] if row >= 0 else []
-        rows = sorted({index.row() for index in model.selectedRows()})
-        if rows:
-            return rows
-        row = self.table.currentRow()
-        return [row] if row >= 0 else []
+        if not model:
+            return []
+        return sorted({index.row() for index in model.selectedRows()})
 
     def _on_table_clicked_seek(self, row: int, col: int):
         it_time = self.table.item(row, 0)
@@ -656,9 +653,9 @@ class LyricsEditorWidget(QWidget):
         rows = self._selected_rows()
         if not rows:
             return
-        if not self._apply_delta_to_rows(rows, int(delta_ms)):
+        if not self._apply_delta_to_rows(rows, delta_ms):
             return
-        rendered = f"{int(delta_ms):+d} ms"
+        rendered = f"{delta_ms:+d} ms"
         line_word = "line" if len(rows) == 1 else "lines"
         self._set_validation_message(
             f"Shifted {len(rows)} selected {line_word} by {rendered}.",
@@ -700,7 +697,7 @@ class LyricsEditorWidget(QWidget):
             if not it_time:
                 continue
             current_ms = int(it_time.data(TIMESTAMP_MS_ROLE) or 0)
-            updated_ms = max(0, current_ms + int(delta_ms))
+            updated_ms = max(0, current_ms + delta_ms)
             it_time.setData(TIMESTAMP_MS_ROLE, updated_ms)
             it_time.setData(TIMESTAMP_VALID_ROLE, True)
             it_time.setText(_ms_to_ts(updated_ms))
@@ -720,7 +717,7 @@ class LyricsEditorWidget(QWidget):
             if not it_time:
                 continue
             current_ms = int(it_time.data(TIMESTAMP_MS_ROLE) or 0)
-            if current_ms + int(delta_ms) <= 0:
+            if current_ms + delta_ms <= 0:
                 collapse_rows.append(row)
         return collapse_rows
 
@@ -729,8 +726,8 @@ class LyricsEditorWidget(QWidget):
         if provider is not None:
             try:
                 return int(provider())
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.warning("Failed to get playback position from provider: %s", exc)
         return int(self._current_pos_ms)
 
     def _emit_save(self):
