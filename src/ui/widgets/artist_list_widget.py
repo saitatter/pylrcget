@@ -147,6 +147,12 @@ class ArtistListWidget(QWidget):
     def refresh(self):
         self._load_rows(reset=True)
 
+    def set_download_state(self, track_id: int, state: str) -> None:
+        self.album_browser.set_download_state(track_id, state)
+
+    def get_download_state(self, track_id: int) -> str:
+        return self.album_browser.get_download_state(track_id)
+
     def _load_rows(self, *, reset: bool) -> None:
         from db.database import get_artist_rows
 

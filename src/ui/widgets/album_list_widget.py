@@ -190,6 +190,12 @@ class AlbumListWidget(QWidget):
     def clearArtistScope(self) -> None:
         self.setArtistScope(None, "")
 
+    def set_download_state(self, track_id: int, state: str) -> None:
+        self.track_list.set_download_state(track_id, state)
+
+    def get_download_state(self, track_id: int) -> str:
+        return self.track_list.get_download_state(track_id)
+
     def refresh(self):
         self._load_rows(reset=True)
 

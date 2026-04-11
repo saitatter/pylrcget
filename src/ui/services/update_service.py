@@ -4,6 +4,8 @@ from dataclasses import dataclass
 import importlib.metadata
 import os
 from pathlib import Path
+from contextlib import nullcontext
+import shlex
 import shutil
 import subprocess
 import sys
@@ -133,17 +135,18 @@ def _powershell_single_quoted(value: str) -> str:
 
 
 def check_for_updates(*, timeout_s: float = 10.0, session: requests.Session | None = None) -> UpdateInfo:
-    http = session or requests.Session()
-    response = http.get(
-        GITHUB_RELEASES_LATEST_URL,
-        timeout=timeout_s,
-        headers={
-            "Accept": "application/vnd.github+json",
-            "User-Agent": GITHUB_API_USER_AGENT,
-        },
-    )
-    response.raise_for_status()
-    payload = response.json()
+    manager = nullcontext(session) if session is not None else requests.Session()
+    with manager as http:
+        response = http.get(
+            GITHUB_RELEASES_LATEST_URL,
+            timeout=timeout_s,
+            headers={
+                "Accept": "application/vnd.github+json",
+                "User-Agent": GITHUB_API_USER_AGENT,
+            },
+        )
+        response.raise_for_status()
+        payload = response.json()
 
     tag_name = str(payload.get("tag_name") or "")
     latest_version = normalize_version_tag(tag_name)
@@ -179,19 +182,20 @@ def download_release_asset(
     progress_callback=None,
 ) -> Path:
     destination.parent.mkdir(parents=True, exist_ok=True)
-    http = session or requests.Session()
-    with http.get(asset.download_url, stream=True, timeout=timeout_s) as response:
-        response.raise_for_status()
-        total = int(response.headers.get("Content-Length") or asset.size or 0)
-        downloaded = 0
-        with destination.open("wb") as handle:
-            for chunk in response.iter_content(chunk_size=1024 * 128):
-                if not chunk:
-                    continue
-                handle.write(chunk)
-                downloaded += len(chunk)
-                if progress_callback is not None:
-                    progress_callback(downloaded, total)
+    manager = nullcontext(session) if session is not None else requests.Session()
+    with manager as http:
+        with http.get(asset.download_url, stream=True, timeout=timeout_s) as response:
+            response.raise_for_status()
+            total = int(response.headers.get("Content-Length") or asset.size or 0)
+            downloaded = 0
+            with destination.open("wb") as handle:
+                for chunk in response.iter_content(chunk_size=1024 * 128):
+                    if not chunk:
+                        continue
+                    handle.write(chunk)
+                    downloaded += len(chunk)
+                    if progress_callback is not None:
+                        progress_callback(downloaded, total)
     return destination
 
 
@@ -263,7 +267,7 @@ rm -f "$0"
 
 
 def shlex_quote(value: str) -> str:
-    return "'" + value.replace("'", "'\"'\"'") + "'"
+    return shlex.quote(value)
 
 
 def stage_self_update(archive_path: Path, *, pid: int | None = None) -> Path:

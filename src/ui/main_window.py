@@ -703,10 +703,8 @@ class MainWindow(QMainWindow):
 
     def _set_track_download_state_all(self, track_id: int, state: str) -> None:
         self.track_list.set_download_state(int(track_id), state)
-        if hasattr(self.albums_tab, "track_list"):
-            self.albums_tab.track_list.set_download_state(int(track_id), state)
-        if hasattr(self.artists_tab, "album_browser") and hasattr(self.artists_tab.album_browser, "track_list"):
-            self.artists_tab.album_browser.track_list.set_download_state(int(track_id), state)
+        self.albums_tab.set_download_state(int(track_id), state)
+        self.artists_tab.set_download_state(int(track_id), state)
 
     def _get_primary_track_download_state(self, track_id: int) -> str:
         return self.track_list.get_download_state(int(track_id))
