@@ -1,13 +1,23 @@
 from __future__ import annotations
 
+from collections import deque
 import html
 import logging
 import os
 
-from PySide6.QtWidgets import QApplication, QFileDialog, QComboBox
 from PySide6.QtCore import QObject, Signal, QUrl
 from PySide6.QtGui import QDesktopServices
-from PySide6.QtWidgets import QHBoxLayout, QLabel, QTextEdit, QPushButton, QVBoxLayout, QWidget
+from PySide6.QtWidgets import (
+    QApplication,
+    QComboBox,
+    QFileDialog,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QTextEdit,
+    QVBoxLayout,
+    QWidget,
+)
 
 from ui.spacing import SPACE_1, SPACE_2, set_layout_spacing
 
@@ -33,9 +43,9 @@ class LogPanel(QWidget):
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
         self.setObjectName("LogPanel")
-        self._entries: list[tuple[str, str]] = []
-        self._log_path: str = ""
         self._max_entries = 1000
+        self._entries: deque[tuple[str, str]] = deque(maxlen=self._max_entries)
+        self._log_path: str = ""
 
         root = QVBoxLayout(self)
         set_layout_spacing(root, margins=(SPACE_2, SPACE_2, SPACE_2, SPACE_2), spacing=SPACE_2)
@@ -84,6 +94,7 @@ class LogPanel(QWidget):
         self.output = QTextEdit()
         self.output.setObjectName("LogPanelOutput")
         self.output.setReadOnly(True)
+        self.output.document().setMaximumBlockCount(self._max_entries)
         root.addWidget(self.output, 1)
 
     def set_log_file_path(self, path: str) -> None:
@@ -96,21 +107,18 @@ class LogPanel(QWidget):
 
     def append_log(self, level: str, message: str) -> None:
         level = level.upper()
+        selected = self.level_filter.currentData() or "ALL"
+        needs_full_refresh = len(self._entries) == self._max_entries
         self._entries.append((level, message))
-        if len(self._entries) > self._max_entries:
-            self._entries = self._entries[-self._max_entries :]
+        if needs_full_refresh:
             self._refresh_output()
             return
 
-        selected = self.level_filter.currentData() or "ALL"
         if self._matches_filter(level, selected):
-            cursor = self.output.textCursor()
-            cursor.movePosition(cursor.MoveOperation.End)
-            cursor.insertHtml(self._render_entry(level, message))
-            cursor.insertBlock()
-            self.output.setTextCursor(cursor)
             bar = self.output.verticalScrollBar()
-            if bar is not None:
+            at_bottom = bar is None or bar.value() >= bar.maximum() - 2
+            self.output.append(self._render_entry(level, message))
+            if bar is not None and at_bottom:
                 bar.setValue(bar.maximum())
 
     def copy_visible_logs(self) -> None:
@@ -171,4 +179,4 @@ class LogPanel(QWidget):
         }
         color = palette.get(level.upper(), "#cbd5e1")
         safe = html.escape(message)
-        return f'<div style="color:{color}; margin:0; white-space:pre-wrap;">{safe}</div>'
+        return f'<span style="color:{color}; white-space:pre-wrap;">{safe}</span>'
