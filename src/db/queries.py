@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 import sqlite3
+from datetime import datetime, timezone
 from typing import List, Sequence
 
 from core.utils import prepare_input
@@ -775,3 +776,72 @@ def get_artist_tracks(db: sqlite3.Connection, artist_id: int) -> List[Track]:
     """
     rows = db.execute(query, (int(artist_id),)).fetchall()
     return [Track.from_row(row) for row in rows]
+
+
+# -------------------------------
+# PUBLISH HISTORY
+# -------------------------------
+def record_publish_history(
+    db: sqlite3.Connection,
+    *,
+    track_id: int | None,
+    title: str,
+    artist_name: str,
+    album_name: str,
+    publish_kind: str,
+    lrclib_instance: str,
+    publish_status: str = "Published",
+) -> int:
+    published_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+    cursor = db.execute(
+        """
+        INSERT INTO publish_history (
+            track_id,
+            title,
+            artist_name,
+            album_name,
+            publish_kind,
+            publish_status,
+            lrclib_instance,
+            published_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            int(track_id) if track_id is not None else None,
+            (title or "").strip(),
+            (artist_name or "").strip(),
+            (album_name or "").strip(),
+            (publish_kind or "").strip() or "plain",
+            (publish_status or "").strip() or "Published",
+            (lrclib_instance or "").strip(),
+            published_at,
+        ),
+    )
+    db.commit()
+    return int(cursor.lastrowid)
+
+
+def get_publish_history_rows(
+    db: sqlite3.Connection,
+    *,
+    limit: int | None = None,
+) -> list[sqlite3.Row]:
+    limit_clause = f"LIMIT {int(limit)}" if limit else ""
+    query = f"""
+        SELECT
+            h.id,
+            h.track_id,
+            h.title,
+            h.artist_name,
+            h.album_name,
+            h.publish_kind,
+            h.publish_status,
+            h.lrclib_instance,
+            h.published_at,
+            CASE WHEN t.id IS NOT NULL THEN 1 ELSE 0 END AS track_exists
+        FROM publish_history h
+        LEFT JOIN tracks t ON t.id = h.track_id
+        ORDER BY h.published_at DESC, h.id DESC
+        {limit_clause}
+    """
+    return db.execute(query).fetchall()

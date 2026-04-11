@@ -209,3 +209,27 @@ def upgrade_database_if_needed(db: sqlite3.Connection, existing_version: int) ->
         """)
         db.commit()
         db.execute("PRAGMA user_version=18")
+
+    # v19
+    if existing_version <= 18:
+        print("Migrate database version 19...")
+        db.executescript("""
+            CREATE TABLE IF NOT EXISTS publish_history (
+                id INTEGER PRIMARY KEY,
+                track_id INTEGER,
+                title TEXT NOT NULL,
+                artist_name TEXT NOT NULL,
+                album_name TEXT NOT NULL,
+                publish_kind TEXT NOT NULL,
+                publish_status TEXT NOT NULL DEFAULT 'Published',
+                lrclib_instance TEXT NOT NULL,
+                published_at TEXT NOT NULL
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_publish_history_published_at
+                ON publish_history(published_at DESC, id DESC);
+            CREATE INDEX IF NOT EXISTS idx_publish_history_track_id
+                ON publish_history(track_id);
+        """)
+        db.commit()
+        db.execute("PRAGMA user_version=19")

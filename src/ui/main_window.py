@@ -30,6 +30,8 @@ from ui.style_loader import load_stylesheet
 from ui.widgets.toast import ToastManager
 from PySide6.QtWidgets import QToolButton
 from ui.widgets.log_panel import LogPanel, QtLogHandler
+from ui.widgets.my_lrclib_widget import MyLrclibWidget
+from db.queries import record_publish_history
 
 logger = logging.getLogger(__name__)
 
@@ -311,7 +313,7 @@ class MainWindow(QMainWindow):
         self.artists_splitter.setStretchFactor(1, 2)
         artists_layout.addWidget(self.artists_splitter)
 
-        self.mylrclib_tab = QLabel("My Lrclib")
+        self.mylrclib_tab = MyLrclibWidget(self.app_state)
 
         self.tabs.addTab(self.tracks_tab, "Tracks")
         self.tabs.addTab(self.albums_page, "Albums")
@@ -407,6 +409,7 @@ class MainWindow(QMainWindow):
         self.artists_tab.clearSearchRequested.connect(self._clear_library_search)
         self.artists_tab.refreshLibraryRequested.connect(self.refresh_library)
         self.artists_tab.configureFoldersRequested.connect(self.open_config_modal)
+        self.mylrclib_tab.playTrack.connect(self.on_play_track)
 
         # --- Filters wiring ---
         self.search_box.textChanged.connect(self._schedule_library_search)
@@ -837,6 +840,20 @@ class MainWindow(QMainWindow):
             view.set_publish_feedback(is_synced=is_synced, state="loading", message="Publishing...")
         dlg.exec()
         if dlg.publish_result is True:
+            try:
+                record_publish_history(
+                    self.app_state.db,
+                    track_id=int(track.id),
+                    title=track.title,
+                    artist_name=track.artist_name,
+                    album_name=track.album_name,
+                    publish_kind="synced" if is_synced else "plain",
+                    lrclib_instance=self._normalize_lrclib_base(get_config(self.app_state.db).lrclib_instance),
+                )
+            except Exception as exc:
+                logger.warning("Failed to record publish history: %s", exc)
+            else:
+                self.mylrclib_tab.refresh()
             for view in self._all_lyrics_views():
                 view.set_publish_feedback(is_synced=is_synced, state="success", message="Published")
             self.app_state.notify("Lyrics published successfully.", "success")
@@ -1199,6 +1216,8 @@ class MainWindow(QMainWindow):
             self.albums_tab._apply_styles()
         if hasattr(self, "artists_tab"):
             self.artists_tab._apply_styles()
+        if hasattr(self, "mylrclib_tab"):
+            self.mylrclib_tab._apply_styles()
         if hasattr(self, "lyrics_view"):
             self.lyrics_view._apply_styles()
         if hasattr(self, "albums_lyrics_view"):
