@@ -13,11 +13,11 @@ from db.database import get_album_by_id, get_artist_by_id, get_config, get_direc
 from core.lyrics_sidecar import export_lyrics_sidecars
 from ui.workers.library_scanner import LibraryScanner
 from ui.controllers.lyrics_download_controller import LyricsDownloadController
+from ui.controllers.publish_history_controller import PublishHistoryController
 from ui.widgets.track_list_widget import TrackListWidget
 from ui.dialogs.music_folders_dialog import MusicFoldersDialog
 from ui.player_bar import PlayerBar
 from ui.widgets.lyrics_editor_widget import LyricsEditorWidget
-from ui.dialogs.publish_lyrics_dialog import PublishLyricsDialog
 from ui.dialogs.first_run_dialog import FirstRunDialog
 from player.player import NowPlaying
 from core.embed_lyrics import embed_lyrics_for_track
@@ -33,7 +33,6 @@ from PySide6.QtWidgets import QToolButton
 from ui.widgets.log_panel import LogPanel, QtLogHandler
 from ui.widgets.my_lrclib_widget import MyLrclibWidget
 from ui.widgets.download_progress_overlay import DownloadProgressOverlay
-from db.queries import record_publish_history
 
 logger = logging.getLogger(__name__)
 
@@ -272,8 +271,6 @@ class MainWindow(QMainWindow):
         if self.app_state.player:
             self.app_state.player.positionChanged.connect(self.lyrics_view.on_player_position)
 
-        self.lyrics_view.publishSyncedRequested.connect(self._publish_synced)
-        self.lyrics_view.publishPlainRequested.connect(self._publish_plain)
         self.lyrics_view.exportFilesRequested.connect(self._export_current_track_sidecars)
 
         splitter.setStretchFactor(0, 3)
@@ -291,8 +288,6 @@ class MainWindow(QMainWindow):
         self.albums_lyrics_view.show_none("Select a track to see lyrics")
         self.albums_lyrics_view.saveRequested.connect(self._on_lyrics_save_requested)
         self.albums_lyrics_view.seekRequested.connect(lambda ms: self.app_state.player.seek_ms(ms))
-        self.albums_lyrics_view.publishSyncedRequested.connect(self._publish_synced)
-        self.albums_lyrics_view.publishPlainRequested.connect(self._publish_plain)
         self.albums_lyrics_view.downloadRequested.connect(self._download_current_track_lyrics)
         self.albums_lyrics_view.exportFilesRequested.connect(self._export_current_track_sidecars)
         if self.app_state.player:
@@ -312,8 +307,6 @@ class MainWindow(QMainWindow):
         self.artists_lyrics_view.show_none("Select a track to see lyrics")
         self.artists_lyrics_view.saveRequested.connect(self._on_lyrics_save_requested)
         self.artists_lyrics_view.seekRequested.connect(lambda ms: self.app_state.player.seek_ms(ms))
-        self.artists_lyrics_view.publishSyncedRequested.connect(self._publish_synced)
-        self.artists_lyrics_view.publishPlainRequested.connect(self._publish_plain)
         self.artists_lyrics_view.downloadRequested.connect(self._download_current_track_lyrics)
         self.artists_lyrics_view.exportFilesRequested.connect(self._export_current_track_sidecars)
         if self.app_state.player:
@@ -363,6 +356,20 @@ class MainWindow(QMainWindow):
             parent=self,
         )
         self.download_overlay.cancelRequested.connect(self.downloads.cancel)
+        self.publish_history = PublishHistoryController(
+            self.app_state,
+            normalize_lrclib_base=self._normalize_lrclib_base,
+            current_player_track_id=self._current_player_track_id,
+            lyrics_views=self._all_lyrics_views,
+            refresh_history=self.mylrclib_tab.refresh,
+            parent=self,
+        )
+        self.lyrics_view.publishSyncedRequested.connect(self.publish_history.publish_synced)
+        self.lyrics_view.publishPlainRequested.connect(self.publish_history.publish_plain)
+        self.albums_lyrics_view.publishSyncedRequested.connect(self.publish_history.publish_synced)
+        self.albums_lyrics_view.publishPlainRequested.connect(self.publish_history.publish_plain)
+        self.artists_lyrics_view.publishSyncedRequested.connect(self.publish_history.publish_synced)
+        self.artists_lyrics_view.publishPlainRequested.connect(self.publish_history.publish_plain)
 
         # --- Scan progress (pretty + hidden when idle) ---
         self.scan_row = QWidget()
@@ -838,62 +845,6 @@ class MainWindow(QMainWindow):
             self.app_state.notify(f"Failed to save lyrics: {exc}", "error")
             for view in self._all_lyrics_views():
                 view.set_save_feedback("error", "Save Failed")
-
-    # ------------------ publish dialogs ------------------
-    def _publish_synced(self):
-        self._open_publish_dialog(is_synced=True)
-
-    def _publish_plain(self):
-        self._open_publish_dialog(is_synced=False)
-
-    def _open_publish_dialog(self, is_synced: bool):
-        if not self.app_state.player or not self.app_state.player.track:
-            self.app_state.notify("Start playback or select a track first.", "warning")
-            for view in self._all_lyrics_views():
-                view.set_publish_feedback(is_synced=is_synced, state="error", message="No Track")
-            return
-
-        track_id = self.app_state.player.track.track_id
-        track = get_track_by_id(self.app_state.db, track_id)
-
-        lyrics_text = (track.lrc_lyrics or "") if is_synced else (track.txt_lyrics or "")
-        dlg = PublishLyricsDialog(
-            title=track.title,
-            artist_name=track.artist_name,
-            album_name=track.album_name,
-            duration_s=float(track.duration or 0.0),
-            lyrics_text=lyrics_text,
-            is_synced=is_synced,
-            lint_result=[],
-            parent=self,
-        )
-        for view in self._all_lyrics_views():
-            view.set_publish_feedback(is_synced=is_synced, state="loading", message="Publishing...")
-        dlg.exec()
-        if dlg.publish_result is True:
-            try:
-                record_publish_history(
-                    self.app_state.db,
-                    track_id=int(track.id),
-                    title=track.title,
-                    artist_name=track.artist_name,
-                    album_name=track.album_name,
-                    publish_kind="synced" if is_synced else "plain",
-                    lrclib_instance=self._normalize_lrclib_base(get_config(self.app_state.db).lrclib_instance),
-                )
-            except Exception as exc:
-                logger.warning("Failed to record publish history: %s", exc)
-            else:
-                self.mylrclib_tab.refresh()
-            for view in self._all_lyrics_views():
-                view.set_publish_feedback(is_synced=is_synced, state="success", message="Published")
-            self.app_state.notify("Lyrics published successfully.", "success")
-        elif dlg.publish_result is False:
-            for view in self._all_lyrics_views():
-                view.set_publish_feedback(is_synced=is_synced, state="error", message="Publish Failed")
-        else:
-            for view in self._all_lyrics_views():
-                view.set_publish_feedback(is_synced=is_synced, state="idle")
 
     # ------------------ helpers ------------------
     def _normalize_lrclib_base(self, url: str) -> str:
