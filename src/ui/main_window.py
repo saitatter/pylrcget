@@ -39,6 +39,7 @@ from ui.controllers.top_bar_controller import TopBarController
 from ui.widgets.track_list_widget import TrackListWidget
 from ui.dialogs.music_folders_dialog import MusicFoldersDialog
 from ui.dialogs.about_dialog import AboutDialog
+from ui.icon_loader import load_app_icon
 from ui.player_bar import PlayerBar
 from ui.widgets.lyrics_editor_widget import LyricsEditorWidget
 from ui.dialogs.first_run_dialog import FirstRunDialog
@@ -77,6 +78,7 @@ class MainWindow(QMainWindow):
     def __init__(self, app_state):
         super().__init__()
         self.setWindowTitle("LrcGet")
+        self.setWindowIcon(load_app_icon())
         self.resize(900, 600)
         self.app_state = app_state
 

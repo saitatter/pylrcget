@@ -9,6 +9,14 @@ from PySide6.QtSvg import QSvgRenderer
 from ui.style_loader import asset_path
 
 
+def load_app_icon() -> QIcon:
+    svg_path = asset_path("assets", "app-icon.svg")
+    icon = QIcon(str(svg_path))
+    if not icon.isNull():
+        return icon
+    return load_svg_icon("audio-lines.svg", 32)
+
+
 def load_svg_icon(name: str, size: int = 20, color: str = "#e5e7eb") -> QIcon:
     return QIcon(_render_svg_to_pixmap(name, size, color))
 

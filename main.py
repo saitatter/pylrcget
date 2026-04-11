@@ -17,6 +17,7 @@ from core.state import AppState, Notify
 from db.database import get_config, initialize_database
 from player.player import Player
 from ui.app_theme import apply_app_theme
+from ui.icon_loader import load_app_icon
 from ui.main_window import MainWindow
 
 def debug_print_schema(db) -> None:
@@ -94,6 +95,8 @@ def init_app_state(app_data_dir: str | None = None) -> AppState:
 def main() -> int:
     app_data_dir = get_app_data_dir()
     qt_app = QApplication(sys.argv)
+    qt_app.setApplicationName("LrcGet")
+    qt_app.setWindowIcon(load_app_icon())
     app_state = init_app_state(app_data_dir)
     apply_app_theme(qt_app, get_config(app_state.db).theme_mode)
     main_window = MainWindow(app_state)

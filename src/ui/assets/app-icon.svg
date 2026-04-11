@@ -1,0 +1,44 @@
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  width="256"
+  height="256"
+  viewBox="0 0 256 256"
+  fill="none"
+>
+  <defs>
+    <linearGradient id="bg" x1="28" y1="22" x2="230" y2="234" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#7D1D57" />
+      <stop offset="1" stop-color="#2D3148" />
+    </linearGradient>
+    <radialGradient id="glow" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(128 126) rotate(90) scale(84)">
+      <stop offset="0" stop-color="#FFF7FB" stop-opacity="0.92" />
+      <stop offset="1" stop-color="#F3D4E3" stop-opacity="0.78" />
+    </radialGradient>
+  </defs>
+
+  <rect x="20" y="20" width="216" height="216" rx="54" fill="url(#bg)" />
+
+  <circle cx="128" cy="128" r="64" fill="url(#glow)" />
+
+  <path
+    d="M84 84C74 92 68 105 68 128C68 151 74 164 84 172"
+    stroke="#FFD6E8"
+    stroke-width="12"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+  <path
+    d="M172 84C182 92 188 105 188 128C188 151 182 164 172 172"
+    stroke="#FFD6E8"
+    stroke-width="12"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+
+  <path
+    d="M118 88V143.5C118 151.5 112.5 158.2 102.5 160.8C92.5 163.4 84 159.9 84 152.7C84 145.8 91.4 140 100.5 140C104.9 140 108.8 141.1 111.5 142.9V107.5L161 97V134.5C161 142.5 155.5 149.2 145.5 151.8C135.5 154.4 127 150.9 127 143.7C127 136.8 134.4 131 143.5 131C147.9 131 151.8 132.1 154.5 133.9V88L118 88Z"
+    fill="#7D1D57"
+  />
+
+  <circle cx="128" cy="128" r="10" fill="#FFF7FB" fill-opacity="0.88" />
+</svg>
