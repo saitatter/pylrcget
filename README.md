@@ -21,6 +21,7 @@ This version goes beyond bulk lyric downloads and turns the app into a full desk
 - previous / next track
 - queue based on the current visible track list
 - adjustable playback speed, including custom values
+- playback volume control with mute-safe persistence across sessions
 - keyboard shortcuts such as `Space`, `Enter`, `Ctrl+Left`, `Ctrl+Right`
 
 ### Lyrics workflow
@@ -29,6 +30,8 @@ This version goes beyond bulk lyric downloads and turns the app into a full desk
 - real-time synced lyrics editor
 - per-line snapping while audio is playing
 - configurable reaction delay for timestamping
+- shift selected lines by preset or custom time offsets
+- shift the entire lyric sheet from the first line based on the current playback position
 - live lyric highlighting during playback
 - publish synced or plain lyrics to LRCLIB
 
@@ -37,8 +40,9 @@ This version goes beyond bulk lyric downloads and turns the app into a full desk
 - recursive library scan into a local SQLite database
 - incremental refresh using per-file signature checks (`mtime` + `size`)
 - scan exclusion rules by path and regex
+- automatic re-scan after changing library folders in Settings
 - drilldown browsing for `Tracks`, `Albums`, and `Artists`
-- breadcrumb navigation with back / forward history
+- breadcrumb-based navigation across library views
 
 ### Export and embedding
 
@@ -53,6 +57,7 @@ This version goes beyond bulk lyric downloads and turns the app into a full desk
 - multiple built-in themes
 - clickable artist / album navigation from the player bar and track list
 - fast non-native file dialogs on Windows for better browsing performance
+- built-in log panel with live filtering, copy/save actions, and on-disk log files
 
 ---
 
@@ -70,6 +75,7 @@ The library scanner currently detects these formats:
 - ASF
 - DSF
 - DFF
+- MPC / Musepack
 
 Notes:
 
@@ -92,6 +98,7 @@ Embedded lyric handling is implemented for:
 - WMA / ASF
 - DSF
 - DFF
+- MPC / Musepack
 
 Sidecar lyric export supports:
 
@@ -117,6 +124,7 @@ The Settings dialog is organized by category and includes:
 - excluded paths
 - excluded regex patterns
 - exclusion preview / test
+- automatic library refresh after folder changes
 
 ### Lyrics
 
@@ -125,6 +133,8 @@ The Settings dialog is organized by category and includes:
 - download directory
 - filename pattern with live preview
 - reaction delay
+- shift selected lines by preset or custom offset
+- shift all lines from the first timestamp anchor
 
 ### Appearance
 
@@ -138,10 +148,23 @@ Library navigation is route-based and supports:
 
 - drilldown browsing inside `Albums` and `Artists`
 - breadcrumb navigation
-- back / forward history
 - restoring the last library route between sessions
 
 Unknown metadata buckets are normalized as `N/A` in the UI.
+
+---
+
+## Diagnostics
+
+The desktop app includes built-in diagnostics features:
+
+- a toggleable in-app `Logs` panel
+- level filters for `INFO`, `WARNING`, and `ERROR`
+- `Copy`, `Save`, and `Open Folder` actions for logs
+- automatic log panel opening for errors
+- rotating log files stored in the app data directory
+
+Important errors can also surface as toast notifications so they are harder to miss.
 
 ---
 
