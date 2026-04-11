@@ -4,6 +4,7 @@ from __future__ import annotations
 import logging
 import sqlite3
 import time
+from typing import Callable
 from PySide6.QtCore import QThread, Signal
 
 from lrclib import LrcLibAPI  # pip install lrclibapi
@@ -19,6 +20,7 @@ logger = logging.getLogger(__name__)
 _RETRYABLE_API_ERRORS = (RateLimitError, ServerError, requests_exceptions.Timeout, requests_exceptions.ConnectionError)
 _MAX_LRCLIB_RETRIES = 3
 _INITIAL_BACKOFF_S = 0.5
+ProgressCallback = Callable[[str], None]
 
 def _strip_empty(s: str | None) -> str | None:
     if not s:
@@ -79,7 +81,15 @@ def _should_retry_lrclib_error(exc: Exception) -> bool:
     return False
 
 
-def _fetch_lyrics_with_retry(api: LrcLibAPI, *, notify, title: str, artist: str, album: str | None, duration_s: int | None):
+def _fetch_lyrics_with_retry(
+    api: LrcLibAPI,
+    *,
+    notify: ProgressCallback,
+    title: str,
+    artist: str,
+    album: str | None,
+    duration_s: int | None,
+):
     backoff_s = _INITIAL_BACKOFF_S
     last_error: Exception | None = None
     for attempt in range(1, _MAX_LRCLIB_RETRIES + 1):
@@ -109,10 +119,10 @@ def download_track_lyrics(
     lrclib_instance: str,
     *,
     download_mode: str = "prefer_synced",
-    progress_callback=None,
+    progress_callback: ProgressCallback | None = None,
     db: sqlite3.Connection | None = None,
     config: Config | None = None,
-    track=None,
+    track: Track | None = None,
 ) -> tuple[bool, str, int, str]:
     mode = (download_mode or "prefer_synced").strip() or "prefer_synced"
     notify = progress_callback or (lambda _msg: None)
@@ -191,7 +201,7 @@ def download_track_lyrics(
 def _sync_track_outputs(
     db: sqlite3.Connection,
     track: Track,
-    notify,
+    notify: ProgressCallback,
     *,
     config: Config | None = None,
 ) -> None:

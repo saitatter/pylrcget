@@ -2,17 +2,26 @@ from __future__ import annotations
 
 import sqlite3
 import time
+from typing import TypedDict
 
 from PySide6.QtCore import QThread, Signal
 
 from db.database import get_config, get_track_by_id
+from db.models import Track
 from ui.workers.lyrics_download_worker import download_track_lyrics
+
+
+class BulkDownloadStats(TypedDict):
+    total: int
+    ok: int
+    failed: int
+    cancelled: bool
 
 
 class BulkLyricsDownloadWorker(QThread):
     progress = Signal(int, int, str, str, float)  # current, total, track label, status, elapsed seconds
     itemFinished = Signal(int, bool, str, str)  # track_id, ok, track label, message
-    finishedBatch = Signal(bool, str, object)  # ok, message, stats dict
+    finishedBatch = Signal(bool, str, dict)  # ok, message, stats dict
 
     def __init__(
         self,
@@ -49,7 +58,7 @@ class BulkLyricsDownloadWorker(QThread):
                     time.sleep(request_delay_s)
 
                 current_label = {"value": f"Track {idx}/{total}"}
-                track = None
+                track: Track | None = None
                 try:
                     track = get_track_by_id(db, track_id)
                     title = (track.title or "").strip()
@@ -107,7 +116,7 @@ class BulkLyricsDownloadWorker(QThread):
             if db is not None:
                 db.close()
 
-        stats = {
+        stats: BulkDownloadStats = {
             "total": total,
             "ok": ok_count,
             "failed": fail_count,

@@ -7,9 +7,10 @@ from typing import Callable
 from PySide6.QtCore import QObject, QTimer
 
 from db.database import get_config, get_track_by_id
+from db.models import Track
 from db.queries import get_track_ids_for_download_mode
 from ui.widgets.download_progress_overlay import DownloadProgressOverlay
-from ui.workers.bulk_lyrics_download_worker import BulkLyricsDownloadWorker
+from ui.workers.bulk_lyrics_download_worker import BulkDownloadStats, BulkLyricsDownloadWorker
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +31,7 @@ class LyricsDownloadController(QObject):
         normalize_lrclib_base: Callable[[str], str],
         show_status: Callable[[str, int | None], None],
         current_player_track_id: Callable[[], int | None],
-        set_track_lyrics_views: Callable[[object], None],
+        set_track_lyrics_views: Callable[[Track], None],
         refresh_visible_library_view: Callable[[], None],
         set_track_download_state: Callable[[int, str], None],
         get_track_download_state: Callable[[int], str],
@@ -142,7 +143,7 @@ class LyricsDownloadController(QObject):
             ),
         )
 
-    def _on_download_batch_finished(self, ok: bool, msg: str, stats: object) -> None:
+    def _on_download_batch_finished(self, ok: bool, msg: str, stats: dict) -> None:
         del ok
         self._show_status(msg, 4000)
         for track_id in list(self._active_track_ids):
@@ -154,7 +155,12 @@ class LyricsDownloadController(QObject):
         except Exception as exc:
             logger.warning("Failed to refresh current view after lyrics download: %s", exc)
 
-        stats_dict = stats if isinstance(stats, dict) else {}
+        stats_dict: BulkDownloadStats = {
+            "total": int(stats.get("total", 0)) if isinstance(stats, dict) else 0,
+            "ok": int(stats.get("ok", 0)) if isinstance(stats, dict) else 0,
+            "failed": int(stats.get("failed", 0)) if isinstance(stats, dict) else 0,
+            "cancelled": bool(stats.get("cancelled")) if isinstance(stats, dict) else False,
+        }
         self._overlay.finish_batch(msg, cancelled=bool(stats_dict.get("cancelled")))
         if stats_dict.get("cancelled"):
             self._app_state.notify("Lyrics download cancelled.", "warning")
