@@ -1,6 +1,7 @@
 # ui/lyrics_view.py
 from __future__ import annotations
 
+import logging
 import re
 from bisect import bisect_right
 from typing import List, Optional, Tuple
@@ -10,7 +11,7 @@ from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QStackedWidget,
     QTextEdit, QTableWidget, QTableWidgetItem,
-    QPushButton, QHBoxLayout
+    QPushButton, QHBoxLayout, QDoubleSpinBox
 )
 
 from ui.spacing import SPACE_2, SPACE_3, set_layout_spacing
@@ -20,6 +21,7 @@ from ui.widgets.empty_state_widget import EmptyStateWidget
 _TS_RE = re.compile(r"\[(\d+):(\d+)(?:\.(\d+))?\]")
 TIMESTAMP_MS_ROLE = Qt.ItemDataRole.UserRole
 TIMESTAMP_VALID_ROLE = Qt.ItemDataRole.UserRole + 1
+logger = logging.getLogger(__name__)
 
 
 def _ts_to_ms(mm: str, ss: str, frac: str | None) -> int:
@@ -148,6 +150,7 @@ class LyricsEditorWidget(QWidget):
         self._publish_synced_available = False
         self._publish_plain_available = False
         self._reaction_delay_ms: int = 0
+        self._current_position_provider = None
 
         root = QVBoxLayout(self)
         set_layout_spacing(root, margins=SPACE_3, spacing=SPACE_2)
@@ -162,21 +165,45 @@ class LyricsEditorWidget(QWidget):
         header.addWidget(self.title, 1)
 
         self.btn_snap = QPushButton("Snap")
+        self.btn_shift_minus = QPushButton("-0.1s")
+        self.btn_shift_plus = QPushButton("+0.1s")
+        self.shift_spin = QDoubleSpinBox()
+        self.shift_spin.setRange(-30.0, 30.0)
+        self.shift_spin.setDecimals(2)
+        self.shift_spin.setSingleStep(0.05)
+        self.shift_spin.setValue(0.10)
+        self.shift_spin.setSuffix(" s")
+        self.btn_shift_selected = QPushButton("Shift Selected")
+        self.btn_shift_all_from_first = QPushButton("Shift All from First")
         self.btn_add = QPushButton("+ Line")
         self.btn_del = QPushButton("Delete")
         self.btn_save = QPushButton("Save")
 
         self.btn_snap.setEnabled(False)
+        self.btn_shift_minus.setEnabled(False)
+        self.btn_shift_plus.setEnabled(False)
+        self.shift_spin.setEnabled(False)
+        self.btn_shift_selected.setEnabled(False)
+        self.btn_shift_all_from_first.setEnabled(False)
         self.btn_add.setEnabled(False)
         self.btn_del.setEnabled(False)
         self.btn_save.setEnabled(False)
 
         self.btn_snap.clicked.connect(self._snap_selected_line_to_current_time)
+        self.btn_shift_minus.clicked.connect(lambda: self._shift_selected_lines(-100))
+        self.btn_shift_plus.clicked.connect(lambda: self._shift_selected_lines(100))
+        self.btn_shift_selected.clicked.connect(self._shift_selected_lines_by_custom_amount)
+        self.btn_shift_all_from_first.clicked.connect(self._shift_all_lines_from_first_delta)
         self.btn_add.clicked.connect(self._add_line_after_selection)
         self.btn_del.clicked.connect(self._delete_selected_line)
         self.btn_save.clicked.connect(self._emit_save)
 
         header.addWidget(self.btn_snap)
+        header.addWidget(self.btn_shift_minus)
+        header.addWidget(self.btn_shift_plus)
+        header.addWidget(self.shift_spin)
+        header.addWidget(self.btn_shift_selected)
+        header.addWidget(self.btn_shift_all_from_first)
         header.addWidget(self.btn_add)
         header.addWidget(self.btn_del)
         header.addWidget(self.btn_save)
@@ -217,7 +244,7 @@ class LyricsEditorWidget(QWidget):
         self.table.setHorizontalHeaderLabels(["Time", "Text"])
         self.table.verticalHeader().setVisible(False)
         self.table.setSelectionBehavior(self.table.SelectionBehavior.SelectRows)
-        self.table.setSelectionMode(self.table.SelectionMode.SingleSelection)
+        self.table.setSelectionMode(self.table.SelectionMode.ExtendedSelection)
         self.table.setEditTriggers(self.table.EditTrigger.DoubleClicked | self.table.EditTrigger.EditKeyPressed)
         self.table.cellClicked.connect(self._on_table_clicked_seek)
         self.table.itemSelectionChanged.connect(self._on_table_selection_changed)
@@ -262,6 +289,9 @@ class LyricsEditorWidget(QWidget):
 
     def set_reaction_delay_ms(self, reaction_delay_ms: int) -> None:
         self._reaction_delay_ms = int(reaction_delay_ms or 0)
+
+    def set_current_position_provider(self, provider) -> None:
+        self._current_position_provider = provider
 
     def _apply_styles(self):
         self.setStyleSheet(load_stylesheet("lyrics_editor.qss"))
@@ -342,6 +372,11 @@ class LyricsEditorWidget(QWidget):
         self.table.blockSignals(False)
         self._set_validation_message("")
         self.btn_snap.setEnabled(False)
+        self.btn_shift_minus.setEnabled(False)
+        self.btn_shift_plus.setEnabled(False)
+        self.shift_spin.setEnabled(False)
+        self.btn_shift_selected.setEnabled(False)
+        self.btn_shift_all_from_first.setEnabled(False)
         self.btn_add.setEnabled(False)
         self.btn_del.setEnabled(False)
         self.btn_save.setEnabled(False)
@@ -358,6 +393,11 @@ class LyricsEditorWidget(QWidget):
         self.btn_add.setEnabled(False)
         self.btn_del.setEnabled(False)
         self.btn_snap.setEnabled(False)
+        self.btn_shift_minus.setEnabled(False)
+        self.btn_shift_plus.setEnabled(False)
+        self.shift_spin.setEnabled(False)
+        self.btn_shift_selected.setEnabled(False)
+        self.btn_shift_all_from_first.setEnabled(False)
 
     def _set_synced(self, pairs: List[Tuple[int, str]]):
         self._reset_state()
@@ -386,8 +426,14 @@ class LyricsEditorWidget(QWidget):
 
         # enable editing controls
         self.btn_add.setEnabled(True)
-        self.btn_del.setEnabled(self.table.currentRow() >= 0)
-        self.btn_snap.setEnabled(self.table.currentRow() >= 0)
+        self.btn_shift_all_from_first.setEnabled(bool(self.table.rowCount()))
+        has_selection = self.table.currentRow() >= 0
+        self.btn_del.setEnabled(has_selection)
+        self.btn_snap.setEnabled(has_selection)
+        self.btn_shift_minus.setEnabled(has_selection)
+        self.btn_shift_plus.setEnabled(has_selection)
+        self.shift_spin.setEnabled(has_selection)
+        self.btn_shift_selected.setEnabled(has_selection)
         self.btn_save.setEnabled(not self._invalid_rows)
 
     def _rebuild_times_cache(self):
@@ -454,11 +500,21 @@ class LyricsEditorWidget(QWidget):
             self._update_save_enabled()
 
     def _on_table_selection_changed(self):
-        row = self.table.currentRow()
-        has = row >= 0
+        has = bool(self._selected_rows())
         self.btn_del.setEnabled(has)
         self.btn_snap.setEnabled(has)
+        self.btn_shift_minus.setEnabled(has)
+        self.btn_shift_plus.setEnabled(has)
+        self.shift_spin.setEnabled(has)
+        self.btn_shift_selected.setEnabled(has)
+        self.btn_shift_all_from_first.setEnabled(bool(self.table.rowCount()))
         self._refresh_row_styles()
+
+    def _selected_rows(self) -> list[int]:
+        model = self.table.selectionModel()
+        if not model:
+            return []
+        return sorted({index.row() for index in model.selectedRows()})
 
     def _on_table_clicked_seek(self, row: int, col: int):
         it_time = self.table.item(row, 0)
@@ -510,7 +566,7 @@ class LyricsEditorWidget(QWidget):
         insert_at = row + 1 if row >= 0 else self.table.rowCount()
 
         # default time: current playback time
-        ms = int(self._current_pos_ms)
+        ms = int(self._current_playback_ms())
 
         self.table.blockSignals(True)
         self.table.insertRow(insert_at)
@@ -562,7 +618,7 @@ class LyricsEditorWidget(QWidget):
         if not it_time:
             return
 
-        ms = max(0, int(self._current_pos_ms) + int(self._reaction_delay_ms))
+        ms = max(0, int(self._current_playback_ms()) + int(self._reaction_delay_ms))
         self.table.blockSignals(True)
         it_time.setData(TIMESTAMP_MS_ROLE, ms)
         it_time.setData(TIMESTAMP_VALID_ROLE, True)
@@ -588,6 +644,91 @@ class LyricsEditorWidget(QWidget):
                 self._set_validation_message("Snapped selected line to current playback time.", state="success")
         self._update_save_enabled()
         self._refresh_row_styles()
+
+    def _shift_selected_lines_by_custom_amount(self):
+        delta_ms = int(round(float(self.shift_spin.value()) * 1000.0))
+        self._shift_selected_lines(delta_ms)
+
+    def _shift_selected_lines(self, delta_ms: int):
+        rows = self._selected_rows()
+        if not rows:
+            return
+        if not self._apply_delta_to_rows(rows, delta_ms):
+            return
+        rendered = f"{delta_ms:+d} ms"
+        line_word = "line" if len(rows) == 1 else "lines"
+        self._set_validation_message(
+            f"Shifted {len(rows)} selected {line_word} by {rendered}.",
+            state="success",
+        )
+
+    def _shift_all_lines_from_first_delta(self):
+        if self.table.rowCount() <= 0:
+            return
+        first_item = self.table.item(0, 0)
+        if not first_item:
+            return
+        first_ms = int(first_item.data(TIMESTAMP_MS_ROLE) or 0)
+        target_ms = max(0, int(self._current_playback_ms()) + int(self._reaction_delay_ms))
+        delta_ms = target_ms - first_ms
+        if delta_ms == 0:
+            self._set_validation_message("First line already matches the current playback time.", state="success")
+            return
+        if not self._apply_delta_to_rows(list(range(self.table.rowCount())), delta_ms):
+            return
+        self._set_validation_message(
+            f"Shifted all lines by {delta_ms:+d} ms using the first line as reference.",
+            state="success",
+        )
+
+    def _apply_delta_to_rows(self, rows: list[int], delta_ms: int) -> bool:
+        if not rows:
+            return False
+        collapse_rows = self._rows_that_would_collapse_to_zero(rows, delta_ms)
+        if len(collapse_rows) > 1:
+            self._set_validation_message(
+                "Shift cancelled because multiple selected lines would collapse to 00:00.00.",
+                state="error",
+            )
+            return False
+        self.table.blockSignals(True)
+        for row in rows:
+            it_time = self.table.item(row, 0)
+            if not it_time:
+                continue
+            current_ms = int(it_time.data(TIMESTAMP_MS_ROLE) or 0)
+            updated_ms = max(0, current_ms + delta_ms)
+            it_time.setData(TIMESTAMP_MS_ROLE, updated_ms)
+            it_time.setData(TIMESTAMP_VALID_ROLE, True)
+            it_time.setText(_ms_to_ts(updated_ms))
+            self._invalid_rows.discard(row)
+        self.table.blockSignals(False)
+        self._rebuild_times_cache()
+        self._update_save_enabled()
+        self._refresh_row_styles()
+        return True
+
+    def _rows_that_would_collapse_to_zero(self, rows: list[int], delta_ms: int) -> list[int]:
+        collapse_rows: list[int] = []
+        if delta_ms >= 0:
+            return collapse_rows
+        for row in rows:
+            it_time = self.table.item(row, 0)
+            if not it_time:
+                continue
+            current_ms = int(it_time.data(TIMESTAMP_MS_ROLE) or 0)
+            if current_ms + delta_ms <= 0:
+                collapse_rows.append(row)
+        return collapse_rows
+
+    def _current_playback_ms(self) -> int:
+        provider = self._current_position_provider
+        if provider is not None:
+            try:
+                return int(provider())
+            except Exception as exc:
+                logger.warning("Failed to get playback position from provider: %s", exc)
+        return int(self._current_pos_ms)
 
     def _emit_save(self):
         # Synced view: build LRC + plain

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import html
+import logging
 from pathlib import Path
 
 from PySide6.QtCore import QEvent, QRectF, QSize, Qt, Signal, QTimer
@@ -30,6 +31,8 @@ from ui.icon_loader import load_svg_icon
 from ui.spacing import SPACE_2, SPACE_3, set_layout_spacing
 from ui.style_loader import load_stylesheet
 from ui.theme_tokens import STYLE_TOKENS
+
+logger = logging.getLogger(__name__)
 
 
 def _fmt(ms: int) -> str:
@@ -237,6 +240,7 @@ class SeekSlider(QSlider):
 
 class PlayerBar(QWidget):
     playbackSpeedChanged = Signal(float)
+    volumeChanged = Signal(float)
     artistNavigationRequested = Signal(int)
     albumNavigationRequested = Signal(int)
 
@@ -429,6 +433,29 @@ class PlayerBar(QWidget):
         right_layout.addWidget(self.lbl_speed)
         right_layout.addLayout(speed_row)
 
+        volume_row = QHBoxLayout()
+        set_layout_spacing(volume_row, margins=0, spacing=SPACE_2)
+
+        self.lbl_volume = QLabel("Volume")
+        self.lbl_volume.setObjectName("MetaLabel")
+
+        self.slider_volume = SeekSlider(Qt.Orientation.Horizontal)
+        self.slider_volume.setObjectName("VolumeSlider")
+        self.slider_volume.setRange(0, 100)
+        self.slider_volume.setSingleStep(5)
+        self.slider_volume.setPageStep(10)
+        self.slider_volume.setMinimumHeight(16)
+
+        self.lbl_volume_value = QLabel("70%")
+        self.lbl_volume_value.setObjectName("TimeLabel")
+        self.lbl_volume_value.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        self.lbl_volume_value.setMinimumWidth(34)
+
+        volume_row.addWidget(self.lbl_volume)
+        volume_row.addWidget(self.slider_volume, 1)
+        volume_row.addWidget(self.lbl_volume_value)
+        right_layout.addLayout(volume_row)
+
         shell_layout.addWidget(left_panel, 0, 0, Qt.AlignLeft | Qt.AlignVCenter)
         shell_layout.addWidget(center_panel, 0, 1, Qt.AlignCenter)
         shell_layout.addWidget(right_panel, 0, 2, Qt.AlignRight | Qt.AlignVCenter)
@@ -447,6 +474,7 @@ class PlayerBar(QWidget):
         self.cmb_speed.lineEdit().textEdited.connect(self._on_custom_speed_edited)
         self.btn_speed_down.clicked.connect(lambda: self._step_speed(-self._speed_step))
         self.btn_speed_up.clicked.connect(lambda: self._step_speed(self._speed_step))
+        self.slider_volume.valueChanged.connect(self._on_volume_changed)
 
         if self.player:
             self.player.trackChanged.connect(self._on_track_changed)
@@ -458,6 +486,7 @@ class PlayerBar(QWidget):
 
         self._apply_styles()
         self._sync_speed_from_player()
+        self._sync_volume_from_player()
         self.set_compact_mode(False)
 
     def set_prev_next_handlers(self, prev_fn, next_fn):
@@ -467,6 +496,9 @@ class PlayerBar(QWidget):
     def set_playback_speed_value(self, speed: float) -> None:
         self._set_speed_combo_value(self._normalize_speed(speed))
 
+    def set_volume_value(self, volume_0_to_1: float) -> None:
+        self._set_volume_slider_value(volume_0_to_1)
+
     def set_compact_mode(self, compact: bool):
         self.setProperty("compact", compact)
         self.style().unpolish(self)
@@ -475,9 +507,10 @@ class PlayerBar(QWidget):
 
         self.lbl_album.setVisible(not compact)
         self.lbl_speed.setVisible(not compact)
+        self.lbl_volume.setVisible(True)
         self.lbl_title.setMinimumWidth(110 if compact else 150)
         left_width = 240 if compact else 300
-        right_width = 132 if compact else 168
+        right_width = 150 if compact else 190
         center_width = 420 if compact else 560
         cover_size = 44 if compact else 52
         bar_height = 92 if compact else 104
@@ -516,6 +549,26 @@ class PlayerBar(QWidget):
                 return
         self._set_speed_combo_value(normalized)
         self.playbackSpeedChanged.emit(normalized)
+
+    def _set_volume_slider_value(self, volume_0_to_1: float) -> None:
+        normalized = max(0.0, min(1.0, float(volume_0_to_1)))
+        rendered = int(round(normalized * 100))
+        self.slider_volume.blockSignals(True)
+        self.slider_volume.setValue(rendered)
+        self.slider_volume.blockSignals(False)
+        self.lbl_volume_value.setText(f"{rendered}%")
+
+    def _on_volume_changed(self, value: int) -> None:
+        normalized = max(0.0, min(1.0, float(value) / 100.0))
+        self.lbl_volume_value.setText(f"{int(round(normalized * 100))}%")
+        if self.player and hasattr(self.player, "set_volume"):
+            try:
+                self.player.set_volume(normalized)
+            except Exception as exc:
+                logger.warning("Failed to set volume from slider: %s", exc)
+                self._sync_volume_from_player()
+                return
+        self.volumeChanged.emit(normalized)
 
     def _on_speed_preset_selected(self, index: int):
         speed = self.cmb_speed.itemData(index)
@@ -562,6 +615,16 @@ class PlayerBar(QWidget):
             speed = 1.0
 
         self._set_speed_combo_value(speed)
+
+    def _sync_volume_from_player(self):
+        if not self.player or not hasattr(self.player, "volume"):
+            return
+        try:
+            volume = float(self.player.volume())
+        except Exception as exc:
+            logger.warning("Failed to sync volume from player: %s", exc)
+            volume = 0.7
+        self._set_volume_slider_value(volume)
 
     def _set_speed_combo_value(self, speed: float):
         for idx in range(self.cmb_speed.count()):

@@ -56,6 +56,12 @@ QToolButton#TopBarAction[actionState="error"] {
     color: {{color-error-text}};
 }
 
+QToolButton#TopBarAction:checked {
+    background: {{color-bg-control}};
+    border-color: {{color-accent}};
+    color: {{color-accent}};
+}
+
 QWidget#ScanRow {
     background: {{color-bg-app}};
     border-top: 1px solid {{color-border-strong}};
@@ -122,6 +128,40 @@ QProgressBar#ScanProgress::chunk {
         x1: 0, y1: 0, x2: 1, y2: 0,
         stop: 0 {{color-slider-fill-start}}, stop: 1 {{color-slider-fill-end}}
     );
+}
+
+QWidget#LogPanel {
+    background: {{color-bg-panel}};
+    border: 1px solid {{color-border-strong}};
+    border-radius: {{radius-lg}};
+}
+
+QLabel#LogPanelTitle {
+    color: {{color-text-strong}};
+    font-size: {{font-size-sm}};
+    font-weight: 600;
+}
+
+QComboBox#LogPanelFilter {
+    min-width: 96px;
+}
+
+QPushButton#LogPanelCopy,
+QPushButton#LogPanelSave,
+QPushButton#LogPanelOpenFolder,
+QPushButton#LogPanelClear {
+    min-width: 84px;
+}
+
+QPlainTextEdit#LogPanelOutput {
+    background: {{color-bg-app}};
+    border: 1px solid {{color-border}};
+    border-radius: {{radius-md}};
+    color: {{color-text}};
+    selection-background-color: {{color-selection-bg}};
+    selection-color: {{color-selection-text}};
+    font-family: Consolas, "Cascadia Mono", "Segoe UI Mono", monospace;
+    font-size: {{font-size-sm}};
 }
 
 QToolButton {

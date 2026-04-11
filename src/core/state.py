@@ -17,6 +17,7 @@ class AppState(QObject):
         super().__init__()
         self.db = None
         self.player = None
+        self.log_path = ""
         self.cancel_requested = False
         self.queued_notifications: list[Notify] = []
 

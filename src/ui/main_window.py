@@ -4,6 +4,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QCloseEvent, QShortcut, QKeySequence
+import logging
 import os
 
 from dataclasses import replace
@@ -28,6 +29,9 @@ from ui.spacing import SPACE_1, SPACE_2, SPACE_3, set_layout_spacing
 from ui.style_loader import load_stylesheet
 from ui.widgets.toast import ToastManager
 from PySide6.QtWidgets import QToolButton
+from ui.widgets.log_panel import LogPanel, QtLogHandler
+
+logger = logging.getLogger(__name__)
 
 
 class MainWindow(QMainWindow):
@@ -55,18 +59,25 @@ class MainWindow(QMainWindow):
         self._queue_index: int = -1
         self._refresh_default_label = "Global Actions"
         self._pending_playback_speed: float | None = None
+        self._pending_playback_volume: float | None = None
         self._pending_library_route: str | None = None
         self._nav_history: list[LibraryRoute] = []
         self._nav_index: int = -1
         self._current_route = tracks_all()
         self._artist_label_cache: dict[int, str] = {}
         self._album_label_cache: dict[int, str] = {}
+        self._recent_toast_messages: set[str] = set()
         self._nav_apply_in_progress = False
         self._tab_sync_suppressed = False
+        self.scanner = None
         self._playback_speed_save_timer = QTimer(self)
         self._playback_speed_save_timer.setSingleShot(True)
         self._playback_speed_save_timer.setInterval(350)
         self._playback_speed_save_timer.timeout.connect(self._flush_playback_speed)
+        self._playback_volume_save_timer = QTimer(self)
+        self._playback_volume_save_timer.setSingleShot(True)
+        self._playback_volume_save_timer.setInterval(250)
+        self._playback_volume_save_timer.timeout.connect(self._flush_playback_volume)
         self._search_apply_timer = QTimer(self)
         self._search_apply_timer.setSingleShot(True)
         self._search_apply_timer.setInterval(180)
@@ -95,6 +106,11 @@ class MainWindow(QMainWindow):
 
         self.toasts = ToastManager(self)
         self.app_state.notification.connect(self._on_notify)
+        self._ui_log_handler = QtLogHandler()
+        self._ui_log_handler.setLevel(logging.INFO)
+        self._ui_log_handler.setFormatter(
+            logging.Formatter("%(asctime)s  %(levelname)s  %(name)s: %(message)s", "%H:%M:%S")
+        )
 
         # --- Top controls (search + filters) ---
         self.top_bar = QWidget()
@@ -188,9 +204,18 @@ class MainWindow(QMainWindow):
         self.btn_about.setAccessibleName("About LrcGet")
         self.btn_about.clicked.connect(self.open_about_modal)
 
+        self.btn_logs = QToolButton()
+        self.btn_logs.setObjectName("TopBarAction")
+        self.btn_logs.setIcon(load_svg_icon("logs.svg", 18))
+        self.btn_logs.setToolTip("Logs")
+        self.btn_logs.setAccessibleName("Toggle log panel")
+        self.btn_logs.setCheckable(True)
+        self.btn_logs.clicked.connect(self._toggle_logs_panel)
+
         actions_row.addWidget(self.btn_refresh)
         actions_row.addWidget(self.btn_config)
         actions_row.addWidget(self.btn_about)
+        actions_row.addWidget(self.btn_logs)
         actions_row.addStretch(1)
         actions_layout.addLayout(actions_row)
         top_bar.addWidget(self.actions_group, stretch=1)
@@ -299,11 +324,14 @@ class MainWindow(QMainWindow):
         self.layout.addWidget(self.player_bar)
         self.player_bar.set_prev_next_handlers(self.play_prev, self.play_next)
         self.player_bar.playbackSpeedChanged.connect(self._persist_playback_speed)
+        self.player_bar.volumeChanged.connect(self._persist_playback_volume)
         self.player_bar.artistNavigationRequested.connect(self._navigate_current_track_artist)
         self.player_bar.albumNavigationRequested.connect(self._navigate_current_track_album)
         for view in self._all_lyrics_views():
             view.set_reaction_delay_ms(get_config(self.app_state.db).reaction_delay_ms)
+            view.set_current_position_provider(self.app_state.player.position_ms if self.app_state.player else None)
         self._apply_saved_playback_speed()
+        self._apply_saved_playback_volume()
 
         # --- Scan progress (pretty + hidden when idle) ---
         self.scan_row = QWidget()
@@ -338,6 +366,13 @@ class MainWindow(QMainWindow):
         self.layout.addWidget(self.scan_row)
         self.scan_row.setVisible(False)
         self.scan_row.setObjectName("ScanRow")
+
+        self.log_panel = LogPanel(self)
+        self.log_panel.set_log_file_path(getattr(self.app_state, "log_path", ""))
+        self.log_panel.setVisible(False)
+        self.layout.addWidget(self.log_panel)
+        self._ui_log_handler.bridge.messageReady.connect(self._on_log_message)
+        logging.getLogger().addHandler(self._ui_log_handler)
 
         # --- Signals from track list ---
         self.track_list.playTrack.connect(self.on_play_track)
@@ -400,7 +435,9 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event: QCloseEvent) -> None:
         self._flush_playback_speed()
+        self._flush_playback_volume()
         self._flush_library_route()
+        logging.getLogger().removeHandler(self._ui_log_handler)
         super().closeEvent(event)
 
     # ------------------ filters ------------------
@@ -440,6 +477,9 @@ class MainWindow(QMainWindow):
             for view in self._all_lyrics_views():
                 view.set_reaction_delay_ms(updated_config.reaction_delay_ms)
             self._apply_track_filters()
+            after_dirs = get_directories(self.app_state.db)
+            if dlg.directories_changed and after_dirs:
+                self.refresh_library()
 
     def open_about_modal(self):
         self.app_state.notify("LrcGet helps you scan your library, edit lyrics, and publish them to LRCLIB.", "info")
@@ -457,12 +497,16 @@ class MainWindow(QMainWindow):
 
     # ------------------ scanning ------------------
     def refresh_library(self):
+        if self.scanner is not None and self.scanner.isRunning():
+            return
         directories = get_directories(self.app_state.db)
         if not directories:
             self.app_state.notify("Add at least one music folder before starting a library scan.", "warning")
             self._set_tool_feedback(self.btn_refresh, "error")
             QTimer.singleShot(1800, self._reset_refresh_feedback)
             return
+
+        logger.info("Starting library scan across %d folder(s).", len(directories))
 
         self.scan_row.setVisible(True)
         self.progress_bar.setValue(0)
@@ -522,7 +566,27 @@ class MainWindow(QMainWindow):
         if not msg:
             return
 
-        self.toasts.show_toast(msg, notify_type=kind, timeout_ms=3000)
+        self._show_deduped_toast(msg, kind, 3000)
+
+    def _on_log_message(self, level: str, message: str) -> None:
+        self.log_panel.append_log(level, message)
+        normalized_level = (level or "").upper()
+        if normalized_level in {"ERROR", "CRITICAL"}:
+            self.btn_logs.setChecked(True)
+            self.log_panel.setVisible(True)
+            self._show_deduped_toast(message, "error", 4000)
+
+    def _show_deduped_toast(self, message: str, notify_type: str, timeout_ms: int) -> None:
+        key = f"{notify_type.lower()}::{message.strip()}"
+        if key in self._recent_toast_messages:
+            return
+        self._recent_toast_messages.add(key)
+        self.toasts.show_toast(message, notify_type=notify_type, timeout_ms=timeout_ms)
+        QTimer.singleShot(
+            max(1000, int(timeout_ms) + 500),
+            self,
+            lambda k=key: self._recent_toast_messages.discard(k),
+        )
 
     def _scan_finished(self, ok: bool, msg: str):
         # hide progress strip
@@ -535,24 +599,32 @@ class MainWindow(QMainWindow):
             self._apply_track_filters()
             self.app_state.notify(msg or "Library scan finished successfully.", "success")
             self._set_tool_feedback(self.btn_refresh, "success")
+            logger.info("Library scan finished successfully: %s", msg or "ok")
         else:
             if "cancel" in (msg or "").lower():
                 self.app_state.notify(msg, "warning")
                 self._set_tool_feedback(self.btn_refresh, "idle")
+                logger.warning("Library scan cancelled: %s", msg)
             else:
                 self.app_state.notify(f"Library scanning failed: {msg}", "error")
                 self._set_tool_feedback(self.btn_refresh, "error")
+                logger.error("Library scan failed: %s", msg)
 
         self.btn_refresh.setEnabled(True)
         QTimer.singleShot(1800, self._reset_refresh_feedback)
         self.statusBar().showMessage(msg, 4000)
+        self.scanner = None
 
     def _cancel_scan(self):
         if not hasattr(self, "scanner") or self.scanner is None:
             return
         self.btn_cancel_scan.setEnabled(False)
         self.scan_details.setText("Cancelling scan after the current batch…")
+        logger.info("Cancellation requested for library scan.")
         self.scanner.requestInterruption()
+
+    def _toggle_logs_panel(self, checked: bool) -> None:
+        self.log_panel.setVisible(bool(checked))
 
     # ------------------ track actions ------------------
     def on_play_track(self, track_id: int):
@@ -807,9 +879,24 @@ class MainWindow(QMainWindow):
                 speed = 1.0
         self.player_bar.set_playback_speed_value(speed)
 
+    def _apply_saved_playback_volume(self) -> None:
+        config = get_config(self.app_state.db)
+        volume = float(config.playback_volume)
+        if self.app_state.player and hasattr(self.app_state.player, "set_volume"):
+            try:
+                self.app_state.player.set_volume(volume)
+            except Exception as exc:
+                logger.warning("Failed to apply saved volume: %s", exc)
+                volume = 0.7
+        self.player_bar.set_volume_value(volume)
+
     def _persist_playback_speed(self, speed: float) -> None:
         self._pending_playback_speed = float(speed)
         self._playback_speed_save_timer.start()
+
+    def _persist_playback_volume(self, volume: float) -> None:
+        self._pending_playback_volume = float(volume)
+        self._playback_volume_save_timer.start()
 
     def _flush_playback_speed(self) -> None:
         if self._pending_playback_speed is None:
@@ -817,6 +904,13 @@ class MainWindow(QMainWindow):
         config = get_config(self.app_state.db)
         set_config(self.app_state.db, replace(config, playback_speed=float(self._pending_playback_speed)))
         self._pending_playback_speed = None
+
+    def _flush_playback_volume(self) -> None:
+        if self._pending_playback_volume is None:
+            return
+        config = get_config(self.app_state.db)
+        set_config(self.app_state.db, replace(config, playback_volume=float(self._pending_playback_volume)))
+        self._pending_playback_volume = None
 
     def _persist_library_route(self, route: LibraryRoute) -> None:
         self._pending_library_route = serialize_route(route)

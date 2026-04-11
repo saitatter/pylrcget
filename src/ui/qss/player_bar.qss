@@ -14,7 +14,7 @@ QWidget#PlayerBar[compact="true"] QWidget#PlayerShell {
 }
 
 QWidget#PlayerBar[compact="true"] QWidget#PlayerExtras {
-    min-width: 116px;
+    min-width: 168px;
 }
 
 QWidget#PlayerMeta,
@@ -143,6 +143,10 @@ QLabel#TimeLabel {
     background: transparent;
 }
 
+QWidget#PlayerExtras QLabel#MetaLabel {
+    min-width: 40px;
+}
+
 QLabel#NowPlayingCover {
     background: {{color-bg-pressed}};
     border: 1px solid {{color-cover-border}};
@@ -194,6 +198,32 @@ QComboBox#SpeedCombo {
     min-height: 28px;
     max-height: 28px;
     font-size: 11px;
+}
+
+QSlider#VolumeSlider::groove:horizontal {
+    height: 5px;
+    background: {{color-bg-pressed}};
+    border-radius: 999px;
+    margin: 0;
+}
+
+QSlider#VolumeSlider::sub-page:horizontal {
+    background: {{color-accent}};
+    border-radius: 999px;
+}
+
+QSlider#VolumeSlider::add-page:horizontal {
+    background: {{color-bg-pressed}};
+    border-radius: 999px;
+}
+
+QSlider#VolumeSlider::handle:horizontal {
+    width: 10px;
+    height: 10px;
+    margin: -3px 0;
+    border-radius: 999px;
+    background: {{color-text-strong}};
+    border: 1px solid {{color-slider-handle-border}};
 }
 
 QComboBox#SpeedCombo:hover {
