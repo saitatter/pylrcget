@@ -10,7 +10,6 @@ import os
 from dataclasses import replace
 
 from db.database import get_album_by_id, get_artist_by_id, get_config, get_directories, set_config
-from core.lyrics_sidecar import export_lyrics_sidecars
 from ui.workers.library_scanner import LibraryScanner
 from ui.controllers.lyrics_download_controller import LyricsDownloadController
 from ui.controllers.publish_history_controller import PublishHistoryController
@@ -20,7 +19,7 @@ from ui.player_bar import PlayerBar
 from ui.widgets.lyrics_editor_widget import LyricsEditorWidget
 from ui.dialogs.first_run_dialog import FirstRunDialog
 from player.player import NowPlaying
-from core.embed_lyrics import embed_lyrics_for_track
+from ui.services.lyrics_download_service import sync_track_outputs_with_result
 from ui.app_theme import apply_app_theme
 from ui.widgets.album_list_widget import AlbumListWidget
 from ui.widgets.artist_list_widget import ArtistListWidget
@@ -857,22 +856,16 @@ class MainWindow(QMainWindow):
 
     def _sync_track_lyrics_outputs(self, track) -> None:
         config = get_config(self.app_state.db)
-        if config.save_lyrics_sidecars:
-            try:
-                written_paths = export_lyrics_sidecars(track, config)
-            except Exception as exc:
-                self.app_state.notify(f"Failed to export lyrics files: {exc}", "error")
-            else:
-                if written_paths:
-                    self.statusBar().showMessage(f"Lyrics exported to {os.path.dirname(written_paths[0])}", 3000)
+        result = sync_track_outputs_with_result(track, config)
+        if result.sidecar_error is not None:
+            self.app_state.notify(f"Failed to export lyrics files: {result.sidecar_error}", "error")
+        elif result.sidecar_paths:
+            self.statusBar().showMessage(f"Lyrics exported to {os.path.dirname(result.sidecar_paths[0])}", 3000)
 
-        if config.try_embed_lyrics:
-            try:
-                embed_lyrics_for_track(track)
-            except Exception as exc:
-                self.app_state.notify(f"Failed to embed lyrics: {exc}", "error")
-            else:
-                self.statusBar().showMessage("Lyrics embedded into the audio file.", 3000)
+        if result.embed_error is not None:
+            self.app_state.notify(f"Failed to embed lyrics: {result.embed_error}", "error")
+        elif result.embedded:
+            self.statusBar().showMessage("Lyrics embedded into the audio file.", 3000)
 
     def _apply_saved_playback_speed(self) -> None:
         config = get_config(self.app_state.db)
@@ -989,7 +982,8 @@ class MainWindow(QMainWindow):
 
             config = get_config(self.app_state.db)
             export_config = replace(config, save_lyrics_sidecars=True)
-            written_paths = export_lyrics_sidecars(track, export_config)
+            result = sync_track_outputs_with_result(track, export_config)
+            written_paths = list(result.sidecar_paths)
             if not written_paths:
                 self.app_state.notify("No lyrics files were generated for this track.", "warning")
                 for view in self._all_lyrics_views():

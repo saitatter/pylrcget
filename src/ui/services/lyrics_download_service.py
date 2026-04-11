@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 import logging
 import sqlite3
 import time
@@ -20,6 +21,14 @@ ProgressCallback = Callable[[str], None]
 _RETRYABLE_API_ERRORS = (RateLimitError, ServerError, requests_exceptions.Timeout, requests_exceptions.ConnectionError)
 _MAX_LRCLIB_RETRIES = 3
 _INITIAL_BACKOFF_S = 0.5
+
+
+@dataclass(frozen=True)
+class TrackOutputSyncResult:
+    sidecar_paths: tuple[str, ...] = ()
+    sidecar_error: Exception | None = None
+    embedded: bool = False
+    embed_error: Exception | None = None
 
 
 def _strip_empty(s: str | None) -> str | None:
@@ -89,20 +98,45 @@ def sync_track_outputs(
     config: Config | None = None,
 ) -> None:
     config = config or get_config(db)
+    sync_track_outputs_with_result(track, config, notify=notify)
+
+
+def sync_track_outputs_with_result(
+    track: Track,
+    config: Config,
+    *,
+    notify: ProgressCallback | None = None,
+) -> TrackOutputSyncResult:
+    notify_cb = notify or (lambda _msg: None)
+
+    sidecar_paths: tuple[str, ...] = ()
+    sidecar_error: Exception | None = None
+    embedded = False
+    embed_error: Exception | None = None
 
     if config.save_lyrics_sidecars:
         try:
-            notify("Writing lyrics sidecar files...")
-            export_lyrics_sidecars(track, config)
+            notify_cb("Writing lyrics sidecar files...")
+            sidecar_paths = tuple(export_lyrics_sidecars(track, config))
         except Exception as exc:
+            sidecar_error = exc
             logger.warning("Failed to export lyrics sidecars for track %s: %s", track.id, exc)
 
     if config.try_embed_lyrics:
         try:
-            notify("Embedding lyrics into the audio file...")
+            notify_cb("Embedding lyrics into the audio file...")
             embed_lyrics_for_track(track)
+            embedded = True
         except Exception as exc:
+            embed_error = exc
             logger.warning("Failed to embed lyrics for track %s: %s", track.id, exc)
+
+    return TrackOutputSyncResult(
+        sidecar_paths=sidecar_paths,
+        sidecar_error=sidecar_error,
+        embedded=embedded,
+        embed_error=embed_error,
+    )
 
 
 def download_track_lyrics(
