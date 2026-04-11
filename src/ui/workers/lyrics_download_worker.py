@@ -1,12 +1,18 @@
 # ui/lyrics_download_worker.py
 from __future__ import annotations
 
+import logging
 import sqlite3
 from PySide6.QtCore import QThread, Signal
 
 from lrclib import LrcLibAPI  # pip install lrclibapi
 
-from db.database import get_track_by_id, update_track_plain_lyrics, update_track_synced_lyrics
+from core.embed_lyrics import embed_lyrics_for_track
+from core.lyrics_sidecar import export_lyrics_sidecars
+from db.database import get_track_by_id, get_config, update_track_plain_lyrics, update_track_synced_lyrics
+from db.models import Config
+
+logger = logging.getLogger(__name__)
 
 def _strip_empty(s: str | None) -> str | None:
     if not s:
@@ -63,15 +69,20 @@ def download_track_lyrics(
     *,
     download_mode: str = "prefer_synced",
     progress_callback=None,
+    db: sqlite3.Connection | None = None,
+    config: Config | None = None,
 ) -> tuple[bool, str, int, str]:
     mode = (download_mode or "prefer_synced").strip() or "prefer_synced"
     notify = progress_callback or (lambda _msg: None)
-    db = None
+    owns_db = db is None
     title_for_ui = ""
     try:
+        if db is None:
+            notify("Opening database...")
+            db = sqlite3.connect(db_path, timeout=15.0)
+            db.row_factory = sqlite3.Row
+
         notify("Reading track metadata...")
-        db = sqlite3.connect(db_path, timeout=15.0)
-        db.row_factory = sqlite3.Row
 
         track = get_track_by_id(db, track_id)
         title = (track.title or "").strip()
@@ -100,12 +111,14 @@ def download_track_lyrics(
             if plain:
                 notify("Saving plain lyrics...")
                 update_track_plain_lyrics(db, track_id, plain)
+                _sync_track_outputs(db, track_id, notify, config=config)
                 return True, "Downloaded plain lyrics.", track_id, title_for_ui
             if synced:
                 derived_plain = _strip_empty(_strip_timestamps(synced))
                 if derived_plain:
                     notify("Saving plain lyrics derived from synced lyrics...")
                     update_track_plain_lyrics(db, track_id, derived_plain)
+                    _sync_track_outputs(db, track_id, notify, config=config)
                     return True, "Downloaded plain lyrics.", track_id, title_for_ui
             return False, "No plain lyrics found on LRCLIB for this track.", track_id, title_for_ui
 
@@ -114,6 +127,7 @@ def download_track_lyrics(
                 plain = _strip_empty(_strip_timestamps(synced))
             notify("Saving synced + plain lyrics...")
             update_track_synced_lyrics(db, track_id, synced, plain or "")
+            _sync_track_outputs(db, track_id, notify, config=config)
             return True, "Downloaded synced lyrics.", track_id, title_for_ui
 
         if plain:
@@ -121,14 +135,37 @@ def download_track_lyrics(
                 return False, "Only plain lyrics were found; synced-only mode is enabled.", track_id, title_for_ui
             notify("Saving plain lyrics...")
             update_track_plain_lyrics(db, track_id, plain)
+            _sync_track_outputs(db, track_id, notify, config=config)
             return True, "Downloaded plain lyrics.", track_id, title_for_ui
 
         return False, "No lyrics found on LRCLIB for this track.", track_id, title_for_ui
     except Exception as e:
         return False, f"Download failed: {e}", track_id, title_for_ui
     finally:
-        if db is not None:
+        if owns_db and db is not None:
             db.close()
 
-    # unreachable
-    return False, "Download failed.", track_id, title_for_ui
+
+def _sync_track_outputs(
+    db: sqlite3.Connection,
+    track_id: int,
+    notify,
+    *,
+    config: Config | None = None,
+) -> None:
+    track = get_track_by_id(db, int(track_id))
+    config = config or get_config(db)
+
+    if config.save_lyrics_sidecars:
+        try:
+            notify("Writing lyrics sidecar files...")
+            export_lyrics_sidecars(track, config)
+        except Exception as exc:
+            logger.warning("Failed to export lyrics sidecars for track %s: %s", track_id, exc)
+
+    if config.try_embed_lyrics:
+        try:
+            notify("Embedding lyrics into the audio file...")
+            embed_lyrics_for_track(track)
+        except Exception as exc:
+            logger.warning("Failed to embed lyrics for track %s: %s", track_id, exc)

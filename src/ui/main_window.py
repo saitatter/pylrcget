@@ -852,10 +852,8 @@ class MainWindow(QMainWindow):
 
     def _on_download_item_finished(self, track_id: int, ok: bool, msg: str) -> None:
         try:
-            track = get_track_by_id(self.app_state.db, int(track_id))
-            if ok:
-                self._sync_track_lyrics_outputs(track)
             if self.app_state.player and self.app_state.player.track and int(self.app_state.player.track.track_id) == int(track_id):
+                track = get_track_by_id(self.app_state.db, int(track_id))
                 self._set_track_lyrics_views(track)
         except Exception as exc:
             logger.warning("Failed to update track after lyrics download for %s: %s", track_id, exc)

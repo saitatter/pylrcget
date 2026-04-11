@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import sqlite3
 import time
 
 from PySide6.QtCore import QThread, Signal
 
+from db.database import get_config
 from ui.workers.lyrics_download_worker import download_track_lyrics
 
 
@@ -33,54 +35,61 @@ class BulkLyricsDownloadWorker(QThread):
         ok_count = 0
         fail_count = 0
         cancelled = False
+        db = sqlite3.connect(self.db_path, timeout=15.0)
+        db.row_factory = sqlite3.Row
+        try:
+            config = get_config(db)
+            for idx, track_id in enumerate(self.track_ids, start=1):
+                if self.isInterruptionRequested():
+                    cancelled = True
+                    break
 
-        for idx, track_id in enumerate(self.track_ids, start=1):
-            if self.isInterruptionRequested():
-                cancelled = True
-                break
-
-            self.progress.emit(
-                idx - 1,
-                total,
-                f"Track {idx}/{total}",
-                "Preparing download...",
-                time.perf_counter() - started_at,
-            )
-
-            current_label = {"value": f"Track {idx}/{total}"}
-
-            def _progress(status: str, i=idx, t=total):
                 self.progress.emit(
-                    i - 1,
-                    t,
-                    current_label["value"],
-                    status,
+                    idx - 1,
+                    total,
+                    f"Track {idx}/{total}",
+                    "Preparing download...",
                     time.perf_counter() - started_at,
                 )
 
-            ok, msg, tid, label = download_track_lyrics(
-                self.db_path,
-                track_id,
-                self.lrclib_instance,
-                download_mode=self.download_mode,
-                progress_callback=_progress,
-            )
-            if label:
-                current_label["value"] = label
+                current_label = {"value": f"Track {idx}/{total}"}
 
-            if ok:
-                ok_count += 1
-            else:
-                fail_count += 1
+                def _progress(status: str, i=idx, t=total):
+                    self.progress.emit(
+                        i - 1,
+                        t,
+                        current_label["value"],
+                        status,
+                        time.perf_counter() - started_at,
+                    )
 
-            self.itemFinished.emit(int(tid), bool(ok), msg)
-            self.progress.emit(
-                idx,
-                total,
-                label or f"Track {idx}/{total}",
-                msg,
-                time.perf_counter() - started_at,
-            )
+                ok, msg, tid, label = download_track_lyrics(
+                    self.db_path,
+                    track_id,
+                    self.lrclib_instance,
+                    download_mode=self.download_mode,
+                    progress_callback=_progress,
+                    db=db,
+                    config=config,
+                )
+                if label:
+                    current_label["value"] = label
+
+                if ok:
+                    ok_count += 1
+                else:
+                    fail_count += 1
+
+                self.itemFinished.emit(int(tid), bool(ok), msg)
+                self.progress.emit(
+                    idx,
+                    total,
+                    label or f"Track {idx}/{total}",
+                    msg,
+                    time.perf_counter() - started_at,
+                )
+        finally:
+            db.close()
 
         stats = {
             "total": total,
