@@ -206,3 +206,35 @@ class LyricsDownloadWorkerTests(unittest.TestCase):
                 self.assertIsNone(refreshed.lrc_lyrics)
             finally:
                 db.close()
+
+    def test_plain_only_preserves_non_timestamp_bracket_headers(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db = initialize_database(tmp)
+            try:
+                audio = Path(tmp) / "headers.mp3"
+                touch_text(audio, "a")
+                add_tracks(db, [make_fs_track(audio, artist="Artist D", album="Album D", title="Song D")])
+                track = db.execute("SELECT id FROM tracks LIMIT 1").fetchone()
+                self.assertIsNotNone(track)
+
+                finished: list[tuple[bool, str, int]] = []
+                worker = LyricsDownloadWorker(
+                    db_path=str(Path(tmp) / "db.sqlite3"),
+                    track_id=int(track["id"]),
+                    download_mode="plain_only",
+                )
+                worker.finished.connect(lambda ok, msg, tid: finished.append((ok, msg, tid)))
+
+                fake_lyrics = SimpleNamespace(
+                    synced_lyrics="[00:10.00][Chorus]\n[00:12.00]world",
+                    plain_lyrics=None,
+                )
+                with patch("ui.services.lyrics_download_service.LrcLibAPI") as api_cls:
+                    api_cls.return_value.get_lyrics.return_value = fake_lyrics
+                    worker.run()
+
+                self.assertEqual(len(finished), 1)
+                refreshed = get_track_by_id(db, int(track["id"]))
+                self.assertEqual(refreshed.txt_lyrics, "[Chorus]\nworld")
+            finally:
+                db.close()

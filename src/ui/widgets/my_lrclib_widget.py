@@ -123,7 +123,7 @@ class MyLrclibWidget(QWidget):
             table,
             default_sort_column=default_sort_column,
             default_sort_order=Qt.SortOrder.DescendingOrder,
-            non_sortable_columns=set(range(len(headers))),
+            non_sortable_columns=set(),
         )
         table.setHorizontalHeader(header)
         table.setSelectionBehavior(QTableView.SelectionBehavior.SelectRows)
@@ -132,6 +132,7 @@ class MyLrclibWidget(QWidget):
         table.setShowGrid(False)
         table.setAlternatingRowColors(True)
         table.setEditTriggers(QTableView.EditTrigger.NoEditTriggers)
+        table.setSortingEnabled(True)
         table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         table.customContextMenuRequested.connect(
             lambda pos, t=table, m=model: self._on_context_menu(t, m, pos)

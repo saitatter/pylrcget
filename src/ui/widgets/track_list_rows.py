@@ -10,9 +10,9 @@ def build_track_list_rows(rows, download_states: dict[int, DownloadState]) -> li
         lrc = row["lrc_lyrics"]
         txt = row["txt_lyrics"]
 
-        if instrumental:
+        if instrumental or lrc == "[au: instrumental]":
             state = LyricsState.INSTRUMENTAL
-        elif lrc and lrc != "[au: instrumental]":
+        elif lrc:
             state = LyricsState.SYNCED
         elif txt:
             state = LyricsState.PLAIN

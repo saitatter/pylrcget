@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import logging
+import re
 import sqlite3
 import time
 from typing import Callable
@@ -40,12 +41,7 @@ def _strip_empty(s: str | None) -> str | None:
 
 
 def _strip_timestamps(lrc: str) -> str:
-    out_lines = []
-    for line in lrc.splitlines():
-        while line.startswith("[") and "]" in line:
-            line = line.split("]", 1)[1].lstrip()
-        out_lines.append(line)
-    return "\n".join(out_lines).strip()
+    return re.sub(r"^(?:\[\d+:\d+(?:\.\d+)?\])+\s*", "", lrc, flags=re.MULTILINE).strip()
 
 
 def _should_retry_lrclib_error(exc: Exception) -> bool:
@@ -150,6 +146,7 @@ def download_track_lyrics(
     db: sqlite3.Connection | None = None,
     config: Config | None = None,
     track: Track | None = None,
+    api: LrcLibAPI | None = None,
 ) -> tuple[bool, str, int, str]:
     mode = normalize_download_mode(download_mode)
     notify = progress_callback or (lambda _msg: None)
@@ -173,9 +170,9 @@ def download_track_lyrics(
         if not title or not artist:
             return False, "Missing title/artist; cannot search lyrics.", track_id, title_for_ui
 
-        api = LrcLibAPI(user_agent="lrcget-python/0.1", base_url=lrclib_instance)
+        api_instance = api or LrcLibAPI(user_agent="lrcget-python/0.1", base_url=lrclib_instance)
         lyrics = fetch_lyrics_with_retry(
-            api,
+            api_instance,
             notify=notify,
             title=title,
             artist=artist,

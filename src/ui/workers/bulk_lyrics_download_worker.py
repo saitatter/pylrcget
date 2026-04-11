@@ -5,10 +5,12 @@ import time
 from typing import TypedDict
 
 from PySide6.QtCore import QObject, QThread, Signal
+from lrclib import LrcLibAPI
 
 from db.models import Track
 from db.queries import get_config, get_track_by_id
 from ui.services.lyrics_download_service import download_track_lyrics
+from ui.services.download_modes import normalize_download_mode
 
 
 class BulkDownloadStats(TypedDict):
@@ -36,7 +38,7 @@ class BulkLyricsDownloadWorker(QThread):
         self.db_path = db_path
         self.track_ids = [int(t) for t in track_ids]
         self.lrclib_instance = lrclib_instance
-        self.download_mode = (download_mode or "prefer_synced").strip() or "prefer_synced"
+        self.download_mode = normalize_download_mode(download_mode)
 
     def run(self) -> None:
         total = len(self.track_ids)
@@ -46,10 +48,12 @@ class BulkLyricsDownloadWorker(QThread):
         cancelled = False
         request_delay_s = 0.35
         db = None
+        api = None
         try:
             db = sqlite3.connect(self.db_path, timeout=15.0)
             db.row_factory = sqlite3.Row
             config = get_config(db)
+            api = LrcLibAPI(user_agent="lrcget-python/0.1", base_url=self.lrclib_instance)
             for idx, track_id in enumerate(self.track_ids, start=1):
                 if self.isInterruptionRequested():
                     cancelled = True
@@ -95,6 +99,7 @@ class BulkLyricsDownloadWorker(QThread):
                     db=db,
                     config=config,
                     track=track,
+                    api=api,
                 )
                 if label:
                     current_label["value"] = label
