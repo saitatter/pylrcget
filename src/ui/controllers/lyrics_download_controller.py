@@ -9,6 +9,7 @@ from PySide6.QtCore import QObject, QTimer
 from db.models import Track
 from db.queries import get_config, get_track_by_id, get_track_ids_for_download_mode, record_download_history
 from core.tracklist_models import DownloadState
+from ui.services.feedback import notify_user
 from ui.widgets.download_progress_overlay import DownloadProgressOverlay
 from ui.workers.bulk_lyrics_download_worker import BulkDownloadStats, BulkLyricsDownloadWorker
 
@@ -84,7 +85,13 @@ class LyricsDownloadController(QObject):
         mode = self._resolve_download_mode("use_global")
         track_ids = get_track_ids_for_download_mode(self._app_state.db, mode)
         if not track_ids:
-            self._app_state.notify("No tracks are missing lyrics for the current download mode.", "info")
+            notify_user(
+                self._app_state,
+                "No tracks are missing lyrics for the current download mode.",
+                "info",
+                show_status=self._show_status,
+                status_timeout_ms=3000,
+            )
             return
         self.start_downloads(track_ids, mode_override=mode)
 
@@ -102,10 +109,22 @@ class LyricsDownloadController(QObject):
     def _build_request(self, track_ids: list[int], *, mode_override: str) -> LyricsDownloadRequest | None:
         unique_ids = tuple(dict.fromkeys(int(x) for x in track_ids if x is not None))
         if not unique_ids:
-            self._app_state.notify("No tracks selected for lyrics download.", "warning")
+            notify_user(
+                self._app_state,
+                "No tracks selected for lyrics download.",
+                "warning",
+                show_status=self._show_status,
+                status_timeout_ms=3000,
+            )
             return None
         if self._download_worker is not None and self._download_worker.isRunning():
-            self._app_state.notify("A lyrics download is already running.", "warning")
+            notify_user(
+                self._app_state,
+                "A lyrics download is already running.",
+                "warning",
+                show_status=self._show_status,
+                status_timeout_ms=3000,
+            )
             return None
 
         config = get_config(self._app_state.db)
@@ -172,13 +191,29 @@ class LyricsDownloadController(QObject):
         }
         self._overlay.finish_batch(msg, cancelled=bool(stats_dict.get("cancelled")))
         if stats_dict.get("cancelled"):
-            self._app_state.notify("Lyrics download cancelled.", "warning")
+            notify_user(
+                self._app_state,
+                "Lyrics download cancelled.",
+                "warning",
+            )
         elif int(stats_dict.get("failed", 0)) > 0 and int(stats_dict.get("ok", 0)) > 0:
-            self._app_state.notify(msg, "warning")
+            notify_user(
+                self._app_state,
+                msg,
+                "warning",
+            )
         elif int(stats_dict.get("failed", 0)) > 0:
-            self._app_state.notify(msg, "error")
+            notify_user(
+                self._app_state,
+                msg,
+                "error",
+            )
         else:
-            self._app_state.notify("Lyrics downloaded successfully.", "success")
+            notify_user(
+                self._app_state,
+                "Lyrics downloaded successfully.",
+                "success",
+            )
         self._download_worker = None
         self._active_request = None
 

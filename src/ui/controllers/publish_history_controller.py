@@ -7,6 +7,7 @@ from PySide6.QtCore import QObject
 
 from db.queries import get_config, get_track_by_id, record_publish_history
 from ui.dialogs.publish_lyrics_dialog import PublishLyricsDialog
+from ui.services.feedback import notify_user
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +21,7 @@ class PublishHistoryController(QObject):
         current_player_track_id: Callable[[], int | None],
         lyrics_views: Callable[[], list],
         refresh_history: Callable[[], None],
+        show_status: Callable[[str, int | None], None] | None = None,
         parent=None,
     ) -> None:
         super().__init__(parent)
@@ -28,6 +30,7 @@ class PublishHistoryController(QObject):
         self._current_player_track_id = current_player_track_id
         self._lyrics_views = lyrics_views
         self._refresh_history = refresh_history
+        self._show_status = show_status
 
     def publish_synced(self) -> None:
         self._open_publish_dialog(is_synced=True)
@@ -38,7 +41,13 @@ class PublishHistoryController(QObject):
     def _open_publish_dialog(self, *, is_synced: bool) -> None:
         track_id = self._current_player_track_id()
         if track_id is None:
-            self._app_state.notify("Start playback or select a track first.", "warning")
+            notify_user(
+                self._app_state,
+                "Start playback or select a track first.",
+                "warning",
+                show_status=self._show_status,
+                status_timeout_ms=3000,
+            )
             for view in self._lyrics_views():
                 view.set_publish_feedback(is_synced=is_synced, state="error", message="No Track")
             return
@@ -76,7 +85,13 @@ class PublishHistoryController(QObject):
                 self._refresh_history()
             for view in self._lyrics_views():
                 view.set_publish_feedback(is_synced=is_synced, state="success", message="Published")
-            self._app_state.notify("Lyrics published successfully.", "success")
+            notify_user(
+                self._app_state,
+                "Lyrics published successfully.",
+                "success",
+                show_status=self._show_status,
+                status_timeout_ms=3000,
+            )
             return
 
         if dlg.publish_result is False:

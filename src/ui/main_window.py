@@ -43,6 +43,7 @@ from ui.widgets.lyrics_editor_widget import LyricsEditorWidget
 from ui.dialogs.first_run_dialog import FirstRunDialog
 from player.player import NowPlaying
 from ui.services.lyrics_download_service import sync_track_outputs_with_result
+from ui.services.feedback import exception_message, log_and_notify, normalize_notify_type, notify_user
 from ui.app_theme import apply_app_theme
 from ui.widgets.album_list_widget import AlbumListWidget
 from ui.widgets.artist_list_widget import ArtistListWidget
@@ -264,6 +265,7 @@ class MainWindow(QMainWindow):
             current_player_track_id=self._current_player_track_id,
             lyrics_views=self._all_lyrics_views,
             refresh_history=self.mylrclib_tab.refresh,
+            show_status=self._show_status_message,
             parent=self,
         )
         self.lyrics_view.publishSyncedRequested.connect(self.publish_history.publish_synced)
@@ -431,7 +433,13 @@ class MainWindow(QMainWindow):
                 self.refresh_library()
 
     def open_about_modal(self):
-        self.app_state.notify("LrcGet helps you scan your library, edit lyrics, and publish them to LRCLIB.", "info")
+        notify_user(
+            self.app_state,
+            "LrcGet helps you scan your library, edit lyrics, and publish them to LRCLIB.",
+            "info",
+            show_status=self._show_status_message,
+            status_timeout_ms=3000,
+        )
 
     def _maybe_show_first_run_onboarding(self):
         if get_directories(self.app_state.db):
@@ -450,7 +458,13 @@ class MainWindow(QMainWindow):
             return
         directories = get_directories(self.app_state.db)
         if not directories:
-            self.app_state.notify("Add at least one music folder before starting a library scan.", "warning")
+            notify_user(
+                self.app_state,
+                "Add at least one music folder before starting a library scan.",
+                "warning",
+                show_status=self._show_status_message,
+                status_timeout_ms=3000,
+            )
             self.top_bar.set_button_feedback(self.top_bar.btn_refresh, "error")
             QTimer.singleShot(1800, self._reset_refresh_feedback)
             return
@@ -506,10 +520,7 @@ class MainWindow(QMainWindow):
 
     def _on_notify(self, n):
         # n is core.state.Notify
-        kind = (getattr(n, "notify_type", "info") or "info").lower()
-        # your enum uses "warn"; toast supports "warning"
-        if kind == "warn":
-            kind = "warning"
+        kind = normalize_notify_type(getattr(n, "notify_type", "info") or "info")
 
         msg = getattr(n, "message", "") or ""
         if not msg:
@@ -546,22 +557,40 @@ class MainWindow(QMainWindow):
 
         if ok:
             self._apply_track_filters()
-            self.app_state.notify(msg or "Library scan finished successfully.", "success")
+            notify_user(
+                self.app_state,
+                msg or "Library scan finished successfully.",
+                "success",
+                show_status=self._show_status_message,
+                status_timeout_ms=4000,
+            )
             self.top_bar.set_button_feedback(self.top_bar.btn_refresh, "success")
             logger.info("Library scan finished successfully: %s", msg or "ok")
         else:
             if "cancel" in (msg or "").lower():
-                self.app_state.notify(msg, "warning")
+                notify_user(
+                    self.app_state,
+                    msg,
+                    "warning",
+                    show_status=self._show_status_message,
+                    status_timeout_ms=4000,
+                )
                 self.top_bar.set_button_feedback(self.top_bar.btn_refresh, "idle")
                 logger.warning("Library scan cancelled: %s", msg)
             else:
-                self.app_state.notify(f"Library scanning failed: {msg}", "error")
+                log_and_notify(
+                    self.app_state,
+                    logger,
+                    logging.ERROR,
+                    f"Library scanning failed: {msg}",
+                    "error",
+                    show_status=self._show_status_message,
+                    status_timeout_ms=4000,
+                )
                 self.top_bar.set_button_feedback(self.top_bar.btn_refresh, "error")
-                logger.error("Library scan failed: %s", msg)
 
         self.top_bar.btn_refresh.setEnabled(True)
         QTimer.singleShot(1800, self._reset_refresh_feedback)
-        self.statusBar().showMessage(msg, 4000)
         self.scanner = None
 
     def _cancel_scan(self):
@@ -704,7 +733,13 @@ class MainWindow(QMainWindow):
 
     def _on_lyrics_save_requested(self, lrc: str, txt: str):
         if not self.app_state.player or not self.app_state.player.track:
-            self.app_state.notify("Start playback or select a track first.", "warning")
+            notify_user(
+                self.app_state,
+                "Start playback or select a track first.",
+                "warning",
+                show_status=self._show_status_message,
+                status_timeout_ms=3000,
+            )
             for view in self._all_lyrics_views():
                 view.set_save_feedback("error", "No Track")
             return
@@ -724,12 +759,19 @@ class MainWindow(QMainWindow):
             track = get_track_by_id(self.app_state.db, track_id)
             self._sync_track_lyrics_outputs(track)
             self._set_track_lyrics_views(track)
-            self.statusBar().showMessage("Lyrics saved.", 2500)
+            self._show_status_message("Lyrics saved.", 2500)
             for view in self._all_lyrics_views():
                 view.set_save_feedback("success", "Saved")
         except Exception as exc:
-            self.statusBar().showMessage("Failed to save lyrics.", 4000)
-            self.app_state.notify(f"Failed to save lyrics: {exc}", "error")
+            log_and_notify(
+                self.app_state,
+                logger,
+                logging.ERROR,
+                exception_message("Failed to save lyrics", exc),
+                "error",
+                show_status=self._show_status_message,
+                status_timeout_ms=4000,
+            )
             for view in self._all_lyrics_views():
                 view.set_save_feedback("error", "Save Failed")
 
@@ -746,14 +788,30 @@ class MainWindow(QMainWindow):
         config = get_config(self.app_state.db)
         result = sync_track_outputs_with_result(track, config)
         if result.sidecar_error is not None:
-            self.app_state.notify(f"Failed to export lyrics files: {result.sidecar_error}", "error")
+            log_and_notify(
+                self.app_state,
+                logger,
+                logging.ERROR,
+                exception_message("Failed to export lyrics files", result.sidecar_error),
+                "error",
+                show_status=self._show_status_message,
+                status_timeout_ms=4000,
+            )
         elif result.sidecar_paths:
-            self.statusBar().showMessage(f"Lyrics exported to {os.path.dirname(result.sidecar_paths[0])}", 3000)
+            self._show_status_message(f"Lyrics exported to {os.path.dirname(result.sidecar_paths[0])}", 3000)
 
         if result.embed_error is not None:
-            self.app_state.notify(f"Failed to embed lyrics: {result.embed_error}", "error")
+            log_and_notify(
+                self.app_state,
+                logger,
+                logging.ERROR,
+                exception_message("Failed to embed lyrics", result.embed_error),
+                "error",
+                show_status=self._show_status_message,
+                status_timeout_ms=4000,
+            )
         elif result.embedded:
-            self.statusBar().showMessage("Lyrics embedded into the audio file.", 3000)
+            self._show_status_message("Lyrics embedded into the audio file.", 3000)
 
     def _apply_saved_playback_speed(self) -> None:
         config = get_config(self.app_state.db)
@@ -820,13 +878,25 @@ class MainWindow(QMainWindow):
 
     def _download_current_track_lyrics(self):
         if not self.app_state.player or not self.app_state.player.track:
-            self.app_state.notify("Select a track before downloading lyrics.", "warning")
+            notify_user(
+                self.app_state,
+                "Select a track before downloading lyrics.",
+                "warning",
+                show_status=self._show_status_message,
+                status_timeout_ms=3000,
+            )
             return
         self.on_download_lyrics(int(self.app_state.player.track.track_id))
 
     def _export_current_track_sidecars(self):
         if not self.app_state.player or not self.app_state.player.track:
-            self.app_state.notify("Select or start a track before exporting lyrics files.", "warning")
+            notify_user(
+                self.app_state,
+                "Select or start a track before exporting lyrics files.",
+                "warning",
+                show_status=self._show_status_message,
+                status_timeout_ms=3000,
+            )
             for view in self._all_lyrics_views():
                 view.set_export_feedback("error", "No Track")
             return
@@ -838,7 +908,13 @@ class MainWindow(QMainWindow):
         try:
             track = get_track_by_id(self.app_state.db, int(track_id))
             if not (track.lrc_lyrics or track.txt_lyrics):
-                self.app_state.notify("No lyrics are available to export for this track.", "warning")
+                notify_user(
+                    self.app_state,
+                    "No lyrics are available to export for this track.",
+                    "warning",
+                    show_status=self._show_status_message,
+                    status_timeout_ms=3000,
+                )
                 for view in self._all_lyrics_views():
                     view.set_export_feedback("error", "No Lyrics")
                 return
@@ -848,18 +924,38 @@ class MainWindow(QMainWindow):
             result = sync_track_outputs_with_result(track, export_config)
             written_paths = list(result.sidecar_paths)
             if not written_paths:
-                self.app_state.notify("No lyrics files were generated for this track.", "warning")
+                notify_user(
+                    self.app_state,
+                    "No lyrics files were generated for this track.",
+                    "warning",
+                    show_status=self._show_status_message,
+                    status_timeout_ms=3000,
+                )
                 for view in self._all_lyrics_views():
                     view.set_export_feedback("error", "Nothing Exported")
                 return
 
             output_dir = os.path.dirname(written_paths[0]) or os.path.dirname(track.file_path)
-            self.statusBar().showMessage(f"Lyrics files exported to {output_dir}", 3000)
-            self.app_state.notify("Lyrics files generated successfully.", "success")
+            notify_user(
+                self.app_state,
+                "Lyrics files generated successfully.",
+                "success",
+                show_status=self._show_status_message,
+                status_timeout_ms=3000,
+            )
+            self._show_status_message(f"Lyrics files exported to {output_dir}", 3000)
             for view in self._all_lyrics_views():
                 view.set_export_feedback("success", "Exported")
         except Exception as exc:
-            self.app_state.notify(f"Failed to export lyrics files: {exc}", "error")
+            log_and_notify(
+                self.app_state,
+                logger,
+                logging.ERROR,
+                exception_message("Failed to export lyrics files", exc),
+                "error",
+                show_status=self._show_status_message,
+                status_timeout_ms=4000,
+            )
             for view in self._all_lyrics_views():
                 view.set_export_feedback("error", "Export Failed")
 
@@ -1019,11 +1115,19 @@ class MainWindow(QMainWindow):
 
         try:
             mark_tracks_instrumental(self.app_state.db, track_ids)
-            self.statusBar().showMessage(f"Marked {len(track_ids)} track(s) as instrumental.", 3000)
+            self._show_status_message(f"Marked {len(track_ids)} track(s) as instrumental.", 3000)
             self._apply_track_filters()
             self.track_list.restore_selection(selected_before)
         except Exception as e:
-            self.app_state.notify(f"Failed to update tracks: {e}", "error")
+            log_and_notify(
+                self.app_state,
+                logger,
+                logging.ERROR,
+                exception_message("Failed to update tracks", e),
+                "error",
+                show_status=self._show_status_message,
+                status_timeout_ms=4000,
+            )
 
 
     def _on_unmark_instrumental(self, track_ids: list[int]):
@@ -1038,8 +1142,16 @@ class MainWindow(QMainWindow):
 
         try:
             unmark_tracks_instrumental(self.app_state.db, track_ids)
-            self.statusBar().showMessage(f"Unmarked {len(track_ids)} track(s).", 3000)
+            self._show_status_message(f"Unmarked {len(track_ids)} track(s).", 3000)
             self._apply_track_filters()
             self.track_list.restore_selection(selected_before)
         except Exception as e:
-            self.app_state.notify(f"Failed to update tracks: {e}", "error")
+            log_and_notify(
+                self.app_state,
+                logger,
+                logging.ERROR,
+                exception_message("Failed to update tracks", e),
+                "error",
+                show_status=self._show_status_message,
+                status_timeout_ms=4000,
+            )
