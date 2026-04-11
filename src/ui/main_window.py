@@ -9,10 +9,10 @@ import os
 
 from dataclasses import replace
 
-from db.database import get_album_by_id, get_artist_by_id, get_config, get_directories, get_track_by_id, set_config
+from db.database import get_album_by_id, get_artist_by_id, get_config, get_directories, set_config
 from core.lyrics_sidecar import export_lyrics_sidecars
 from ui.workers.library_scanner import LibraryScanner
-from ui.workers.bulk_lyrics_download_worker import BulkLyricsDownloadWorker
+from ui.controllers.lyrics_download_controller import LyricsDownloadController
 from ui.widgets.track_list_widget import TrackListWidget
 from ui.dialogs.music_folders_dialog import MusicFoldersDialog
 from ui.player_bar import PlayerBar
@@ -33,7 +33,7 @@ from PySide6.QtWidgets import QToolButton
 from ui.widgets.log_panel import LogPanel, QtLogHandler
 from ui.widgets.my_lrclib_widget import MyLrclibWidget
 from ui.widgets.download_progress_overlay import DownloadProgressOverlay
-from db.queries import get_track_ids_for_download_mode, record_publish_history
+from db.queries import record_publish_history
 
 logger = logging.getLogger(__name__)
 
@@ -71,12 +71,9 @@ class MainWindow(QMainWindow):
         self._artist_label_cache: dict[int, str] = {}
         self._album_label_cache: dict[int, str] = {}
         self._recent_toast_messages: set[str] = set()
-        self._active_download_track_ids: set[int] = set()
-        self._download_state_tokens: dict[int, int] = {}
         self._nav_apply_in_progress = False
         self._tab_sync_suppressed = False
         self.scanner = None
-        self._download_worker = None
         self._playback_speed_save_timer = QTimer(self)
         self._playback_speed_save_timer.setSingleShot(True)
         self._playback_speed_save_timer.setInterval(350)
@@ -352,8 +349,20 @@ class MainWindow(QMainWindow):
         self._apply_saved_playback_volume()
 
         self.download_overlay = DownloadProgressOverlay(self.central_widget)
-        self.download_overlay.cancelRequested.connect(self._cancel_downloads)
         self.download_overlay.sync_to_parent()
+        self.downloads = LyricsDownloadController(
+            self.app_state,
+            self.download_overlay,
+            normalize_lrclib_base=self._normalize_lrclib_base,
+            show_status=self._show_status_message,
+            current_player_track_id=self._current_player_track_id,
+            set_track_lyrics_views=self._set_track_lyrics_views,
+            refresh_visible_library_view=self._refresh_visible_library_view_after_downloads,
+            set_track_download_state=self._set_track_download_state_all,
+            get_track_download_state=self._get_primary_track_download_state,
+            parent=self,
+        )
+        self.download_overlay.cancelRequested.connect(self.downloads.cancel)
 
         # --- Scan progress (pretty + hidden when idle) ---
         self.scan_row = QWidget()
@@ -754,120 +763,13 @@ class MainWindow(QMainWindow):
 
     # ------------------ lyrics download & save ------------------
     def on_download_lyrics(self, track_id: int):
-        self._start_lyrics_downloads([int(track_id)], mode_override="use_global")
+        self.downloads.start_downloads([int(track_id)], mode_override="use_global")
 
     def _on_bulk_download_requested(self, track_ids: list[int], mode: str) -> None:
-        self._start_lyrics_downloads(track_ids, mode_override=mode)
-
-    def _resolve_download_mode(self, mode_override: str = "use_global") -> str:
-        if mode_override and mode_override != "use_global":
-            return mode_override
-        config = get_config(self.app_state.db)
-        return str(config.download_lyrics_mode or "prefer_synced")
-
-    def _start_lyrics_downloads(self, track_ids: list[int], *, mode_override: str = "use_global") -> None:
-        unique_ids = list(dict.fromkeys(int(x) for x in track_ids if x is not None))
-        if not unique_ids:
-            self.app_state.notify("No tracks selected for lyrics download.", "warning")
-            return
-        if self._download_worker is not None and self._download_worker.isRunning():
-            self.app_state.notify("A lyrics download is already running.", "warning")
-            return
-
-        config = get_config(self.app_state.db)
-        lrclib_instance = self._normalize_lrclib_base(config.lrclib_instance or "https://lrclib.net")
-        mode = self._resolve_download_mode(mode_override)
-
-        for track_id in unique_ids:
-            self._set_track_download_state_all(track_id, "loading")
-        self._active_download_track_ids = set(unique_ids)
-
-        self.download_overlay.start_batch(self._download_mode_label(mode), len(unique_ids))
-        self.statusBar().showMessage(f"Starting lyrics download... ({lrclib_instance})")
-
-        self._download_worker = BulkLyricsDownloadWorker(
-            db_path=self.app_state.db_path,
-            track_ids=unique_ids,
-            lrclib_instance=lrclib_instance,
-            download_mode=mode,
-            parent=self,
-        )
-        self._download_worker.progress.connect(self._on_download_progress)
-        self._download_worker.itemFinished.connect(self._on_download_item_finished)
-        self._download_worker.finishedBatch.connect(self._on_download_batch_finished)
-        self._download_worker.start()
+        self.downloads.start_downloads(track_ids, mode_override=mode)
 
     def _download_missing_lyrics(self) -> None:
-        mode = self._resolve_download_mode("use_global")
-        track_ids = get_track_ids_for_download_mode(self.app_state.db, mode)
-        if not track_ids:
-            self.app_state.notify("No tracks are missing lyrics for the current download mode.", "info")
-            return
-        self._start_lyrics_downloads(track_ids, mode_override=mode)
-
-    def _cancel_downloads(self) -> None:
-        if self._download_worker is None or not self._download_worker.isRunning():
-            return
-        self._download_worker.requestInterruption()
-
-    def _on_download_progress(self, current: int, total: int, track_label: str, status: str, elapsed_s: float) -> None:
-        label = track_label or "Lyrics download"
-        self.download_overlay.update_progress(current, total, label, status)
-        self.statusBar().showMessage(status)
-
-    def _on_download_item_finished(self, track_id: int, ok: bool, track_label: str, msg: str) -> None:
-        try:
-            if self.app_state.player and self.app_state.player.track and int(self.app_state.player.track.track_id) == int(track_id):
-                track = get_track_by_id(self.app_state.db, int(track_id))
-                self._set_track_lyrics_views(track)
-        except Exception as exc:
-            logger.warning("Failed to update track after lyrics download for %s: %s", track_id, exc)
-
-        self._active_download_track_ids.discard(int(track_id))
-        state = "success" if ok else "error"
-        self._set_track_download_state_all(int(track_id), state)
-        self.download_overlay.append_result(track_label, msg, ok)
-
-        token = self._download_state_tokens.get(int(track_id), 0) + 1
-        self._download_state_tokens[int(track_id)] = token
-        QTimer.singleShot(
-            1800,
-            self,
-            lambda tid=track_id, expected=token, expected_state=state: self._reset_track_download_state_if_unchanged(
-                tid,
-                expected,
-                expected_state,
-            ),
-        )
-
-    def _on_download_batch_finished(self, ok: bool, msg: str, stats: object) -> None:
-        self.statusBar().showMessage(msg, 4000)
-        for track_id in list(self._active_download_track_ids):
-            self._set_track_download_state_all(int(track_id), "idle")
-        self._active_download_track_ids.clear()
-
-        try:
-            current = self.tabs.currentWidget()
-            if current is self.tracks_tab:
-                self.track_list.apply_route(self._current_route if self._current_route.tab == "tracks" else tracks_all())
-            elif current is self.albums_page:
-                self.albums_tab.apply_route(self._current_route if self._current_route.tab == "albums" else LibraryRoute(tab="albums", mode="root"))
-            elif current is self.artists_page:
-                self.artists_tab.apply_route(self._current_route if self._current_route.tab == "artists" else LibraryRoute(tab="artists", mode="root"))
-        except Exception as exc:
-            logger.warning("Failed to refresh current view after lyrics download: %s", exc)
-
-        stats_dict = stats if isinstance(stats, dict) else {}
-        self.download_overlay.finish_batch(msg, cancelled=bool(stats_dict.get("cancelled")))
-        if stats_dict.get("cancelled"):
-            self.app_state.notify("Lyrics download cancelled.", "warning")
-        elif int(stats_dict.get("failed", 0)) > 0 and int(stats_dict.get("ok", 0)) > 0:
-            self.app_state.notify(msg, "warning")
-        elif int(stats_dict.get("failed", 0)) > 0:
-            self.app_state.notify(msg, "error")
-        else:
-            self.app_state.notify("Lyrics downloaded successfully.", "success")
-        self._download_worker = None
+        self.downloads.download_missing()
 
     def _set_track_download_state_all(self, track_id: int, state: str) -> None:
         self.track_list.set_download_state(int(track_id), state)
@@ -879,26 +781,25 @@ class MainWindow(QMainWindow):
     def _get_primary_track_download_state(self, track_id: int) -> str:
         return self.track_list.get_download_state(int(track_id))
 
-    def _reset_track_download_state_if_unchanged(
-        self,
-        track_id: int,
-        expected_token: int,
-        expected_state: str,
-    ) -> None:
-        if self._download_state_tokens.get(int(track_id)) != int(expected_token):
+    def _show_status_message(self, message: str, timeout_ms: int | None = None) -> None:
+        if timeout_ms is None:
+            self.statusBar().showMessage(message)
             return
-        if self._get_primary_track_download_state(int(track_id)) != expected_state:
-            return
-        self._set_track_download_state_all(int(track_id), "idle")
+        self.statusBar().showMessage(message, int(timeout_ms))
 
-    @staticmethod
-    def _download_mode_label(mode: str) -> str:
-        labels = {
-            "prefer_synced": "Prefer synced",
-            "synced_only": "Synced only",
-            "plain_only": "Plain only",
-        }
-        return labels.get((mode or "").strip(), "Custom")
+    def _current_player_track_id(self) -> int | None:
+        if not self.app_state.player or not self.app_state.player.track:
+            return None
+        return int(self.app_state.player.track.track_id)
+
+    def _refresh_visible_library_view_after_downloads(self) -> None:
+        current = self.tabs.currentWidget()
+        if current is self.tracks_tab:
+            self.track_list.apply_route(self._current_route if self._current_route.tab == "tracks" else tracks_all())
+        elif current is self.albums_page:
+            self.albums_tab.apply_route(self._current_route if self._current_route.tab == "albums" else LibraryRoute(tab="albums", mode="root"))
+        elif current is self.artists_page:
+            self.artists_tab.apply_route(self._current_route if self._current_route.tab == "artists" else LibraryRoute(tab="artists", mode="root"))
 
 
     def _on_lyrics_save_requested(self, lrc: str, txt: str):
