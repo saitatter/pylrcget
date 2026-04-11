@@ -262,6 +262,7 @@ class MainWindow(QMainWindow):
 
         self.lyrics_view.publishSyncedRequested.connect(self._publish_synced)
         self.lyrics_view.publishPlainRequested.connect(self._publish_plain)
+        self.lyrics_view.exportFilesRequested.connect(self._export_current_track_sidecars)
 
         splitter.setStretchFactor(0, 3)
         splitter.setStretchFactor(1, 2)
@@ -281,6 +282,7 @@ class MainWindow(QMainWindow):
         self.albums_lyrics_view.publishSyncedRequested.connect(self._publish_synced)
         self.albums_lyrics_view.publishPlainRequested.connect(self._publish_plain)
         self.albums_lyrics_view.downloadRequested.connect(self._download_current_track_lyrics)
+        self.albums_lyrics_view.exportFilesRequested.connect(self._export_current_track_sidecars)
         if self.app_state.player:
             self.app_state.player.positionChanged.connect(self.albums_lyrics_view.on_player_position)
         self.albums_splitter.addWidget(self.albums_lyrics_view)
@@ -301,6 +303,7 @@ class MainWindow(QMainWindow):
         self.artists_lyrics_view.publishSyncedRequested.connect(self._publish_synced)
         self.artists_lyrics_view.publishPlainRequested.connect(self._publish_plain)
         self.artists_lyrics_view.downloadRequested.connect(self._download_current_track_lyrics)
+        self.artists_lyrics_view.exportFilesRequested.connect(self._export_current_track_sidecars)
         if self.app_state.player:
             self.app_state.player.positionChanged.connect(self.artists_lyrics_view.on_player_position)
         self.artists_splitter.addWidget(self.artists_lyrics_view)
@@ -377,6 +380,7 @@ class MainWindow(QMainWindow):
         # --- Signals from track list ---
         self.track_list.playTrack.connect(self.on_play_track)
         self.track_list.downloadLyrics.connect(self.on_download_lyrics)
+        self.track_list.exportLyricsFiles.connect(self._export_track_sidecars)
         self.track_list.navigateRequested.connect(self.navigate_to)
         self.track_list.markInstrumental.connect(self._on_mark_instrumental)
         self.track_list.unmarkInstrumental.connect(self._on_unmark_instrumental)
@@ -385,6 +389,7 @@ class MainWindow(QMainWindow):
         self.lyrics_view.downloadRequested.connect(self._download_current_track_lyrics)
         self.albums_tab.playTrack.connect(self.on_play_track)
         self.albums_tab.downloadLyrics.connect(self.on_download_lyrics)
+        self.albums_tab.exportLyricsFiles.connect(self._export_track_sidecars)
         self.albums_tab.navigateRequested.connect(self.navigate_to)
         self.albums_tab.markInstrumental.connect(self._on_mark_instrumental)
         self.albums_tab.unmarkInstrumental.connect(self._on_unmark_instrumental)
@@ -394,6 +399,7 @@ class MainWindow(QMainWindow):
         self.albums_tab.configureFoldersRequested.connect(self.open_config_modal)
         self.artists_tab.playTrack.connect(self.on_play_track)
         self.artists_tab.downloadLyrics.connect(self.on_download_lyrics)
+        self.artists_tab.exportLyricsFiles.connect(self._export_track_sidecars)
         self.artists_tab.navigateRequested.connect(self.navigate_to)
         self.artists_tab.markInstrumental.connect(self._on_mark_instrumental)
         self.artists_tab.unmarkInstrumental.connect(self._on_unmark_instrumental)
@@ -962,6 +968,44 @@ class MainWindow(QMainWindow):
             self.app_state.notify("Select a track before downloading lyrics.", "warning")
             return
         self.on_download_lyrics(int(self.app_state.player.track.track_id))
+
+    def _export_current_track_sidecars(self):
+        if not self.app_state.player or not self.app_state.player.track:
+            self.app_state.notify("Select or start a track before exporting lyrics files.", "warning")
+            for view in self._all_lyrics_views():
+                view.set_export_feedback("error", "No Track")
+            return
+        self._export_track_sidecars(int(self.app_state.player.track.track_id))
+
+    def _export_track_sidecars(self, track_id: int):
+        for view in self._all_lyrics_views():
+            view.set_export_feedback("loading", "Exporting...")
+        try:
+            track = get_track_by_id(self.app_state.db, int(track_id))
+            if not (track.lrc_lyrics or track.txt_lyrics):
+                self.app_state.notify("No lyrics are available to export for this track.", "warning")
+                for view in self._all_lyrics_views():
+                    view.set_export_feedback("error", "No Lyrics")
+                return
+
+            config = get_config(self.app_state.db)
+            export_config = replace(config, save_lyrics_sidecars=True)
+            written_paths = export_lyrics_sidecars(track, export_config)
+            if not written_paths:
+                self.app_state.notify("No lyrics files were generated for this track.", "warning")
+                for view in self._all_lyrics_views():
+                    view.set_export_feedback("error", "Nothing Exported")
+                return
+
+            output_dir = os.path.dirname(written_paths[0]) or os.path.dirname(track.file_path)
+            self.statusBar().showMessage(f"Lyrics files exported to {output_dir}", 3000)
+            self.app_state.notify("Lyrics files generated successfully.", "success")
+            for view in self._all_lyrics_views():
+                view.set_export_feedback("success", "Exported")
+        except Exception as exc:
+            self.app_state.notify(f"Failed to export lyrics files: {exc}", "error")
+            for view in self._all_lyrics_views():
+                view.set_export_feedback("error", "Export Failed")
 
     def _all_lyrics_views(self) -> list[LyricsEditorWidget]:
         return [self.lyrics_view, self.albums_lyrics_view, self.artists_lyrics_view]

@@ -21,6 +21,7 @@ from core.tracklist_models import TrackListRow
 class TrackListWidget(QWidget):
     playTrack = Signal(int)       # track_id
     downloadLyrics = Signal(int)  # track_id
+    exportLyricsFiles = Signal(int)  # track_id
     openArtist = Signal(int)
     openAlbum = Signal(int)
     navigateRequested = Signal(object)
@@ -333,6 +334,7 @@ class TrackListWidget(QWidget):
         quick.setEnabled(False)
         act_play = menu.addAction("Play now")
         act_dl = menu.addAction("Download lyrics for this track")
+        act_export = menu.addAction("Export lyrics files for this track")
 
         menu.addSeparator()
         bulk = menu.addAction("Selection Actions")
@@ -348,6 +350,9 @@ class TrackListWidget(QWidget):
         elif chosen == act_dl:
             if current_track_id is not None:
                 self.downloadLyrics.emit(int(current_track_id))
+        elif chosen == act_export:
+            if current_track_id is not None:
+                self.exportLyricsFiles.emit(int(current_track_id))
         elif chosen == act_instr:
             self.markInstrumental.emit(selected_ids)
         elif chosen == act_uninstr:

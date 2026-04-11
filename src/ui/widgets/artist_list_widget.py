@@ -26,6 +26,7 @@ class ArtistListRow:
 class ArtistListWidget(QWidget):
     playTrack = Signal(int)
     downloadLyrics = Signal(int)
+    exportLyricsFiles = Signal(int)
     openArtist = Signal(int)
     openAlbum = Signal(int)
     markInstrumental = Signal(list)
@@ -99,6 +100,7 @@ class ArtistListWidget(QWidget):
         self.album_browser.setRouteTab("artists")
         self.album_browser.playTrack.connect(self.playTrack.emit)
         self.album_browser.downloadLyrics.connect(self.downloadLyrics.emit)
+        self.album_browser.exportLyricsFiles.connect(self.exportLyricsFiles.emit)
         self.album_browser.openArtist.connect(self.openArtist.emit)
         self.album_browser.openAlbum.connect(self.openAlbum.emit)
         self.album_browser.navigateRequested.connect(self.navigateRequested.emit)

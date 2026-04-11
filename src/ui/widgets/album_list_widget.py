@@ -26,6 +26,7 @@ class AlbumListRow:
 class AlbumListWidget(QWidget):
     playTrack = Signal(int)
     downloadLyrics = Signal(int)
+    exportLyricsFiles = Signal(int)
     openArtist = Signal(int)
     openAlbum = Signal(int)
     markInstrumental = Signal(list)
@@ -118,6 +119,7 @@ class AlbumListWidget(QWidget):
         self.track_list.setScopeBannerEnabled(False)
         self.track_list.playTrack.connect(self.playTrack.emit)
         self.track_list.downloadLyrics.connect(self.downloadLyrics.emit)
+        self.track_list.exportLyricsFiles.connect(self.exportLyricsFiles.emit)
         self.track_list.openArtist.connect(self.openArtist.emit)
         self.track_list.openAlbum.connect(self.openAlbum.emit)
         self.track_list.navigateRequested.connect(self._handle_track_route)
