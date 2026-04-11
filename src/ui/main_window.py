@@ -197,7 +197,7 @@ class MainWindow(QMainWindow):
 
         self.btn_download_missing = QToolButton()
         self.btn_download_missing.setObjectName("TopBarAction")
-        self.btn_download_missing.setIcon(load_svg_icon("audio-lines.svg", 18))
+        self.btn_download_missing.setIcon(load_svg_icon("download.svg", 18))
         self.btn_download_missing.setToolTip("Download missing lyrics")
         self.btn_download_missing.setAccessibleName("Download missing lyrics")
         self.btn_download_missing.clicked.connect(self._download_missing_lyrics)
