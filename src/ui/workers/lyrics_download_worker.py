@@ -111,14 +111,16 @@ def download_track_lyrics(
             if plain:
                 notify("Saving plain lyrics...")
                 update_track_plain_lyrics(db, track_id, plain)
-                _sync_track_outputs(db, track_id, notify, config=config)
+                track = get_track_by_id(db, track_id)
+                _sync_track_outputs(db, track, notify, config=config)
                 return True, "Downloaded plain lyrics.", track_id, title_for_ui
             if synced:
                 derived_plain = _strip_empty(_strip_timestamps(synced))
                 if derived_plain:
                     notify("Saving plain lyrics derived from synced lyrics...")
                     update_track_plain_lyrics(db, track_id, derived_plain)
-                    _sync_track_outputs(db, track_id, notify, config=config)
+                    track = get_track_by_id(db, track_id)
+                    _sync_track_outputs(db, track, notify, config=config)
                     return True, "Downloaded plain lyrics.", track_id, title_for_ui
             return False, "No plain lyrics found on LRCLIB for this track.", track_id, title_for_ui
 
@@ -127,7 +129,8 @@ def download_track_lyrics(
                 plain = _strip_empty(_strip_timestamps(synced))
             notify("Saving synced + plain lyrics...")
             update_track_synced_lyrics(db, track_id, synced, plain or "")
-            _sync_track_outputs(db, track_id, notify, config=config)
+            track = get_track_by_id(db, track_id)
+            _sync_track_outputs(db, track, notify, config=config)
             return True, "Downloaded synced lyrics.", track_id, title_for_ui
 
         if plain:
@@ -135,7 +138,8 @@ def download_track_lyrics(
                 return False, "Only plain lyrics were found; synced-only mode is enabled.", track_id, title_for_ui
             notify("Saving plain lyrics...")
             update_track_plain_lyrics(db, track_id, plain)
-            _sync_track_outputs(db, track_id, notify, config=config)
+            track = get_track_by_id(db, track_id)
+            _sync_track_outputs(db, track, notify, config=config)
             return True, "Downloaded plain lyrics.", track_id, title_for_ui
 
         return False, "No lyrics found on LRCLIB for this track.", track_id, title_for_ui
@@ -148,12 +152,11 @@ def download_track_lyrics(
 
 def _sync_track_outputs(
     db: sqlite3.Connection,
-    track_id: int,
+    track,
     notify,
     *,
     config: Config | None = None,
 ) -> None:
-    track = get_track_by_id(db, int(track_id))
     config = config or get_config(db)
 
     if config.save_lyrics_sidecars:
@@ -161,11 +164,11 @@ def _sync_track_outputs(
             notify("Writing lyrics sidecar files...")
             export_lyrics_sidecars(track, config)
         except Exception as exc:
-            logger.warning("Failed to export lyrics sidecars for track %s: %s", track_id, exc)
+            logger.warning("Failed to export lyrics sidecars for track %s: %s", track.id, exc)
 
     if config.try_embed_lyrics:
         try:
             notify("Embedding lyrics into the audio file...")
             embed_lyrics_for_track(track)
         except Exception as exc:
-            logger.warning("Failed to embed lyrics for track %s: %s", track_id, exc)
+            logger.warning("Failed to embed lyrics for track %s: %s", track.id, exc)

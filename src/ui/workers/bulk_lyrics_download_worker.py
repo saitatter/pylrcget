@@ -11,7 +11,7 @@ from ui.workers.lyrics_download_worker import download_track_lyrics
 
 class BulkLyricsDownloadWorker(QThread):
     progress = Signal(int, int, str, str, float)  # current, total, track label, status, elapsed seconds
-    itemFinished = Signal(int, bool, str)  # track_id, ok, message
+    itemFinished = Signal(int, bool, str, str)  # track_id, ok, track label, message
     finishedBatch = Signal(bool, str, object)  # ok, message, stats dict
 
     def __init__(
@@ -80,7 +80,7 @@ class BulkLyricsDownloadWorker(QThread):
                 else:
                     fail_count += 1
 
-                self.itemFinished.emit(int(tid), bool(ok), msg)
+                self.itemFinished.emit(int(tid), bool(ok), label or f"Track {idx}/{total}", msg)
                 self.progress.emit(
                     idx,
                     total,

@@ -32,6 +32,7 @@ from ui.widgets.toast import ToastManager
 from PySide6.QtWidgets import QToolButton
 from ui.widgets.log_panel import LogPanel, QtLogHandler
 from ui.widgets.my_lrclib_widget import MyLrclibWidget
+from ui.widgets.download_progress_overlay import DownloadProgressOverlay
 from db.queries import get_track_ids_for_download_mode, record_publish_history
 
 logger = logging.getLogger(__name__)
@@ -350,6 +351,10 @@ class MainWindow(QMainWindow):
         self._apply_saved_playback_speed()
         self._apply_saved_playback_volume()
 
+        self.download_overlay = DownloadProgressOverlay(self.central_widget)
+        self.download_overlay.cancelRequested.connect(self._cancel_downloads)
+        self.download_overlay.sync_to_parent()
+
         # --- Scan progress (pretty + hidden when idle) ---
         self.scan_row = QWidget()
         scan_layout = QHBoxLayout(self.scan_row)
@@ -489,6 +494,8 @@ class MainWindow(QMainWindow):
     def resizeEvent(self, event):
         super().resizeEvent(event)
         self._update_responsive_layout()
+        if hasattr(self, "download_overlay"):
+            self.download_overlay.sync_to_parent()
 
     def closeEvent(self, event: QCloseEvent) -> None:
         self._flush_playback_speed()
@@ -792,7 +799,7 @@ class MainWindow(QMainWindow):
         return str(config.download_lyrics_mode or "prefer_synced")
 
     def _start_lyrics_downloads(self, track_ids: list[int], *, mode_override: str = "use_global") -> None:
-        unique_ids = [int(t) for t in dict.fromkeys(int(x) for x in track_ids if x is not None)]
+        unique_ids = list(dict.fromkeys(int(x) for x in track_ids if x is not None))
         if not unique_ids:
             self.app_state.notify("No tracks selected for lyrics download.", "warning")
             return
@@ -808,12 +815,13 @@ class MainWindow(QMainWindow):
             self._set_track_download_state_all(track_id, "loading")
         self._active_download_track_ids = set(unique_ids)
 
-        self.download_row.setVisible(True)
+        self.download_row.setVisible(False)
         self.btn_cancel_download.setEnabled(True)
         self.download_label.setText(f"Downloading lyrics ({self._download_mode_label(mode)})")
         self.download_details.setText("Preparing download queue…")
         self.download_progress_bar.setRange(0, len(unique_ids))
         self.download_progress_bar.setValue(0)
+        self.download_overlay.start_batch(self._download_mode_label(mode), len(unique_ids))
         self.statusBar().showMessage(f"Starting lyrics download... ({lrclib_instance})")
 
         self._download_worker = BulkLyricsDownloadWorker(
@@ -848,9 +856,10 @@ class MainWindow(QMainWindow):
         self.download_progress_bar.setValue(min(int(current), int(total)))
         label = track_label or "Lyrics download"
         self.download_details.setText(f"{label}  •  {status}")
+        self.download_overlay.update_progress(current, total, label, status)
         self.statusBar().showMessage(status)
 
-    def _on_download_item_finished(self, track_id: int, ok: bool, msg: str) -> None:
+    def _on_download_item_finished(self, track_id: int, ok: bool, track_label: str, msg: str) -> None:
         try:
             if self.app_state.player and self.app_state.player.track and int(self.app_state.player.track.track_id) == int(track_id):
                 track = get_track_by_id(self.app_state.db, int(track_id))
@@ -861,13 +870,14 @@ class MainWindow(QMainWindow):
         self._active_download_track_ids.discard(int(track_id))
         state = "success" if ok else "error"
         self._set_track_download_state_all(int(track_id), state)
+        self.download_overlay.append_result(track_label, msg, ok)
 
         token = self._download_state_tokens.get(int(track_id), 0) + 1
         self._download_state_tokens[int(track_id)] = token
         QTimer.singleShot(
             1800,
             self,
-            lambda tid=int(track_id), expected=token, expected_state=state: self._reset_track_download_state_if_unchanged(
+            lambda tid=track_id, expected=token, expected_state=state: self._reset_track_download_state_if_unchanged(
                 tid,
                 expected,
                 expected_state,
@@ -894,6 +904,7 @@ class MainWindow(QMainWindow):
             logger.warning("Failed to refresh current view after lyrics download: %s", exc)
 
         stats_dict = stats if isinstance(stats, dict) else {}
+        self.download_overlay.finish_batch(msg, cancelled=bool(stats_dict.get("cancelled")))
         if stats_dict.get("cancelled"):
             self.app_state.notify("Lyrics download cancelled.", "warning")
         elif int(stats_dict.get("failed", 0)) > 0 and int(stats_dict.get("ok", 0)) > 0:
