@@ -32,13 +32,22 @@ class LyricsDownloadWorker(QThread):
     progress = Signal(str)
     finished = Signal(bool, str, int)  # ok, msg, track_id
 
-    def __init__(self, db_path: str, track_id: int, lrclib_instance: str = "https://lrclib.net", parent=None):
+    def __init__(
+        self,
+        db_path: str,
+        track_id: int,
+        lrclib_instance: str = "https://lrclib.net",
+        *,
+        synced_only: bool = False,
+        parent=None,
+    ):
         super().__init__(parent)
         self.db_path = db_path
         self.track_id = track_id
         self.lrclib_instance = (lrclib_instance or "https://lrclib.net").rstrip("/")
         if not self.lrclib_instance.endswith("/api"):
             self.lrclib_instance += "/api"
+        self.synced_only = bool(synced_only)
 
     def run(self):
         try:
@@ -82,6 +91,10 @@ class LyricsDownloadWorker(QThread):
 
             # altfel, doar plain
             if plain:
+                if self.synced_only:
+                    db.close()
+                    self.finished.emit(False, "Only plain lyrics were found; synced-only mode is enabled.", self.track_id)
+                    return
                 self.progress.emit("Saving plain lyrics...")
                 update_track_plain_lyrics(db, self.track_id, plain)
                 db.close()

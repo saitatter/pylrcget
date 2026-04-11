@@ -133,20 +133,24 @@ class MusicFoldersDialog(QDialog):
         self.save_sidecars_chk.setChecked(True)
         lyrics_layout.addWidget(self.save_sidecars_chk, 0, 0, 1, 4)
 
+        self.download_synced_only_chk = QCheckBox("Download synced lyrics only")
+        self.download_synced_only_chk.setChecked(False)
+        lyrics_layout.addWidget(self.download_synced_only_chk, 1, 0, 1, 4)
+
         self.output_dir_edit = QLineEdit()
         self.output_dir_edit.setPlaceholderText("Leave empty to save next to the audio file")
         self.browse_output_btn = QPushButton("Browse")
         self.clear_output_btn = QPushButton("Use Track Folder")
 
-        lyrics_layout.addWidget(QLabel("Download directory"), 1, 0)
-        lyrics_layout.addWidget(self.output_dir_edit, 1, 1)
-        lyrics_layout.addWidget(self.browse_output_btn, 1, 2)
-        lyrics_layout.addWidget(self.clear_output_btn, 1, 3)
+        lyrics_layout.addWidget(QLabel("Download directory"), 2, 0)
+        lyrics_layout.addWidget(self.output_dir_edit, 2, 1)
+        lyrics_layout.addWidget(self.browse_output_btn, 2, 2)
+        lyrics_layout.addWidget(self.clear_output_btn, 2, 3)
 
         self.pattern_edit = QLineEdit()
         self.pattern_edit.setPlaceholderText(DEFAULT_LYRICS_FILE_PATTERN)
-        lyrics_layout.addWidget(QLabel("Filename pattern"), 2, 0)
-        lyrics_layout.addWidget(self.pattern_edit, 2, 1, 1, 3)
+        lyrics_layout.addWidget(QLabel("Filename pattern"), 3, 0)
+        lyrics_layout.addWidget(self.pattern_edit, 3, 1, 1, 3)
 
         self.pattern_preview_label = QLabel("")
         self.pattern_preview_label.setObjectName("SettingsValidationHint")
@@ -157,14 +161,14 @@ class MusicFoldersDialog(QDialog):
         )
         mono_font = QFontDatabase.systemFont(QFontDatabase.SystemFont.FixedFont)
         self.pattern_preview_label.setFont(mono_font)
-        lyrics_layout.addWidget(self.pattern_preview_label, 3, 0, 1, 4)
+        lyrics_layout.addWidget(self.pattern_preview_label, 4, 0, 1, 4)
 
         hint = QLabel(
             "Available placeholders: {artist}, {title}, {album}, {track}. "
             "Extensions are added automatically as .lrc and .txt."
         )
         hint.setWordWrap(True)
-        lyrics_layout.addWidget(hint, 4, 0, 1, 4)
+        lyrics_layout.addWidget(hint, 5, 0, 1, 4)
         lyrics_tab_layout.addWidget(lyrics_box)
         lyrics_tab_layout.addStretch(1)
 
@@ -219,6 +223,7 @@ class MusicFoldersDialog(QDialog):
         theme_idx = self.theme_combo.findData(config.theme_mode or "auto")
         self.theme_combo.setCurrentIndex(max(0, theme_idx))
         self.save_sidecars_chk.setChecked(config.save_lyrics_sidecars)
+        self.download_synced_only_chk.setChecked(config.download_synced_only)
         self.output_dir_edit.setText(config.lyrics_output_dir)
         self.pattern_edit.setText(config.lyrics_file_pattern or DEFAULT_LYRICS_FILE_PATTERN)
         self.embed_chk.setChecked(config.try_embed_lyrics)
@@ -459,6 +464,7 @@ class MusicFoldersDialog(QDialog):
             config,
             theme_mode=str(self.theme_combo.currentData() or "auto"),
             save_lyrics_sidecars=self.save_sidecars_chk.isChecked(),
+            download_synced_only=self.download_synced_only_chk.isChecked(),
             try_embed_lyrics=self.embed_chk.isChecked(),
             lyrics_output_dir=self.output_dir_edit.text().strip(),
             lyrics_file_pattern=self.pattern_edit.text().strip() or DEFAULT_LYRICS_FILE_PATTERN,
