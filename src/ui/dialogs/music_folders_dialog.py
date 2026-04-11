@@ -133,9 +133,12 @@ class MusicFoldersDialog(QDialog):
         self.save_sidecars_chk.setChecked(True)
         lyrics_layout.addWidget(self.save_sidecars_chk, 0, 0, 1, 4)
 
-        self.download_synced_only_chk = QCheckBox("Download synced lyrics only")
-        self.download_synced_only_chk.setChecked(False)
-        lyrics_layout.addWidget(self.download_synced_only_chk, 1, 0, 1, 4)
+        self.download_mode_combo = QComboBox()
+        self.download_mode_combo.addItem("Prefer synced, fallback to plain", "prefer_synced")
+        self.download_mode_combo.addItem("Synced only", "synced_only")
+        self.download_mode_combo.addItem("Plain only", "plain_only")
+        lyrics_layout.addWidget(QLabel("Download mode"), 1, 0)
+        lyrics_layout.addWidget(self.download_mode_combo, 1, 1, 1, 3)
 
         self.output_dir_edit = QLineEdit()
         self.output_dir_edit.setPlaceholderText("Leave empty to save next to the audio file")
@@ -223,7 +226,8 @@ class MusicFoldersDialog(QDialog):
         theme_idx = self.theme_combo.findData(config.theme_mode or "auto")
         self.theme_combo.setCurrentIndex(max(0, theme_idx))
         self.save_sidecars_chk.setChecked(config.save_lyrics_sidecars)
-        self.download_synced_only_chk.setChecked(config.download_synced_only)
+        mode_index = self.download_mode_combo.findData(config.download_lyrics_mode or "prefer_synced")
+        self.download_mode_combo.setCurrentIndex(max(0, mode_index))
         self.output_dir_edit.setText(config.lyrics_output_dir)
         self.pattern_edit.setText(config.lyrics_file_pattern or DEFAULT_LYRICS_FILE_PATTERN)
         self.embed_chk.setChecked(config.try_embed_lyrics)
@@ -464,7 +468,7 @@ class MusicFoldersDialog(QDialog):
             config,
             theme_mode=str(self.theme_combo.currentData() or "auto"),
             save_lyrics_sidecars=self.save_sidecars_chk.isChecked(),
-            download_synced_only=self.download_synced_only_chk.isChecked(),
+            download_lyrics_mode=str(self.download_mode_combo.currentData() or "prefer_synced"),
             try_embed_lyrics=self.embed_chk.isChecked(),
             lyrics_output_dir=self.output_dir_edit.text().strip(),
             lyrics_file_pattern=self.pattern_edit.text().strip() or DEFAULT_LYRICS_FILE_PATTERN,

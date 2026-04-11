@@ -97,7 +97,7 @@ class Artist:
 class Config:
     skip_tracks_with_synced_lyrics: bool
     skip_tracks_with_plain_lyrics: bool
-    download_synced_only: bool
+    download_lyrics_mode: str
     show_line_count: bool
     save_lyrics_sidecars: bool
     try_embed_lyrics: bool

@@ -44,7 +44,7 @@ def get_config(db: sqlite3.Connection) -> Config:
     row = db.execute("""
         SELECT skip_tracks_with_synced_lyrics,
                skip_tracks_with_plain_lyrics,
-               download_synced_only,
+               download_lyrics_mode,
                show_line_count,
                save_lyrics_sidecars,
                try_embed_lyrics,
@@ -65,7 +65,7 @@ def get_config(db: sqlite3.Connection) -> Config:
     return Config(
         skip_tracks_with_synced_lyrics=bool(row["skip_tracks_with_synced_lyrics"]),
         skip_tracks_with_plain_lyrics=bool(row["skip_tracks_with_plain_lyrics"]),
-        download_synced_only=bool(row["download_synced_only"]),
+        download_lyrics_mode=(row["download_lyrics_mode"] or "prefer_synced"),
         show_line_count=bool(row["show_line_count"]),
         save_lyrics_sidecars=bool(row["save_lyrics_sidecars"]),
         try_embed_lyrics=bool(row["try_embed_lyrics"]),
@@ -87,7 +87,7 @@ def set_config(db: sqlite3.Connection, config: Config) -> None:
         UPDATE config_data
         SET skip_tracks_with_synced_lyrics = ?,
             skip_tracks_with_plain_lyrics = ?,
-            download_synced_only = ?,
+            download_lyrics_mode = ?,
             show_line_count = ?,
             save_lyrics_sidecars = ?,
             try_embed_lyrics = ?,
@@ -105,7 +105,7 @@ def set_config(db: sqlite3.Connection, config: Config) -> None:
     """, (
         config.skip_tracks_with_synced_lyrics,
         config.skip_tracks_with_plain_lyrics,
-        config.download_synced_only,
+        config.download_lyrics_mode,
         config.show_line_count,
         config.save_lyrics_sidecars,
         config.try_embed_lyrics,

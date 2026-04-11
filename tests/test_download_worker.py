@@ -27,7 +27,7 @@ class LyricsDownloadWorkerTests(unittest.TestCase):
                 worker = LyricsDownloadWorker(
                     db_path=str(Path(tmp) / "db.sqlite3"),
                     track_id=int(track["id"]),
-                    synced_only=True,
+                    download_mode="synced_only",
                 )
                 worker.finished.connect(lambda ok, msg, tid: finished.append((ok, msg, tid)))
 
@@ -62,7 +62,7 @@ class LyricsDownloadWorkerTests(unittest.TestCase):
                 worker = LyricsDownloadWorker(
                     db_path=str(Path(tmp) / "db.sqlite3"),
                     track_id=int(track["id"]),
-                    synced_only=False,
+                    download_mode="prefer_synced",
                 )
                 worker.finished.connect(lambda ok, msg, tid: finished.append((ok, msg, tid)))
 
@@ -79,6 +79,44 @@ class LyricsDownloadWorkerTests(unittest.TestCase):
 
                 refreshed = get_track_by_id(db, int(track["id"]))
                 self.assertEqual(refreshed.txt_lyrics, "plain text")
+                self.assertIsNone(refreshed.lrc_lyrics)
+            finally:
+                db.close()
+
+    def test_plain_only_mode_derives_plain_from_synced(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db = initialize_database(tmp)
+            try:
+                audio = Path(tmp) / "synced_only.mp3"
+                touch_text(audio, "a")
+                add_tracks(db, [make_fs_track(audio, artist="Artist C", album="Album C", title="Song C")])
+                track = db.execute("SELECT id FROM tracks LIMIT 1").fetchone()
+                self.assertIsNotNone(track)
+
+                finished: list[tuple[bool, str, int]] = []
+                worker = LyricsDownloadWorker(
+                    db_path=str(Path(tmp) / "db.sqlite3"),
+                    track_id=int(track["id"]),
+                    download_mode="plain_only",
+                )
+                worker.finished.connect(lambda ok, msg, tid: finished.append((ok, msg, tid)))
+
+                fake_lyrics = SimpleNamespace(
+                    synced_lyrics="[00:10.00] hello\n[00:12.00] world",
+                    plain_lyrics=None,
+                )
+                with patch("ui.workers.lyrics_download_worker.LrcLibAPI") as api_cls:
+                    api_cls.return_value.get_lyrics.return_value = fake_lyrics
+                    worker.run()
+
+                self.assertEqual(len(finished), 1)
+                ok, msg, tid = finished[0]
+                self.assertTrue(ok)
+                self.assertIn("plain lyrics", msg)
+                self.assertEqual(tid, int(track["id"]))
+
+                refreshed = get_track_by_id(db, int(track["id"]))
+                self.assertEqual(refreshed.txt_lyrics, "hello\nworld")
                 self.assertIsNone(refreshed.lrc_lyrics)
             finally:
                 db.close()

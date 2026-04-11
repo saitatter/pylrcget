@@ -744,7 +744,7 @@ class MainWindow(QMainWindow):
             db_path=self.app_state.db_path,
             track_id=track_id,
             lrclib_instance=lrclib_instance,
-            synced_only=bool(config.download_synced_only),
+            download_mode=str(config.download_lyrics_mode or "prefer_synced"),
             parent=self,
         )
         self._lyrics_worker.progress.connect(lambda s: self.statusBar().showMessage(s))

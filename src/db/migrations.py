@@ -238,7 +238,7 @@ def upgrade_database_if_needed(db: sqlite3.Connection, existing_version: int) ->
     if existing_version <= 19:
         print("Migrate database version 20...")
         db.executescript("""
-            ALTER TABLE config_data ADD COLUMN download_synced_only BOOLEAN DEFAULT 0;
+            ALTER TABLE config_data ADD COLUMN download_lyrics_mode TEXT DEFAULT 'prefer_synced';
         """)
         db.commit()
         db.execute("PRAGMA user_version=20")
