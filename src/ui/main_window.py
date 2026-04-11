@@ -21,6 +21,7 @@ from dataclasses import replace
 from db.database import get_album_by_id, get_artist_by_id, get_config, get_directories, set_config
 from ui.workers.library_scanner import LibraryScanner
 from ui.controllers.lyrics_download_controller import LyricsDownloadController
+from ui.controllers.navigation_controller import NavigationController
 from ui.controllers.publish_history_controller import PublishHistoryController
 from ui.controllers.top_bar_controller import TopBarController
 from ui.widgets.track_list_widget import TrackListWidget
@@ -33,7 +34,7 @@ from ui.services.lyrics_download_service import sync_track_outputs_with_result
 from ui.app_theme import apply_app_theme
 from ui.widgets.album_list_widget import AlbumListWidget
 from ui.widgets.artist_list_widget import ArtistListWidget
-from ui.library_routes import LibraryRoute, deserialize_route, route_breadcrumbs, serialize_route, tracks_album, tracks_all, tracks_artist
+from ui.library_routes import LibraryRoute, tracks_album, tracks_all, tracks_artist
 from ui.spacing import SPACE_1, SPACE_2, SPACE_3, set_layout_spacing
 from ui.style_loader import load_stylesheet
 from ui.widgets.toast import ToastManager
@@ -70,15 +71,7 @@ class MainWindow(QMainWindow):
         self._refresh_default_label = "Global Actions"
         self._pending_playback_speed: float | None = None
         self._pending_playback_volume: float | None = None
-        self._pending_library_route: str | None = None
-        self._nav_history: list[LibraryRoute] = []
-        self._nav_index: int = -1
-        self._current_route = tracks_all()
-        self._artist_label_cache: dict[int, str] = {}
-        self._album_label_cache: dict[int, str] = {}
         self._recent_toast_messages: set[str] = set()
-        self._nav_apply_in_progress = False
-        self._tab_sync_suppressed = False
         self.scanner = None
         self._playback_speed_save_timer = QTimer(self)
         self._playback_speed_save_timer.setSingleShot(True)
@@ -92,11 +85,6 @@ class MainWindow(QMainWindow):
         self._search_apply_timer.setSingleShot(True)
         self._search_apply_timer.setInterval(180)
         self._search_apply_timer.timeout.connect(self._apply_library_search)
-        self._route_save_timer = QTimer(self)
-        self._route_save_timer.setSingleShot(True)
-        self._route_save_timer.setInterval(250)
-        self._route_save_timer.timeout.connect(self._flush_library_route)
-
         # --- Player signals ---
         if self.app_state.player:
             self.app_state.player.trackChanged.connect(self._on_player_track_changed)
@@ -227,7 +215,6 @@ class MainWindow(QMainWindow):
         self.tabs.setAccessibleName("Library navigation tabs")
 
         self.layout.addWidget(self.tabs)
-        self.tabs.currentChanged.connect(self._on_tab_changed)
 
         # --- PlayerBar (fără Now Playing label separat) ---
         self.player_bar = PlayerBar(self.app_state.player, self)
@@ -314,6 +301,19 @@ class MainWindow(QMainWindow):
         self._ui_log_handler.bridge.messageReady.connect(self._on_log_message)
         logging.getLogger().addHandler(self._ui_log_handler)
 
+        self.navigation = NavigationController(
+            db=self.app_state.db,
+            tabs=self.tabs,
+            tracks_tab=self.tracks_tab,
+            albums_page=self.albums_page,
+            artists_page=self.artists_page,
+            breadcrumbs_layout=self.breadcrumbs_layout,
+            apply_route=self._apply_library_route,
+            display_artist_name=self._display_artist_name,
+            display_album_name=self._display_album_name,
+            parent=self,
+        )
+
         # --- Signals from track list ---
         self.track_list.playTrack.connect(self.on_play_track)
         self.track_list.downloadLyrics.connect(self.on_download_lyrics)
@@ -356,9 +356,8 @@ class MainWindow(QMainWindow):
         self._apply_track_filters()
         self.show_queued_notifications()
         self._update_responsive_layout()
-        self._update_nav_controls()
         self.navigate_to(tracks_all(), record_history=False)
-        QTimer.singleShot(0, self._restore_last_library_route)
+        QTimer.singleShot(0, self.navigation.restore_last_route)
         QTimer.singleShot(0, self._maybe_show_first_run_onboarding)
 
         self._apply_styles()
@@ -372,7 +371,7 @@ class MainWindow(QMainWindow):
     def closeEvent(self, event: QCloseEvent) -> None:
         self._flush_playback_speed()
         self._flush_playback_volume()
-        self._flush_library_route()
+        self.navigation.flush_pending_route()
         logging.getLogger().removeHandler(self._ui_log_handler)
         super().closeEvent(event)
 
@@ -631,18 +630,6 @@ class MainWindow(QMainWindow):
         if hasattr(self.app_state, "queued_notifications"):
             self.app_state.queued_notifications.clear()
 
-    def _on_tab_changed(self, idx: int):
-        if self._tab_sync_suppressed or self._nav_apply_in_progress:
-            return
-        w = self.tabs.widget(idx)
-        if w is self.tracks_tab:
-            self.navigate_to(tracks_all())
-        elif w is self.albums_page:
-            self.navigate_to(LibraryRoute(tab="albums", mode="root"))
-        elif w is self.artists_page:
-            self.navigate_to(LibraryRoute(tab="artists", mode="root"))
-        self._schedule_library_search()
-
     def _on_player_track_changed(self, now_playing):
         if hasattr(self, "track_list") and self.track_list:
             if now_playing:
@@ -692,11 +679,14 @@ class MainWindow(QMainWindow):
     def _refresh_visible_library_view_after_downloads(self) -> None:
         current = self.tabs.currentWidget()
         if current is self.tracks_tab:
-            self.track_list.apply_route(self._current_route if self._current_route.tab == "tracks" else tracks_all())
+            route = self.navigation.current_route
+            self.track_list.apply_route(route if route.tab == "tracks" else tracks_all())
         elif current is self.albums_page:
-            self.albums_tab.apply_route(self._current_route if self._current_route.tab == "albums" else LibraryRoute(tab="albums", mode="root"))
+            route = self.navigation.current_route
+            self.albums_tab.apply_route(route if route.tab == "albums" else LibraryRoute(tab="albums", mode="root"))
         elif current is self.artists_page:
-            self.artists_tab.apply_route(self._current_route if self._current_route.tab == "artists" else LibraryRoute(tab="artists", mode="root"))
+            route = self.navigation.current_route
+            self.artists_tab.apply_route(route if route.tab == "artists" else LibraryRoute(tab="artists", mode="root"))
 
 
     def _on_lyrics_save_requested(self, lrc: str, txt: str):
@@ -801,16 +791,6 @@ class MainWindow(QMainWindow):
         set_config(self.app_state.db, replace(config, playback_volume=float(self._pending_playback_volume)))
         self._pending_playback_volume = None
 
-    def _persist_library_route(self, route: LibraryRoute) -> None:
-        self._pending_library_route = serialize_route(route)
-        self._route_save_timer.start()
-
-    def _flush_library_route(self) -> None:
-        if self._pending_library_route is None:
-            return
-        config = get_config(self.app_state.db)
-        set_config(self.app_state.db, replace(config, last_library_route=self._pending_library_route))
-        self._pending_library_route = None
     def _play_selected_or_current(self):
         tid = self.track_list.selected_track_id()
         if tid is not None:
@@ -926,116 +906,17 @@ class MainWindow(QMainWindow):
         self.setStyleSheet(load_stylesheet("main_window.qss"))
 
     def navigate_to(self, route: LibraryRoute, *, record_history: bool = True) -> None:
-        route = self._hydrate_route(route)
-        self._current_route = route
-        self._nav_apply_in_progress = True
-        try:
-            self._tab_sync_suppressed = True
-            if route.tab == "tracks":
-                self.tabs.setCurrentWidget(self.tracks_tab)
-                self.top_bar.clear_library_search()
-                self.track_list.apply_route(route)
-            elif route.tab == "albums":
-                self.tabs.setCurrentWidget(self.albums_page)
-                self.albums_tab.apply_route(route)
-            elif route.tab == "artists":
-                self.tabs.setCurrentWidget(self.artists_page)
-                self.artists_tab.apply_route(route)
-        finally:
-            self._tab_sync_suppressed = False
-            self._nav_apply_in_progress = False
+        self.navigation.navigate_to(route, record_history=record_history)
 
-        if record_history:
-            if self._nav_index < 0 or self._nav_history[self._nav_index] != route:
-                self._nav_history = self._nav_history[: self._nav_index + 1]
-                self._nav_history.append(route)
-                self._nav_index = len(self._nav_history) - 1
-        self._persist_library_route(route)
-        self._update_nav_controls()
-
-    def _hydrate_route(self, route: LibraryRoute) -> LibraryRoute:
-        artist_label = route.artist_label
-        album_label = route.album_label
-
-        if not artist_label and len(route.artist_ids) == 1:
-            artist_id = int(route.artist_ids[0])
-            artist_label = self._artist_label_cache.get(artist_id, artist_label)
-            if not artist_label:
-                try:
-                    artist = get_artist_by_id(self.app_state.db, artist_id)
-                    artist_label = self._display_artist_name(artist.get("artist_name", ""))
-                    if artist_label:
-                        self._artist_label_cache[artist_id] = artist_label
-                except Exception:
-                    pass
-
-        if not album_label and len(route.album_ids) == 1:
-            album_id = int(route.album_ids[0])
-            album_label = self._album_label_cache.get(album_id, album_label)
-            if not album_label:
-                try:
-                    album = get_album_by_id(self.app_state.db, album_id)
-                    album_label = self._display_album_name(album.get("album_name", ""))
-                    if album_label:
-                        self._album_label_cache[album_id] = album_label
-                    if not artist_label:
-                        artist_label = self._display_artist_name(album.get("artist_name") or album.get("album_artist_name") or "")
-                        artist_id = album.get("artist_id")
-                        if artist_label and artist_id is not None:
-                            self._artist_label_cache[int(artist_id)] = artist_label
-                except Exception:
-                    pass
-
-        if artist_label == route.artist_label and album_label == route.album_label:
-            return route
-        return replace(route, artist_label=artist_label, album_label=album_label)
-
-    def _update_nav_controls(self) -> None:
-        while self.breadcrumbs_layout.count():
-            item = self.breadcrumbs_layout.takeAt(0)
-            widget = item.widget()
-            if widget is not None:
-                widget.deleteLater()
-
-        crumbs = route_breadcrumbs(self._current_route)
-        for idx, (label, route) in enumerate(crumbs):
-            btn = QToolButton()
-            btn.setObjectName("LibraryBreadcrumbButton")
-            btn.setText(label)
-            btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextOnly)
-            btn.setAutoRaise(True)
-            btn.setEnabled(idx != len(crumbs) - 1)
-            if idx != len(crumbs) - 1:
-                btn.clicked.connect(lambda _=False, r=route: self.navigate_to(r))
-            self.breadcrumbs_layout.addWidget(btn)
-            if idx != len(crumbs) - 1:
-                sep = QLabel(">")
-                sep.setObjectName("LibraryBreadcrumbSeparator")
-                self.breadcrumbs_layout.addWidget(sep)
-        self.breadcrumbs_layout.addStretch(1)
-
-    def _navigate_back(self) -> None:
-        if self._nav_index <= 0:
-            return
-        self._nav_index -= 1
-        self.navigate_to(self._nav_history[self._nav_index], record_history=False)
-        self._update_nav_controls()
-
-    def _navigate_forward(self) -> None:
-        if self._nav_index >= len(self._nav_history) - 1:
-            return
-        self._nav_index += 1
-        self.navigate_to(self._nav_history[self._nav_index], record_history=False)
-        self._update_nav_controls()
-
-    def _restore_last_library_route(self) -> None:
-        config = get_config(self.app_state.db)
-        route = deserialize_route(config.last_library_route)
-        if route is None:
-            route = tracks_all()
-        self._nav_history = [route]
-        self._nav_index = 0
-        self.navigate_to(route, record_history=False)
+    def _apply_library_route(self, route: LibraryRoute) -> None:
+        if route.tab == "tracks":
+            self.top_bar.clear_library_search()
+            self.track_list.apply_route(route)
+        elif route.tab == "albums":
+            self.albums_tab.apply_route(route)
+        elif route.tab == "artists":
+            self.artists_tab.apply_route(route)
+        self._schedule_library_search()
 
     def _apply_theme(self, theme_mode: str):
         app = QApplication.instance()
