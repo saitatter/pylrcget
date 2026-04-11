@@ -27,6 +27,8 @@ This version goes beyond bulk lyric downloads and turns the app into a full desk
 ### Lyrics workflow
 
 - synced lyrics (`.lrc`) and plain lyrics support
+- configurable download modes for `Prefer synced`, `Synced only`, and `Plain only`
+- bulk `Download missing lyrics` action based on the active download mode
 - real-time synced lyrics editor
 - per-line snapping while audio is playing
 - configurable reaction delay for timestamping
@@ -128,6 +130,10 @@ The Settings dialog is organized by category and includes:
 
 ### Lyrics
 
+- download mode:
+  - `Prefer synced, fallback to plain`
+  - `Synced only`
+  - `Plain only`
 - save lyrics files
 - embed lyrics into audio files
 - download directory
@@ -139,6 +145,38 @@ The Settings dialog is organized by category and includes:
 ### Appearance
 
 - theme selection
+
+---
+
+## Download Modes
+
+Lyrics downloads can be configured in three modes:
+
+- `Prefer synced, fallback to plain`
+  - the app tries to download synced lyrics first
+  - if no synced lyrics exist, it saves plain lyrics instead
+- `Synced only`
+  - the app saves only synced lyrics
+  - plain-only matches are skipped
+- `Plain only`
+  - the app saves only plain lyrics
+  - if LRCLIB only returns synced lyrics, the app derives plain text by stripping timestamps
+
+The track context menu also supports temporary mode overrides for the current selection:
+
+- `Download selection using current mode`
+- `Download selection as synced only`
+- `Download selection as plain only`
+
+### Download Missing Lyrics
+
+The global `Download missing lyrics` action respects the active download mode:
+
+- in `Prefer synced, fallback to plain`, a track is considered missing if it has no synced lyrics yet
+- in `Synced only`, a track is considered missing if it has no synced lyrics
+- in `Plain only`, a track is considered missing if it has no plain lyrics
+
+This means the bulk action can be used not only to fill empty tracks, but also to upgrade plain-only tracks to synced lyrics when synced lyrics become available.
 
 ---
 
@@ -165,6 +203,13 @@ The desktop app includes built-in diagnostics features:
 - rotating log files stored in the app data directory
 
 Important errors can also surface as toast notifications so they are harder to miss.
+
+Bulk lyrics downloads also show a dedicated progress overlay with:
+
+- current track and live status messages
+- per-track success / failure results
+- cancel support
+- session summary when the batch completes
 
 ---
 
