@@ -1,6 +1,15 @@
 from PySide6.QtWidgets import (
-    QMainWindow, QWidget, QVBoxLayout, QLabel,
-    QTabWidget, QProgressBar, QMessageBox, QLineEdit, QHBoxLayout, QCheckBox, QSplitter, QBoxLayout, QPushButton, QApplication
+    QApplication,
+    QHBoxLayout,
+    QLabel,
+    QMainWindow,
+    QMessageBox,
+    QProgressBar,
+    QPushButton,
+    QSplitter,
+    QTabWidget,
+    QVBoxLayout,
+    QWidget,
 )
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QCloseEvent, QShortcut, QKeySequence
@@ -13,6 +22,7 @@ from db.database import get_album_by_id, get_artist_by_id, get_config, get_direc
 from ui.workers.library_scanner import LibraryScanner
 from ui.controllers.lyrics_download_controller import LyricsDownloadController
 from ui.controllers.publish_history_controller import PublishHistoryController
+from ui.controllers.top_bar_controller import TopBarController
 from ui.widgets.track_list_widget import TrackListWidget
 from ui.dialogs.music_folders_dialog import MusicFoldersDialog
 from ui.player_bar import PlayerBar
@@ -24,11 +34,9 @@ from ui.app_theme import apply_app_theme
 from ui.widgets.album_list_widget import AlbumListWidget
 from ui.widgets.artist_list_widget import ArtistListWidget
 from ui.library_routes import LibraryRoute, deserialize_route, route_breadcrumbs, serialize_route, tracks_album, tracks_all, tracks_artist
-from ui.icon_loader import load_svg_icon
 from ui.spacing import SPACE_1, SPACE_2, SPACE_3, set_layout_spacing
 from ui.style_loader import load_stylesheet
 from ui.widgets.toast import ToastManager
-from PySide6.QtWidgets import QToolButton
 from ui.widgets.log_panel import LogPanel, QtLogHandler
 from ui.widgets.my_lrclib_widget import MyLrclibWidget
 from ui.widgets.download_progress_overlay import DownloadProgressOverlay
@@ -115,121 +123,16 @@ class MainWindow(QMainWindow):
         )
 
         # --- Top controls (search + filters) ---
-        self.top_bar = QWidget()
-        self.top_bar.setObjectName("TopBar")
-        top_bar = QHBoxLayout(self.top_bar)
-        self.top_bar_layout = top_bar
-        set_layout_spacing(top_bar, margins=SPACE_2, spacing=SPACE_2)
-
-        self.search_group = QWidget()
-        self.search_group.setObjectName("TopBarGroup")
-        search_layout = QVBoxLayout(self.search_group)
-        set_layout_spacing(search_layout, margins=SPACE_2, spacing=SPACE_1)
-
-        self.search_label = QLabel("Search Library")
-        self.search_label.setObjectName("TopBarLabel")
-        search_layout.addWidget(self.search_label)
-
-        self.search_box = QLineEdit()
-        self.search_box.setPlaceholderText("Search tracks / artists / albums...")
-        self.search_box.setObjectName("TopBarSearch")
-        self.search_box.setAccessibleName("Library search")
-        search_layout.addWidget(self.search_box)
-        top_bar.addWidget(self.search_group, stretch=3)
-
-        self.filters_group = QWidget()
-        self.filters_group.setObjectName("TopBarGroup")
-        filters_layout = QVBoxLayout(self.filters_group)
-        set_layout_spacing(filters_layout, margins=SPACE_2, spacing=SPACE_1)
-
-        self.filters_label = QLabel("Filter Lyrics")
-        self.filters_label.setObjectName("TopBarLabel")
-        filters_layout.addWidget(self.filters_label)
-
-        filters_row = QHBoxLayout()
-        set_layout_spacing(filters_row, spacing=SPACE_2)
-
-        self.chk_synced = QCheckBox("Synced")
-        self.chk_synced.setChecked(True)
-        self.chk_synced.setAccessibleName("Filter synced lyrics")
-        filters_row.addWidget(self.chk_synced)
-
-        self.chk_plain = QCheckBox("Plain")
-        self.chk_plain.setChecked(True)
-        self.chk_plain.setAccessibleName("Filter plain lyrics")
-        filters_row.addWidget(self.chk_plain)
-
-        self.chk_instr = QCheckBox("Instrumental")
-        self.chk_instr.setChecked(False)
-        self.chk_instr.setAccessibleName("Filter instrumental tracks")
-        filters_row.addWidget(self.chk_instr)
-
-        self.chk_none = QCheckBox("No lyrics")
-        self.chk_none.setChecked(True)
-        self.chk_none.setAccessibleName("Filter tracks without lyrics")
-        filters_row.addWidget(self.chk_none)
-        filters_row.addStretch(1)
-        filters_layout.addLayout(filters_row)
-        top_bar.addWidget(self.filters_group, stretch=2)
-
-        # --- Action icons (top-right) ---
-        self.actions_group = QWidget()
-        self.actions_group.setObjectName("TopBarGroup")
-        actions_layout = QVBoxLayout(self.actions_group)
-        set_layout_spacing(actions_layout, margins=SPACE_2, spacing=SPACE_1)
-
-        self.actions_label = QLabel("Global Actions")
-        self.actions_label.setObjectName("TopBarLabel")
-        actions_layout.addWidget(self.actions_label)
-
-        actions_row = QHBoxLayout()
-        set_layout_spacing(actions_row, spacing=SPACE_2)
-
-        self.btn_refresh = QToolButton()
-        self.btn_refresh.setObjectName("TopBarAction")
-        self.btn_refresh.setIcon(load_svg_icon("refresh-cw.svg", 18))
-        self.btn_refresh.setToolTip("Refresh library")
-        self.btn_refresh.setAccessibleName("Refresh library")
-        self.btn_refresh.clicked.connect(self.refresh_library)
-
-        self.btn_download_missing = QToolButton()
-        self.btn_download_missing.setObjectName("TopBarAction")
-        self.btn_download_missing.setIcon(load_svg_icon("download.svg", 18))
-        self.btn_download_missing.setToolTip("Download missing lyrics")
-        self.btn_download_missing.setAccessibleName("Download missing lyrics")
-        self.btn_download_missing.clicked.connect(self._download_missing_lyrics)
-
-        self.btn_config = QToolButton()
-        self.btn_config.setObjectName("TopBarAction")
-        self.btn_config.setIcon(load_svg_icon("settings-2.svg", 18))
-        self.btn_config.setToolTip("Settings")
-        self.btn_config.setAccessibleName("Open music folder settings")
-        self.btn_config.clicked.connect(self.open_config_modal)
-
-        self.btn_about = QToolButton()
-        self.btn_about.setObjectName("TopBarAction")
-        self.btn_about.setIcon(load_svg_icon("info.svg", 18))
-        self.btn_about.setToolTip("About")
-        self.btn_about.setAccessibleName("About LrcGet")
-        self.btn_about.clicked.connect(self.open_about_modal)
-
-        self.btn_logs = QToolButton()
-        self.btn_logs.setObjectName("TopBarAction")
-        self.btn_logs.setIcon(load_svg_icon("logs.svg", 18))
-        self.btn_logs.setToolTip("Logs")
-        self.btn_logs.setAccessibleName("Toggle log panel")
-        self.btn_logs.setCheckable(True)
-        self.btn_logs.clicked.connect(self._toggle_logs_panel)
-
-        actions_row.addWidget(self.btn_refresh)
-        actions_row.addWidget(self.btn_download_missing)
-        actions_row.addWidget(self.btn_config)
-        actions_row.addWidget(self.btn_about)
-        actions_row.addWidget(self.btn_logs)
-        actions_row.addStretch(1)
-        actions_layout.addLayout(actions_row)
-        top_bar.addWidget(self.actions_group, stretch=1)
-
+        self.top_bar = TopBarController(
+            on_refresh=self.refresh_library,
+            on_download_missing=self._download_missing_lyrics,
+            on_open_settings=self.open_config_modal,
+            on_open_about=self.open_about_modal,
+            on_toggle_logs=self._toggle_logs_panel,
+            on_schedule_search=self._schedule_library_search,
+            on_filter_changed=self._apply_track_filters,
+            parent=self,
+        )
         self.layout.addWidget(self.top_bar)
 
         self.nav_bar = QWidget()
@@ -447,20 +350,7 @@ class MainWindow(QMainWindow):
         self.mylrclib_tab.playTrack.connect(self.on_play_track)
 
         # --- Filters wiring ---
-        self.search_box.textChanged.connect(self._schedule_library_search)
-        self.chk_synced.toggled.connect(self._apply_track_filters)
-        self.chk_plain.toggled.connect(self._apply_track_filters)
-        self.chk_instr.toggled.connect(self._apply_track_filters)
-        self.chk_none.toggled.connect(self._apply_track_filters)
-
-        self.setTabOrder(self.search_box, self.chk_synced)
-        self.setTabOrder(self.chk_synced, self.chk_plain)
-        self.setTabOrder(self.chk_plain, self.chk_instr)
-        self.setTabOrder(self.chk_instr, self.chk_none)
-        self.setTabOrder(self.chk_none, self.btn_refresh)
-        self.setTabOrder(self.btn_refresh, self.btn_config)
-        self.setTabOrder(self.btn_config, self.btn_about)
-        self.setTabOrder(self.btn_about, self.tabs)
+        self.top_bar.bind_tab_order(self, self.tabs)
 
         # initial load
         self._apply_track_filters()
@@ -488,12 +378,13 @@ class MainWindow(QMainWindow):
 
     # ------------------ filters ------------------
     def _apply_track_filters(self):
-        self.track_list.setSearchValue(self.search_box.text())
+        filters = self.top_bar.filter_values()
+        self.track_list.setSearchValue(self.top_bar.search_text())
         self.track_list.setFilters(
-            synced=self.chk_synced.isChecked(),
-            plain=self.chk_plain.isChecked(),
-            instrumental=self.chk_instr.isChecked(),
-            none_=self.chk_none.isChecked(),
+            synced=filters["synced"],
+            plain=filters["plain"],
+            instrumental=filters["instrumental"],
+            none_=filters["none"],
         )
         if self.app_state.player and self.app_state.player.track:
             self.track_list.set_now_playing(self.app_state.player.track.track_id)
@@ -503,7 +394,7 @@ class MainWindow(QMainWindow):
 
     def _apply_library_search(self):
         current = self.tabs.currentWidget()
-        text = self.search_box.text()
+        text = self.top_bar.search_text()
         if current is self.tracks_tab:
             self._apply_track_filters()
         elif current is self.albums_page:
@@ -548,7 +439,7 @@ class MainWindow(QMainWindow):
         directories = get_directories(self.app_state.db)
         if not directories:
             self.app_state.notify("Add at least one music folder before starting a library scan.", "warning")
-            self._set_tool_feedback(self.btn_refresh, "error")
+            self.top_bar.set_button_feedback(self.top_bar.btn_refresh, "error")
             QTimer.singleShot(1800, self._reset_refresh_feedback)
             return
 
@@ -556,8 +447,8 @@ class MainWindow(QMainWindow):
 
         self.scan_row.setVisible(True)
         self.progress_bar.setValue(0)
-        self.actions_label.setText("Scanning Library")
-        self._set_tool_feedback(self.btn_refresh, "loading")
+        self.top_bar.set_actions_label("Scanning Library")
+        self.top_bar.set_button_feedback(self.top_bar.btn_refresh, "loading")
         self.scan_label.setText("Scanning…")
         self.scan_details.setText(f"Preparing a scan across {len(directories)} folder(s)…")
         self.btn_cancel_scan.setEnabled(True)
@@ -572,7 +463,7 @@ class MainWindow(QMainWindow):
         self.scanner.progress_signal.connect(self._update_scan_progress)
         self.scanner.finished_signal.connect(self._scan_finished)
         self.scanner.start()
-        self.btn_refresh.setEnabled(False)
+        self.top_bar.btn_refresh.setEnabled(False)
         self.statusBar().showMessage("Scanning library…")
 
     def _update_scan_progress(self, scanned: int, total: int, current_path: str, elapsed_s: float):
@@ -618,7 +509,7 @@ class MainWindow(QMainWindow):
         self.log_panel.append_log(level, message)
         normalized_level = (level or "").upper()
         if normalized_level in {"ERROR", "CRITICAL"}:
-            self.btn_logs.setChecked(True)
+            self.top_bar.set_logs_checked(True)
             self.log_panel.setVisible(True)
             self._show_deduped_toast(message, "error", 4000)
 
@@ -644,19 +535,19 @@ class MainWindow(QMainWindow):
         if ok:
             self._apply_track_filters()
             self.app_state.notify(msg or "Library scan finished successfully.", "success")
-            self._set_tool_feedback(self.btn_refresh, "success")
+            self.top_bar.set_button_feedback(self.top_bar.btn_refresh, "success")
             logger.info("Library scan finished successfully: %s", msg or "ok")
         else:
             if "cancel" in (msg or "").lower():
                 self.app_state.notify(msg, "warning")
-                self._set_tool_feedback(self.btn_refresh, "idle")
+                self.top_bar.set_button_feedback(self.top_bar.btn_refresh, "idle")
                 logger.warning("Library scan cancelled: %s", msg)
             else:
                 self.app_state.notify(f"Library scanning failed: {msg}", "error")
-                self._set_tool_feedback(self.btn_refresh, "error")
+                self.top_bar.set_button_feedback(self.top_bar.btn_refresh, "error")
                 logger.error("Library scan failed: %s", msg)
 
-        self.btn_refresh.setEnabled(True)
+        self.top_bar.btn_refresh.setEnabled(True)
         QTimer.singleShot(1800, self._reset_refresh_feedback)
         self.statusBar().showMessage(msg, 4000)
         self.scanner = None
@@ -926,27 +817,12 @@ class MainWindow(QMainWindow):
             self.on_play_track(tid)
 
     def _reset_track_filters(self):
-        self.search_box.blockSignals(True)
-        self.search_box.setText("")
-        self.search_box.blockSignals(False)
+        self.top_bar.reset_track_filters()
         self.track_list.apply_route(tracks_all())
-
-        for checkbox, checked in (
-            (self.chk_synced, True),
-            (self.chk_plain, True),
-            (self.chk_instr, False),
-            (self.chk_none, True),
-        ):
-            checkbox.blockSignals(True)
-            checkbox.setChecked(checked)
-            checkbox.blockSignals(False)
-
         self._apply_track_filters()
 
     def _clear_library_search(self) -> None:
-        self.search_box.blockSignals(True)
-        self.search_box.setText("")
-        self.search_box.blockSignals(False)
+        self.top_bar.clear_library_search()
         current = self.tabs.currentWidget()
         if current is self.tracks_tab:
             self._apply_track_filters()
@@ -1013,26 +889,12 @@ class MainWindow(QMainWindow):
                 instrumental=bool(track.instrumental),
             )
 
-    def _set_tool_feedback(self, button: QToolButton, state: str) -> None:
-        button.setProperty("actionState", state if state != "idle" else "")
-        button.style().unpolish(button)
-        button.style().polish(button)
-        button.update()
-        button.setEnabled(state != "loading")
-
     def _reset_refresh_feedback(self):
-        self._set_tool_feedback(self.btn_refresh, "idle")
-        self.btn_refresh.setEnabled(True)
-        self.actions_label.setText(self._refresh_default_label)
+        self.top_bar.reset_refresh_feedback(self._refresh_default_label)
 
     def _update_responsive_layout(self):
         width = max(0, self.width())
-
-        if hasattr(self, "top_bar_layout"):
-            if width < 1120:
-                self.top_bar_layout.setDirection(QBoxLayout.TopToBottom)
-            else:
-                self.top_bar_layout.setDirection(QBoxLayout.LeftToRight)
+        self.top_bar.update_responsive_layout(width)
 
         if hasattr(self, "content_splitter"):
             if width < 980:
@@ -1071,9 +933,7 @@ class MainWindow(QMainWindow):
             self._tab_sync_suppressed = True
             if route.tab == "tracks":
                 self.tabs.setCurrentWidget(self.tracks_tab)
-                self.search_box.blockSignals(True)
-                self.search_box.setText("")
-                self.search_box.blockSignals(False)
+                self.top_bar.clear_library_search()
                 self.track_list.apply_route(route)
             elif route.tab == "albums":
                 self.tabs.setCurrentWidget(self.albums_page)
