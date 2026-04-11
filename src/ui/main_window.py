@@ -38,6 +38,7 @@ from ui.controllers.publish_history_controller import PublishHistoryController
 from ui.controllers.top_bar_controller import TopBarController
 from ui.widgets.track_list_widget import TrackListWidget
 from ui.dialogs.music_folders_dialog import MusicFoldersDialog
+from ui.dialogs.about_dialog import AboutDialog
 from ui.player_bar import PlayerBar
 from ui.widgets.lyrics_editor_widget import LyricsEditorWidget
 from ui.dialogs.first_run_dialog import FirstRunDialog
@@ -439,13 +440,8 @@ class MainWindow(QMainWindow):
         self.top_bar.set_download_missing_mode(str(config.download_lyrics_mode or "prefer_synced"))
 
     def open_about_modal(self):
-        notify_user(
-            self.app_state,
-            "LrcGet helps you scan your library, edit lyrics, and publish them to LRCLIB.",
-            "info",
-            show_status=self._show_status_message,
-            status_timeout_ms=3000,
-        )
+        dlg = AboutDialog(self.app_state, self)
+        dlg.exec()
 
     def _maybe_show_first_run_onboarding(self):
         if get_directories(self.app_state.db):
