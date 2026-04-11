@@ -12,6 +12,7 @@ from dataclasses import replace
 from db.database import get_album_by_id, get_artist_by_id, get_config, get_directories, get_track_by_id, set_config
 from core.lyrics_sidecar import export_lyrics_sidecars
 from ui.workers.library_scanner import LibraryScanner
+from ui.workers.bulk_lyrics_download_worker import BulkLyricsDownloadWorker
 from ui.widgets.track_list_widget import TrackListWidget
 from ui.dialogs.music_folders_dialog import MusicFoldersDialog
 from ui.player_bar import PlayerBar
@@ -31,7 +32,7 @@ from ui.widgets.toast import ToastManager
 from PySide6.QtWidgets import QToolButton
 from ui.widgets.log_panel import LogPanel, QtLogHandler
 from ui.widgets.my_lrclib_widget import MyLrclibWidget
-from db.queries import record_publish_history
+from db.queries import get_track_ids_for_download_mode, record_publish_history
 
 logger = logging.getLogger(__name__)
 
@@ -69,9 +70,11 @@ class MainWindow(QMainWindow):
         self._artist_label_cache: dict[int, str] = {}
         self._album_label_cache: dict[int, str] = {}
         self._recent_toast_messages: set[str] = set()
+        self._active_download_track_ids: set[int] = set()
         self._nav_apply_in_progress = False
         self._tab_sync_suppressed = False
         self.scanner = None
+        self._download_worker = None
         self._playback_speed_save_timer = QTimer(self)
         self._playback_speed_save_timer.setSingleShot(True)
         self._playback_speed_save_timer.setInterval(350)
@@ -192,6 +195,13 @@ class MainWindow(QMainWindow):
         self.btn_refresh.setAccessibleName("Refresh library")
         self.btn_refresh.clicked.connect(self.refresh_library)
 
+        self.btn_download_missing = QToolButton()
+        self.btn_download_missing.setObjectName("TopBarAction")
+        self.btn_download_missing.setIcon(load_svg_icon("audio-lines.svg", 18))
+        self.btn_download_missing.setToolTip("Download missing lyrics")
+        self.btn_download_missing.setAccessibleName("Download missing lyrics")
+        self.btn_download_missing.clicked.connect(self._download_missing_lyrics)
+
         self.btn_config = QToolButton()
         self.btn_config.setObjectName("TopBarAction")
         self.btn_config.setIcon(load_svg_icon("settings-2.svg", 18))
@@ -215,6 +225,7 @@ class MainWindow(QMainWindow):
         self.btn_logs.clicked.connect(self._toggle_logs_panel)
 
         actions_row.addWidget(self.btn_refresh)
+        actions_row.addWidget(self.btn_download_missing)
         actions_row.addWidget(self.btn_config)
         actions_row.addWidget(self.btn_about)
         actions_row.addWidget(self.btn_logs)
@@ -372,6 +383,39 @@ class MainWindow(QMainWindow):
         self.scan_row.setVisible(False)
         self.scan_row.setObjectName("ScanRow")
 
+        self.download_row = QWidget()
+        download_layout = QHBoxLayout(self.download_row)
+        set_layout_spacing(download_layout, margins=(SPACE_3, SPACE_2, SPACE_3, SPACE_2), spacing=SPACE_2)
+
+        self.download_label = QLabel("Downloading lyrics…")
+        self.download_label.setObjectName("ScanLabel")
+        self.download_details = QLabel("Preparing download…")
+        self.download_details.setObjectName("ScanDetails")
+
+        self.download_progress_bar = QProgressBar()
+        self.download_progress_bar.setObjectName("ScanProgress")
+        self.download_progress_bar.setTextVisible(False)
+        self.download_progress_bar.setRange(0, 100)
+        self.download_progress_bar.setValue(0)
+
+        download_text = QVBoxLayout()
+        set_layout_spacing(download_text, spacing=SPACE_1)
+        download_text.addWidget(self.download_label)
+        download_text.addWidget(self.download_details)
+
+        self.btn_cancel_download = QPushButton("Cancel")
+        self.btn_cancel_download.setObjectName("ScanCancelButton")
+        self.btn_cancel_download.clicked.connect(self._cancel_downloads)
+        self.btn_cancel_download.setEnabled(False)
+
+        download_layout.addLayout(download_text)
+        download_layout.addWidget(self.download_progress_bar, 1)
+        download_layout.addWidget(self.btn_cancel_download)
+
+        self.layout.addWidget(self.download_row)
+        self.download_row.setVisible(False)
+        self.download_row.setObjectName("ScanRow")
+
         self.log_panel = LogPanel(self)
         self.log_panel.set_log_file_path(getattr(self.app_state, "log_path", ""))
         self.log_panel.setVisible(False)
@@ -383,6 +427,7 @@ class MainWindow(QMainWindow):
         self.track_list.playTrack.connect(self.on_play_track)
         self.track_list.downloadLyrics.connect(self.on_download_lyrics)
         self.track_list.exportLyricsFiles.connect(self._export_track_sidecars)
+        self.track_list.bulkDownloadRequested.connect(self._on_bulk_download_requested)
         self.track_list.navigateRequested.connect(self.navigate_to)
         self.track_list.markInstrumental.connect(self._on_mark_instrumental)
         self.track_list.unmarkInstrumental.connect(self._on_unmark_instrumental)
@@ -392,6 +437,7 @@ class MainWindow(QMainWindow):
         self.albums_tab.playTrack.connect(self.on_play_track)
         self.albums_tab.downloadLyrics.connect(self.on_download_lyrics)
         self.albums_tab.exportLyricsFiles.connect(self._export_track_sidecars)
+        self.albums_tab.bulkDownloadRequested.connect(self._on_bulk_download_requested)
         self.albums_tab.navigateRequested.connect(self.navigate_to)
         self.albums_tab.markInstrumental.connect(self._on_mark_instrumental)
         self.albums_tab.unmarkInstrumental.connect(self._on_unmark_instrumental)
@@ -402,6 +448,7 @@ class MainWindow(QMainWindow):
         self.artists_tab.playTrack.connect(self.on_play_track)
         self.artists_tab.downloadLyrics.connect(self.on_download_lyrics)
         self.artists_tab.exportLyricsFiles.connect(self._export_track_sidecars)
+        self.artists_tab.bulkDownloadRequested.connect(self._on_bulk_download_requested)
         self.artists_tab.navigateRequested.connect(self.navigate_to)
         self.artists_tab.markInstrumental.connect(self._on_mark_instrumental)
         self.artists_tab.unmarkInstrumental.connect(self._on_unmark_instrumental)
@@ -732,44 +779,135 @@ class MainWindow(QMainWindow):
 
     # ------------------ lyrics download & save ------------------
     def on_download_lyrics(self, track_id: int):
+        self._start_lyrics_downloads([int(track_id)], mode_override="use_global")
+
+    def _on_bulk_download_requested(self, track_ids: list[int], mode: str) -> None:
+        self._start_lyrics_downloads(track_ids, mode_override=mode)
+
+    def _resolve_download_mode(self, mode_override: str = "use_global") -> str:
+        if mode_override and mode_override != "use_global":
+            return mode_override
         config = get_config(self.app_state.db)
-        lrclib_instance = config.lrclib_instance or "https://lrclib.net"
-        lrclib_instance = self._normalize_lrclib_base(lrclib_instance)
+        return str(config.download_lyrics_mode or "prefer_synced")
 
+    def _start_lyrics_downloads(self, track_ids: list[int], *, mode_override: str = "use_global") -> None:
+        unique_ids = [int(t) for t in dict.fromkeys(int(x) for x in track_ids if x is not None)]
+        if not unique_ids:
+            self.app_state.notify("No tracks selected for lyrics download.", "warning")
+            return
+        if self._download_worker is not None and self._download_worker.isRunning():
+            self.app_state.notify("A lyrics download is already running.", "warning")
+            return
+
+        config = get_config(self.app_state.db)
+        lrclib_instance = self._normalize_lrclib_base(config.lrclib_instance or "https://lrclib.net")
+        mode = self._resolve_download_mode(mode_override)
+
+        for track_id in unique_ids:
+            self._set_track_download_state_all(track_id, "loading")
+        self._active_download_track_ids = set(unique_ids)
+
+        self.download_row.setVisible(True)
+        self.btn_cancel_download.setEnabled(True)
+        self.download_label.setText(f"Downloading lyrics ({self._download_mode_label(mode)})")
+        self.download_details.setText("Preparing download queue…")
+        self.download_progress_bar.setRange(0, len(unique_ids))
+        self.download_progress_bar.setValue(0)
         self.statusBar().showMessage(f"Starting lyrics download... ({lrclib_instance})")
-        self.track_list.set_download_state(int(track_id), "loading")
 
-        from ui.workers.lyrics_download_worker import LyricsDownloadWorker
-        self._lyrics_worker = LyricsDownloadWorker(
+        self._download_worker = BulkLyricsDownloadWorker(
             db_path=self.app_state.db_path,
-            track_id=track_id,
+            track_ids=unique_ids,
             lrclib_instance=lrclib_instance,
-            download_mode=str(config.download_lyrics_mode or "prefer_synced"),
+            download_mode=mode,
             parent=self,
         )
-        self._lyrics_worker.progress.connect(lambda s: self.statusBar().showMessage(s))
-        self._lyrics_worker.finished.connect(self._on_lyrics_download_finished)
-        self._lyrics_worker.start()
+        self._download_worker.progress.connect(self._on_download_progress)
+        self._download_worker.itemFinished.connect(self._on_download_item_finished)
+        self._download_worker.finishedBatch.connect(self._on_download_batch_finished)
+        self._download_worker.start()
 
-    def _on_lyrics_download_finished(self, ok: bool, msg: str, track_id: int):
-        self.statusBar().showMessage(msg, 4000)
-        self._apply_track_filters()
+    def _download_missing_lyrics(self) -> None:
+        mode = self._resolve_download_mode("use_global")
+        track_ids = get_track_ids_for_download_mode(self.app_state.db, mode)
+        if not track_ids:
+            self.app_state.notify("No tracks are missing lyrics for the current download mode.", "info")
+            return
+        self._start_lyrics_downloads(track_ids, mode_override=mode)
 
+    def _cancel_downloads(self) -> None:
+        if self._download_worker is None or not self._download_worker.isRunning():
+            return
+        self.btn_cancel_download.setEnabled(False)
+        self.download_details.setText("Cancelling after the current track…")
+        self._download_worker.requestInterruption()
+
+    def _on_download_progress(self, current: int, total: int, track_label: str, status: str, elapsed_s: float) -> None:
+        self.download_progress_bar.setRange(0, max(1, int(total)))
+        self.download_progress_bar.setValue(min(int(current), int(total)))
+        label = track_label or "Lyrics download"
+        self.download_details.setText(f"{label}  •  {status}")
+        self.statusBar().showMessage(status)
+
+    def _on_download_item_finished(self, track_id: int, ok: bool, msg: str) -> None:
         try:
-            track = get_track_by_id(self.app_state.db, track_id)
+            track = get_track_by_id(self.app_state.db, int(track_id))
             if ok:
                 self._sync_track_lyrics_outputs(track)
-            self._set_track_lyrics_views(track)
-        except Exception:
-            pass
+            if self.app_state.player and self.app_state.player.track and int(self.app_state.player.track.track_id) == int(track_id):
+                self._set_track_lyrics_views(track)
+        except Exception as exc:
+            logger.warning("Failed to update track after lyrics download for %s: %s", track_id, exc)
 
-        if ok:
-            self.app_state.notify("Lyrics downloaded successfully.", "success")
-            self.track_list.set_download_state(int(track_id), "success")
+        self._active_download_track_ids.discard(int(track_id))
+        self._set_track_download_state_all(int(track_id), "success" if ok else "error")
+        QTimer.singleShot(1800, lambda tid=int(track_id): self._set_track_download_state_all(tid, "idle"))
+
+    def _on_download_batch_finished(self, ok: bool, msg: str, stats: object) -> None:
+        self.statusBar().showMessage(msg, 4000)
+        self.btn_cancel_download.setEnabled(False)
+        self.download_row.setVisible(False)
+        for track_id in list(self._active_download_track_ids):
+            self._set_track_download_state_all(int(track_id), "idle")
+        self._active_download_track_ids.clear()
+
+        try:
+            current = self.tabs.currentWidget()
+            if current is self.tracks_tab:
+                self.track_list.apply_route(self._current_route if self._current_route.tab == "tracks" else tracks_all())
+            elif current is self.albums_page:
+                self.albums_tab.apply_route(self._current_route if self._current_route.tab == "albums" else LibraryRoute(tab="albums", mode="root"))
+            elif current is self.artists_page:
+                self.artists_tab.apply_route(self._current_route if self._current_route.tab == "artists" else LibraryRoute(tab="artists", mode="root"))
+        except Exception as exc:
+            logger.warning("Failed to refresh current view after lyrics download: %s", exc)
+
+        stats_dict = stats if isinstance(stats, dict) else {}
+        if stats_dict.get("cancelled"):
+            self.app_state.notify("Lyrics download cancelled.", "warning")
+        elif int(stats_dict.get("failed", 0)) > 0 and int(stats_dict.get("ok", 0)) > 0:
+            self.app_state.notify(msg, "warning")
+        elif int(stats_dict.get("failed", 0)) > 0:
+            self.app_state.notify(msg, "error")
         else:
-            self.app_state.notify(f"Failed to download lyrics: {msg}", "error")
-            self.track_list.set_download_state(int(track_id), "error")
-        QTimer.singleShot(1800, lambda tid=int(track_id): self.track_list.set_download_state(tid, "idle"))
+            self.app_state.notify("Lyrics downloaded successfully.", "success")
+        self._download_worker = None
+
+    def _set_track_download_state_all(self, track_id: int, state: str) -> None:
+        self.track_list.set_download_state(int(track_id), state)
+        if hasattr(self.albums_tab, "track_list"):
+            self.albums_tab.track_list.set_download_state(int(track_id), state)
+        if hasattr(self.artists_tab, "album_browser") and hasattr(self.artists_tab.album_browser, "track_list"):
+            self.artists_tab.album_browser.track_list.set_download_state(int(track_id), state)
+
+    @staticmethod
+    def _download_mode_label(mode: str) -> str:
+        labels = {
+            "prefer_synced": "Prefer synced",
+            "synced_only": "Synced only",
+            "plain_only": "Plain only",
+        }
+        return labels.get((mode or "").strip(), "Custom")
 
 
     def _on_lyrics_save_requested(self, lrc: str, txt: str):

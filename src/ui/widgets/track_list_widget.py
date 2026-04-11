@@ -22,6 +22,7 @@ class TrackListWidget(QWidget):
     playTrack = Signal(int)       # track_id
     downloadLyrics = Signal(int)  # track_id
     exportLyricsFiles = Signal(int)  # track_id
+    bulkDownloadRequested = Signal(list, str)  # track_ids, mode
     openArtist = Signal(int)
     openAlbum = Signal(int)
     navigateRequested = Signal(object)
@@ -340,6 +341,9 @@ class TrackListWidget(QWidget):
         bulk = menu.addAction("Selection Actions")
         bulk.setEnabled(False)
         count_suffix = f"({len(selected_ids)})"
+        act_dl_selected = menu.addAction(f"Download selection using current mode {count_suffix}")
+        act_dl_synced = menu.addAction(f"Download selection as synced only {count_suffix}")
+        act_dl_plain = menu.addAction(f"Download selection as plain only {count_suffix}")
         act_instr = menu.addAction(f"Mark selection as instrumental {count_suffix}")
         act_uninstr = menu.addAction(f"Unmark instrumental on selection {count_suffix}")
 
@@ -353,6 +357,12 @@ class TrackListWidget(QWidget):
         elif chosen == act_export:
             if current_track_id is not None:
                 self.exportLyricsFiles.emit(int(current_track_id))
+        elif chosen == act_dl_selected:
+            self.bulkDownloadRequested.emit(selected_ids, "use_global")
+        elif chosen == act_dl_synced:
+            self.bulkDownloadRequested.emit(selected_ids, "synced_only")
+        elif chosen == act_dl_plain:
+            self.bulkDownloadRequested.emit(selected_ids, "plain_only")
         elif chosen == act_instr:
             self.markInstrumental.emit(selected_ids)
         elif chosen == act_uninstr:

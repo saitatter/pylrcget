@@ -708,6 +708,22 @@ def get_artist_track_ids(
     return [int(r["id"]) for r in rows]
 
 
+def get_track_ids_for_download_mode(db: sqlite3.Connection, download_mode: str) -> list[int]:
+    mode = (download_mode or "prefer_synced").strip() or "prefer_synced"
+    conditions = ["instrumental = 0"]
+
+    if mode == "plain_only":
+        conditions.append("txt_lyrics IS NULL")
+    else:
+        conditions.append("(lrc_lyrics IS NULL OR lrc_lyrics = '[au: instrumental]')")
+
+    where_clause = " AND ".join(conditions)
+    rows = db.execute(
+        f"SELECT id FROM tracks WHERE {where_clause} ORDER BY title_lower ASC"
+    ).fetchall()
+    return [int(r["id"]) for r in rows]
+
+
 # -------------------------------
 # CLEAN LIBRARY
 # -------------------------------
