@@ -38,8 +38,8 @@ class LyricsDownloadWorkerTests(unittest.TestCase):
 
                 fake_lyrics = SimpleNamespace(synced_lyrics=None, plain_lyrics="plain text")
                 with (
-                    patch("ui.workers.lyrics_download_worker.time.sleep") as sleep_mock,
-                    patch("ui.workers.lyrics_download_worker.LrcLibAPI") as api_cls,
+                    patch("ui.services.lyrics_download_service.time.sleep") as sleep_mock,
+                    patch("ui.services.lyrics_download_service.LrcLibAPI") as api_cls,
                 ):
                     api_cls.return_value.get_lyrics.side_effect = [
                         requests.exceptions.Timeout("slow network"),
@@ -83,8 +83,8 @@ class LyricsDownloadWorkerTests(unittest.TestCase):
                 response.url = "https://lrclib.net/api/get"
                 response._content = b"not found"
                 with (
-                    patch("ui.workers.lyrics_download_worker.time.sleep") as sleep_mock,
-                    patch("ui.workers.lyrics_download_worker.LrcLibAPI") as api_cls,
+                    patch("ui.services.lyrics_download_service.time.sleep") as sleep_mock,
+                    patch("ui.services.lyrics_download_service.LrcLibAPI") as api_cls,
                 ):
                     api_cls.return_value.get_lyrics.side_effect = NotFoundError(response)
                     worker.run()
@@ -118,7 +118,7 @@ class LyricsDownloadWorkerTests(unittest.TestCase):
                 worker.finished.connect(lambda ok, msg, tid: finished.append((ok, msg, tid)))
 
                 fake_lyrics = SimpleNamespace(synced_lyrics=None, plain_lyrics="plain text")
-                with patch("ui.workers.lyrics_download_worker.LrcLibAPI") as api_cls:
+                with patch("ui.services.lyrics_download_service.LrcLibAPI") as api_cls:
                     api_cls.return_value.get_lyrics.return_value = fake_lyrics
                     worker.run()
 
@@ -153,7 +153,7 @@ class LyricsDownloadWorkerTests(unittest.TestCase):
                 worker.finished.connect(lambda ok, msg, tid: finished.append((ok, msg, tid)))
 
                 fake_lyrics = SimpleNamespace(synced_lyrics=None, plain_lyrics="plain text")
-                with patch("ui.workers.lyrics_download_worker.LrcLibAPI") as api_cls:
+                with patch("ui.services.lyrics_download_service.LrcLibAPI") as api_cls:
                     api_cls.return_value.get_lyrics.return_value = fake_lyrics
                     worker.run()
 
@@ -191,7 +191,7 @@ class LyricsDownloadWorkerTests(unittest.TestCase):
                     synced_lyrics="[00:10.00] hello\n[00:12.00] world",
                     plain_lyrics=None,
                 )
-                with patch("ui.workers.lyrics_download_worker.LrcLibAPI") as api_cls:
+                with patch("ui.services.lyrics_download_service.LrcLibAPI") as api_cls:
                     api_cls.return_value.get_lyrics.return_value = fake_lyrics
                     worker.run()
 

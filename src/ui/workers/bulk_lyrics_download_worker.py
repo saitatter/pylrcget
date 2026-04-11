@@ -8,7 +8,7 @@ from PySide6.QtCore import QThread, Signal
 
 from db.database import get_config, get_track_by_id
 from db.models import Track
-from ui.workers.lyrics_download_worker import download_track_lyrics
+from ui.services.lyrics_download_service import download_track_lyrics
 
 
 class BulkDownloadStats(TypedDict):
