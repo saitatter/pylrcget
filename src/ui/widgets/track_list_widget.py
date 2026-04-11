@@ -15,8 +15,9 @@ from ui.delegates.actions_delegate import ActionsDelegate
 from ui.delegates.track_info_delegate import TrackInfoDelegate
 from ui.style_loader import load_stylesheet
 from ui.widgets.sortable_header_view import SortableHeaderView
-from core.tracklist_models import TrackListRow
-from core.tracklist_models import DownloadState, LyricsState, TrackListRow
+from ui.widgets.library_table_utils import should_load_more
+from ui.widgets.track_list_rows import build_track_list_rows
+from core.tracklist_models import DownloadState
 
 
 class TrackListWidget(QWidget):
@@ -241,37 +242,7 @@ class TrackListWidget(QWidget):
         self._has_more_rows = len(rows) > self._page_size
         visible_rows = rows[: self._page_size]
 
-        ui_rows: list[TrackListRow] = []
-        for r in visible_rows:
-            instrumental = bool(r["instrumental"])
-            lrc = r["lrc_lyrics"]
-            txt = r["txt_lyrics"]
-
-            if instrumental:
-                state = LyricsState.INSTRUMENTAL
-            elif lrc and lrc != "[au: instrumental]":
-                state = LyricsState.SYNCED
-            elif txt:
-                state = LyricsState.PLAIN
-            else:
-                state = LyricsState.NONE
-
-            dur = r["duration"]
-            dur_s = int(round(dur)) if dur is not None else None
-
-            ui_rows.append(
-                TrackListRow(
-                    track_id=int(r["id"]),
-                    title=r["title"] or "",
-                    artist=r["artist_name"],
-                    artist_id=int(r["artist_id"]) if r["artist_id"] is not None else None,
-                    album=r["album_name"] or "",
-                    album_id=int(r["album_id"]) if r["album_id"] is not None else None,
-                    duration_s=dur_s,
-                    lyrics_state=state,
-                    download_state=self._download_states.get(int(r["id"]), DownloadState.IDLE),
-                )
-            )
+        ui_rows = build_track_list_rows(visible_rows, self._download_states)
 
         if reset:
             self.model.set_rows(ui_rows)
@@ -539,10 +510,14 @@ class TrackListWidget(QWidget):
             self.refresh()
 
     def _maybe_load_more(self, value: int) -> None:
-        if not self._has_more_rows or self._loading_more:
-            return
         scroll = self.table.verticalScrollBar()
-        if value < max(0, scroll.maximum() - 120):
+        if not should_load_more(
+            has_more_rows=self._has_more_rows,
+            loading_more=self._loading_more,
+            is_browser_visible=True,
+            value=value,
+            maximum=scroll.maximum(),
+        ):
             return
         self._loading_more = True
         try:
