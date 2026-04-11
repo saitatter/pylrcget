@@ -214,6 +214,9 @@ class LyricsDownloadController(QObject):
                 "Lyrics downloaded successfully.",
                 "success",
             )
+            queue_auto_close = getattr(self._overlay, "queue_auto_close", None)
+            if callable(queue_auto_close):
+                queue_auto_close(2200)
         self._download_worker = None
         self._active_request = None
 

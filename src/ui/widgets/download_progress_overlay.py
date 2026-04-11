@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from html import escape
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import QTimer, Qt, Signal
 from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,
@@ -33,6 +33,9 @@ class DownloadProgressOverlay(QWidget):
         self._ok_count = 0
         self._fail_count = 0
         self._total = 0
+        self._auto_close_timer = QTimer(self)
+        self._auto_close_timer.setSingleShot(True)
+        self._auto_close_timer.timeout.connect(self._dismiss_overlay)
 
         root = QVBoxLayout(self)
         set_layout_spacing(root, margins=(SPACE_3, SPACE_3, SPACE_3, SPACE_3), spacing=0)
@@ -112,6 +115,7 @@ class DownloadProgressOverlay(QWidget):
             self.setGeometry(parent.rect())
 
     def start_batch(self, mode_label: str, total: int) -> None:
+        self._auto_close_timer.stop()
         self._active = True
         self._ok_count = 0
         self._fail_count = 0
@@ -167,6 +171,12 @@ class DownloadProgressOverlay(QWidget):
         else:
             self.title_label.setText("Download Complete")
 
+    def queue_auto_close(self, delay_ms: int) -> None:
+        if self._active:
+            return
+        timeout = max(250, int(delay_ms))
+        self._auto_close_timer.start(timeout)
+
     def _refresh_summary(self) -> None:
         self.ok_label.setText(f"{self._ok_count} DOWNLOADED")
         self.fail_label.setText(f"{self._fail_count} FAILED")
@@ -184,5 +194,9 @@ class DownloadProgressOverlay(QWidget):
         if self._active:
             self._handle_cancel()
             return
+        self._dismiss_overlay()
+
+    def _dismiss_overlay(self) -> None:
+        self._auto_close_timer.stop()
         self.hide()
         self.dismissed.emit()
