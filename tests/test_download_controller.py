@@ -92,6 +92,7 @@ class LyricsDownloadControllerTests(unittest.TestCase):
             current_player_track_id=lambda: current_track_id,
             set_track_lyrics_views=lambda track: refreshed.append(f"lyrics:{track.id}"),
             refresh_visible_library_view=lambda: refreshed.append("view"),
+            refresh_history=lambda: refreshed.append("history"),
             set_track_download_state=lambda track_id, state: download_states.__setitem__(int(track_id), state),
             get_track_download_state=lambda track_id: download_states.get(int(track_id), "idle"),
         )
@@ -182,6 +183,7 @@ class LyricsDownloadControllerTests(unittest.TestCase):
                 self.assertEqual(download_states[32], "idle")
                 self.assertIn(("Lyrics downloaded successfully.", "success"), notifications)
                 self.assertIn("view", refreshed)
+                self.assertIn("history", refreshed)
                 self.assertEqual(statuses[-1], ("Finished lyrics download. Success: 1, Failed: 0.", 4000))
             finally:
                 db.close()

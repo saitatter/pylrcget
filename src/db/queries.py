@@ -865,3 +865,73 @@ def get_publish_history_rows(
         {limit_clause}
     """
     return db.execute(query).fetchall()
+
+
+def record_download_history(
+    db: sqlite3.Connection,
+    *,
+    track_id: int | None,
+    title: str,
+    artist_name: str,
+    album_name: str,
+    download_mode: str,
+    download_status: str,
+    message: str,
+    lrclib_instance: str,
+) -> int:
+    downloaded_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+    cursor = db.execute(
+        """
+        INSERT INTO download_history (
+            track_id,
+            title,
+            artist_name,
+            album_name,
+            download_mode,
+            download_status,
+            message,
+            lrclib_instance,
+            downloaded_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            int(track_id) if track_id is not None else None,
+            (title or "").strip(),
+            (artist_name or "").strip(),
+            (album_name or "").strip(),
+            (download_mode or "").strip() or "prefer_synced",
+            (download_status or "").strip() or "unknown",
+            (message or "").strip(),
+            (lrclib_instance or "").strip(),
+            downloaded_at,
+        ),
+    )
+    db.commit()
+    return int(cursor.lastrowid)
+
+
+def get_download_history_rows(
+    db: sqlite3.Connection,
+    *,
+    limit: int | None = None,
+) -> list[sqlite3.Row]:
+    limit_clause = f"LIMIT {int(limit)}" if limit else ""
+    query = f"""
+        SELECT
+            h.id,
+            h.track_id,
+            h.title,
+            h.artist_name,
+            h.album_name,
+            h.download_mode,
+            h.download_status,
+            h.message,
+            h.lrclib_instance,
+            h.downloaded_at,
+            CASE WHEN t.id IS NOT NULL THEN 1 ELSE 0 END AS track_exists
+        FROM download_history h
+        LEFT JOIN tracks t ON t.id = h.track_id
+        ORDER BY h.downloaded_at DESC, h.id DESC
+        {limit_clause}
+    """
+    return db.execute(query).fetchall()

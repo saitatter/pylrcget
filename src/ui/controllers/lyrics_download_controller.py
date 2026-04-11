@@ -6,7 +6,7 @@ from typing import Callable
 
 from PySide6.QtCore import QObject, QTimer
 
-from db.database import get_config, get_track_by_id
+from db.database import get_config, get_track_by_id, record_download_history
 from db.models import Track
 from db.queries import get_track_ids_for_download_mode
 from core.tracklist_models import DownloadState
@@ -34,6 +34,7 @@ class LyricsDownloadController(QObject):
         current_player_track_id: Callable[[], int | None],
         set_track_lyrics_views: Callable[[Track], None],
         refresh_visible_library_view: Callable[[], None],
+        refresh_history: Callable[[], None],
         set_track_download_state: Callable[[int, DownloadState], None],
         get_track_download_state: Callable[[int], DownloadState],
         parent: QObject | None = None,
@@ -46,10 +47,12 @@ class LyricsDownloadController(QObject):
         self._current_player_track_id = current_player_track_id
         self._set_track_lyrics_views = set_track_lyrics_views
         self._refresh_visible_library_view = refresh_visible_library_view
+        self._refresh_history = refresh_history
         self._set_track_download_state = set_track_download_state
         self._get_track_download_state = get_track_download_state
 
         self._download_worker: BulkLyricsDownloadWorker | None = None
+        self._active_request: LyricsDownloadRequest | None = None
         self._active_track_ids: set[int] = set()
         self._state_tokens: dict[int, int] = {}
 
@@ -60,6 +63,7 @@ class LyricsDownloadController(QObject):
 
         for track_id in request.track_ids:
             self._set_track_download_state(track_id, DownloadState.LOADING)
+        self._active_request = request
         self._active_track_ids = set(request.track_ids)
 
         self._overlay.start_batch(self._download_mode_label(request.mode), len(request.track_ids))
@@ -131,6 +135,7 @@ class LyricsDownloadController(QObject):
         state = DownloadState.SUCCESS if ok else DownloadState.ERROR
         self._set_track_download_state(int(track_id), state)
         self._overlay.append_result(track_label, msg, ok)
+        self._record_download_history(int(track_id), track_label, msg)
 
         token = self._state_tokens.get(int(track_id), 0) + 1
         self._state_tokens[int(track_id)] = token
@@ -155,6 +160,10 @@ class LyricsDownloadController(QObject):
             self._refresh_visible_library_view()
         except Exception as exc:
             logger.warning("Failed to refresh current view after lyrics download: %s", exc)
+        try:
+            self._refresh_history()
+        except Exception as exc:
+            logger.warning("Failed to refresh history after lyrics download: %s", exc)
 
         stats_dict: BulkDownloadStats = {
             "total": int(stats.get("total", 0)) if isinstance(stats, dict) else 0,
@@ -172,6 +181,7 @@ class LyricsDownloadController(QObject):
         else:
             self._app_state.notify("Lyrics downloaded successfully.", "success")
         self._download_worker = None
+        self._active_request = None
 
     def _reset_track_download_state_if_unchanged(
         self,
@@ -184,6 +194,58 @@ class LyricsDownloadController(QObject):
         if self._get_track_download_state(int(track_id)) != expected_state:
             return
         self._set_track_download_state(int(track_id), DownloadState.IDLE)
+
+    def _record_download_history(self, track_id: int, track_label: str, message: str) -> None:
+        try:
+            track = get_track_by_id(self._app_state.db, int(track_id))
+            title = str(track.title or "").strip()
+            artist_name = str(track.artist_name or "").strip()
+            album_name = str(track.album_name or "").strip()
+        except Exception:
+            title = ""
+            artist_name = ""
+            album_name = ""
+
+        label = (track_label or "").strip()
+        if not title and label:
+            parts = [part.strip() for part in label.split(" - ", 1)]
+            if len(parts) == 2:
+                artist_name = artist_name or parts[0]
+                title = title or parts[1]
+            else:
+                title = label
+
+        normalized_message = (message or "").strip()
+        lowered = normalized_message.casefold()
+        if "synced lyrics" in lowered:
+            status = "synced"
+        elif "plain lyrics" in lowered:
+            status = "plain"
+        elif "instrumental" in lowered:
+            status = "instrumental"
+        elif "does not exist" in lowered or "not found" in lowered:
+            status = "not_found"
+        else:
+            status = "error"
+
+        request = self._active_request
+        lrclib_instance = request.lrclib_instance if request is not None else ""
+        mode = request.mode if request is not None else self._resolve_download_mode("use_global")
+
+        try:
+            record_download_history(
+                self._app_state.db,
+                track_id=int(track_id),
+                title=title,
+                artist_name=artist_name,
+                album_name=album_name,
+                download_mode=mode,
+                download_status=status,
+                message=normalized_message,
+                lrclib_instance=lrclib_instance,
+            )
+        except Exception as exc:
+            logger.warning("Failed to record download history for %s: %s", track_id, exc)
 
     @staticmethod
     def _download_mode_label(mode: str) -> str:

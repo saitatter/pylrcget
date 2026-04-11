@@ -6,6 +6,7 @@ import unittest
 from pathlib import Path
 
 from tests import test_support as _test_support  # noqa: F401
+from db.database import CURRENT_DB_VERSION
 from db.migrations import upgrade_database_if_needed
 
 
@@ -37,7 +38,7 @@ class MigrationTests(unittest.TestCase):
                 self.assertIsNotNone(row)
                 self.assertEqual(row["download_lyrics_mode"], "synced_only")
                 version = int(db.execute("PRAGMA user_version").fetchone()[0])
-                self.assertEqual(version, 21)
+                self.assertEqual(version, CURRENT_DB_VERSION)
             finally:
                 db.close()
 
@@ -66,7 +67,7 @@ class MigrationTests(unittest.TestCase):
                 self.assertIsNotNone(row)
                 self.assertEqual(row["download_lyrics_mode"], "synced_only")
                 version = int(db.execute("PRAGMA user_version").fetchone()[0])
-                self.assertEqual(version, 21)
+                self.assertEqual(version, CURRENT_DB_VERSION)
             finally:
                 db.close()
 

@@ -240,6 +240,7 @@ class MainWindow(QMainWindow):
             current_player_track_id=self._current_player_track_id,
             set_track_lyrics_views=self._set_track_lyrics_views,
             refresh_visible_library_view=self._refresh_visible_library_view_after_downloads,
+            refresh_history=self.mylrclib_tab.refresh,
             set_track_download_state=self._set_track_download_state_all,
             get_track_download_state=self._get_primary_track_download_state,
             parent=self,
