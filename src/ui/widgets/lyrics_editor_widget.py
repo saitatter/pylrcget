@@ -138,6 +138,7 @@ class LyricsEditorWidget(QWidget):
     publishPlainRequested = Signal()
     saveRequested = Signal(str, str)     # lrc_text, plain_text
     downloadRequested = Signal()
+    exportFilesRequested = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -178,6 +179,7 @@ class LyricsEditorWidget(QWidget):
         self.btn_add = QPushButton("+ Line")
         self.btn_del = QPushButton("Delete")
         self.btn_save = QPushButton("Save")
+        self.btn_export_files = QPushButton("Export Files")
 
         self.btn_snap.setEnabled(False)
         self.btn_shift_minus.setEnabled(False)
@@ -188,6 +190,7 @@ class LyricsEditorWidget(QWidget):
         self.btn_add.setEnabled(False)
         self.btn_del.setEnabled(False)
         self.btn_save.setEnabled(False)
+        self.btn_export_files.setEnabled(False)
 
         self.btn_snap.clicked.connect(self._snap_selected_line_to_current_time)
         self.btn_shift_minus.clicked.connect(lambda: self._shift_selected_lines(-100))
@@ -197,6 +200,7 @@ class LyricsEditorWidget(QWidget):
         self.btn_add.clicked.connect(self._add_line_after_selection)
         self.btn_del.clicked.connect(self._delete_selected_line)
         self.btn_save.clicked.connect(self._emit_save)
+        self.btn_export_files.clicked.connect(self.exportFilesRequested.emit)
 
         header.addWidget(self.btn_snap)
         header.addWidget(self.btn_shift_minus)
@@ -207,6 +211,7 @@ class LyricsEditorWidget(QWidget):
         header.addWidget(self.btn_add)
         header.addWidget(self.btn_del)
         header.addWidget(self.btn_save)
+        header.addWidget(self.btn_export_files)
 
         self.btn_publish_synced = QPushButton("Publish Synced")
         self.btn_publish_plain = QPushButton("Publish Plain")
@@ -257,6 +262,7 @@ class LyricsEditorWidget(QWidget):
 
         self._default_button_text = {
             self.btn_save: "Save",
+            self.btn_export_files: "Export Files",
             self.btn_publish_synced: "Publish Synced",
             self.btn_publish_plain: "Publish Plain",
         }
@@ -380,6 +386,7 @@ class LyricsEditorWidget(QWidget):
         self.btn_add.setEnabled(False)
         self.btn_del.setEnabled(False)
         self.btn_save.setEnabled(False)
+        self.btn_export_files.setEnabled(False)
 
     def _set_plain(self, txt: str):
         self._reset_state()
@@ -398,6 +405,7 @@ class LyricsEditorWidget(QWidget):
         self.shift_spin.setEnabled(False)
         self.btn_shift_selected.setEnabled(False)
         self.btn_shift_all_from_first.setEnabled(False)
+        self.btn_export_files.setEnabled(True)
 
     def _set_synced(self, pairs: List[Tuple[int, str]]):
         self._reset_state()
@@ -435,6 +443,7 @@ class LyricsEditorWidget(QWidget):
         self.shift_spin.setEnabled(has_selection)
         self.btn_shift_selected.setEnabled(has_selection)
         self.btn_save.setEnabled(not self._invalid_rows)
+        self.btn_export_files.setEnabled(True)
 
     def _rebuild_times_cache(self):
         times: List[int] = []
@@ -781,6 +790,9 @@ class LyricsEditorWidget(QWidget):
         button = self.btn_publish_synced if is_synced else self.btn_publish_plain
         self._set_button_feedback(button, state, message)
 
+    def set_export_feedback(self, state: str, message: str | None = None) -> None:
+        self._set_button_feedback(self.btn_export_files, state, message)
+
     def _set_button_feedback(self, button: QPushButton, state: str, message: str | None = None) -> None:
         default_text = self._default_button_text.get(button, button.text())
         text = message or {
@@ -807,6 +819,8 @@ class LyricsEditorWidget(QWidget):
         button.update()
         if button is self.btn_save:
             self._update_save_enabled()
+        elif button is self.btn_export_files:
+            button.setEnabled(self.stack.currentWidget() in {self.table, self.plain})
         elif button is self.btn_publish_synced:
             button.setEnabled(self._publish_synced_available)
         elif button is self.btn_publish_plain:

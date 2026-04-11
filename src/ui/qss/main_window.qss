@@ -67,6 +67,90 @@ QWidget#ScanRow {
     border-top: 1px solid {{color-border-strong}};
 }
 
+QWidget#DownloadOverlay {
+    background: {{color-overlay-scrim}};
+}
+
+QFrame#DownloadOverlayCard {
+    min-width: 720px;
+    max-width: 820px;
+    min-height: 500px;
+    background: {{color-bg-panel}};
+    border: 1px solid {{color-border-strong}};
+    border-radius: {{radius-xl}};
+}
+
+QLabel#DownloadOverlayTitle {
+    color: {{color-text-strong}};
+    font-size: 30px;
+    font-weight: 700;
+}
+
+QToolButton#DownloadOverlayClose {
+    min-width: 32px;
+    min-height: 32px;
+    font-size: 20px;
+    font-weight: 600;
+    color: {{color-text-soft}};
+    border-radius: {{radius-pill}};
+}
+
+QToolButton#DownloadOverlayClose:hover {
+    color: {{color-accent}};
+    background: {{color-bg-control}};
+}
+
+QProgressBar#DownloadOverlayProgress {
+    background: {{color-bg-control}};
+    border: none;
+    border-radius: 999px;
+    min-height: 14px;
+}
+
+QProgressBar#DownloadOverlayProgress::chunk {
+    border-radius: 999px;
+    background: qlineargradient(
+        x1: 0, y1: 0, x2: 1, y2: 0,
+        stop: 0 {{color-slider-fill-start}}, stop: 1 {{color-slider-fill-end}}
+    );
+}
+
+QLabel#DownloadOverlaySummaryOk {
+    color: {{color-success-text}};
+    font-size: {{font-size-sm}};
+    font-weight: 700;
+}
+
+QLabel#DownloadOverlaySummaryFail {
+    color: {{color-error-text}};
+    font-size: {{font-size-sm}};
+    font-weight: 700;
+}
+
+QLabel#DownloadOverlayStatus {
+    color: {{color-text-soft}};
+    font-size: {{font-size-sm}};
+}
+
+QTextEdit#DownloadOverlayLog {
+    background: {{color-bg-app}};
+    border: 1px solid {{color-border}};
+    border-radius: {{radius-lg}};
+    color: {{color-text}};
+    padding: 8px;
+    selection-background-color: {{color-selection-bg}};
+    selection-color: {{color-selection-text}};
+    font-size: {{font-size-sm}};
+}
+
+QPushButton#DownloadOverlayStop {
+    min-width: 140px;
+    min-height: 44px;
+    border-radius: {{radius-pill}};
+    font-size: {{font-size-md}};
+    font-weight: 700;
+}
+
 QWidget#LibraryNavBar {
     background: {{color-bg-panel}};
     border: 1px solid {{color-border-strong}};

@@ -4,6 +4,9 @@ from PySide6.QtCore import QEvent, QRect, QSize, Qt, Signal
 from PySide6.QtGui import QColor, QCursor, QFont, QFontMetrics, QPainter
 from PySide6.QtWidgets import QApplication, QStyle, QStyledItemDelegate
 
+from core.tracklist_models import TrackListRow
+from ui.theme_tokens import STYLE_TOKENS
+
 
 class TrackInfoDelegate(QStyledItemDelegate):
     artistClicked = Signal(int)
@@ -21,7 +24,7 @@ class TrackInfoDelegate(QStyledItemDelegate):
         return text
 
     def paint(self, painter: QPainter, option, index) -> None:
-        row = index.data(Qt.UserRole)
+        row: TrackListRow | None = index.data(Qt.UserRole)
         if not row:
             super().paint(painter, option, index)
             return
@@ -39,8 +42,12 @@ class TrackInfoDelegate(QStyledItemDelegate):
 
         is_selected = bool(option.state & option.state.State_Selected)
         title_color = option.palette.highlightedText().color() if is_selected else option.palette.text().color()
-        meta_color = option.palette.highlightedText().color() if is_selected else QColor("#94a3b8")
-        link_color = option.palette.highlightedText().color() if is_selected else QColor("#60a5fa")
+        meta_color = option.palette.highlightedText().color() if is_selected else QColor(
+            STYLE_TOKENS.get("color-text-soft", "#94a3b8")
+        )
+        link_color = option.palette.highlightedText().color() if is_selected else QColor(
+            STYLE_TOKENS.get("color-accent-alt", "#60a5fa")
+        )
 
         title_metrics = QFontMetrics(title_font)
         meta_metrics = QFontMetrics(meta_font)
@@ -86,10 +93,11 @@ class TrackInfoDelegate(QStyledItemDelegate):
         size = super().sizeHint(option, index)
         return QSize(size.width(), max(size.height(), 44))
 
-    def editorEvent(self, event, model, option, index):
+    def editorEvent(self, event, model, option, index) -> bool:
+        del model
         if index.column() != 0:
             return False
-        row = index.data(Qt.UserRole)
+        row: TrackListRow | None = index.data(Qt.UserRole)
         if not row:
             return False
 
@@ -113,7 +121,7 @@ class TrackInfoDelegate(QStyledItemDelegate):
                 return True
         return False
 
-    def _hit_target(self, rect: QRect, base_font: QFont, row, pos) -> str | None:
+    def _hit_target(self, rect: QRect, base_font: QFont, row: TrackListRow, pos) -> str | None:
         content = rect.adjusted(10, 6, -10, -6)
         meta_font = QFont(base_font)
         meta_font.setPointSize(max(meta_font.pointSize() - 1, 9))
@@ -133,7 +141,12 @@ class TrackInfoDelegate(QStyledItemDelegate):
 
         return None
 
-    def _metadata_layout(self, meta_rect: QRect, metrics: QFontMetrics, row) -> tuple[str, str, str, QRect, QRect]:
+    def _metadata_layout(
+        self,
+        meta_rect: QRect,
+        metrics: QFontMetrics,
+        row: TrackListRow,
+    ) -> tuple[str, str, str, QRect, QRect]:
         album_display = self._clean_metadata(row.album, kind="album") or "N/A"
         artist_display = self._clean_metadata(row.artist, kind="artist") or "N/A"
         separator = " | "

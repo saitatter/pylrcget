@@ -15,12 +15,16 @@ from ui.delegates.actions_delegate import ActionsDelegate
 from ui.delegates.track_info_delegate import TrackInfoDelegate
 from ui.style_loader import load_stylesheet
 from ui.widgets.sortable_header_view import SortableHeaderView
-from core.tracklist_models import TrackListRow
+from ui.widgets.library_table_utils import should_load_more
+from ui.widgets.track_list_rows import build_track_list_rows
+from core.tracklist_models import DownloadState
 
 
 class TrackListWidget(QWidget):
     playTrack = Signal(int)       # track_id
     downloadLyrics = Signal(int)  # track_id
+    exportLyricsFiles = Signal(int)  # track_id
+    bulkDownloadRequested = Signal(list, str)  # track_ids, mode
     openArtist = Signal(int)
     openAlbum = Signal(int)
     navigateRequested = Signal(object)
@@ -47,7 +51,7 @@ class TrackListWidget(QWidget):
         self._album_ids: list[int] | None = None
         self._scope_label: str = ""
         self._scope_banner_enabled = True
-        self._download_states: dict[int, str] = {}
+        self._download_states: dict[int, DownloadState] = {}
         self._sort_column = 0
         self._sort_order = Qt.SortOrder.AscendingOrder
         self._has_more_rows = False
@@ -238,37 +242,7 @@ class TrackListWidget(QWidget):
         self._has_more_rows = len(rows) > self._page_size
         visible_rows = rows[: self._page_size]
 
-        ui_rows: list[TrackListRow] = []
-        for r in visible_rows:
-            instrumental = bool(r["instrumental"])
-            lrc = r["lrc_lyrics"]
-            txt = r["txt_lyrics"]
-
-            if instrumental:
-                state = "instrumental"
-            elif lrc and lrc != "[au: instrumental]":
-                state = "synced"
-            elif txt:
-                state = "plain"
-            else:
-                state = "none"
-
-            dur = r["duration"]
-            dur_s = int(round(dur)) if dur is not None else None
-
-            ui_rows.append(
-                TrackListRow(
-                    track_id=int(r["id"]),
-                    title=r["title"] or "",
-                    artist=r["artist_name"],
-                    artist_id=int(r["artist_id"]) if r["artist_id"] is not None else None,
-                    album=r["album_name"] or "",
-                    album_id=int(r["album_id"]) if r["album_id"] is not None else None,
-                    duration_s=dur_s,
-                    lyrics_state=state,
-                    download_state=self._download_states.get(int(r["id"]), "idle"),
-                )
-            )
+        ui_rows = build_track_list_rows(visible_rows, self._download_states)
 
         if reset:
             self.model.set_rows(ui_rows)
@@ -333,11 +307,15 @@ class TrackListWidget(QWidget):
         quick.setEnabled(False)
         act_play = menu.addAction("Play now")
         act_dl = menu.addAction("Download lyrics for this track")
+        act_export = menu.addAction("Export lyrics files for this track")
 
         menu.addSeparator()
         bulk = menu.addAction("Selection Actions")
         bulk.setEnabled(False)
         count_suffix = f"({len(selected_ids)})"
+        act_dl_selected = menu.addAction(f"Download selection using current mode {count_suffix}")
+        act_dl_synced = menu.addAction(f"Download selection as synced only {count_suffix}")
+        act_dl_plain = menu.addAction(f"Download selection as plain only {count_suffix}")
         act_instr = menu.addAction(f"Mark selection as instrumental {count_suffix}")
         act_uninstr = menu.addAction(f"Unmark instrumental on selection {count_suffix}")
 
@@ -348,6 +326,15 @@ class TrackListWidget(QWidget):
         elif chosen == act_dl:
             if current_track_id is not None:
                 self.downloadLyrics.emit(int(current_track_id))
+        elif chosen == act_export:
+            if current_track_id is not None:
+                self.exportLyricsFiles.emit(int(current_track_id))
+        elif chosen == act_dl_selected:
+            self.bulkDownloadRequested.emit(selected_ids, "use_global")
+        elif chosen == act_dl_synced:
+            self.bulkDownloadRequested.emit(selected_ids, "synced_only")
+        elif chosen == act_dl_plain:
+            self.bulkDownloadRequested.emit(selected_ids, "plain_only")
         elif chosen == act_instr:
             self.markInstrumental.emit(selected_ids)
         elif chosen == act_uninstr:
@@ -500,15 +487,19 @@ class TrackListWidget(QWidget):
         elif self._empty_action == "configure-folders":
             self.configureFoldersRequested.emit()
 
-    def set_download_state(self, track_id: int, state: str) -> None:
-        self._download_states[int(track_id)] = state
+    def set_download_state(self, track_id: int, state: str | DownloadState) -> None:
+        normalized = state if isinstance(state, DownloadState) else DownloadState(str(state))
+        self._download_states[int(track_id)] = normalized
         row = self.model.row_for_track_id(int(track_id))
         if row < 0:
             return
         current = self.model._rows[row]
-        self.model._rows[row] = replace(current, download_state=state)
+        self.model._rows[row] = replace(current, download_state=normalized)
         idx = self.model.index(row, 3)
         self.model.dataChanged.emit(idx, idx, [Qt.DisplayRole, Qt.UserRole])
+
+    def get_download_state(self, track_id: int) -> DownloadState:
+        return self._download_states.get(int(track_id), DownloadState.IDLE)
 
     def _on_sort_changed(self, column: int, order: Qt.SortOrder) -> None:
         if column == 3:
@@ -519,10 +510,14 @@ class TrackListWidget(QWidget):
             self.refresh()
 
     def _maybe_load_more(self, value: int) -> None:
-        if not self._has_more_rows or self._loading_more:
-            return
         scroll = self.table.verticalScrollBar()
-        if value < max(0, scroll.maximum() - 120):
+        if not should_load_more(
+            has_more_rows=self._has_more_rows,
+            loading_more=self._loading_more,
+            is_browser_visible=True,
+            value=value,
+            maximum=scroll.maximum(),
+        ):
             return
         self._loading_more = True
         try:

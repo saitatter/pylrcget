@@ -13,6 +13,7 @@ from mutagen.dsf import DSF
 from mutagen.dsdiff import DSDIFF
 from mutagen.id3 import ID3, USLT, TXXX, ID3NoHeaderError
 from mutagen.flac import FLAC
+from mutagen.musepack import Musepack
 from mutagen.oggvorbis import OggVorbis
 from mutagen.oggopus import OggOpus
 from mutagen.mp4 import MP4
@@ -28,10 +29,12 @@ from core.embed_lyrics import (
 
 logger = logging.getLogger(__name__)
 
-AUDIO_EXTS = {".mp3", ".m4a", ".flac", ".ogg", ".opus", ".wav", ".wma", ".asf", ".dsf", ".dff"}
+AUDIO_EXTS = {".mp3", ".m4a", ".flac", ".ogg", ".opus", ".wav", ".wma", ".asf", ".dsf", ".dff", ".mpc"}
 
 ASF_PLAIN_KEYS = ("WM/Lyrics", "LYRICS", "UNSYNCEDLYRICS")
 ASF_SYNCED_KEYS = ("LRCLIB_LRC", "SYNCEDLYRICS")
+APE_PLAIN_KEYS = ("UNSYNCEDLYRICS", "lyrics")
+APE_SYNCED_KEYS = ("LYRICS", "LRCLIB_LRC")
 
 
 def _split_lines(block: str | None) -> list[str]:
@@ -359,6 +362,28 @@ def read_embedded_lyrics(path: str) -> Tuple[Optional[str], Optional[str]]:
 
             plain = _first_asf_text(ASF_PLAIN_KEYS)
             synced = _first_asf_text(ASF_SYNCED_KEYS)
+
+        elif ext == ".mpc":
+            audio = Musepack(path)
+            tags = getattr(audio, "tags", None)
+
+            def _first_ape_text(keys: tuple[str, ...]) -> Optional[str]:
+                if not tags:
+                    return None
+                for key in keys:
+                    value = tags.get(key)
+                    if not value:
+                        continue
+                    if isinstance(value, (list, tuple)) and value:
+                        rendered = str(value[0]).strip()
+                    else:
+                        rendered = str(value).strip()
+                    if rendered:
+                        return rendered
+                return None
+
+            plain = _first_ape_text(APE_PLAIN_KEYS)
+            synced = _first_ape_text(APE_SYNCED_KEYS)
 
         else:
             # Fallback generic MutagenFile with common keys

@@ -26,6 +26,10 @@ def upgrade_database_if_needed(db: sqlite3.Connection, existing_version: int) ->
     if existing_version >= CURRENT_DB_VERSION:
         return
 
+    def _column_exists(table: str, column: str) -> bool:
+        rows = db.execute(f"PRAGMA table_info({table})").fetchall()
+        return any(row["name"] == column for row in rows)
+
     # v1
     if existing_version <= 0:
         print("Migrate database version 1...")
@@ -209,3 +213,87 @@ def upgrade_database_if_needed(db: sqlite3.Connection, existing_version: int) ->
         """)
         db.commit()
         db.execute("PRAGMA user_version=18")
+
+    # v19
+    if existing_version <= 18:
+        print("Migrate database version 19...")
+        db.executescript("""
+            CREATE TABLE IF NOT EXISTS publish_history (
+                id INTEGER PRIMARY KEY,
+                track_id INTEGER,
+                title TEXT NOT NULL,
+                artist_name TEXT NOT NULL,
+                album_name TEXT NOT NULL,
+                publish_kind TEXT NOT NULL,
+                publish_status TEXT NOT NULL DEFAULT 'Published',
+                lrclib_instance TEXT NOT NULL,
+                published_at TEXT NOT NULL
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_publish_history_published_at
+                ON publish_history(published_at DESC, id DESC);
+            CREATE INDEX IF NOT EXISTS idx_publish_history_track_id
+                ON publish_history(track_id);
+        """)
+        db.commit()
+        db.execute("PRAGMA user_version=19")
+
+    # v20
+    if existing_version <= 19:
+        print("Migrate database version 20...")
+        if not _column_exists("config_data", "download_lyrics_mode"):
+            db.execute(
+                "ALTER TABLE config_data ADD COLUMN download_lyrics_mode TEXT DEFAULT 'prefer_synced'"
+            )
+        db.commit()
+        db.execute("PRAGMA user_version=20")
+
+    # v21
+    if existing_version <= 20:
+        print("Migrate database version 21...")
+        # Keep this guard for compatibility with development databases that reached
+        # user_version=20 before download_lyrics_mode was finalized.
+        if not _column_exists("config_data", "download_lyrics_mode"):
+            db.execute(
+                "ALTER TABLE config_data ADD COLUMN download_lyrics_mode TEXT DEFAULT 'prefer_synced'"
+            )
+
+        if _column_exists("config_data", "download_synced_only"):
+            db.execute("""
+                UPDATE config_data
+                SET download_lyrics_mode = CASE
+                    WHEN download_synced_only = 1 THEN 'synced_only'
+                    ELSE 'prefer_synced'
+                END
+                WHERE download_lyrics_mode = 'prefer_synced'
+                   OR download_lyrics_mode IS NULL
+                   OR TRIM(download_lyrics_mode) = ''
+            """)
+
+        db.commit()
+        db.execute("PRAGMA user_version=21")
+
+    # v22
+    if existing_version <= 21:
+        print("Migrate database version 22...")
+        db.executescript("""
+            CREATE TABLE IF NOT EXISTS download_history (
+                id INTEGER PRIMARY KEY,
+                track_id INTEGER,
+                title TEXT NOT NULL,
+                artist_name TEXT NOT NULL,
+                album_name TEXT NOT NULL,
+                download_mode TEXT NOT NULL,
+                download_status TEXT NOT NULL,
+                message TEXT NOT NULL,
+                lrclib_instance TEXT NOT NULL,
+                downloaded_at TEXT NOT NULL
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_download_history_downloaded_at
+                ON download_history(downloaded_at DESC, id DESC);
+            CREATE INDEX IF NOT EXISTS idx_download_history_track_id
+                ON download_history(track_id);
+        """)
+        db.commit()
+        db.execute("PRAGMA user_version=22")

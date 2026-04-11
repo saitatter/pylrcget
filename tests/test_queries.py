@@ -6,7 +6,14 @@ from pathlib import Path
 
 from tests.test_support import make_fs_track, touch_text
 from db.database import add_tracks, get_album_rows, initialize_database
-from db.queries import find_artist
+from db.queries import (
+    find_artist,
+    get_download_history_rows,
+    get_publish_history_rows,
+    record_download_history_batch,
+    record_download_history,
+    record_publish_history,
+)
 
 
 class ArtistAlbumQueryTests(unittest.TestCase):
@@ -69,5 +76,138 @@ class ArtistAlbumQueryTests(unittest.TestCase):
 
                 rows = get_album_rows(db, limit=2, offset=1, sort_column=0, sort_order="asc")
                 self.assertEqual([row["album_name"] for row in rows], ["Beta", "Gamma"])
+            finally:
+                db.close()
+
+
+class PublishHistoryQueryTests(unittest.TestCase):
+    def test_record_publish_history_persists_and_sorts_latest_first(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db = initialize_database(tmp)
+            try:
+                audio = Path(tmp) / "song.mp3"
+                touch_text(audio, "a")
+                add_tracks(db, [make_fs_track(audio, artist="Artist A", album="Album A", title="Song A")])
+
+                track = db.execute("SELECT id FROM tracks LIMIT 1").fetchone()
+                self.assertIsNotNone(track)
+
+                first_id = record_publish_history(
+                    db,
+                    track_id=int(track["id"]),
+                    title="Song A",
+                    artist_name="Artist A",
+                    album_name="Album A",
+                    publish_kind="plain",
+                    lrclib_instance="https://lrclib.net/api",
+                )
+                second_id = record_publish_history(
+                    db,
+                    track_id=int(track["id"]),
+                    title="Song A",
+                    artist_name="Artist A",
+                    album_name="Album A",
+                    publish_kind="synced",
+                    lrclib_instance="https://lrclib.net/api",
+                )
+
+                rows = get_publish_history_rows(db)
+                self.assertEqual(len(rows), 2)
+                self.assertEqual(int(rows[0]["id"]), second_id)
+                self.assertEqual(rows[0]["publish_kind"], "synced")
+                self.assertEqual(rows[0]["publish_status"], "Published")
+                self.assertEqual(int(rows[0]["track_exists"]), 1)
+                self.assertEqual(int(rows[1]["id"]), first_id)
+            finally:
+                db.close()
+
+
+class DownloadHistoryQueryTests(unittest.TestCase):
+    def test_record_download_history_persists_and_sorts_latest_first(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db = initialize_database(tmp)
+            try:
+                audio = Path(tmp) / "song.mp3"
+                touch_text(audio, "a")
+                add_tracks(db, [make_fs_track(audio, artist="Artist A", album="Album A", title="Song A")])
+
+                track = db.execute("SELECT id FROM tracks LIMIT 1").fetchone()
+                self.assertIsNotNone(track)
+
+                first_id = record_download_history(
+                    db,
+                    track_id=int(track["id"]),
+                    title="Song A",
+                    artist_name="Artist A",
+                    album_name="Album A",
+                    download_mode="prefer_synced",
+                    download_status="plain",
+                    message="Downloaded plain lyrics.",
+                    lrclib_instance="https://lrclib.net/api",
+                )
+                second_id = record_download_history(
+                    db,
+                    track_id=int(track["id"]),
+                    title="Song A",
+                    artist_name="Artist A",
+                    album_name="Album A",
+                    download_mode="synced_only",
+                    download_status="synced",
+                    message="Downloaded synced lyrics.",
+                    lrclib_instance="https://lrclib.net/api",
+                )
+
+                rows = get_download_history_rows(db)
+                self.assertEqual(len(rows), 2)
+                self.assertEqual(int(rows[0]["id"]), second_id)
+                self.assertEqual(rows[0]["download_status"], "synced")
+                self.assertEqual(rows[0]["download_mode"], "synced_only")
+                self.assertEqual(int(rows[0]["track_exists"]), 1)
+                self.assertEqual(int(rows[1]["id"]), first_id)
+            finally:
+                db.close()
+
+    def test_record_download_history_batch_persists_multiple_rows(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db = initialize_database(tmp)
+            try:
+                audio = Path(tmp) / "song.mp3"
+                touch_text(audio, "a")
+                add_tracks(db, [make_fs_track(audio, artist="Artist A", album="Album A", title="Song A")])
+                track = db.execute("SELECT id FROM tracks LIMIT 1").fetchone()
+                self.assertIsNotNone(track)
+
+                record_download_history_batch(
+                    db,
+                    [
+                        {
+                            "track_id": int(track["id"]),
+                            "title": "Song A",
+                            "artist_name": "Artist A",
+                            "album_name": "Album A",
+                            "download_mode": "prefer_synced",
+                            "download_status": "plain",
+                            "message": "Downloaded plain lyrics.",
+                            "lrclib_instance": "https://lrclib.net/api",
+                            "downloaded_at": "2026-04-12 10:00:00 UTC",
+                        },
+                        {
+                            "track_id": int(track["id"]),
+                            "title": "Song A",
+                            "artist_name": "Artist A",
+                            "album_name": "Album A",
+                            "download_mode": "synced_only",
+                            "download_status": "synced",
+                            "message": "Downloaded synced lyrics.",
+                            "lrclib_instance": "https://lrclib.net/api",
+                            "downloaded_at": "2026-04-12 10:00:01 UTC",
+                        },
+                    ],
+                )
+
+                rows = get_download_history_rows(db)
+                self.assertEqual(len(rows), 2)
+                self.assertEqual(rows[0]["download_status"], "synced")
+                self.assertEqual(rows[1]["download_status"], "plain")
             finally:
                 db.close()

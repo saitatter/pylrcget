@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import Iterable
 
 from PySide6.QtCore import Qt, Signal, QModelIndex, QItemSelectionModel
@@ -12,20 +11,22 @@ from ui.style_loader import load_stylesheet
 from ui.library_routes import LibraryRoute, artists_detail
 from ui.widgets.album_list_widget import AlbumListWidget
 from ui.widgets.empty_state_widget import EmptyStateWidget
+from ui.widgets.library_rows import ArtistListRow
+from ui.widgets.library_table_utils import (
+    build_text_item,
+    display_artist_name,
+    find_display_row,
+    normalize_id_bucket,
+    should_load_more,
+)
 from ui.widgets.sortable_header_view import SortableHeaderView
-
-
-@dataclass(frozen=True)
-class ArtistListRow:
-    artist_ids: tuple[int, ...]
-    artist: str
-    albums: int
-    tracks: int
 
 
 class ArtistListWidget(QWidget):
     playTrack = Signal(int)
     downloadLyrics = Signal(int)
+    exportLyricsFiles = Signal(int)
+    bulkDownloadRequested = Signal(list, str)
     openArtist = Signal(int)
     openAlbum = Signal(int)
     markInstrumental = Signal(list)
@@ -99,6 +100,8 @@ class ArtistListWidget(QWidget):
         self.album_browser.setRouteTab("artists")
         self.album_browser.playTrack.connect(self.playTrack.emit)
         self.album_browser.downloadLyrics.connect(self.downloadLyrics.emit)
+        self.album_browser.exportLyricsFiles.connect(self.exportLyricsFiles.emit)
+        self.album_browser.bulkDownloadRequested.connect(self.bulkDownloadRequested.emit)
         self.album_browser.openArtist.connect(self.openArtist.emit)
         self.album_browser.openAlbum.connect(self.openAlbum.emit)
         self.album_browser.navigateRequested.connect(self.navigateRequested.emit)
@@ -114,21 +117,6 @@ class ArtistListWidget(QWidget):
 
         self._apply_styles()
         self._empty_action = ""
-
-    @staticmethod
-    def _display_artist(value: str | None) -> str:
-        text = (value or "").strip()
-        if text.casefold() in {"", "artist", "unknown artist"}:
-            return "N/A"
-        return text
-
-    @staticmethod
-    def _normalize_artist_ids(value) -> tuple[int, ...]:
-        if value is None:
-            return ()
-        if isinstance(value, (list, tuple)):
-            return tuple(int(v) for v in value)
-        return (int(value),)
 
     def setActive(self, active: bool):
         self._active = active
@@ -158,6 +146,12 @@ class ArtistListWidget(QWidget):
 
     def refresh(self):
         self._load_rows(reset=True)
+
+    def set_download_state(self, track_id: int, state: str) -> None:
+        self.album_browser.set_download_state(track_id, state)
+
+    def get_download_state(self, track_id: int) -> str:
+        return self.album_browser.get_download_state(track_id)
 
     def _load_rows(self, *, reset: bool) -> None:
         from db.database import get_artist_rows
@@ -196,7 +190,7 @@ class ArtistListWidget(QWidget):
         for r in visible_rows:
             artist_id = int(r["artist_id"])
             artist_name = r["artist_name"] or ""
-            display_artist = self._display_artist(artist_name)
+            display_artist = display_artist_name(artist_name)
             if display_artist == "N/A":
                 self._unknown_artist_ids.append(artist_id)
                 self._unknown_album_count += int(r.get("album_count") or 0)
@@ -237,9 +231,9 @@ class ArtistListWidget(QWidget):
         self.model.setRowCount(0)
         for r in rows:
             items = [
-                self._item_text(r.artist, r.artist_ids),
-                self._item_text(str(r.albums), r.artist_ids, align=Qt.AlignmentFlag.AlignCenter),
-                self._item_text(str(r.tracks), r.artist_ids, align=Qt.AlignmentFlag.AlignCenter),
+                build_text_item(r.artist, r.artist_ids),
+                build_text_item(str(r.albums), r.artist_ids, align=Qt.AlignmentFlag.AlignCenter),
+                build_text_item(str(r.tracks), r.artist_ids, align=Qt.AlignmentFlag.AlignCenter),
             ]
             self.model.appendRow(items)
 
@@ -250,15 +244,15 @@ class ArtistListWidget(QWidget):
             self.model.setRowCount(0)
         for r in rows:
             items = [
-                self._item_text(r.artist, r.artist_ids),
-                self._item_text(str(r.albums), r.artist_ids, align=Qt.AlignmentFlag.AlignCenter),
-                self._item_text(str(r.tracks), r.artist_ids, align=Qt.AlignmentFlag.AlignCenter),
+                build_text_item(r.artist, r.artist_ids),
+                build_text_item(str(r.albums), r.artist_ids, align=Qt.AlignmentFlag.AlignCenter),
+                build_text_item(str(r.tracks), r.artist_ids, align=Qt.AlignmentFlag.AlignCenter),
             ]
             self.model.appendRow(items)
 
     def _show_artist_albums(self, artist_id: int | list[int] | tuple[int, ...], artist_name: str) -> None:
         artist_ids = [int(v) for v in artist_id] if isinstance(artist_id, (list, tuple)) else [int(artist_id)]
-        self.album_browser.setArtistScope(artist_ids[0] if len(artist_ids) == 1 else artist_ids, self._display_artist(artist_name))
+        self.album_browser.setArtistScope(artist_ids[0] if len(artist_ids) == 1 else artist_ids, display_artist_name(artist_name))
         self.stack.setCurrentWidget(self.album_browser)
 
     def show_artist_albums(self, artist_id: int | list[int] | tuple[int, ...], artist_name: str = "") -> None:
@@ -279,7 +273,7 @@ class ArtistListWidget(QWidget):
             return
         artist_id = self.model.index(index.row(), 0).data(Qt.ItemDataRole.UserRole)
         artist_name = self.model.index(index.row(), 0).data(Qt.ItemDataRole.DisplayRole) or "N/A"
-        artist_ids = self._normalize_artist_ids(artist_id)
+        artist_ids = normalize_id_bucket(artist_id)
         if artist_ids:
             self.navigateRequested.emit(artists_detail(artist_ids, label=str(artist_name)))
 
@@ -293,7 +287,7 @@ class ArtistListWidget(QWidget):
             sm.setCurrentIndex(idx, QItemSelectionModel.ClearAndSelect | QItemSelectionModel.Rows)
 
         artist_id = self.model.index(idx.row(), 0).data(Qt.ItemDataRole.UserRole)
-        artist_ids = self._normalize_artist_ids(artist_id)
+        artist_ids = normalize_id_bucket(artist_id)
         if not artist_ids:
             return
         artist_name = self.model.index(idx.row(), 0).data(Qt.ItemDataRole.DisplayRole) or "N/A"
@@ -309,13 +303,6 @@ class ArtistListWidget(QWidget):
         chosen = menu.exec(self.table.viewport().mapToGlobal(pos))
         if chosen == act_open:
             self.navigateRequested.emit(artists_detail(artist_ids, label=str(artist_name)))
-
-    def _item_text(self, text: str, artist_id: int | tuple[int, ...], align: Qt.AlignmentFlag = Qt.AlignmentFlag.AlignVCenter):
-        it = QStandardItem(text)
-        it.setEditable(False)
-        it.setData(tuple(int(v) for v in artist_id) if isinstance(artist_id, tuple) else int(artist_id), Qt.ItemDataRole.UserRole)
-        it.setTextAlignment(align)
-        return it
 
     def _apply_styles(self):
         self.setStyleSheet(load_stylesheet("data_table.qss", table_name="ArtistTable"))
@@ -344,10 +331,7 @@ class ArtistListWidget(QWidget):
             self.clearSearchRequested.emit()
 
     def _find_unknown_row(self) -> int:
-        for row in range(self.model.rowCount()):
-            if self.model.index(row, 0).data(Qt.ItemDataRole.DisplayRole) == "N/A":
-                return row
-        return -1
+        return find_display_row(self.model, "N/A")
 
     def _sync_unknown_bucket(self) -> None:
         if not self._unknown_artist_ids:
@@ -360,9 +344,9 @@ class ArtistListWidget(QWidget):
         if row < 0:
             self.model.appendRow(
                 [
-                    self._item_text("N/A", tuple(self._unknown_artist_ids)),
-                    self._item_text(str(self._unknown_album_count), tuple(self._unknown_artist_ids), align=Qt.AlignmentFlag.AlignCenter),
-                    self._item_text(str(self._unknown_track_count), tuple(self._unknown_artist_ids), align=Qt.AlignmentFlag.AlignCenter),
+                    build_text_item("N/A", tuple(self._unknown_artist_ids)),
+                    build_text_item(str(self._unknown_album_count), tuple(self._unknown_artist_ids), align=Qt.AlignmentFlag.AlignCenter),
+                    build_text_item(str(self._unknown_track_count), tuple(self._unknown_artist_ids), align=Qt.AlignmentFlag.AlignCenter),
                 ]
             )
             return
@@ -380,15 +364,14 @@ class ArtistListWidget(QWidget):
             self.refresh()
 
     def _maybe_load_more(self, value: int) -> None:
-        if (
-            not self._has_more_rows
-            or self._loading_more
-            or self.stack.currentWidget() is not self.browser_page
-            or self.table.isHidden()
-        ):
-            return
         scroll = self.table.verticalScrollBar()
-        if value < max(0, scroll.maximum() - 120):
+        if not should_load_more(
+            has_more_rows=self._has_more_rows,
+            loading_more=self._loading_more,
+            is_browser_visible=self.stack.currentWidget() is self.browser_page and not self.table.isHidden(),
+            value=value,
+            maximum=scroll.maximum(),
+        ):
             return
         self._loading_more = True
         self._load_rows(reset=False)

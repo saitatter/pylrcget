@@ -1,6 +1,15 @@
 from PySide6.QtWidgets import (
-    QMainWindow, QWidget, QVBoxLayout, QLabel,
-    QTabWidget, QProgressBar, QMessageBox, QLineEdit, QHBoxLayout, QCheckBox, QSplitter, QBoxLayout, QPushButton, QApplication
+    QApplication,
+    QHBoxLayout,
+    QLabel,
+    QMainWindow,
+    QMessageBox,
+    QProgressBar,
+    QPushButton,
+    QSplitter,
+    QTabWidget,
+    QVBoxLayout,
+    QWidget,
 )
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QCloseEvent, QShortcut, QKeySequence
@@ -9,27 +18,44 @@ import os
 
 from dataclasses import replace
 
-from db.database import get_album_by_id, get_artist_by_id, get_config, get_directories, get_track_by_id, set_config
-from core.lyrics_sidecar import export_lyrics_sidecars
+from db.queries import (
+    get_album_by_id,
+    get_artist_by_id,
+    get_config,
+    get_directories,
+    get_track_by_id,
+    mark_tracks_instrumental,
+    set_config,
+    unmark_tracks_instrumental,
+    update_track_null_lyrics,
+    update_track_plain_lyrics,
+    update_track_synced_lyrics,
+)
 from ui.workers.library_scanner import LibraryScanner
+from ui.controllers.lyrics_download_controller import LyricsDownloadController
+from ui.controllers.navigation_controller import NavigationController
+from ui.controllers.publish_history_controller import PublishHistoryController
+from ui.controllers.top_bar_controller import TopBarController
 from ui.widgets.track_list_widget import TrackListWidget
 from ui.dialogs.music_folders_dialog import MusicFoldersDialog
+from ui.dialogs.about_dialog import AboutDialog
+from ui.icon_loader import load_app_icon
 from ui.player_bar import PlayerBar
 from ui.widgets.lyrics_editor_widget import LyricsEditorWidget
-from ui.dialogs.publish_lyrics_dialog import PublishLyricsDialog
 from ui.dialogs.first_run_dialog import FirstRunDialog
 from player.player import NowPlaying
-from core.embed_lyrics import embed_lyrics_for_track
+from ui.services.lyrics_download_service import sync_track_outputs_with_result
+from ui.services.feedback import exception_message, log_and_notify, normalize_notify_type, notify_user
 from ui.app_theme import apply_app_theme
 from ui.widgets.album_list_widget import AlbumListWidget
 from ui.widgets.artist_list_widget import ArtistListWidget
-from ui.library_routes import LibraryRoute, deserialize_route, route_breadcrumbs, serialize_route, tracks_album, tracks_all, tracks_artist
-from ui.icon_loader import load_svg_icon
+from ui.library_routes import LibraryRoute, tracks_album, tracks_all, tracks_artist
 from ui.spacing import SPACE_1, SPACE_2, SPACE_3, set_layout_spacing
 from ui.style_loader import load_stylesheet
 from ui.widgets.toast import ToastManager
-from PySide6.QtWidgets import QToolButton
 from ui.widgets.log_panel import LogPanel, QtLogHandler
+from ui.widgets.my_lrclib_widget import MyLrclibWidget
+from ui.widgets.download_progress_overlay import DownloadProgressOverlay
 
 logger = logging.getLogger(__name__)
 
@@ -52,6 +78,7 @@ class MainWindow(QMainWindow):
     def __init__(self, app_state):
         super().__init__()
         self.setWindowTitle("LrcGet")
+        self.setWindowIcon(load_app_icon())
         self.resize(900, 600)
         self.app_state = app_state
 
@@ -60,15 +87,7 @@ class MainWindow(QMainWindow):
         self._refresh_default_label = "Global Actions"
         self._pending_playback_speed: float | None = None
         self._pending_playback_volume: float | None = None
-        self._pending_library_route: str | None = None
-        self._nav_history: list[LibraryRoute] = []
-        self._nav_index: int = -1
-        self._current_route = tracks_all()
-        self._artist_label_cache: dict[int, str] = {}
-        self._album_label_cache: dict[int, str] = {}
         self._recent_toast_messages: set[str] = set()
-        self._nav_apply_in_progress = False
-        self._tab_sync_suppressed = False
         self.scanner = None
         self._playback_speed_save_timer = QTimer(self)
         self._playback_speed_save_timer.setSingleShot(True)
@@ -82,11 +101,6 @@ class MainWindow(QMainWindow):
         self._search_apply_timer.setSingleShot(True)
         self._search_apply_timer.setInterval(180)
         self._search_apply_timer.timeout.connect(self._apply_library_search)
-        self._route_save_timer = QTimer(self)
-        self._route_save_timer.setSingleShot(True)
-        self._route_save_timer.setInterval(250)
-        self._route_save_timer.timeout.connect(self._flush_library_route)
-
         # --- Player signals ---
         if self.app_state.player:
             self.app_state.player.trackChanged.connect(self._on_player_track_changed)
@@ -113,113 +127,16 @@ class MainWindow(QMainWindow):
         )
 
         # --- Top controls (search + filters) ---
-        self.top_bar = QWidget()
-        self.top_bar.setObjectName("TopBar")
-        top_bar = QHBoxLayout(self.top_bar)
-        self.top_bar_layout = top_bar
-        set_layout_spacing(top_bar, margins=SPACE_2, spacing=SPACE_2)
-
-        self.search_group = QWidget()
-        self.search_group.setObjectName("TopBarGroup")
-        search_layout = QVBoxLayout(self.search_group)
-        set_layout_spacing(search_layout, margins=SPACE_2, spacing=SPACE_1)
-
-        self.search_label = QLabel("Search Library")
-        self.search_label.setObjectName("TopBarLabel")
-        search_layout.addWidget(self.search_label)
-
-        self.search_box = QLineEdit()
-        self.search_box.setPlaceholderText("Search tracks / artists / albums...")
-        self.search_box.setObjectName("TopBarSearch")
-        self.search_box.setAccessibleName("Library search")
-        search_layout.addWidget(self.search_box)
-        top_bar.addWidget(self.search_group, stretch=3)
-
-        self.filters_group = QWidget()
-        self.filters_group.setObjectName("TopBarGroup")
-        filters_layout = QVBoxLayout(self.filters_group)
-        set_layout_spacing(filters_layout, margins=SPACE_2, spacing=SPACE_1)
-
-        self.filters_label = QLabel("Filter Lyrics")
-        self.filters_label.setObjectName("TopBarLabel")
-        filters_layout.addWidget(self.filters_label)
-
-        filters_row = QHBoxLayout()
-        set_layout_spacing(filters_row, spacing=SPACE_2)
-
-        self.chk_synced = QCheckBox("Synced")
-        self.chk_synced.setChecked(True)
-        self.chk_synced.setAccessibleName("Filter synced lyrics")
-        filters_row.addWidget(self.chk_synced)
-
-        self.chk_plain = QCheckBox("Plain")
-        self.chk_plain.setChecked(True)
-        self.chk_plain.setAccessibleName("Filter plain lyrics")
-        filters_row.addWidget(self.chk_plain)
-
-        self.chk_instr = QCheckBox("Instrumental")
-        self.chk_instr.setChecked(False)
-        self.chk_instr.setAccessibleName("Filter instrumental tracks")
-        filters_row.addWidget(self.chk_instr)
-
-        self.chk_none = QCheckBox("No lyrics")
-        self.chk_none.setChecked(True)
-        self.chk_none.setAccessibleName("Filter tracks without lyrics")
-        filters_row.addWidget(self.chk_none)
-        filters_row.addStretch(1)
-        filters_layout.addLayout(filters_row)
-        top_bar.addWidget(self.filters_group, stretch=2)
-
-        # --- Action icons (top-right) ---
-        self.actions_group = QWidget()
-        self.actions_group.setObjectName("TopBarGroup")
-        actions_layout = QVBoxLayout(self.actions_group)
-        set_layout_spacing(actions_layout, margins=SPACE_2, spacing=SPACE_1)
-
-        self.actions_label = QLabel("Global Actions")
-        self.actions_label.setObjectName("TopBarLabel")
-        actions_layout.addWidget(self.actions_label)
-
-        actions_row = QHBoxLayout()
-        set_layout_spacing(actions_row, spacing=SPACE_2)
-
-        self.btn_refresh = QToolButton()
-        self.btn_refresh.setObjectName("TopBarAction")
-        self.btn_refresh.setIcon(load_svg_icon("refresh-cw.svg", 18))
-        self.btn_refresh.setToolTip("Refresh library")
-        self.btn_refresh.setAccessibleName("Refresh library")
-        self.btn_refresh.clicked.connect(self.refresh_library)
-
-        self.btn_config = QToolButton()
-        self.btn_config.setObjectName("TopBarAction")
-        self.btn_config.setIcon(load_svg_icon("settings-2.svg", 18))
-        self.btn_config.setToolTip("Settings")
-        self.btn_config.setAccessibleName("Open music folder settings")
-        self.btn_config.clicked.connect(self.open_config_modal)
-
-        self.btn_about = QToolButton()
-        self.btn_about.setObjectName("TopBarAction")
-        self.btn_about.setIcon(load_svg_icon("info.svg", 18))
-        self.btn_about.setToolTip("About")
-        self.btn_about.setAccessibleName("About LrcGet")
-        self.btn_about.clicked.connect(self.open_about_modal)
-
-        self.btn_logs = QToolButton()
-        self.btn_logs.setObjectName("TopBarAction")
-        self.btn_logs.setIcon(load_svg_icon("logs.svg", 18))
-        self.btn_logs.setToolTip("Logs")
-        self.btn_logs.setAccessibleName("Toggle log panel")
-        self.btn_logs.setCheckable(True)
-        self.btn_logs.clicked.connect(self._toggle_logs_panel)
-
-        actions_row.addWidget(self.btn_refresh)
-        actions_row.addWidget(self.btn_config)
-        actions_row.addWidget(self.btn_about)
-        actions_row.addWidget(self.btn_logs)
-        actions_row.addStretch(1)
-        actions_layout.addLayout(actions_row)
-        top_bar.addWidget(self.actions_group, stretch=1)
-
+        self.top_bar = TopBarController(
+            on_refresh=self.refresh_library,
+            on_download_missing=self._download_missing_lyrics,
+            on_open_settings=self.open_config_modal,
+            on_open_about=self.open_about_modal,
+            on_toggle_logs=self._toggle_logs_panel,
+            on_schedule_search=self._schedule_library_search,
+            on_filter_changed=self._apply_track_filters,
+            parent=self,
+        )
         self.layout.addWidget(self.top_bar)
 
         self.nav_bar = QWidget()
@@ -260,8 +177,7 @@ class MainWindow(QMainWindow):
         if self.app_state.player:
             self.app_state.player.positionChanged.connect(self.lyrics_view.on_player_position)
 
-        self.lyrics_view.publishSyncedRequested.connect(self._publish_synced)
-        self.lyrics_view.publishPlainRequested.connect(self._publish_plain)
+        self.lyrics_view.exportFilesRequested.connect(self._export_current_track_sidecars)
 
         splitter.setStretchFactor(0, 3)
         splitter.setStretchFactor(1, 2)
@@ -278,9 +194,8 @@ class MainWindow(QMainWindow):
         self.albums_lyrics_view.show_none("Select a track to see lyrics")
         self.albums_lyrics_view.saveRequested.connect(self._on_lyrics_save_requested)
         self.albums_lyrics_view.seekRequested.connect(lambda ms: self.app_state.player.seek_ms(ms))
-        self.albums_lyrics_view.publishSyncedRequested.connect(self._publish_synced)
-        self.albums_lyrics_view.publishPlainRequested.connect(self._publish_plain)
         self.albums_lyrics_view.downloadRequested.connect(self._download_current_track_lyrics)
+        self.albums_lyrics_view.exportFilesRequested.connect(self._export_current_track_sidecars)
         if self.app_state.player:
             self.app_state.player.positionChanged.connect(self.albums_lyrics_view.on_player_position)
         self.albums_splitter.addWidget(self.albums_lyrics_view)
@@ -298,9 +213,8 @@ class MainWindow(QMainWindow):
         self.artists_lyrics_view.show_none("Select a track to see lyrics")
         self.artists_lyrics_view.saveRequested.connect(self._on_lyrics_save_requested)
         self.artists_lyrics_view.seekRequested.connect(lambda ms: self.app_state.player.seek_ms(ms))
-        self.artists_lyrics_view.publishSyncedRequested.connect(self._publish_synced)
-        self.artists_lyrics_view.publishPlainRequested.connect(self._publish_plain)
         self.artists_lyrics_view.downloadRequested.connect(self._download_current_track_lyrics)
+        self.artists_lyrics_view.exportFilesRequested.connect(self._export_current_track_sidecars)
         if self.app_state.player:
             self.app_state.player.positionChanged.connect(self.artists_lyrics_view.on_player_position)
         self.artists_splitter.addWidget(self.artists_lyrics_view)
@@ -308,7 +222,7 @@ class MainWindow(QMainWindow):
         self.artists_splitter.setStretchFactor(1, 2)
         artists_layout.addWidget(self.artists_splitter)
 
-        self.mylrclib_tab = QLabel("My Lrclib")
+        self.mylrclib_tab = MyLrclibWidget(self.app_state)
 
         self.tabs.addTab(self.tracks_tab, "Tracks")
         self.tabs.addTab(self.albums_page, "Albums")
@@ -317,7 +231,6 @@ class MainWindow(QMainWindow):
         self.tabs.setAccessibleName("Library navigation tabs")
 
         self.layout.addWidget(self.tabs)
-        self.tabs.currentChanged.connect(self._on_tab_changed)
 
         # --- PlayerBar (fără Now Playing label separat) ---
         self.player_bar = PlayerBar(self.app_state.player, self)
@@ -332,6 +245,38 @@ class MainWindow(QMainWindow):
             view.set_current_position_provider(self.app_state.player.position_ms if self.app_state.player else None)
         self._apply_saved_playback_speed()
         self._apply_saved_playback_volume()
+
+        self.download_overlay = DownloadProgressOverlay(self.central_widget)
+        self.download_overlay.sync_to_parent()
+        self.downloads = LyricsDownloadController(
+            self.app_state,
+            self.download_overlay,
+            normalize_lrclib_base=self._normalize_lrclib_base,
+            show_status=self._show_status_message,
+            current_player_track_id=self._current_player_track_id,
+            set_track_lyrics_views=self._set_track_lyrics_views,
+            refresh_visible_library_view=self._refresh_visible_library_view_after_downloads,
+            refresh_history=self.mylrclib_tab.refresh,
+            set_track_download_state=self._set_track_download_state_all,
+            get_track_download_state=self._get_primary_track_download_state,
+            parent=self,
+        )
+        self.download_overlay.cancelRequested.connect(self.downloads.cancel)
+        self.publish_history = PublishHistoryController(
+            self.app_state,
+            normalize_lrclib_base=self._normalize_lrclib_base,
+            current_player_track_id=self._current_player_track_id,
+            lyrics_views=self._all_lyrics_views,
+            refresh_history=self.mylrclib_tab.refresh,
+            show_status=self._show_status_message,
+            parent=self,
+        )
+        self.lyrics_view.publishSyncedRequested.connect(self.publish_history.publish_synced)
+        self.lyrics_view.publishPlainRequested.connect(self.publish_history.publish_plain)
+        self.albums_lyrics_view.publishSyncedRequested.connect(self.publish_history.publish_synced)
+        self.albums_lyrics_view.publishPlainRequested.connect(self.publish_history.publish_plain)
+        self.artists_lyrics_view.publishSyncedRequested.connect(self.publish_history.publish_synced)
+        self.artists_lyrics_view.publishPlainRequested.connect(self.publish_history.publish_plain)
 
         # --- Scan progress (pretty + hidden when idle) ---
         self.scan_row = QWidget()
@@ -374,9 +319,24 @@ class MainWindow(QMainWindow):
         self._ui_log_handler.bridge.messageReady.connect(self._on_log_message)
         logging.getLogger().addHandler(self._ui_log_handler)
 
+        self.navigation = NavigationController(
+            db=self.app_state.db,
+            tabs=self.tabs,
+            tracks_tab=self.tracks_tab,
+            albums_page=self.albums_page,
+            artists_page=self.artists_page,
+            breadcrumbs_layout=self.breadcrumbs_layout,
+            apply_route=self._apply_library_route,
+            display_artist_name=self._display_artist_name,
+            display_album_name=self._display_album_name,
+            parent=self,
+        )
+
         # --- Signals from track list ---
         self.track_list.playTrack.connect(self.on_play_track)
         self.track_list.downloadLyrics.connect(self.on_download_lyrics)
+        self.track_list.exportLyricsFiles.connect(self._export_track_sidecars)
+        self.track_list.bulkDownloadRequested.connect(self._on_bulk_download_requested)
         self.track_list.navigateRequested.connect(self.navigate_to)
         self.track_list.markInstrumental.connect(self._on_mark_instrumental)
         self.track_list.unmarkInstrumental.connect(self._on_unmark_instrumental)
@@ -385,6 +345,8 @@ class MainWindow(QMainWindow):
         self.lyrics_view.downloadRequested.connect(self._download_current_track_lyrics)
         self.albums_tab.playTrack.connect(self.on_play_track)
         self.albums_tab.downloadLyrics.connect(self.on_download_lyrics)
+        self.albums_tab.exportLyricsFiles.connect(self._export_track_sidecars)
+        self.albums_tab.bulkDownloadRequested.connect(self._on_bulk_download_requested)
         self.albums_tab.navigateRequested.connect(self.navigate_to)
         self.albums_tab.markInstrumental.connect(self._on_mark_instrumental)
         self.albums_tab.unmarkInstrumental.connect(self._on_unmark_instrumental)
@@ -394,6 +356,8 @@ class MainWindow(QMainWindow):
         self.albums_tab.configureFoldersRequested.connect(self.open_config_modal)
         self.artists_tab.playTrack.connect(self.on_play_track)
         self.artists_tab.downloadLyrics.connect(self.on_download_lyrics)
+        self.artists_tab.exportLyricsFiles.connect(self._export_track_sidecars)
+        self.artists_tab.bulkDownloadRequested.connect(self._on_bulk_download_requested)
         self.artists_tab.navigateRequested.connect(self.navigate_to)
         self.artists_tab.markInstrumental.connect(self._on_mark_instrumental)
         self.artists_tab.unmarkInstrumental.connect(self._on_unmark_instrumental)
@@ -401,30 +365,18 @@ class MainWindow(QMainWindow):
         self.artists_tab.clearSearchRequested.connect(self._clear_library_search)
         self.artists_tab.refreshLibraryRequested.connect(self.refresh_library)
         self.artists_tab.configureFoldersRequested.connect(self.open_config_modal)
+        self.mylrclib_tab.playTrack.connect(self.on_play_track)
 
         # --- Filters wiring ---
-        self.search_box.textChanged.connect(self._schedule_library_search)
-        self.chk_synced.toggled.connect(self._apply_track_filters)
-        self.chk_plain.toggled.connect(self._apply_track_filters)
-        self.chk_instr.toggled.connect(self._apply_track_filters)
-        self.chk_none.toggled.connect(self._apply_track_filters)
-
-        self.setTabOrder(self.search_box, self.chk_synced)
-        self.setTabOrder(self.chk_synced, self.chk_plain)
-        self.setTabOrder(self.chk_plain, self.chk_instr)
-        self.setTabOrder(self.chk_instr, self.chk_none)
-        self.setTabOrder(self.chk_none, self.btn_refresh)
-        self.setTabOrder(self.btn_refresh, self.btn_config)
-        self.setTabOrder(self.btn_config, self.btn_about)
-        self.setTabOrder(self.btn_about, self.tabs)
+        self.top_bar.bind_tab_order(self, self.tabs)
+        self._sync_download_mode_ui()
 
         # initial load
         self._apply_track_filters()
         self.show_queued_notifications()
         self._update_responsive_layout()
-        self._update_nav_controls()
         self.navigate_to(tracks_all(), record_history=False)
-        QTimer.singleShot(0, self._restore_last_library_route)
+        QTimer.singleShot(0, self.navigation.restore_last_route)
         QTimer.singleShot(0, self._maybe_show_first_run_onboarding)
 
         self._apply_styles()
@@ -432,22 +384,25 @@ class MainWindow(QMainWindow):
     def resizeEvent(self, event):
         super().resizeEvent(event)
         self._update_responsive_layout()
+        if hasattr(self, "download_overlay"):
+            self.download_overlay.sync_to_parent()
 
     def closeEvent(self, event: QCloseEvent) -> None:
         self._flush_playback_speed()
         self._flush_playback_volume()
-        self._flush_library_route()
+        self.navigation.flush_pending_route()
         logging.getLogger().removeHandler(self._ui_log_handler)
         super().closeEvent(event)
 
     # ------------------ filters ------------------
     def _apply_track_filters(self):
-        self.track_list.setSearchValue(self.search_box.text())
+        filters = self.top_bar.filter_values()
+        self.track_list.setSearchValue(self.top_bar.search_text())
         self.track_list.setFilters(
-            synced=self.chk_synced.isChecked(),
-            plain=self.chk_plain.isChecked(),
-            instrumental=self.chk_instr.isChecked(),
-            none_=self.chk_none.isChecked(),
+            synced=filters["synced"],
+            plain=filters["plain"],
+            instrumental=filters["instrumental"],
+            none_=filters["none"],
         )
         if self.app_state.player and self.app_state.player.track:
             self.track_list.set_now_playing(self.app_state.player.track.track_id)
@@ -457,7 +412,7 @@ class MainWindow(QMainWindow):
 
     def _apply_library_search(self):
         current = self.tabs.currentWidget()
-        text = self.search_box.text()
+        text = self.top_bar.search_text()
         if current is self.tracks_tab:
             self._apply_track_filters()
         elif current is self.albums_page:
@@ -474,6 +429,7 @@ class MainWindow(QMainWindow):
             after = updated_config.theme_mode
             if after != before:
                 self._apply_theme(after)
+            self._sync_download_mode_ui()
             for view in self._all_lyrics_views():
                 view.set_reaction_delay_ms(updated_config.reaction_delay_ms)
             self._apply_track_filters()
@@ -481,8 +437,13 @@ class MainWindow(QMainWindow):
             if dlg.directories_changed and after_dirs:
                 self.refresh_library()
 
+    def _sync_download_mode_ui(self) -> None:
+        config = get_config(self.app_state.db)
+        self.top_bar.set_download_missing_mode(str(config.download_lyrics_mode or "prefer_synced"))
+
     def open_about_modal(self):
-        self.app_state.notify("LrcGet helps you scan your library, edit lyrics, and publish them to LRCLIB.", "info")
+        dlg = AboutDialog(self.app_state, self)
+        dlg.exec()
 
     def _maybe_show_first_run_onboarding(self):
         if get_directories(self.app_state.db):
@@ -501,8 +462,14 @@ class MainWindow(QMainWindow):
             return
         directories = get_directories(self.app_state.db)
         if not directories:
-            self.app_state.notify("Add at least one music folder before starting a library scan.", "warning")
-            self._set_tool_feedback(self.btn_refresh, "error")
+            notify_user(
+                self.app_state,
+                "Add at least one music folder before starting a library scan.",
+                "warning",
+                show_status=self._show_status_message,
+                status_timeout_ms=3000,
+            )
+            self.top_bar.set_button_feedback(self.top_bar.btn_refresh, "error")
             QTimer.singleShot(1800, self._reset_refresh_feedback)
             return
 
@@ -510,8 +477,8 @@ class MainWindow(QMainWindow):
 
         self.scan_row.setVisible(True)
         self.progress_bar.setValue(0)
-        self.actions_label.setText("Scanning Library")
-        self._set_tool_feedback(self.btn_refresh, "loading")
+        self.top_bar.set_actions_label("Scanning Library")
+        self.top_bar.set_button_feedback(self.top_bar.btn_refresh, "loading")
         self.scan_label.setText("Scanning…")
         self.scan_details.setText(f"Preparing a scan across {len(directories)} folder(s)…")
         self.btn_cancel_scan.setEnabled(True)
@@ -526,7 +493,7 @@ class MainWindow(QMainWindow):
         self.scanner.progress_signal.connect(self._update_scan_progress)
         self.scanner.finished_signal.connect(self._scan_finished)
         self.scanner.start()
-        self.btn_refresh.setEnabled(False)
+        self.top_bar.btn_refresh.setEnabled(False)
         self.statusBar().showMessage("Scanning library…")
 
     def _update_scan_progress(self, scanned: int, total: int, current_path: str, elapsed_s: float):
@@ -557,10 +524,7 @@ class MainWindow(QMainWindow):
 
     def _on_notify(self, n):
         # n is core.state.Notify
-        kind = (getattr(n, "notify_type", "info") or "info").lower()
-        # your enum uses "warn"; toast supports "warning"
-        if kind == "warn":
-            kind = "warning"
+        kind = normalize_notify_type(getattr(n, "notify_type", "info") or "info")
 
         msg = getattr(n, "message", "") or ""
         if not msg:
@@ -572,7 +536,7 @@ class MainWindow(QMainWindow):
         self.log_panel.append_log(level, message)
         normalized_level = (level or "").upper()
         if normalized_level in {"ERROR", "CRITICAL"}:
-            self.btn_logs.setChecked(True)
+            self.top_bar.set_logs_checked(True)
             self.log_panel.setVisible(True)
             self._show_deduped_toast(message, "error", 4000)
 
@@ -597,22 +561,40 @@ class MainWindow(QMainWindow):
 
         if ok:
             self._apply_track_filters()
-            self.app_state.notify(msg or "Library scan finished successfully.", "success")
-            self._set_tool_feedback(self.btn_refresh, "success")
+            notify_user(
+                self.app_state,
+                msg or "Library scan finished successfully.",
+                "success",
+                show_status=self._show_status_message,
+                status_timeout_ms=4000,
+            )
+            self.top_bar.set_button_feedback(self.top_bar.btn_refresh, "success")
             logger.info("Library scan finished successfully: %s", msg or "ok")
         else:
             if "cancel" in (msg or "").lower():
-                self.app_state.notify(msg, "warning")
-                self._set_tool_feedback(self.btn_refresh, "idle")
+                notify_user(
+                    self.app_state,
+                    msg,
+                    "warning",
+                    show_status=self._show_status_message,
+                    status_timeout_ms=4000,
+                )
+                self.top_bar.set_button_feedback(self.top_bar.btn_refresh, "idle")
                 logger.warning("Library scan cancelled: %s", msg)
             else:
-                self.app_state.notify(f"Library scanning failed: {msg}", "error")
-                self._set_tool_feedback(self.btn_refresh, "error")
-                logger.error("Library scan failed: %s", msg)
+                log_and_notify(
+                    self.app_state,
+                    logger,
+                    logging.ERROR,
+                    f"Library scanning failed: {msg}",
+                    "error",
+                    show_status=self._show_status_message,
+                    status_timeout_ms=4000,
+                )
+                self.top_bar.set_button_feedback(self.top_bar.btn_refresh, "error")
 
-        self.btn_refresh.setEnabled(True)
+        self.top_bar.btn_refresh.setEnabled(True)
         QTimer.singleShot(1800, self._reset_refresh_feedback)
-        self.statusBar().showMessage(msg, 4000)
         self.scanner = None
 
     def _cancel_scan(self):
@@ -694,18 +676,6 @@ class MainWindow(QMainWindow):
         if hasattr(self.app_state, "queued_notifications"):
             self.app_state.queued_notifications.clear()
 
-    def _on_tab_changed(self, idx: int):
-        if self._tab_sync_suppressed or self._nav_apply_in_progress:
-            return
-        w = self.tabs.widget(idx)
-        if w is self.tracks_tab:
-            self.navigate_to(tracks_all())
-        elif w is self.albums_page:
-            self.navigate_to(LibraryRoute(tab="albums", mode="root"))
-        elif w is self.artists_page:
-            self.navigate_to(LibraryRoute(tab="artists", mode="root"))
-        self._schedule_library_search()
-
     def _on_player_track_changed(self, now_playing):
         if hasattr(self, "track_list") and self.track_list:
             if now_playing:
@@ -723,59 +693,60 @@ class MainWindow(QMainWindow):
 
     # ------------------ lyrics download & save ------------------
     def on_download_lyrics(self, track_id: int):
-        config = get_config(self.app_state.db)
-        lrclib_instance = config.lrclib_instance or "https://lrclib.net"
-        lrclib_instance = self._normalize_lrclib_base(lrclib_instance)
+        self.downloads.start_downloads([int(track_id)], mode_override="use_global")
 
-        self.statusBar().showMessage(f"Starting lyrics download... ({lrclib_instance})")
-        self.track_list.set_download_state(int(track_id), "loading")
+    def _on_bulk_download_requested(self, track_ids: list[int], mode: str) -> None:
+        self.downloads.start_downloads(track_ids, mode_override=mode)
 
-        from ui.workers.lyrics_download_worker import LyricsDownloadWorker
-        self._lyrics_worker = LyricsDownloadWorker(
-            db_path=self.app_state.db_path,
-            track_id=track_id,
-            lrclib_instance=lrclib_instance,
-            parent=self,
-        )
-        self._lyrics_worker.progress.connect(lambda s: self.statusBar().showMessage(s))
-        self._lyrics_worker.finished.connect(self._on_lyrics_download_finished)
-        self._lyrics_worker.start()
+    def _download_missing_lyrics(self) -> None:
+        self.downloads.download_missing()
 
-    def _on_lyrics_download_finished(self, ok: bool, msg: str, track_id: int):
-        self.statusBar().showMessage(msg, 4000)
-        self._apply_track_filters()
+    def _set_track_download_state_all(self, track_id: int, state: str) -> None:
+        self.track_list.set_download_state(int(track_id), state)
+        self.albums_tab.set_download_state(int(track_id), state)
+        self.artists_tab.set_download_state(int(track_id), state)
 
-        try:
-            track = get_track_by_id(self.app_state.db, track_id)
-            if ok:
-                self._sync_track_lyrics_outputs(track)
-            self._set_track_lyrics_views(track)
-        except Exception:
-            pass
+    def _get_primary_track_download_state(self, track_id: int) -> str:
+        return self.track_list.get_download_state(int(track_id))
 
-        if ok:
-            self.app_state.notify("Lyrics downloaded successfully.", "success")
-            self.track_list.set_download_state(int(track_id), "success")
-        else:
-            self.app_state.notify(f"Failed to download lyrics: {msg}", "error")
-            self.track_list.set_download_state(int(track_id), "error")
-        QTimer.singleShot(1800, lambda tid=int(track_id): self.track_list.set_download_state(tid, "idle"))
+    def _show_status_message(self, message: str, timeout_ms: int | None = None) -> None:
+        if timeout_ms is None:
+            self.statusBar().showMessage(message)
+            return
+        self.statusBar().showMessage(message, int(timeout_ms))
+
+    def _current_player_track_id(self) -> int | None:
+        if not self.app_state.player or not self.app_state.player.track:
+            return None
+        return int(self.app_state.player.track.track_id)
+
+    def _refresh_visible_library_view_after_downloads(self) -> None:
+        current = self.tabs.currentWidget()
+        if current is self.tracks_tab:
+            route = self.navigation.current_route
+            self.track_list.apply_route(route if route.tab == "tracks" else tracks_all())
+        elif current is self.albums_page:
+            route = self.navigation.current_route
+            self.albums_tab.apply_route(route if route.tab == "albums" else LibraryRoute(tab="albums", mode="root"))
+        elif current is self.artists_page:
+            route = self.navigation.current_route
+            self.artists_tab.apply_route(route if route.tab == "artists" else LibraryRoute(tab="artists", mode="root"))
 
 
     def _on_lyrics_save_requested(self, lrc: str, txt: str):
         if not self.app_state.player or not self.app_state.player.track:
-            self.app_state.notify("Start playback or select a track first.", "warning")
+            notify_user(
+                self.app_state,
+                "Start playback or select a track first.",
+                "warning",
+                show_status=self._show_status_message,
+                status_timeout_ms=3000,
+            )
             for view in self._all_lyrics_views():
                 view.set_save_feedback("error", "No Track")
             return
 
         track_id = self.app_state.player.track.track_id
-
-        from db.database import (
-            update_track_synced_lyrics,
-            update_track_plain_lyrics,
-            update_track_null_lyrics,
-        )
 
         for view in self._all_lyrics_views():
             view.set_save_feedback("loading", "Saving...")
@@ -790,56 +761,21 @@ class MainWindow(QMainWindow):
             track = get_track_by_id(self.app_state.db, track_id)
             self._sync_track_lyrics_outputs(track)
             self._set_track_lyrics_views(track)
-            self.statusBar().showMessage("Lyrics saved.", 2500)
+            self._show_status_message("Lyrics saved.", 2500)
             for view in self._all_lyrics_views():
                 view.set_save_feedback("success", "Saved")
         except Exception as exc:
-            self.statusBar().showMessage("Failed to save lyrics.", 4000)
-            self.app_state.notify(f"Failed to save lyrics: {exc}", "error")
+            log_and_notify(
+                self.app_state,
+                logger,
+                logging.ERROR,
+                exception_message("Failed to save lyrics", exc),
+                "error",
+                show_status=self._show_status_message,
+                status_timeout_ms=4000,
+            )
             for view in self._all_lyrics_views():
                 view.set_save_feedback("error", "Save Failed")
-
-    # ------------------ publish dialogs ------------------
-    def _publish_synced(self):
-        self._open_publish_dialog(is_synced=True)
-
-    def _publish_plain(self):
-        self._open_publish_dialog(is_synced=False)
-
-    def _open_publish_dialog(self, is_synced: bool):
-        if not self.app_state.player or not self.app_state.player.track:
-            self.app_state.notify("Start playback or select a track first.", "warning")
-            for view in self._all_lyrics_views():
-                view.set_publish_feedback(is_synced=is_synced, state="error", message="No Track")
-            return
-
-        track_id = self.app_state.player.track.track_id
-        track = get_track_by_id(self.app_state.db, track_id)
-
-        lyrics_text = (track.lrc_lyrics or "") if is_synced else (track.txt_lyrics or "")
-        dlg = PublishLyricsDialog(
-            title=track.title,
-            artist_name=track.artist_name,
-            album_name=track.album_name,
-            duration_s=float(track.duration or 0.0),
-            lyrics_text=lyrics_text,
-            is_synced=is_synced,
-            lint_result=[],
-            parent=self,
-        )
-        for view in self._all_lyrics_views():
-            view.set_publish_feedback(is_synced=is_synced, state="loading", message="Publishing...")
-        dlg.exec()
-        if dlg.publish_result is True:
-            for view in self._all_lyrics_views():
-                view.set_publish_feedback(is_synced=is_synced, state="success", message="Published")
-            self.app_state.notify("Lyrics published successfully.", "success")
-        elif dlg.publish_result is False:
-            for view in self._all_lyrics_views():
-                view.set_publish_feedback(is_synced=is_synced, state="error", message="Publish Failed")
-        else:
-            for view in self._all_lyrics_views():
-                view.set_publish_feedback(is_synced=is_synced, state="idle")
 
     # ------------------ helpers ------------------
     def _normalize_lrclib_base(self, url: str) -> str:
@@ -852,22 +788,32 @@ class MainWindow(QMainWindow):
 
     def _sync_track_lyrics_outputs(self, track) -> None:
         config = get_config(self.app_state.db)
-        if config.save_lyrics_sidecars:
-            try:
-                written_paths = export_lyrics_sidecars(track, config)
-            except Exception as exc:
-                self.app_state.notify(f"Failed to export lyrics files: {exc}", "error")
-            else:
-                if written_paths:
-                    self.statusBar().showMessage(f"Lyrics exported to {os.path.dirname(written_paths[0])}", 3000)
+        result = sync_track_outputs_with_result(track, config)
+        if result.sidecar_error is not None:
+            log_and_notify(
+                self.app_state,
+                logger,
+                logging.ERROR,
+                exception_message("Failed to export lyrics files", result.sidecar_error),
+                "error",
+                show_status=self._show_status_message,
+                status_timeout_ms=4000,
+            )
+        elif result.sidecar_paths:
+            self._show_status_message(f"Lyrics exported to {os.path.dirname(result.sidecar_paths[0])}", 3000)
 
-        if config.try_embed_lyrics:
-            try:
-                embed_lyrics_for_track(track)
-            except Exception as exc:
-                self.app_state.notify(f"Failed to embed lyrics: {exc}", "error")
-            else:
-                self.statusBar().showMessage("Lyrics embedded into the audio file.", 3000)
+        if result.embed_error is not None:
+            log_and_notify(
+                self.app_state,
+                logger,
+                logging.ERROR,
+                exception_message("Failed to embed lyrics", result.embed_error),
+                "error",
+                show_status=self._show_status_message,
+                status_timeout_ms=4000,
+            )
+        elif result.embedded:
+            self._show_status_message("Lyrics embedded into the audio file.", 3000)
 
     def _apply_saved_playback_speed(self) -> None:
         config = get_config(self.app_state.db)
@@ -912,43 +858,18 @@ class MainWindow(QMainWindow):
         set_config(self.app_state.db, replace(config, playback_volume=float(self._pending_playback_volume)))
         self._pending_playback_volume = None
 
-    def _persist_library_route(self, route: LibraryRoute) -> None:
-        self._pending_library_route = serialize_route(route)
-        self._route_save_timer.start()
-
-    def _flush_library_route(self) -> None:
-        if self._pending_library_route is None:
-            return
-        config = get_config(self.app_state.db)
-        set_config(self.app_state.db, replace(config, last_library_route=self._pending_library_route))
-        self._pending_library_route = None
     def _play_selected_or_current(self):
         tid = self.track_list.selected_track_id()
         if tid is not None:
             self.on_play_track(tid)
 
     def _reset_track_filters(self):
-        self.search_box.blockSignals(True)
-        self.search_box.setText("")
-        self.search_box.blockSignals(False)
+        self.top_bar.reset_track_filters()
         self.track_list.apply_route(tracks_all())
-
-        for checkbox, checked in (
-            (self.chk_synced, True),
-            (self.chk_plain, True),
-            (self.chk_instr, False),
-            (self.chk_none, True),
-        ):
-            checkbox.blockSignals(True)
-            checkbox.setChecked(checked)
-            checkbox.blockSignals(False)
-
         self._apply_track_filters()
 
     def _clear_library_search(self) -> None:
-        self.search_box.blockSignals(True)
-        self.search_box.setText("")
-        self.search_box.blockSignals(False)
+        self.top_bar.clear_library_search()
         current = self.tabs.currentWidget()
         if current is self.tracks_tab:
             self._apply_track_filters()
@@ -959,9 +880,86 @@ class MainWindow(QMainWindow):
 
     def _download_current_track_lyrics(self):
         if not self.app_state.player or not self.app_state.player.track:
-            self.app_state.notify("Select a track before downloading lyrics.", "warning")
+            notify_user(
+                self.app_state,
+                "Select a track before downloading lyrics.",
+                "warning",
+                show_status=self._show_status_message,
+                status_timeout_ms=3000,
+            )
             return
         self.on_download_lyrics(int(self.app_state.player.track.track_id))
+
+    def _export_current_track_sidecars(self):
+        if not self.app_state.player or not self.app_state.player.track:
+            notify_user(
+                self.app_state,
+                "Select or start a track before exporting lyrics files.",
+                "warning",
+                show_status=self._show_status_message,
+                status_timeout_ms=3000,
+            )
+            for view in self._all_lyrics_views():
+                view.set_export_feedback("error", "No Track")
+            return
+        self._export_track_sidecars(int(self.app_state.player.track.track_id))
+
+    def _export_track_sidecars(self, track_id: int):
+        for view in self._all_lyrics_views():
+            view.set_export_feedback("loading", "Exporting...")
+        try:
+            track = get_track_by_id(self.app_state.db, int(track_id))
+            if not (track.lrc_lyrics or track.txt_lyrics):
+                notify_user(
+                    self.app_state,
+                    "No lyrics are available to export for this track.",
+                    "warning",
+                    show_status=self._show_status_message,
+                    status_timeout_ms=3000,
+                )
+                for view in self._all_lyrics_views():
+                    view.set_export_feedback("error", "No Lyrics")
+                return
+
+            config = get_config(self.app_state.db)
+            export_config = replace(config, save_lyrics_sidecars=True)
+            result = sync_track_outputs_with_result(track, export_config)
+            written_paths = list(result.sidecar_paths)
+            if not written_paths:
+                notify_user(
+                    self.app_state,
+                    "No lyrics files were generated for this track.",
+                    "warning",
+                    show_status=self._show_status_message,
+                    status_timeout_ms=3000,
+                )
+                for view in self._all_lyrics_views():
+                    view.set_export_feedback("error", "Nothing Exported")
+                return
+
+            output_dir = os.path.dirname(written_paths[0]) or os.path.dirname(track.file_path)
+            notify_user(
+                self.app_state,
+                "Lyrics files generated successfully.",
+                "success",
+                show_status=self._show_status_message,
+                status_timeout_ms=3000,
+            )
+            self._show_status_message(f"Lyrics files exported to {output_dir}", 3000)
+            for view in self._all_lyrics_views():
+                view.set_export_feedback("success", "Exported")
+        except Exception as exc:
+            log_and_notify(
+                self.app_state,
+                logger,
+                logging.ERROR,
+                exception_message("Failed to export lyrics files", exc),
+                "error",
+                show_status=self._show_status_message,
+                status_timeout_ms=4000,
+            )
+            for view in self._all_lyrics_views():
+                view.set_export_feedback("error", "Export Failed")
 
     def _all_lyrics_views(self) -> list[LyricsEditorWidget]:
         return [self.lyrics_view, self.albums_lyrics_view, self.artists_lyrics_view]
@@ -976,26 +974,12 @@ class MainWindow(QMainWindow):
                 instrumental=bool(track.instrumental),
             )
 
-    def _set_tool_feedback(self, button: QToolButton, state: str) -> None:
-        button.setProperty("actionState", state if state != "idle" else "")
-        button.style().unpolish(button)
-        button.style().polish(button)
-        button.update()
-        button.setEnabled(state != "loading")
-
     def _reset_refresh_feedback(self):
-        self._set_tool_feedback(self.btn_refresh, "idle")
-        self.btn_refresh.setEnabled(True)
-        self.actions_label.setText(self._refresh_default_label)
+        self.top_bar.reset_refresh_feedback(self._refresh_default_label)
 
     def _update_responsive_layout(self):
         width = max(0, self.width())
-
-        if hasattr(self, "top_bar_layout"):
-            if width < 1120:
-                self.top_bar_layout.setDirection(QBoxLayout.TopToBottom)
-            else:
-                self.top_bar_layout.setDirection(QBoxLayout.LeftToRight)
+        self.top_bar.update_responsive_layout(width)
 
         if hasattr(self, "content_splitter"):
             if width < 980:
@@ -1027,118 +1011,17 @@ class MainWindow(QMainWindow):
         self.setStyleSheet(load_stylesheet("main_window.qss"))
 
     def navigate_to(self, route: LibraryRoute, *, record_history: bool = True) -> None:
-        route = self._hydrate_route(route)
-        self._current_route = route
-        self._nav_apply_in_progress = True
-        try:
-            self._tab_sync_suppressed = True
-            if route.tab == "tracks":
-                self.tabs.setCurrentWidget(self.tracks_tab)
-                self.search_box.blockSignals(True)
-                self.search_box.setText("")
-                self.search_box.blockSignals(False)
-                self.track_list.apply_route(route)
-            elif route.tab == "albums":
-                self.tabs.setCurrentWidget(self.albums_page)
-                self.albums_tab.apply_route(route)
-            elif route.tab == "artists":
-                self.tabs.setCurrentWidget(self.artists_page)
-                self.artists_tab.apply_route(route)
-        finally:
-            self._tab_sync_suppressed = False
-            self._nav_apply_in_progress = False
+        self.navigation.navigate_to(route, record_history=record_history)
 
-        if record_history:
-            if self._nav_index < 0 or self._nav_history[self._nav_index] != route:
-                self._nav_history = self._nav_history[: self._nav_index + 1]
-                self._nav_history.append(route)
-                self._nav_index = len(self._nav_history) - 1
-        self._persist_library_route(route)
-        self._update_nav_controls()
-
-    def _hydrate_route(self, route: LibraryRoute) -> LibraryRoute:
-        artist_label = route.artist_label
-        album_label = route.album_label
-
-        if not artist_label and len(route.artist_ids) == 1:
-            artist_id = int(route.artist_ids[0])
-            artist_label = self._artist_label_cache.get(artist_id, artist_label)
-            if not artist_label:
-                try:
-                    artist = get_artist_by_id(self.app_state.db, artist_id)
-                    artist_label = self._display_artist_name(artist.get("artist_name", ""))
-                    if artist_label:
-                        self._artist_label_cache[artist_id] = artist_label
-                except Exception:
-                    pass
-
-        if not album_label and len(route.album_ids) == 1:
-            album_id = int(route.album_ids[0])
-            album_label = self._album_label_cache.get(album_id, album_label)
-            if not album_label:
-                try:
-                    album = get_album_by_id(self.app_state.db, album_id)
-                    album_label = self._display_album_name(album.get("album_name", ""))
-                    if album_label:
-                        self._album_label_cache[album_id] = album_label
-                    if not artist_label:
-                        artist_label = self._display_artist_name(album.get("artist_name") or album.get("album_artist_name") or "")
-                        artist_id = album.get("artist_id")
-                        if artist_label and artist_id is not None:
-                            self._artist_label_cache[int(artist_id)] = artist_label
-                except Exception:
-                    pass
-
-        if artist_label == route.artist_label and album_label == route.album_label:
-            return route
-        return replace(route, artist_label=artist_label, album_label=album_label)
-
-    def _update_nav_controls(self) -> None:
-        while self.breadcrumbs_layout.count():
-            item = self.breadcrumbs_layout.takeAt(0)
-            widget = item.widget()
-            if widget is not None:
-                widget.deleteLater()
-
-        crumbs = route_breadcrumbs(self._current_route)
-        for idx, (label, route) in enumerate(crumbs):
-            btn = QToolButton()
-            btn.setObjectName("LibraryBreadcrumbButton")
-            btn.setText(label)
-            btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextOnly)
-            btn.setAutoRaise(True)
-            btn.setEnabled(idx != len(crumbs) - 1)
-            if idx != len(crumbs) - 1:
-                btn.clicked.connect(lambda _=False, r=route: self.navigate_to(r))
-            self.breadcrumbs_layout.addWidget(btn)
-            if idx != len(crumbs) - 1:
-                sep = QLabel(">")
-                sep.setObjectName("LibraryBreadcrumbSeparator")
-                self.breadcrumbs_layout.addWidget(sep)
-        self.breadcrumbs_layout.addStretch(1)
-
-    def _navigate_back(self) -> None:
-        if self._nav_index <= 0:
-            return
-        self._nav_index -= 1
-        self.navigate_to(self._nav_history[self._nav_index], record_history=False)
-        self._update_nav_controls()
-
-    def _navigate_forward(self) -> None:
-        if self._nav_index >= len(self._nav_history) - 1:
-            return
-        self._nav_index += 1
-        self.navigate_to(self._nav_history[self._nav_index], record_history=False)
-        self._update_nav_controls()
-
-    def _restore_last_library_route(self) -> None:
-        config = get_config(self.app_state.db)
-        route = deserialize_route(config.last_library_route)
-        if route is None:
-            route = tracks_all()
-        self._nav_history = [route]
-        self._nav_index = 0
-        self.navigate_to(route, record_history=False)
+    def _apply_library_route(self, route: LibraryRoute) -> None:
+        if route.tab == "tracks":
+            self.top_bar.clear_library_search()
+            self.track_list.apply_route(route)
+        elif route.tab == "albums":
+            self.albums_tab.apply_route(route)
+        elif route.tab == "artists":
+            self.artists_tab.apply_route(route)
+        self._schedule_library_search()
 
     def _apply_theme(self, theme_mode: str):
         app = QApplication.instance()
@@ -1155,6 +1038,8 @@ class MainWindow(QMainWindow):
             self.albums_tab._apply_styles()
         if hasattr(self, "artists_tab"):
             self.artists_tab._apply_styles()
+        if hasattr(self, "mylrclib_tab"):
+            self.mylrclib_tab._apply_styles()
         if hasattr(self, "lyrics_view"):
             self.lyrics_view._apply_styles()
         if hasattr(self, "albums_lyrics_view"):
@@ -1227,18 +1112,24 @@ class MainWindow(QMainWindow):
         if not self._confirm_bulk("Instrumental", "Mark selected tracks as instrumental?", len(track_ids)):
             return
 
-        from db.database import mark_tracks_instrumental
-
         # Preserve selection across refresh
         selected_before = set(track_ids)
 
         try:
             mark_tracks_instrumental(self.app_state.db, track_ids)
-            self.statusBar().showMessage(f"Marked {len(track_ids)} track(s) as instrumental.", 3000)
+            self._show_status_message(f"Marked {len(track_ids)} track(s) as instrumental.", 3000)
             self._apply_track_filters()
             self.track_list.restore_selection(selected_before)
         except Exception as e:
-            self.app_state.notify(f"Failed to update tracks: {e}", "error")
+            log_and_notify(
+                self.app_state,
+                logger,
+                logging.ERROR,
+                exception_message("Failed to update tracks", e),
+                "error",
+                show_status=self._show_status_message,
+                status_timeout_ms=4000,
+            )
 
 
     def _on_unmark_instrumental(self, track_ids: list[int]):
@@ -1249,14 +1140,20 @@ class MainWindow(QMainWindow):
         if not self._confirm_bulk("Instrumental", "Unmark instrumental for selected tracks?", len(track_ids)):
             return
 
-        from db.database import unmark_tracks_instrumental
-
         selected_before = set(track_ids)
 
         try:
             unmark_tracks_instrumental(self.app_state.db, track_ids)
-            self.statusBar().showMessage(f"Unmarked {len(track_ids)} track(s).", 3000)
+            self._show_status_message(f"Unmarked {len(track_ids)} track(s).", 3000)
             self._apply_track_filters()
             self.track_list.restore_selection(selected_before)
         except Exception as e:
-            self.app_state.notify(f"Failed to update tracks: {e}", "error")
+            log_and_notify(
+                self.app_state,
+                logger,
+                logging.ERROR,
+                exception_message("Failed to update tracks", e),
+                "error",
+                show_status=self._show_status_message,
+                status_timeout_ms=4000,
+            )

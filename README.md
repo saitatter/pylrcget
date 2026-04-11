@@ -21,15 +21,22 @@ This version goes beyond bulk lyric downloads and turns the app into a full desk
 - previous / next track
 - queue based on the current visible track list
 - adjustable playback speed, including custom values
+- playback volume control with mute-safe persistence across sessions
 - keyboard shortcuts such as `Space`, `Enter`, `Ctrl+Left`, `Ctrl+Right`
 
 ### Lyrics workflow
 
 - synced lyrics (`.lrc`) and plain lyrics support
+- configurable download modes for `Prefer synced`, `Synced only`, and `Plain only`
+- bulk `Download missing lyrics` action based on the active download mode
+- per-selection download overrides from the track context menu
 - real-time synced lyrics editor
 - per-line snapping while audio is playing
 - configurable reaction delay for timestamping
+- shift selected lines by preset or custom time offsets
+- shift the entire lyric sheet from the first line based on the current playback position
 - live lyric highlighting during playback
+- explicit `Export Files` action for generating sidecar lyrics from local / embedded lyrics
 - publish synced or plain lyrics to LRCLIB
 
 ### Library workflow
@@ -37,8 +44,9 @@ This version goes beyond bulk lyric downloads and turns the app into a full desk
 - recursive library scan into a local SQLite database
 - incremental refresh using per-file signature checks (`mtime` + `size`)
 - scan exclusion rules by path and regex
+- automatic re-scan after changing library folders in Settings
 - drilldown browsing for `Tracks`, `Albums`, and `Artists`
-- breadcrumb navigation with back / forward history
+- breadcrumb-based navigation across library views
 
 ### Export and embedding
 
@@ -53,6 +61,8 @@ This version goes beyond bulk lyric downloads and turns the app into a full desk
 - multiple built-in themes
 - clickable artist / album navigation from the player bar and track list
 - fast non-native file dialogs on Windows for better browsing performance
+- built-in log panel with live filtering, copy/save actions, and on-disk log files
+- in-app update checker with release notes, download links, and packaged-build self-update support where available
 
 ---
 
@@ -70,6 +80,7 @@ The library scanner currently detects these formats:
 - ASF
 - DSF
 - DFF
+- MPC / Musepack
 
 Notes:
 
@@ -92,6 +103,7 @@ Embedded lyric handling is implemented for:
 - WMA / ASF
 - DSF
 - DFF
+- MPC / Musepack
 
 Sidecar lyric export supports:
 
@@ -117,18 +129,71 @@ The Settings dialog is organized by category and includes:
 - excluded paths
 - excluded regex patterns
 - exclusion preview / test
+- automatic library refresh after folder changes
 
 ### Lyrics
 
+- download mode:
+  - `Prefer synced, fallback to plain`
+  - `Synced only`
+  - `Plain only`
 - save lyrics files
 - embed lyrics into audio files
 - download directory
 - filename pattern with live preview
 - reaction delay
+- shift selected lines by preset or custom offset
+- shift all lines from the first timestamp anchor
 
 ### Appearance
 
 - theme selection
+
+### Updates
+
+- in-app `About` dialog with version info and update check
+- latest GitHub release comparison against the running build
+- release notes / changelog preview before updating
+- `Open release page`, `Download update`, and packaged-build `Install update` actions when supported
+
+---
+
+## Download Modes
+
+Lyrics downloads can be configured in three modes:
+
+- `Prefer synced, fallback to plain`
+  - the app tries to download synced lyrics first
+  - if no synced lyrics exist, it saves plain lyrics instead
+- `Synced only`
+  - the app saves only synced lyrics
+  - plain-only matches are skipped
+- `Plain only`
+  - the app saves only plain lyrics
+  - if LRCLIB only returns synced lyrics, the app derives plain text by stripping timestamps
+
+The track context menu also supports temporary mode overrides for the current selection:
+
+- `Download selection using current mode`
+- `Download selection as synced only`
+- `Download selection as plain only`
+
+The `Tracks` table also color-codes lyric state for faster scanning:
+
+- red for `No lyrics`
+- orange for `Plain`
+- green for `Synced`
+- blue for `Instrumental`
+
+### Download Missing Lyrics
+
+The global `Download missing lyrics` action respects the active download mode:
+
+- in `Prefer synced, fallback to plain`, a track is considered missing if it has no synced lyrics yet
+- in `Synced only`, a track is considered missing if it has no synced lyrics
+- in `Plain only`, a track is considered missing if it has no plain lyrics
+
+This means the bulk action can be used not only to fill empty tracks, but also to upgrade plain-only tracks to synced lyrics when synced lyrics become available.
 
 ---
 
@@ -138,10 +203,37 @@ Library navigation is route-based and supports:
 
 - drilldown browsing inside `Albums` and `Artists`
 - breadcrumb navigation
-- back / forward history
 - restoring the last library route between sessions
 
 Unknown metadata buckets are normalized as `N/A` in the UI.
+
+`My LRCLIB` also includes local history views for:
+
+- published lyrics from this app
+- lyrics download history with per-track outcome details
+
+---
+
+## Diagnostics
+
+The desktop app includes built-in diagnostics features:
+
+- a toggleable in-app `Logs` panel
+- level filters for `INFO`, `WARNING`, and `ERROR`
+- `Copy`, `Save`, and `Open Folder` actions for logs
+- automatic log panel opening for errors
+- rotating log files stored in the app data directory
+
+Important errors can also surface as toast notifications so they are harder to miss.
+
+Bulk lyrics downloads also show a dedicated progress overlay with:
+
+- current track and live status messages
+- per-track success / failure results
+- cancel support
+- session summary when the batch completes
+
+Download history is also persisted locally so recent batch outcomes remain visible after the overlay closes.
 
 ---
 
@@ -189,6 +281,13 @@ Use `!` or a `BREAKING CHANGE:` footer for breaking changes.
 Windows release builds are currently unsigned.
 
 On Windows 11, SmartScreen or Defender may show a warning before launch, especially on newly downloaded builds. If you trust the release source, you can usually continue through `More info` -> `Run anyway`.
+
+### In-app updates
+
+The desktop app can check GitHub Releases for newer versions directly from the `About` dialog.
+
+- source checkouts can view release notes and open / download the latest release
+- packaged builds can also stage and apply self-updates when a matching platform artifact is available
 
 ---
 ## Local Build

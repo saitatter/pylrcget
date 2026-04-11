@@ -1,9 +1,7 @@
 from __future__ import annotations
 
-import base64
 import html
 import logging
-from pathlib import Path
 
 from PySide6.QtCore import QEvent, QRectF, QSize, Qt, Signal, QTimer
 from PySide6.QtGui import QColor, QFont, QLinearGradient, QPainter, QPen, QPixmap
@@ -19,14 +17,8 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from mutagen import File as MutagenFile
-from mutagen.flac import FLAC, Picture
-from mutagen.id3 import APIC
-from mutagen.mp4 import MP4, MP4Cover
-from mutagen.asf import ASF
-from mutagen.oggopus import OggOpus
-from mutagen.oggvorbis import OggVorbis
 
+from core.artwork import extract_embedded_cover_bytes, find_sidecar_cover_path
 from ui.icon_loader import load_svg_icon
 from ui.spacing import SPACE_2, SPACE_3, set_layout_spacing
 from ui.style_loader import load_stylesheet
@@ -71,104 +63,14 @@ def _cover_pixmap(title: str, artist: str | None, size: int = 56) -> QPixmap:
     return pixmap
 
 
-def _sidecar_cover_path(audio_path: str | None) -> Path | None:
-    if not audio_path:
-        return None
-
-    folder = Path(audio_path).resolve().parent
-    candidate_names = (
-        "cover.jpg",
-        "cover.jpeg",
-        "cover.png",
-        "folder.jpg",
-        "folder.jpeg",
-        "folder.png",
-        "front.jpg",
-        "front.jpeg",
-        "front.png",
-        "album.jpg",
-        "album.jpeg",
-        "album.png",
-        "artwork.jpg",
-        "artwork.jpeg",
-        "artwork.png",
-    )
-    for name in candidate_names:
-        candidate = folder / name
-        if candidate.exists() and candidate.is_file():
-            return candidate
-    return None
-
-
-def _embedded_cover_bytes(audio_path: str | None) -> bytes | None:
-    if not audio_path:
-        return None
-
-    try:
-        audio = MutagenFile(audio_path, easy=False)
-    except Exception:
-        return None
-
-    if audio is None:
-        return None
-
-    try:
-        if isinstance(audio, ASF):
-            for picture in audio.get("WM/Picture", []):
-                data = getattr(picture, "data", None)
-                if data:
-                    return bytes(data)
-
-        if isinstance(audio, FLAC) and getattr(audio, "pictures", None):
-            picture = audio.pictures[0]
-            return bytes(getattr(picture, "data", b"") or b"")
-
-        if isinstance(audio, MP4):
-            covers = audio.tags.get("covr", []) if audio.tags else []
-            if covers:
-                cover = covers[0]
-                if isinstance(cover, MP4Cover):
-                    return bytes(cover)
-                return bytes(cover)
-
-        if hasattr(audio, "tags") and audio.tags:
-            for tag in audio.tags.values():
-                if isinstance(tag, APIC):
-                    return bytes(tag.data or b"")
-
-        if isinstance(audio, (OggVorbis, OggOpus)):
-            if audio.tags:
-                metadata_blocks = audio.tags.get("metadata_block_picture", [])
-                for raw in metadata_blocks:
-                    try:
-                        picture = Picture(base64.b64decode(raw))
-                        if picture.data:
-                            return bytes(picture.data)
-                    except Exception:
-                        continue
-
-                coverart_blocks = audio.tags.get("coverart", [])
-                for raw in coverart_blocks:
-                    try:
-                        data = base64.b64decode(raw)
-                        if data:
-                            return data
-                    except Exception:
-                        continue
-    except Exception:
-        return None
-
-    return None
-
-
 def _artwork_pixmap(title: str, artist: str | None, audio_path: str | None, size: int = 56) -> QPixmap:
-    sidecar = _sidecar_cover_path(audio_path)
+    sidecar = find_sidecar_cover_path(audio_path)
     if sidecar is not None:
         pixmap = QPixmap(str(sidecar))
         if not pixmap.isNull():
             return pixmap.scaled(size, size, Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation)
 
-    embedded = _embedded_cover_bytes(audio_path)
+    embedded = extract_embedded_cover_bytes(audio_path)
     if embedded:
         pixmap = QPixmap()
         if pixmap.loadFromData(embedded):

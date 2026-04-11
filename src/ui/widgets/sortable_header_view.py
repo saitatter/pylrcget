@@ -4,6 +4,8 @@ from PySide6.QtCore import QPoint, QRect, Qt
 from PySide6.QtGui import QColor, QPainter
 from PySide6.QtWidgets import QHeaderView, QMenu
 
+from ui.theme_tokens import STYLE_TOKENS
+
 
 class SortableHeaderView(QHeaderView):
     def __init__(
@@ -37,14 +39,15 @@ class SortableHeaderView(QHeaderView):
 
         arrow = "\u25B2" if self.sortIndicatorOrder() == Qt.SortOrder.AscendingOrder else "\u25BC"
         arrow_rect = rect.adjusted(0, 0, -8, 0)
+        accent = QColor(STYLE_TOKENS.get("color-accent", "#38bdf8"))
 
         painter.save()
         painter.setRenderHint(QPainter.RenderHint.TextAntialiasing, True)
-        painter.setPen(QColor("#38bdf8"))
+        painter.setPen(accent)
         painter.drawText(arrow_rect, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter, arrow)
 
         underline_y = rect.bottom() - 1
-        painter.fillRect(QRect(rect.left() + 6, underline_y, max(0, rect.width() - 12), 2), QColor("#38bdf8"))
+        painter.fillRect(QRect(rect.left() + 6, underline_y, max(0, rect.width() - 12), 2), accent)
         painter.restore()
 
     def reset_to_default_sort(self) -> None:
