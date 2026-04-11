@@ -5,7 +5,7 @@ import time
 
 from PySide6.QtCore import QThread, Signal
 
-from db.database import get_config
+from db.database import get_config, get_track_by_id
 from ui.workers.lyrics_download_worker import download_track_lyrics
 
 
@@ -44,15 +44,24 @@ class BulkLyricsDownloadWorker(QThread):
                     cancelled = True
                     break
 
+                current_label = {"value": f"Track {idx}/{total}"}
+                try:
+                    track = get_track_by_id(db, track_id)
+                    title = (track.title or "").strip()
+                    artist = (track.artist_name or "").strip()
+                    label = f"{artist} - {title}".strip(" -")
+                    if label:
+                        current_label["value"] = label
+                except Exception:
+                    pass
+
                 self.progress.emit(
                     idx - 1,
                     total,
-                    f"Track {idx}/{total}",
+                    current_label["value"],
                     "Preparing download...",
                     time.perf_counter() - started_at,
                 )
-
-                current_label = {"value": f"Track {idx}/{total}"}
 
                 def _progress(status: str, i=idx, t=total):
                     self.progress.emit(
