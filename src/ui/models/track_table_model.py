@@ -1,9 +1,12 @@
 # ui/track_table_model.py
 from __future__ import annotations
-from PySide6.QtCore import QAbstractTableModel, Qt, QModelIndex
+from collections.abc import Sequence
+
+from PySide6.QtCore import QAbstractTableModel, QModelIndex, Qt
 from PySide6.QtGui import QColor, QFont
 from core.tracklist_models import LyricsState, TrackListRow
 from ui.theme_tokens import STYLE_TOKENS
+
 
 def fmt_duration(seconds: int | None) -> str:
     if seconds is None:
@@ -12,17 +15,18 @@ def fmt_duration(seconds: int | None) -> str:
     s = seconds % 60
     return f"{m}:{s:02d}"
 
-class TrackTableModel(QAbstractTableModel):
-    def __init__(self, rows):
-        super().__init__()
-        self._rows = list(rows)
 
-    def set_rows(self, rows):
+class TrackTableModel(QAbstractTableModel):
+    def __init__(self, rows: Sequence[TrackListRow]) -> None:
+        super().__init__()
+        self._rows: list[TrackListRow] = list(rows)
+
+    def set_rows(self, rows: Sequence[TrackListRow]) -> None:
         self.beginResetModel()
         self._rows = list(rows)
         self.endResetModel()
 
-    def append_rows(self, rows) -> None:
+    def append_rows(self, rows: Sequence[TrackListRow]) -> None:
         new_rows = list(rows)
         if not new_rows:
             return
@@ -32,21 +36,28 @@ class TrackTableModel(QAbstractTableModel):
         self._rows.extend(new_rows)
         self.endInsertRows()
 
-    def rowCount(self, parent=QModelIndex()) -> int:
+    def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
+        del parent
         return len(self._rows)
 
-    def columnCount(self, parent=QModelIndex()) -> int:
+    def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:
+        del parent
         return 4
 
-    def headerData(self, section, orientation, role=Qt.DisplayRole):
+    def headerData(
+        self,
+        section: int,
+        orientation: Qt.Orientation,
+        role: int = int(Qt.ItemDataRole.DisplayRole),
+    ) -> str | None:
         if role != Qt.DisplayRole or orientation != Qt.Horizontal:
             return None
         return ["Track", "Duration", "Lyrics", ""][section]
 
-    def data(self, index: QModelIndex, role=Qt.DisplayRole):
+    def data(self, index: QModelIndex, role: int = int(Qt.ItemDataRole.DisplayRole)) -> object:
         if not index.isValid():
             return None
-        row = self._rows[index.row()]
+        row: TrackListRow = self._rows[index.row()]
         col = index.column()
 
         if role == Qt.DisplayRole:

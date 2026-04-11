@@ -4,7 +4,7 @@ import sqlite3
 import time
 from typing import TypedDict
 
-from PySide6.QtCore import QThread, Signal
+from PySide6.QtCore import QObject, QThread, Signal
 
 from db.database import get_config, get_track_by_id
 from db.models import Track
@@ -30,15 +30,15 @@ class BulkLyricsDownloadWorker(QThread):
         lrclib_instance: str,
         *,
         download_mode: str = "prefer_synced",
-        parent=None,
-    ):
+        parent: QObject | None = None,
+    ) -> None:
         super().__init__(parent)
         self.db_path = db_path
         self.track_ids = [int(t) for t in track_ids]
         self.lrclib_instance = lrclib_instance
         self.download_mode = (download_mode or "prefer_synced").strip() or "prefer_synced"
 
-    def run(self):
+    def run(self) -> None:
         total = len(self.track_ids)
         started_at = time.perf_counter()
         ok_count = 0
@@ -77,7 +77,7 @@ class BulkLyricsDownloadWorker(QThread):
                     time.perf_counter() - started_at,
                 )
 
-                def _progress(status: str, i=idx, t=total):
+                def _progress(status: str, i: int = idx, t: int = total) -> None:
                     self.progress.emit(
                         i - 1,
                         t,
