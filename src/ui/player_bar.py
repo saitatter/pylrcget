@@ -138,7 +138,7 @@ def _embedded_cover_bytes(audio_path: str | None) -> bytes | None:
                 picture = audio.tags.get(key)
                 if not picture:
                     continue
-                raw = bytes(picture) if isinstance(picture, APEBinaryValue) else bytes(picture)
+                raw = picture[0] if isinstance(picture, APEBinaryValue) else bytes(picture)
                 if b"\x00" in raw:
                     _, image_data = raw.split(b"\x00", 1)
                 else:

@@ -110,16 +110,14 @@ def download_track_lyrics(
         if mode == "plain_only":
             if plain:
                 notify("Saving plain lyrics...")
-                update_track_plain_lyrics(db, track_id, plain)
-                track = get_track_by_id(db, track_id)
+                track = update_track_plain_lyrics(db, track_id, plain)
                 _sync_track_outputs(db, track, notify, config=config)
                 return True, "Downloaded plain lyrics.", track_id, title_for_ui
             if synced:
                 derived_plain = _strip_empty(_strip_timestamps(synced))
                 if derived_plain:
                     notify("Saving plain lyrics derived from synced lyrics...")
-                    update_track_plain_lyrics(db, track_id, derived_plain)
-                    track = get_track_by_id(db, track_id)
+                    track = update_track_plain_lyrics(db, track_id, derived_plain)
                     _sync_track_outputs(db, track, notify, config=config)
                     return True, "Downloaded plain lyrics.", track_id, title_for_ui
             return False, "No plain lyrics found on LRCLIB for this track.", track_id, title_for_ui
@@ -128,8 +126,7 @@ def download_track_lyrics(
             if not plain:
                 plain = _strip_empty(_strip_timestamps(synced))
             notify("Saving synced + plain lyrics...")
-            update_track_synced_lyrics(db, track_id, synced, plain or "")
-            track = get_track_by_id(db, track_id)
+            track = update_track_synced_lyrics(db, track_id, synced, plain or "")
             _sync_track_outputs(db, track, notify, config=config)
             return True, "Downloaded synced lyrics.", track_id, title_for_ui
 
@@ -137,8 +134,7 @@ def download_track_lyrics(
             if mode == "synced_only":
                 return False, "Only plain lyrics were found; synced-only mode is enabled.", track_id, title_for_ui
             notify("Saving plain lyrics...")
-            update_track_plain_lyrics(db, track_id, plain)
-            track = get_track_by_id(db, track_id)
+            track = update_track_plain_lyrics(db, track_id, plain)
             _sync_track_outputs(db, track, notify, config=config)
             return True, "Downloaded plain lyrics.", track_id, title_for_ui
 
