@@ -241,9 +241,10 @@ def upgrade_database_if_needed(db: sqlite3.Connection, existing_version: int) ->
     # v20
     if existing_version <= 19:
         print("Migrate database version 20...")
-        db.executescript("""
-            ALTER TABLE config_data ADD COLUMN download_lyrics_mode TEXT DEFAULT 'prefer_synced';
-        """)
+        if not _column_exists("config_data", "download_lyrics_mode"):
+            db.execute(
+                "ALTER TABLE config_data ADD COLUMN download_lyrics_mode TEXT DEFAULT 'prefer_synced'"
+            )
         db.commit()
         db.execute("PRAGMA user_version=20")
 
@@ -262,7 +263,8 @@ def upgrade_database_if_needed(db: sqlite3.Connection, existing_version: int) ->
                     WHEN download_synced_only = 1 THEN 'synced_only'
                     ELSE 'prefer_synced'
                 END
-                WHERE download_lyrics_mode IS NULL
+                WHERE download_lyrics_mode = 'prefer_synced'
+                   OR download_lyrics_mode IS NULL
                    OR TRIM(download_lyrics_mode) = ''
             """)
 

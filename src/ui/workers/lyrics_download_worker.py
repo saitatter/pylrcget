@@ -70,7 +70,7 @@ def download_track_lyrics(
     title_for_ui = ""
     try:
         notify("Reading track metadata...")
-        db = sqlite3.connect(db_path)
+        db = sqlite3.connect(db_path, timeout=15.0)
         db.row_factory = sqlite3.Row
 
         track = get_track_by_id(db, track_id)

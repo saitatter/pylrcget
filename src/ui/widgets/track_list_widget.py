@@ -525,6 +525,9 @@ class TrackListWidget(QWidget):
         idx = self.model.index(row, 3)
         self.model.dataChanged.emit(idx, idx, [Qt.DisplayRole, Qt.UserRole])
 
+    def get_download_state(self, track_id: int) -> str:
+        return self._download_states.get(int(track_id), "idle")
+
     def _on_sort_changed(self, column: int, order: Qt.SortOrder) -> None:
         if column == 3:
             return

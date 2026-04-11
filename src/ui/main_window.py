@@ -71,6 +71,7 @@ class MainWindow(QMainWindow):
         self._album_label_cache: dict[int, str] = {}
         self._recent_toast_messages: set[str] = set()
         self._active_download_track_ids: set[int] = set()
+        self._download_state_tokens: dict[int, int] = {}
         self._nav_apply_in_progress = False
         self._tab_sync_suppressed = False
         self.scanner = None
@@ -860,8 +861,20 @@ class MainWindow(QMainWindow):
             logger.warning("Failed to update track after lyrics download for %s: %s", track_id, exc)
 
         self._active_download_track_ids.discard(int(track_id))
-        self._set_track_download_state_all(int(track_id), "success" if ok else "error")
-        QTimer.singleShot(1800, lambda tid=int(track_id): self._set_track_download_state_all(tid, "idle"))
+        state = "success" if ok else "error"
+        self._set_track_download_state_all(int(track_id), state)
+
+        token = self._download_state_tokens.get(int(track_id), 0) + 1
+        self._download_state_tokens[int(track_id)] = token
+        QTimer.singleShot(
+            1800,
+            self,
+            lambda tid=int(track_id), expected=token, expected_state=state: self._reset_track_download_state_if_unchanged(
+                tid,
+                expected,
+                expected_state,
+            ),
+        )
 
     def _on_download_batch_finished(self, ok: bool, msg: str, stats: object) -> None:
         self.statusBar().showMessage(msg, 4000)
@@ -899,6 +912,21 @@ class MainWindow(QMainWindow):
             self.albums_tab.track_list.set_download_state(int(track_id), state)
         if hasattr(self.artists_tab, "album_browser") and hasattr(self.artists_tab.album_browser, "track_list"):
             self.artists_tab.album_browser.track_list.set_download_state(int(track_id), state)
+
+    def _get_primary_track_download_state(self, track_id: int) -> str:
+        return self.track_list.get_download_state(int(track_id))
+
+    def _reset_track_download_state_if_unchanged(
+        self,
+        track_id: int,
+        expected_token: int,
+        expected_state: str,
+    ) -> None:
+        if self._download_state_tokens.get(int(track_id)) != int(expected_token):
+            return
+        if self._get_primary_track_download_state(int(track_id)) != expected_state:
+            return
+        self._set_track_download_state_all(int(track_id), "idle")
 
     @staticmethod
     def _download_mode_label(mode: str) -> str:
