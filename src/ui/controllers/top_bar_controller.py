@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
 
 from ui.icon_loader import load_svg_icon
 from ui.spacing import SPACE_1, SPACE_2, set_layout_spacing
+from ui.services.download_modes import download_missing_tooltip
 
 
 class TopBarController(QWidget):
@@ -187,6 +188,11 @@ class TopBarController(QWidget):
 
     def set_actions_label(self, text: str) -> None:
         self.actions_label.setText(text)
+
+    def set_download_missing_mode(self, mode: str) -> None:
+        tooltip = download_missing_tooltip(mode)
+        self.btn_download_missing.setToolTip(tooltip)
+        self.btn_download_missing.setStatusTip(tooltip)
 
     def set_logs_checked(self, checked: bool) -> None:
         self.btn_logs.setChecked(bool(checked))

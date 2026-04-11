@@ -10,6 +10,7 @@ from db.models import Track
 from db.queries import get_config, get_track_by_id, get_track_ids_for_download_mode, record_download_history
 from core.tracklist_models import DownloadState
 from ui.services.feedback import notify_user
+from ui.services.download_modes import download_mode_label, no_missing_tracks_message
 from ui.widgets.download_progress_overlay import DownloadProgressOverlay
 from ui.workers.bulk_lyrics_download_worker import BulkDownloadStats, BulkLyricsDownloadWorker
 
@@ -87,10 +88,10 @@ class LyricsDownloadController(QObject):
         if not track_ids:
             notify_user(
                 self._app_state,
-                "No tracks are missing lyrics for the current download mode.",
+                no_missing_tracks_message(mode),
                 "info",
                 show_status=self._show_status,
-                status_timeout_ms=3000,
+                status_timeout_ms=4000,
             )
             return
         self.start_downloads(track_ids, mode_override=mode)
@@ -286,9 +287,4 @@ class LyricsDownloadController(QObject):
 
     @staticmethod
     def _download_mode_label(mode: str) -> str:
-        labels = {
-            "prefer_synced": "Prefer synced",
-            "synced_only": "Synced only",
-            "plain_only": "Plain only",
-        }
-        return labels.get((mode or "").strip(), "Custom")
+        return download_mode_label(mode)

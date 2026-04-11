@@ -30,6 +30,7 @@ from core.lyrics_sidecar import DEFAULT_LYRICS_FILE_PATTERN
 from db.database import get_config, get_directories, set_config, set_directories
 from db.models import Config
 from library.scan_library import preview_audio_path_exclusions
+from ui.services.download_modes import missing_lyrics_detail, missing_lyrics_summary
 from ui.theme_tokens import get_available_themes
 
 
@@ -139,21 +140,25 @@ class MusicFoldersDialog(QDialog):
         self.download_mode_combo.addItem("Plain only", "plain_only")
         lyrics_layout.addWidget(QLabel("Download mode"), 1, 0)
         lyrics_layout.addWidget(self.download_mode_combo, 1, 1, 1, 3)
+        self.download_mode_hint_label = QLabel("")
+        self.download_mode_hint_label.setObjectName("SettingsValidationHint")
+        self.download_mode_hint_label.setWordWrap(True)
+        lyrics_layout.addWidget(self.download_mode_hint_label, 2, 0, 1, 4)
 
         self.output_dir_edit = QLineEdit()
         self.output_dir_edit.setPlaceholderText("Leave empty to save next to the audio file")
         self.browse_output_btn = QPushButton("Browse")
         self.clear_output_btn = QPushButton("Use Track Folder")
 
-        lyrics_layout.addWidget(QLabel("Download directory"), 2, 0)
-        lyrics_layout.addWidget(self.output_dir_edit, 2, 1)
-        lyrics_layout.addWidget(self.browse_output_btn, 2, 2)
-        lyrics_layout.addWidget(self.clear_output_btn, 2, 3)
+        lyrics_layout.addWidget(QLabel("Download directory"), 3, 0)
+        lyrics_layout.addWidget(self.output_dir_edit, 3, 1)
+        lyrics_layout.addWidget(self.browse_output_btn, 3, 2)
+        lyrics_layout.addWidget(self.clear_output_btn, 3, 3)
 
         self.pattern_edit = QLineEdit()
         self.pattern_edit.setPlaceholderText(DEFAULT_LYRICS_FILE_PATTERN)
-        lyrics_layout.addWidget(QLabel("Filename pattern"), 3, 0)
-        lyrics_layout.addWidget(self.pattern_edit, 3, 1, 1, 3)
+        lyrics_layout.addWidget(QLabel("Filename pattern"), 4, 0)
+        lyrics_layout.addWidget(self.pattern_edit, 4, 1, 1, 3)
 
         self.pattern_preview_label = QLabel("")
         self.pattern_preview_label.setObjectName("SettingsValidationHint")
@@ -164,14 +169,14 @@ class MusicFoldersDialog(QDialog):
         )
         mono_font = QFontDatabase.systemFont(QFontDatabase.SystemFont.FixedFont)
         self.pattern_preview_label.setFont(mono_font)
-        lyrics_layout.addWidget(self.pattern_preview_label, 4, 0, 1, 4)
+        lyrics_layout.addWidget(self.pattern_preview_label, 5, 0, 1, 4)
 
         hint = QLabel(
             "Available placeholders: {artist}, {title}, {album}, {track}. "
             "Extensions are added automatically as .lrc and .txt."
         )
         hint.setWordWrap(True)
-        lyrics_layout.addWidget(hint, 5, 0, 1, 4)
+        lyrics_layout.addWidget(hint, 6, 0, 1, 4)
         lyrics_tab_layout.addWidget(lyrics_box)
         lyrics_tab_layout.addStretch(1)
 
@@ -211,6 +216,7 @@ class MusicFoldersDialog(QDialog):
         self.save_sidecars_chk.toggled.connect(self._update_export_fields_enabled)
         self.pattern_edit.textChanged.connect(self._update_pattern_preview)
         self.output_dir_edit.textChanged.connect(self._update_pattern_preview)
+        self.download_mode_combo.currentIndexChanged.connect(self._update_download_mode_hint)
         self.add_excluded_path_btn.clicked.connect(self._add_excluded_path)
         self.add_excluded_file_btn.clicked.connect(self._add_excluded_file)
         self.remove_excluded_path_btn.clicked.connect(self._remove_selected_excluded_path_lines)
@@ -242,6 +248,7 @@ class MusicFoldersDialog(QDialog):
             if os.path.isdir(first_directory):
                 self._last_browse_dir = first_directory
         self._update_export_fields_enabled()
+        self._update_download_mode_hint()
         self._update_pattern_preview()
         self._validate_regex_patterns()
 
@@ -407,6 +414,12 @@ class MusicFoldersDialog(QDialog):
         self.browse_output_btn.setEnabled(enabled)
         self.clear_output_btn.setEnabled(enabled)
         self._update_pattern_preview()
+
+    def _update_download_mode_hint(self) -> None:
+        mode = str(self.download_mode_combo.currentData() or "prefer_synced")
+        self.download_mode_hint_label.setText(
+            f"{missing_lyrics_summary(mode)} {missing_lyrics_detail(mode)}"
+        )
 
     def _safe_filename_component(self, value: str) -> str:
         cleaned = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", (value or "").strip())

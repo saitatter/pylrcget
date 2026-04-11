@@ -366,6 +366,7 @@ class MainWindow(QMainWindow):
 
         # --- Filters wiring ---
         self.top_bar.bind_tab_order(self, self.tabs)
+        self._sync_download_mode_ui()
 
         # initial load
         self._apply_track_filters()
@@ -425,12 +426,17 @@ class MainWindow(QMainWindow):
             after = updated_config.theme_mode
             if after != before:
                 self._apply_theme(after)
+            self._sync_download_mode_ui()
             for view in self._all_lyrics_views():
                 view.set_reaction_delay_ms(updated_config.reaction_delay_ms)
             self._apply_track_filters()
             after_dirs = get_directories(self.app_state.db)
             if dlg.directories_changed and after_dirs:
                 self.refresh_library()
+
+    def _sync_download_mode_ui(self) -> None:
+        config = get_config(self.app_state.db)
+        self.top_bar.set_download_missing_mode(str(config.download_lyrics_mode or "prefer_synced"))
 
     def open_about_modal(self):
         notify_user(

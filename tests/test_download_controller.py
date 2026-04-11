@@ -157,6 +157,38 @@ class LyricsDownloadControllerTests(unittest.TestCase):
             finally:
                 db.close()
 
+    def test_download_missing_reports_mode_specific_semantics_when_nothing_matches(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db = initialize_database(tmp)
+            try:
+                app_state = SimpleNamespace(db=db, db_path=str(Path(tmp) / "db.sqlite3"))
+                overlay = _FakeOverlay()
+
+                config = replace(get_config(db), download_lyrics_mode="plain_only")
+                set_config(db, config)
+                controller, statuses, notifications, *_ = self._make_controller(app_state, overlay)
+
+                with patch("ui.controllers.lyrics_download_controller.get_track_ids_for_download_mode", return_value=[]):
+                    controller.download_missing()
+
+                self.assertFalse(overlay.started)
+                self.assertIn(
+                    (
+                        "No tracks are missing lyrics for Plain only. Tracks count as missing when they do not have plain lyrics yet.",
+                        "info",
+                    ),
+                    notifications,
+                )
+                self.assertIn(
+                    (
+                        "No tracks are missing lyrics for Plain only. Tracks count as missing when they do not have plain lyrics yet.",
+                        4000,
+                    ),
+                    statuses,
+                )
+            finally:
+                db.close()
+
     def test_progress_and_finish_flow_updates_overlay_and_notifications(self):
         with tempfile.TemporaryDirectory() as tmp:
             db = initialize_database(tmp)
