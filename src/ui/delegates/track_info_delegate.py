@@ -5,6 +5,7 @@ from PySide6.QtGui import QColor, QCursor, QFont, QFontMetrics, QPainter
 from PySide6.QtWidgets import QApplication, QStyle, QStyledItemDelegate
 
 from core.tracklist_models import TrackListRow
+from ui.theme_tokens import STYLE_TOKENS
 
 
 class TrackInfoDelegate(QStyledItemDelegate):
@@ -41,8 +42,12 @@ class TrackInfoDelegate(QStyledItemDelegate):
 
         is_selected = bool(option.state & option.state.State_Selected)
         title_color = option.palette.highlightedText().color() if is_selected else option.palette.text().color()
-        meta_color = option.palette.highlightedText().color() if is_selected else QColor("#94a3b8")
-        link_color = option.palette.highlightedText().color() if is_selected else QColor("#60a5fa")
+        meta_color = option.palette.highlightedText().color() if is_selected else QColor(
+            STYLE_TOKENS.get("color-text-soft", "#94a3b8")
+        )
+        link_color = option.palette.highlightedText().color() if is_selected else QColor(
+            STYLE_TOKENS.get("color-accent-alt", "#60a5fa")
+        )
 
         title_metrics = QFontMetrics(title_font)
         meta_metrics = QFontMetrics(meta_font)

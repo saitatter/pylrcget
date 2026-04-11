@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
 )
 
 from ui.spacing import SPACE_1, SPACE_2, set_layout_spacing
+from ui.theme_tokens import STYLE_TOKENS
 
 
 class _LogBridge(QObject):
@@ -172,11 +173,11 @@ class LogPanel(QWidget):
 
     def _render_entry(self, level: str, message: str) -> str:
         palette = {
-            "INFO": "#93c5fd",
-            "WARNING": "#fbbf24",
-            "ERROR": "#f87171",
-            "CRITICAL": "#ef4444",
+            "INFO": STYLE_TOKENS.get("color-info-border", "#93c5fd"),
+            "WARNING": STYLE_TOKENS.get("color-warning-border", "#fbbf24"),
+            "ERROR": STYLE_TOKENS.get("color-error-border", "#f87171"),
+            "CRITICAL": STYLE_TOKENS.get("color-error-text", "#ef4444"),
         }
-        color = palette.get(level.upper(), "#cbd5e1")
+        color = palette.get(level.upper(), STYLE_TOKENS.get("color-text-soft", "#cbd5e1"))
         safe = html.escape(message)
         return f'<span style="color:{color}; white-space:pre-wrap;">{safe}</span>'

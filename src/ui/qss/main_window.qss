@@ -68,7 +68,7 @@ QWidget#ScanRow {
 }
 
 QWidget#DownloadOverlay {
-    background: rgba(18, 12, 20, 110);
+    background: {{color-overlay-scrim}};
 }
 
 QFrame#DownloadOverlayCard {
