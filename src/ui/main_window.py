@@ -18,7 +18,19 @@ import os
 
 from dataclasses import replace
 
-from db.database import get_album_by_id, get_artist_by_id, get_config, get_directories, set_config
+from db.queries import (
+    get_album_by_id,
+    get_artist_by_id,
+    get_config,
+    get_directories,
+    get_track_by_id,
+    mark_tracks_instrumental,
+    set_config,
+    unmark_tracks_instrumental,
+    update_track_null_lyrics,
+    update_track_plain_lyrics,
+    update_track_synced_lyrics,
+)
 from ui.workers.library_scanner import LibraryScanner
 from ui.controllers.lyrics_download_controller import LyricsDownloadController
 from ui.controllers.navigation_controller import NavigationController
@@ -699,12 +711,6 @@ class MainWindow(QMainWindow):
 
         track_id = self.app_state.player.track.track_id
 
-        from db.database import (
-            update_track_synced_lyrics,
-            update_track_plain_lyrics,
-            update_track_null_lyrics,
-        )
-
         for view in self._all_lyrics_views():
             view.set_save_feedback("loading", "Saving...")
         try:
@@ -1008,8 +1014,6 @@ class MainWindow(QMainWindow):
         if not self._confirm_bulk("Instrumental", "Mark selected tracks as instrumental?", len(track_ids)):
             return
 
-        from db.database import mark_tracks_instrumental
-
         # Preserve selection across refresh
         selected_before = set(track_ids)
 
@@ -1029,8 +1033,6 @@ class MainWindow(QMainWindow):
 
         if not self._confirm_bulk("Instrumental", "Unmark instrumental for selected tracks?", len(track_ids)):
             return
-
-        from db.database import unmark_tracks_instrumental
 
         selected_before = set(track_ids)
 

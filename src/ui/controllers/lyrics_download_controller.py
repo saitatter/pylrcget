@@ -6,9 +6,8 @@ from typing import Callable
 
 from PySide6.QtCore import QObject, QTimer
 
-from db.database import get_config, get_track_by_id, record_download_history
 from db.models import Track
-from db.queries import get_track_ids_for_download_mode
+from db.queries import get_config, get_track_by_id, get_track_ids_for_download_mode, record_download_history
 from core.tracklist_models import DownloadState
 from ui.widgets.download_progress_overlay import DownloadProgressOverlay
 from ui.workers.bulk_lyrics_download_worker import BulkDownloadStats, BulkLyricsDownloadWorker

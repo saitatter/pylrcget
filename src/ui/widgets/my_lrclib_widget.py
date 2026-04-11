@@ -1,12 +1,10 @@
 from __future__ import annotations
 
-from collections.abc import Callable
-
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QStandardItem, QStandardItemModel
 from PySide6.QtWidgets import QMenu, QTableView, QTabWidget, QVBoxLayout, QWidget
 
-from db.database import get_download_history_rows, get_publish_history_rows
+from db.queries import get_download_history_rows, get_publish_history_rows
 from ui.style_loader import load_stylesheet
 from ui.widgets.empty_state_widget import EmptyStateWidget
 from ui.widgets.sortable_header_view import SortableHeaderView

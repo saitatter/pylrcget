@@ -6,7 +6,7 @@ from dataclasses import replace
 from PySide6.QtCore import QObject, QTimer, Qt
 from PySide6.QtWidgets import QLabel, QLayout, QTabWidget, QToolButton, QWidget
 
-from db.database import get_album_by_id, get_artist_by_id, get_config, set_config
+from db.queries import get_album_by_id, get_artist_by_id, get_config, set_config
 from ui.library_routes import LibraryRoute, deserialize_route, route_breadcrumbs, serialize_route, tracks_all
 
 

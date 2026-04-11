@@ -5,8 +5,7 @@ from typing import Callable
 
 from PySide6.QtCore import QObject
 
-from db.database import get_config, get_track_by_id
-from db.queries import record_publish_history
+from db.queries import get_config, get_track_by_id, record_publish_history
 from ui.dialogs.publish_lyrics_dialog import PublishLyricsDialog
 
 logger = logging.getLogger(__name__)

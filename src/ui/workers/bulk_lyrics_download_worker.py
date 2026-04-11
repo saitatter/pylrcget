@@ -6,8 +6,8 @@ from typing import TypedDict
 
 from PySide6.QtCore import QObject, QThread, Signal
 
-from db.database import get_config, get_track_by_id
 from db.models import Track
+from db.queries import get_config, get_track_by_id
 from ui.services.lyrics_download_service import download_track_lyrics
 
 
