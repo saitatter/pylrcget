@@ -36,9 +36,10 @@ class BulkLyricsDownloadWorker(QThread):
         fail_count = 0
         cancelled = False
         request_delay_s = 0.35
-        db = sqlite3.connect(self.db_path, timeout=15.0)
-        db.row_factory = sqlite3.Row
+        db = None
         try:
+            db = sqlite3.connect(self.db_path, timeout=15.0)
+            db.row_factory = sqlite3.Row
             config = get_config(db)
             for idx, track_id in enumerate(self.track_ids, start=1):
                 if self.isInterruptionRequested():
@@ -103,7 +104,8 @@ class BulkLyricsDownloadWorker(QThread):
                     time.perf_counter() - started_at,
                 )
         finally:
-            db.close()
+            if db is not None:
+                db.close()
 
         stats = {
             "total": total,

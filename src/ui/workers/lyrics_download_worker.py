@@ -10,7 +10,7 @@ from lrclib import LrcLibAPI  # pip install lrclibapi
 from core.embed_lyrics import embed_lyrics_for_track
 from core.lyrics_sidecar import export_lyrics_sidecars
 from db.database import get_track_by_id, get_config, update_track_plain_lyrics, update_track_synced_lyrics
-from db.models import Config
+from db.models import Config, Track
 
 logger = logging.getLogger(__name__)
 
@@ -149,7 +149,7 @@ def download_track_lyrics(
 
 def _sync_track_outputs(
     db: sqlite3.Connection,
-    track,
+    track: Track,
     notify,
     *,
     config: Config | None = None,
