@@ -35,6 +35,7 @@ class LogPanel(QWidget):
         self.setObjectName("LogPanel")
         self._entries: list[tuple[str, str]] = []
         self._log_path: str = ""
+        self._max_entries = 1000
 
         root = QVBoxLayout(self)
         set_layout_spacing(root, margins=(SPACE_2, SPACE_2, SPACE_2, SPACE_2), spacing=SPACE_2)
@@ -94,8 +95,23 @@ class LogPanel(QWidget):
         self.output.clear()
 
     def append_log(self, level: str, message: str) -> None:
-        self._entries.append((level.upper(), message))
-        self._refresh_output()
+        level = level.upper()
+        self._entries.append((level, message))
+        if len(self._entries) > self._max_entries:
+            self._entries = self._entries[-self._max_entries :]
+            self._refresh_output()
+            return
+
+        selected = self.level_filter.currentData() or "ALL"
+        if self._matches_filter(level, selected):
+            cursor = self.output.textCursor()
+            cursor.movePosition(cursor.MoveOperation.End)
+            cursor.insertHtml(self._render_entry(level, message))
+            cursor.insertBlock()
+            self.output.setTextCursor(cursor)
+            bar = self.output.verticalScrollBar()
+            if bar is not None:
+                bar.setValue(bar.maximum())
 
     def copy_visible_logs(self) -> None:
         QApplication.clipboard().setText(self._visible_log_text())

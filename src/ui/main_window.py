@@ -582,7 +582,11 @@ class MainWindow(QMainWindow):
             return
         self._recent_toast_messages.add(key)
         self.toasts.show_toast(message, notify_type=notify_type, timeout_ms=timeout_ms)
-        QTimer.singleShot(max(1000, int(timeout_ms) + 500), lambda k=key: self._recent_toast_messages.discard(k))
+        QTimer.singleShot(
+            max(1000, int(timeout_ms) + 500),
+            self,
+            lambda k=key: self._recent_toast_messages.discard(k),
+        )
 
     def _scan_finished(self, ok: bool, msg: str):
         # hide progress strip
