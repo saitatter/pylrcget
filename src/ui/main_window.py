@@ -389,39 +389,6 @@ class MainWindow(QMainWindow):
         self.scan_row.setVisible(False)
         self.scan_row.setObjectName("ScanRow")
 
-        self.download_row = QWidget()
-        download_layout = QHBoxLayout(self.download_row)
-        set_layout_spacing(download_layout, margins=(SPACE_3, SPACE_2, SPACE_3, SPACE_2), spacing=SPACE_2)
-
-        self.download_label = QLabel("Downloading lyrics…")
-        self.download_label.setObjectName("ScanLabel")
-        self.download_details = QLabel("Preparing download…")
-        self.download_details.setObjectName("ScanDetails")
-
-        self.download_progress_bar = QProgressBar()
-        self.download_progress_bar.setObjectName("ScanProgress")
-        self.download_progress_bar.setTextVisible(False)
-        self.download_progress_bar.setRange(0, 100)
-        self.download_progress_bar.setValue(0)
-
-        download_text = QVBoxLayout()
-        set_layout_spacing(download_text, spacing=SPACE_1)
-        download_text.addWidget(self.download_label)
-        download_text.addWidget(self.download_details)
-
-        self.btn_cancel_download = QPushButton("Cancel")
-        self.btn_cancel_download.setObjectName("ScanCancelButton")
-        self.btn_cancel_download.clicked.connect(self._cancel_downloads)
-        self.btn_cancel_download.setEnabled(False)
-
-        download_layout.addLayout(download_text)
-        download_layout.addWidget(self.download_progress_bar, 1)
-        download_layout.addWidget(self.btn_cancel_download)
-
-        self.layout.addWidget(self.download_row)
-        self.download_row.setVisible(False)
-        self.download_row.setObjectName("ScanRow")
-
         self.log_panel = LogPanel(self)
         self.log_panel.set_log_file_path(getattr(self.app_state, "log_path", ""))
         self.log_panel.setVisible(False)
@@ -815,12 +782,6 @@ class MainWindow(QMainWindow):
             self._set_track_download_state_all(track_id, "loading")
         self._active_download_track_ids = set(unique_ids)
 
-        self.download_row.setVisible(False)
-        self.btn_cancel_download.setEnabled(True)
-        self.download_label.setText(f"Downloading lyrics ({self._download_mode_label(mode)})")
-        self.download_details.setText("Preparing download queue…")
-        self.download_progress_bar.setRange(0, len(unique_ids))
-        self.download_progress_bar.setValue(0)
         self.download_overlay.start_batch(self._download_mode_label(mode), len(unique_ids))
         self.statusBar().showMessage(f"Starting lyrics download... ({lrclib_instance})")
 
@@ -847,15 +808,10 @@ class MainWindow(QMainWindow):
     def _cancel_downloads(self) -> None:
         if self._download_worker is None or not self._download_worker.isRunning():
             return
-        self.btn_cancel_download.setEnabled(False)
-        self.download_details.setText("Cancelling after the current track…")
         self._download_worker.requestInterruption()
 
     def _on_download_progress(self, current: int, total: int, track_label: str, status: str, elapsed_s: float) -> None:
-        self.download_progress_bar.setRange(0, max(1, int(total)))
-        self.download_progress_bar.setValue(min(int(current), int(total)))
         label = track_label or "Lyrics download"
-        self.download_details.setText(f"{label}  •  {status}")
         self.download_overlay.update_progress(current, total, label, status)
         self.statusBar().showMessage(status)
 
@@ -886,8 +842,6 @@ class MainWindow(QMainWindow):
 
     def _on_download_batch_finished(self, ok: bool, msg: str, stats: object) -> None:
         self.statusBar().showMessage(msg, 4000)
-        self.btn_cancel_download.setEnabled(False)
-        self.download_row.setVisible(False)
         for track_id in list(self._active_download_track_ids):
             self._set_track_download_state_all(int(track_id), "idle")
         self._active_download_track_ids.clear()
