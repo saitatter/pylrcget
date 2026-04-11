@@ -3,9 +3,12 @@ from __future__ import annotations
 
 import logging
 import sqlite3
+import time
 from PySide6.QtCore import QThread, Signal
 
 from lrclib import LrcLibAPI  # pip install lrclibapi
+from lrclib.exceptions import APIError, NotFoundError, RateLimitError, ServerError
+from requests import exceptions as requests_exceptions
 
 from core.embed_lyrics import embed_lyrics_for_track
 from core.lyrics_sidecar import export_lyrics_sidecars
@@ -13,6 +16,9 @@ from db.database import get_track_by_id, get_config, update_track_plain_lyrics, 
 from db.models import Config, Track
 
 logger = logging.getLogger(__name__)
+_RETRYABLE_API_ERRORS = (RateLimitError, ServerError, requests_exceptions.Timeout, requests_exceptions.ConnectionError)
+_MAX_LRCLIB_RETRIES = 3
+_INITIAL_BACKOFF_S = 0.5
 
 def _strip_empty(s: str | None) -> str | None:
     if not s:
@@ -62,6 +68,41 @@ class LyricsDownloadWorker(QThread):
         self.finished.emit(ok, msg, track_id)
 
 
+def _should_retry_lrclib_error(exc: Exception) -> bool:
+    if isinstance(exc, NotFoundError):
+        return False
+    if isinstance(exc, _RETRYABLE_API_ERRORS):
+        return True
+    if isinstance(exc, APIError):
+        status_code = int(getattr(exc, "status_code", 0) or 0)
+        return status_code == 429 or status_code >= 500
+    return False
+
+
+def _fetch_lyrics_with_retry(api: LrcLibAPI, *, notify, title: str, artist: str, album: str | None, duration_s: int | None):
+    backoff_s = _INITIAL_BACKOFF_S
+    last_error: Exception | None = None
+    for attempt in range(1, _MAX_LRCLIB_RETRIES + 1):
+        try:
+            notify(f"Querying LRCLIB... (attempt {attempt}/{_MAX_LRCLIB_RETRIES})")
+            return api.get_lyrics(
+                track_name=title,
+                artist_name=artist,
+                album_name=album or None,
+                duration=duration_s or None,
+            )
+        except Exception as exc:
+            last_error = exc
+            if not _should_retry_lrclib_error(exc) or attempt >= _MAX_LRCLIB_RETRIES:
+                raise
+            logger.warning("Retrying LRCLIB request for %s - %s after %s: %s", artist, title, type(exc).__name__, exc)
+            notify(f"LRCLIB request failed ({type(exc).__name__}); retrying in {backoff_s:.1f}s...")
+            time.sleep(backoff_s)
+            backoff_s *= 2
+    if last_error is not None:
+        raise last_error
+
+
 def download_track_lyrics(
     db_path: str,
     track_id: int,
@@ -95,14 +136,14 @@ def download_track_lyrics(
         if not title or not artist:
             return False, "Missing title/artist; cannot search lyrics.", track_id, title_for_ui
 
-        notify("Querying LRCLIB...")
         api = LrcLibAPI(user_agent="lrcget-python/0.1", base_url=lrclib_instance)
-
-        lyrics = api.get_lyrics(
-            track_name=title,
-            artist_name=artist,
-            album_name=album or None,
-            duration=duration_s or None,
+        lyrics = _fetch_lyrics_with_retry(
+            api,
+            notify=notify,
+            title=title,
+            artist=artist,
+            album=album or None,
+            duration_s=duration_s or None,
         )
 
         synced = _strip_empty(getattr(lyrics, "synced_lyrics", None))
