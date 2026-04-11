@@ -26,6 +26,10 @@ def upgrade_database_if_needed(db: sqlite3.Connection, existing_version: int) ->
     if existing_version >= CURRENT_DB_VERSION:
         return
 
+    def _column_exists(table: str, column: str) -> bool:
+        rows = db.execute(f"PRAGMA table_info({table})").fetchall()
+        return any(str(row["name"]) == column for row in rows)
+
     # v1
     if existing_version <= 0:
         print("Migrate database version 1...")
@@ -242,3 +246,25 @@ def upgrade_database_if_needed(db: sqlite3.Connection, existing_version: int) ->
         """)
         db.commit()
         db.execute("PRAGMA user_version=20")
+
+    # v21
+    if existing_version <= 20:
+        print("Migrate database version 21...")
+        if not _column_exists("config_data", "download_lyrics_mode"):
+            db.execute(
+                "ALTER TABLE config_data ADD COLUMN download_lyrics_mode TEXT DEFAULT 'prefer_synced'"
+            )
+
+        if _column_exists("config_data", "download_synced_only"):
+            db.execute("""
+                UPDATE config_data
+                SET download_lyrics_mode = CASE
+                    WHEN download_synced_only = 1 THEN 'synced_only'
+                    ELSE 'prefer_synced'
+                END
+                WHERE download_lyrics_mode IS NULL
+                   OR TRIM(download_lyrics_mode) = ''
+            """)
+
+        db.commit()
+        db.execute("PRAGMA user_version=21")
