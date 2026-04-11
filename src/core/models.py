@@ -3,6 +3,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from core.tracklist_models import LyricsState
+
 
 @dataclass(frozen=True)
 class TrackRow:
@@ -10,7 +12,7 @@ class TrackRow:
     title: str
     artist: str | None
     duration_s: int | None
-    lyrics_state: str  # "synced" | "plain" | "instrumental" | "none"
+    lyrics_state: LyricsState
 
 
 @dataclass(frozen=True)

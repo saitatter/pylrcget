@@ -16,6 +16,7 @@ from ui.delegates.track_info_delegate import TrackInfoDelegate
 from ui.style_loader import load_stylesheet
 from ui.widgets.sortable_header_view import SortableHeaderView
 from core.tracklist_models import TrackListRow
+from core.tracklist_models import DownloadState, LyricsState, TrackListRow
 
 
 class TrackListWidget(QWidget):
@@ -49,7 +50,7 @@ class TrackListWidget(QWidget):
         self._album_ids: list[int] | None = None
         self._scope_label: str = ""
         self._scope_banner_enabled = True
-        self._download_states: dict[int, str] = {}
+        self._download_states: dict[int, DownloadState] = {}
         self._sort_column = 0
         self._sort_order = Qt.SortOrder.AscendingOrder
         self._has_more_rows = False
@@ -247,13 +248,13 @@ class TrackListWidget(QWidget):
             txt = r["txt_lyrics"]
 
             if instrumental:
-                state = "instrumental"
+                state = LyricsState.INSTRUMENTAL
             elif lrc and lrc != "[au: instrumental]":
-                state = "synced"
+                state = LyricsState.SYNCED
             elif txt:
-                state = "plain"
+                state = LyricsState.PLAIN
             else:
-                state = "none"
+                state = LyricsState.NONE
 
             dur = r["duration"]
             dur_s = int(round(dur)) if dur is not None else None
@@ -268,7 +269,7 @@ class TrackListWidget(QWidget):
                     album_id=int(r["album_id"]) if r["album_id"] is not None else None,
                     duration_s=dur_s,
                     lyrics_state=state,
-                    download_state=self._download_states.get(int(r["id"]), "idle"),
+                    download_state=self._download_states.get(int(r["id"]), DownloadState.IDLE),
                 )
             )
 
@@ -515,18 +516,19 @@ class TrackListWidget(QWidget):
         elif self._empty_action == "configure-folders":
             self.configureFoldersRequested.emit()
 
-    def set_download_state(self, track_id: int, state: str) -> None:
-        self._download_states[int(track_id)] = state
+    def set_download_state(self, track_id: int, state: str | DownloadState) -> None:
+        normalized = state if isinstance(state, DownloadState) else DownloadState(str(state))
+        self._download_states[int(track_id)] = normalized
         row = self.model.row_for_track_id(int(track_id))
         if row < 0:
             return
         current = self.model._rows[row]
-        self.model._rows[row] = replace(current, download_state=state)
+        self.model._rows[row] = replace(current, download_state=normalized)
         idx = self.model.index(row, 3)
         self.model.dataChanged.emit(idx, idx, [Qt.DisplayRole, Qt.UserRole])
 
-    def get_download_state(self, track_id: int) -> str:
-        return self._download_states.get(int(track_id), "idle")
+    def get_download_state(self, track_id: int) -> DownloadState:
+        return self._download_states.get(int(track_id), DownloadState.IDLE)
 
     def _on_sort_changed(self, column: int, order: Qt.SortOrder) -> None:
         if column == 3:

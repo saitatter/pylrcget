@@ -9,6 +9,7 @@ from PySide6.QtCore import QObject, QTimer
 from db.database import get_config, get_track_by_id
 from db.models import Track
 from db.queries import get_track_ids_for_download_mode
+from core.tracklist_models import DownloadState
 from ui.widgets.download_progress_overlay import DownloadProgressOverlay
 from ui.workers.bulk_lyrics_download_worker import BulkDownloadStats, BulkLyricsDownloadWorker
 
@@ -33,8 +34,8 @@ class LyricsDownloadController(QObject):
         current_player_track_id: Callable[[], int | None],
         set_track_lyrics_views: Callable[[Track], None],
         refresh_visible_library_view: Callable[[], None],
-        set_track_download_state: Callable[[int, str], None],
-        get_track_download_state: Callable[[int], str],
+        set_track_download_state: Callable[[int, DownloadState], None],
+        get_track_download_state: Callable[[int], DownloadState],
         parent: QObject | None = None,
     ) -> None:
         super().__init__(parent)
@@ -58,7 +59,7 @@ class LyricsDownloadController(QObject):
             return
 
         for track_id in request.track_ids:
-            self._set_track_download_state(track_id, "loading")
+            self._set_track_download_state(track_id, DownloadState.LOADING)
         self._active_track_ids = set(request.track_ids)
 
         self._overlay.start_batch(self._download_mode_label(request.mode), len(request.track_ids))
@@ -127,7 +128,7 @@ class LyricsDownloadController(QObject):
             logger.warning("Failed to update track after lyrics download for %s: %s", track_id, exc)
 
         self._active_track_ids.discard(int(track_id))
-        state = "success" if ok else "error"
+        state = DownloadState.SUCCESS if ok else DownloadState.ERROR
         self._set_track_download_state(int(track_id), state)
         self._overlay.append_result(track_label, msg, ok)
 
@@ -147,7 +148,7 @@ class LyricsDownloadController(QObject):
         del ok
         self._show_status(msg, 4000)
         for track_id in list(self._active_track_ids):
-            self._set_track_download_state(int(track_id), "idle")
+            self._set_track_download_state(int(track_id), DownloadState.IDLE)
         self._active_track_ids.clear()
 
         try:
@@ -182,7 +183,7 @@ class LyricsDownloadController(QObject):
             return
         if self._get_track_download_state(int(track_id)) != expected_state:
             return
-        self._set_track_download_state(int(track_id), "idle")
+        self._set_track_download_state(int(track_id), DownloadState.IDLE)
 
     @staticmethod
     def _download_mode_label(mode: str) -> str:
