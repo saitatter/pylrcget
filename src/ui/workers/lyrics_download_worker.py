@@ -71,6 +71,7 @@ def download_track_lyrics(
     progress_callback=None,
     db: sqlite3.Connection | None = None,
     config: Config | None = None,
+    track=None,
 ) -> tuple[bool, str, int, str]:
     mode = (download_mode or "prefer_synced").strip() or "prefer_synced"
     notify = progress_callback or (lambda _msg: None)
@@ -84,7 +85,7 @@ def download_track_lyrics(
 
         notify("Reading track metadata...")
 
-        track = get_track_by_id(db, track_id)
+        track = track or get_track_by_id(db, track_id)
         title = (track.title or "").strip()
         artist = (track.artist_name or "").strip()
         album = (track.album_name or "").strip()

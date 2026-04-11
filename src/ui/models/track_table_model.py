@@ -3,6 +3,7 @@ from __future__ import annotations
 from PySide6.QtCore import QAbstractTableModel, Qt, QModelIndex
 from PySide6.QtGui import QColor, QFont
 from core.tracklist_models import TrackListRow
+from ui.theme_tokens import STYLE_TOKENS
 
 def fmt_duration(seconds: int | None) -> str:
     if seconds is None:
@@ -64,12 +65,12 @@ class TrackTableModel(QAbstractTableModel):
                 return ""
         if role == Qt.ForegroundRole and col == 2:
             color_map = {
-                "none": QColor("#ef4444"),
-                "plain": QColor("#f59e0b"),
-                "synced": QColor("#22c55e"),
-                "instrumental": QColor("#60a5fa"),
+                "none": QColor(STYLE_TOKENS.get("color-error-border", "#ef4444")),
+                "plain": QColor(STYLE_TOKENS.get("color-warning-border", "#f59e0b")),
+                "synced": QColor(STYLE_TOKENS.get("color-success-border", "#22c55e")),
+                "instrumental": QColor(STYLE_TOKENS.get("color-accent-alt", "#60a5fa")),
             }
-            return color_map.get(row.lyrics_state, QColor("#94a3b8"))
+            return color_map.get(row.lyrics_state, QColor(STYLE_TOKENS.get("color-text-muted", "#94a3b8")))
         if role == Qt.FontRole and col == 2:
             font = QFont()
             font.setWeight(QFont.Weight.DemiBold)

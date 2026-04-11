@@ -35,6 +35,7 @@ class BulkLyricsDownloadWorker(QThread):
         ok_count = 0
         fail_count = 0
         cancelled = False
+        request_delay_s = 0.35
         db = sqlite3.connect(self.db_path, timeout=15.0)
         db.row_factory = sqlite3.Row
         try:
@@ -43,8 +44,11 @@ class BulkLyricsDownloadWorker(QThread):
                 if self.isInterruptionRequested():
                     cancelled = True
                     break
+                if idx > 1:
+                    time.sleep(request_delay_s)
 
                 current_label = {"value": f"Track {idx}/{total}"}
+                track = None
                 try:
                     track = get_track_by_id(db, track_id)
                     title = (track.title or "").strip()
@@ -80,6 +84,7 @@ class BulkLyricsDownloadWorker(QThread):
                     progress_callback=_progress,
                     db=db,
                     config=config,
+                    track=track,
                 )
                 if label:
                     current_label["value"] = label

@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
 )
 
 from ui.spacing import SPACE_1, SPACE_2, SPACE_3, set_layout_spacing
+from ui.theme_tokens import STYLE_TOKENS
 
 
 class DownloadProgressOverlay(QWidget):
@@ -141,10 +142,10 @@ class DownloadProgressOverlay(QWidget):
     def append_result(self, track_label: str, message: str, ok: bool) -> None:
         if ok:
             self._ok_count += 1
-            color = "#15803d"
+            color = STYLE_TOKENS.get("color-success-border", "#15803d")
         else:
             self._fail_count += 1
-            color = "#b91c1c"
+            color = STYLE_TOKENS.get("color-error-border", "#b91c1c")
         self._refresh_summary()
 
         label = escape((track_label or "Track").strip())
