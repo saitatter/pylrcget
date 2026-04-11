@@ -620,7 +620,7 @@ class PlayerBar(QWidget):
         if not self.player or not hasattr(self.player, "volume"):
             return
         try:
-            volume = float(self.player.volume() or 0.7)
+            volume = float(self.player.volume())
         except Exception as exc:
             logger.warning("Failed to sync volume from player: %s", exc)
             volume = 0.7

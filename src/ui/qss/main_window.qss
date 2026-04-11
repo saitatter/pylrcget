@@ -142,6 +142,13 @@ QLabel#LogPanelTitle {
     font-weight: 600;
 }
 
+QComboBox#LogPanelFilter {
+    min-width: 96px;
+}
+
+QPushButton#LogPanelCopy,
+QPushButton#LogPanelSave,
+QPushButton#LogPanelOpenFolder,
 QPushButton#LogPanelClear {
     min-width: 84px;
 }

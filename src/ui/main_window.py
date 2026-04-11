@@ -66,6 +66,7 @@ class MainWindow(QMainWindow):
         self._current_route = tracks_all()
         self._artist_label_cache: dict[int, str] = {}
         self._album_label_cache: dict[int, str] = {}
+        self._recent_toast_messages: set[str] = set()
         self._nav_apply_in_progress = False
         self._tab_sync_suppressed = False
         self.scanner = None
@@ -205,7 +206,7 @@ class MainWindow(QMainWindow):
 
         self.btn_logs = QToolButton()
         self.btn_logs.setObjectName("TopBarAction")
-        self.btn_logs.setIcon(load_svg_icon("audio-lines.svg", 18))
+        self.btn_logs.setIcon(load_svg_icon("logs.svg", 18))
         self.btn_logs.setToolTip("Logs")
         self.btn_logs.setAccessibleName("Toggle log panel")
         self.btn_logs.setCheckable(True)
@@ -367,9 +368,10 @@ class MainWindow(QMainWindow):
         self.scan_row.setObjectName("ScanRow")
 
         self.log_panel = LogPanel(self)
+        self.log_panel.set_log_file_path(getattr(self.app_state, "log_path", ""))
         self.log_panel.setVisible(False)
         self.layout.addWidget(self.log_panel)
-        self._ui_log_handler.bridge.messageReady.connect(self.log_panel.append_log)
+        self._ui_log_handler.bridge.messageReady.connect(self._on_log_message)
         logging.getLogger().addHandler(self._ui_log_handler)
 
         # --- Signals from track list ---
@@ -466,7 +468,6 @@ class MainWindow(QMainWindow):
     # ------------------ modals ------------------
     def open_config_modal(self):
         before = get_config(self.app_state.db).theme_mode
-        before_dirs = get_directories(self.app_state.db)
         dlg = MusicFoldersDialog(self.app_state, self)
         if dlg.exec():
             updated_config = get_config(self.app_state.db)
@@ -565,7 +566,23 @@ class MainWindow(QMainWindow):
         if not msg:
             return
 
-        self.toasts.show_toast(msg, notify_type=kind, timeout_ms=3000)
+        self._show_deduped_toast(msg, kind, 3000)
+
+    def _on_log_message(self, level: str, message: str) -> None:
+        self.log_panel.append_log(level, message)
+        normalized_level = (level or "").upper()
+        if normalized_level in {"ERROR", "CRITICAL"}:
+            self.btn_logs.setChecked(True)
+            self.log_panel.setVisible(True)
+            self._show_deduped_toast(message, "error", 4000)
+
+    def _show_deduped_toast(self, message: str, notify_type: str, timeout_ms: int) -> None:
+        key = f"{notify_type.lower()}::{message.strip()}"
+        if key in self._recent_toast_messages:
+            return
+        self._recent_toast_messages.add(key)
+        self.toasts.show_toast(message, notify_type=notify_type, timeout_ms=timeout_ms)
+        QTimer.singleShot(max(1000, int(timeout_ms) + 500), lambda k=key: self._recent_toast_messages.discard(k))
 
     def _scan_finished(self, ok: bool, msg: str):
         # hide progress strip
@@ -860,7 +877,7 @@ class MainWindow(QMainWindow):
 
     def _apply_saved_playback_volume(self) -> None:
         config = get_config(self.app_state.db)
-        volume = float(config.playback_volume or 0.7)
+        volume = float(config.playback_volume)
         if self.app_state.player and hasattr(self.app_state.player, "set_volume"):
             try:
                 self.app_state.player.set_volume(volume)

@@ -74,7 +74,7 @@ def get_config(db: sqlite3.Connection) -> Config:
         scan_excluded_patterns=row["scan_excluded_patterns"] or "",
         reaction_delay_ms=int(row["reaction_delay_ms"] or 0),
         playback_speed=float(row["playback_speed"] or 1.0),
-        playback_volume=float(row["playback_volume"] or 0.7),
+        playback_volume=float(row["playback_volume"] if row["playback_volume"] is not None else 0.7),
         last_library_route=row["last_library_route"] or "",
     )
 
