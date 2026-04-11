@@ -5,11 +5,13 @@ from typing import Optional
 from pathlib import Path
 
 from mutagen import File as MutagenFile
+from mutagen.apev2 import APETextValue
 from mutagen.asf import ASF, ASFUnicodeAttribute
 from mutagen.dsf import DSF
 from mutagen.dsdiff import DSDIFF
 from mutagen.id3 import ID3, USLT, TXXX, ID3NoHeaderError
 from mutagen.flac import FLAC
+from mutagen.musepack import Musepack
 from mutagen.oggvorbis import OggVorbis
 from mutagen.oggopus import OggOpus
 from mutagen.mp4 import MP4
@@ -77,6 +79,7 @@ def embed_lyrics_in_file(path: str, plain: Optional[str], synced: Optional[str])
       - .flac           -> Vorbis comments: UNSYNCEDLYRICS + LYRICS
       - .ogg/.oga/.opus -> Vorbis comments: UNSYNCEDLYRICS + LYRICS
       - .m4a/.mp4       -> MP4: ©lyr for plain + custom atom for synced
+      - .mpc            -> APEv2: UNSYNCEDLYRICS + LYRICS
     """
     EMBEDDER_MAP = {
         ".mp3": _embed_mp3,
@@ -90,6 +93,7 @@ def embed_lyrics_in_file(path: str, plain: Optional[str], synced: Optional[str])
         ".asf": _embed_asf,
         ".dsf": _embed_dsf,
         ".dff": _embed_dsdiff,
+        ".mpc": _embed_musepack,
     }
 
     ext = Path(path).suffix.lower()
@@ -247,6 +251,24 @@ def _embed_asf(path: str, plain: Optional[str], synced: Optional[str]) -> None:
         audio[ASF_PLAIN_KEY] = [ASFUnicodeAttribute(plain)]
     if synced:
         audio[ASF_SYNCED_KEY] = [ASFUnicodeAttribute(synced)]
+
+    audio.save()
+
+
+def _embed_musepack(path: str, plain: Optional[str], synced: Optional[str]) -> None:
+    audio = Musepack(path)
+    if getattr(audio, "tags", None) is None:
+        audio.add_tags()
+
+    tags = audio.tags
+    for key in ("UNSYNCEDLYRICS", "LYRICS", "lyrics", "LRCLIB_LRC"):
+        if key in tags:
+            del tags[key]
+
+    if plain:
+        tags["UNSYNCEDLYRICS"] = APETextValue(plain)
+    if synced:
+        tags["LYRICS"] = APETextValue(synced)
 
     audio.save()
 

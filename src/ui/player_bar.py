@@ -20,10 +20,12 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 from mutagen import File as MutagenFile
+from mutagen.apev2 import APEBinaryValue
 from mutagen.flac import FLAC, Picture
 from mutagen.id3 import APIC
 from mutagen.mp4 import MP4, MP4Cover
 from mutagen.asf import ASF
+from mutagen.musepack import Musepack
 from mutagen.oggopus import OggOpus
 from mutagen.oggvorbis import OggVorbis
 
@@ -130,6 +132,19 @@ def _embedded_cover_bytes(audio_path: str | None) -> bytes | None:
                 if isinstance(cover, MP4Cover):
                     return bytes(cover)
                 return bytes(cover)
+
+        if isinstance(audio, Musepack) and getattr(audio, "tags", None):
+            for key in ("Cover Art (Front)", "Cover Art (Front).jpg", "Cover Art (Front).png"):
+                picture = audio.tags.get(key)
+                if not picture:
+                    continue
+                raw = bytes(picture) if isinstance(picture, APEBinaryValue) else bytes(picture)
+                if b"\x00" in raw:
+                    _, image_data = raw.split(b"\x00", 1)
+                else:
+                    image_data = raw
+                if image_data:
+                    return image_data
 
         if hasattr(audio, "tags") and audio.tags:
             for tag in audio.tags.values():
