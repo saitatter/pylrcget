@@ -878,6 +878,7 @@ def record_download_history(
     download_status: str,
     message: str,
     lrclib_instance: str,
+    commit: bool = True,
 ) -> int:
     downloaded_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
     cursor = db.execute(
@@ -906,8 +907,51 @@ def record_download_history(
             downloaded_at,
         ),
     )
-    db.commit()
+    if commit:
+        db.commit()
     return int(cursor.lastrowid)
+
+
+def record_download_history_batch(
+    db: sqlite3.Connection,
+    entries: list[dict[str, object]],
+) -> None:
+    if not entries:
+        return
+
+    rows = []
+    for entry in entries:
+        rows.append(
+            (
+                int(entry["track_id"]) if entry.get("track_id") is not None else None,
+                str(entry.get("title") or "").strip(),
+                str(entry.get("artist_name") or "").strip(),
+                str(entry.get("album_name") or "").strip(),
+                str(entry.get("download_mode") or "").strip() or "prefer_synced",
+                str(entry.get("download_status") or "").strip() or "unknown",
+                str(entry.get("message") or "").strip(),
+                str(entry.get("lrclib_instance") or "").strip(),
+                str(entry.get("downloaded_at") or datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")),
+            )
+        )
+
+    db.executemany(
+        """
+        INSERT INTO download_history (
+            track_id,
+            title,
+            artist_name,
+            album_name,
+            download_mode,
+            download_status,
+            message,
+            lrclib_instance,
+            downloaded_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        rows,
+    )
+    db.commit()
 
 
 def get_download_history_rows(

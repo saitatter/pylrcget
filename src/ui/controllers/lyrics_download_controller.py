@@ -1,13 +1,19 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime, timezone
 import logging
 from typing import Callable
 
 from PySide6.QtCore import QObject, QTimer
 
 from db.models import Track
-from db.queries import get_config, get_track_by_id, get_track_ids_for_download_mode, record_download_history
+from db.queries import (
+    get_config,
+    get_track_by_id,
+    get_track_ids_for_download_mode,
+    record_download_history_batch,
+)
 from core.tracklist_models import DownloadState
 from ui.services.feedback import notify_user
 from ui.services.download_modes import download_mode_label, no_missing_tracks_message
@@ -56,6 +62,7 @@ class LyricsDownloadController(QObject):
         self._active_request: LyricsDownloadRequest | None = None
         self._active_track_ids: set[int] = set()
         self._state_tokens: dict[int, int] = {}
+        self._pending_history_entries: list[dict[str, object]] = []
 
     def start_downloads(self, track_ids: list[int], *, mode_override: str = "use_global") -> None:
         request = self._build_request(track_ids, mode_override=mode_override)
@@ -66,6 +73,7 @@ class LyricsDownloadController(QObject):
             self._set_track_download_state(track_id, DownloadState.LOADING)
         self._active_request = request
         self._active_track_ids = set(request.track_ids)
+        self._pending_history_entries = []
 
         self._overlay.start_batch(self._download_mode_label(request.mode), len(request.track_ids))
         self._show_status(f"Starting lyrics download... ({request.lrclib_instance})", None)
@@ -154,7 +162,9 @@ class LyricsDownloadController(QObject):
         state = DownloadState.SUCCESS if ok else DownloadState.ERROR
         self._set_track_download_state(int(track_id), state)
         self._overlay.append_result(track_label, msg, ok)
-        self._record_download_history(int(track_id), track_label, msg)
+        history_entry = self._build_download_history_entry(int(track_id), track_label, msg)
+        if history_entry is not None:
+            self._pending_history_entries.append(history_entry)
 
         token = self._state_tokens.get(int(track_id), 0) + 1
         self._state_tokens[int(track_id)] = token
@@ -174,6 +184,7 @@ class LyricsDownloadController(QObject):
         for track_id in list(self._active_track_ids):
             self._set_track_download_state(int(track_id), DownloadState.IDLE)
         self._active_track_ids.clear()
+        self._flush_pending_download_history()
 
         try:
             self._refresh_visible_library_view()
@@ -233,7 +244,7 @@ class LyricsDownloadController(QObject):
             return
         self._set_track_download_state(int(track_id), DownloadState.IDLE)
 
-    def _record_download_history(self, track_id: int, track_label: str, message: str) -> None:
+    def _build_download_history_entry(self, track_id: int, track_label: str, message: str) -> dict[str, object] | None:
         try:
             track = get_track_by_id(self._app_state.db, int(track_id))
             title = str(track.title or "").strip()
@@ -270,20 +281,27 @@ class LyricsDownloadController(QObject):
         lrclib_instance = request.lrclib_instance if request is not None else ""
         mode = request.mode if request is not None else self._resolve_download_mode("use_global")
 
+        return {
+            "track_id": int(track_id),
+            "title": title,
+            "artist_name": artist_name,
+            "album_name": album_name,
+            "download_mode": mode,
+            "download_status": status,
+            "message": normalized_message,
+            "lrclib_instance": lrclib_instance,
+            "downloaded_at": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC"),
+        }
+
+    def _flush_pending_download_history(self) -> None:
+        if not self._pending_history_entries:
+            return
         try:
-            record_download_history(
-                self._app_state.db,
-                track_id=int(track_id),
-                title=title,
-                artist_name=artist_name,
-                album_name=album_name,
-                download_mode=mode,
-                download_status=status,
-                message=normalized_message,
-                lrclib_instance=lrclib_instance,
-            )
+            record_download_history_batch(self._app_state.db, self._pending_history_entries)
         except Exception as exc:
-            logger.warning("Failed to record download history for %s: %s", track_id, exc)
+            logger.warning("Failed to record batch download history: %s", exc)
+        finally:
+            self._pending_history_entries = []
 
     @staticmethod
     def _download_mode_label(mode: str) -> str:

@@ -41,7 +41,12 @@ def _strip_empty(s: str | None) -> str | None:
 
 
 def _strip_timestamps(lrc: str) -> str:
-    return re.sub(r"^(?:\[\d+:\d+(?:\.\d+)?\])+\s*", "", lrc, flags=re.MULTILINE).strip()
+    lines: list[str] = []
+    for line in lrc.splitlines():
+        cleaned = re.sub(r"\[\d+:\d+(?:\.\d+)?\]", "", line).strip()
+        if cleaned:
+            lines.append(cleaned)
+    return "\n".join(lines).strip()
 
 
 def _should_retry_lrclib_error(exc: Exception) -> bool:
