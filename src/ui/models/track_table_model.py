@@ -1,6 +1,7 @@
 # ui/track_table_model.py
 from __future__ import annotations
 from PySide6.QtCore import QAbstractTableModel, Qt, QModelIndex
+from PySide6.QtGui import QColor, QFont
 from core.tracklist_models import TrackListRow
 
 def fmt_duration(seconds: int | None) -> str:
@@ -53,9 +54,28 @@ class TrackTableModel(QAbstractTableModel):
             if col == 1:
                 return fmt_duration(row.duration_s)
             if col == 2:
-                return row.lyrics_state
+                return {
+                    "none": "No lyrics",
+                    "plain": "Plain",
+                    "synced": "Synced",
+                    "instrumental": "Instrumental",
+                }.get(row.lyrics_state, row.lyrics_state)
             if col == 3:
                 return ""
+        if role == Qt.ForegroundRole and col == 2:
+            color_map = {
+                "none": QColor("#ef4444"),
+                "plain": QColor("#f59e0b"),
+                "synced": QColor("#22c55e"),
+                "instrumental": QColor("#60a5fa"),
+            }
+            return color_map.get(row.lyrics_state, QColor("#94a3b8"))
+        if role == Qt.FontRole and col == 2:
+            font = QFont()
+            font.setWeight(QFont.Weight.DemiBold)
+            return font
+        if role == Qt.TextAlignmentRole and col in {1, 2, 3}:
+            return int(Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignVCenter)
         if role == Qt.UserRole:
             return row
         return None
