@@ -23,6 +23,7 @@ ProgressCallback = Callable[[str], None]
 _RETRYABLE_API_ERRORS = (RateLimitError, ServerError, requests_exceptions.Timeout, requests_exceptions.ConnectionError)
 _MAX_LRCLIB_RETRIES = 3
 _INITIAL_BACKOFF_S = 0.5
+_LRC_TIMESTAMP_RE = re.compile(r"\[(?:\d+:)?\d+:\d+(?:\.\d+)?\]")
 
 
 @dataclass(frozen=True)
@@ -43,7 +44,7 @@ def _strip_empty(s: str | None) -> str | None:
 def _strip_timestamps(lrc: str) -> str:
     lines: list[str] = []
     for line in lrc.splitlines():
-        cleaned = re.sub(r"\[\d+:\d+(?:\.\d+)?\]", "", line).strip()
+        cleaned = _LRC_TIMESTAMP_RE.sub("", line).strip()
         if cleaned:
             lines.append(cleaned)
     return "\n".join(lines).strip()

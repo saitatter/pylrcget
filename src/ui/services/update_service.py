@@ -18,6 +18,7 @@ from packaging.version import InvalidVersion, Version
 
 GITHUB_REPOSITORY = "saitatter/pylrcget"
 GITHUB_RELEASES_LATEST_URL = f"https://api.github.com/repos/{GITHUB_REPOSITORY}/releases/latest"
+GITHUB_API_USER_AGENT = "pylrcget-updater/1.0"
 
 
 @dataclass(frozen=True)
@@ -127,12 +128,19 @@ def can_self_update(asset: ReleaseAssetInfo | None) -> bool:
     return False
 
 
+def _powershell_single_quoted(value: str) -> str:
+    return "'" + value.replace("'", "''") + "'"
+
+
 def check_for_updates(*, timeout_s: float = 10.0, session: requests.Session | None = None) -> UpdateInfo:
     http = session or requests.Session()
     response = http.get(
         GITHUB_RELEASES_LATEST_URL,
         timeout=timeout_s,
-        headers={"Accept": "application/vnd.github+json"},
+        headers={
+            "Accept": "application/vnd.github+json",
+            "User-Agent": GITHUB_API_USER_AGENT,
+        },
     )
     response.raise_for_status()
     payload = response.json()
@@ -188,7 +196,7 @@ def download_release_asset(
 
 
 def _extract_updated_binary(archive_path: Path) -> Path:
-    staging_dir = Path(tempfile.mkdtemp(prefix="pylrcget-update-"))
+    staging_dir = Path(tempfile.mkdtemp(prefix="pylrcget-update-", dir=str(archive_path.parent)))
     if archive_path.suffix.lower() == ".zip":
         with zipfile.ZipFile(archive_path, "r") as zf:
             members = [name for name in zf.namelist() if name.lower().endswith("pylrcget.exe")]
@@ -219,8 +227,8 @@ def _write_windows_updater_script(target_exe: Path, new_exe: Path, pid: int) -> 
     script = f"""
 $ErrorActionPreference = 'Stop'
 $pidToWait = {int(pid)}
-$target = {str(target_exe)!r}
-$newExe = {str(new_exe)!r}
+$target = {_powershell_single_quoted(str(target_exe))}
+$newExe = {_powershell_single_quoted(str(new_exe))}
 while (Get-Process -Id $pidToWait -ErrorAction SilentlyContinue) {{
     Start-Sleep -Milliseconds 400
 }}

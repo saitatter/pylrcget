@@ -24,8 +24,10 @@ class _FakeResponse:
 class _FakeSession:
     def __init__(self, payload: dict):
         self.payload = payload
+        self.calls: list[dict] = []
 
-    def get(self, *_args, **_kwargs):
+    def get(self, *_args, **kwargs):
+        self.calls.append(kwargs)
         return _FakeResponse(self.payload)
 
 
@@ -73,11 +75,17 @@ class UpdateServiceTests(unittest.TestCase):
             "assets": [],
         }
 
+        session = _FakeSession(payload)
         with patch.object(update_service, "current_app_version", return_value="0.7.0"):
-            info = update_service.check_for_updates(session=_FakeSession(payload))
+            info = update_service.check_for_updates(session=session)
 
         self.assertFalse(info.is_update_available)
         self.assertIsNone(info.asset)
+        self.assertEqual(len(session.calls), 1)
+        self.assertEqual(
+            session.calls[0]["headers"]["User-Agent"],
+            update_service.GITHUB_API_USER_AGENT,
+        )
 
     def test_stage_self_update_creates_windows_updater_script(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -98,8 +106,11 @@ class UpdateServiceTests(unittest.TestCase):
             script_text = script_path.read_text(encoding="utf-8")
             self.assertIn("1234", script_text)
             self.assertIn("current.exe", script_text)
+            self.assertIn("$target = '", script_text)
+            self.assertIn("$newExe = '", script_text)
             extracted_exe = script_path.parent / "pylrcget.exe"
             self.assertTrue(extracted_exe.exists())
+            self.assertEqual(extracted_exe.parent.parent, archive.parent)
 
 
 if __name__ == "__main__":

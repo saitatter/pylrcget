@@ -267,3 +267,32 @@ class LyricsDownloadWorkerTests(unittest.TestCase):
                 self.assertEqual(refreshed.txt_lyrics, "[offset:120]\nLead  line\n[Chorus]")
             finally:
                 db.close()
+
+    def test_plain_only_removes_hour_style_timestamps_without_dropping_headers(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db = initialize_database(tmp)
+            try:
+                audio = Path(tmp) / "hours.mp3"
+                touch_text(audio, "a")
+                add_tracks(db, [make_fs_track(audio, artist="Artist F", album="Album F", title="Song F")])
+                track = db.execute("SELECT id FROM tracks LIMIT 1").fetchone()
+                self.assertIsNotNone(track)
+
+                worker = LyricsDownloadWorker(
+                    db_path=str(Path(tmp) / "db.sqlite3"),
+                    track_id=int(track["id"]),
+                    download_mode="plain_only",
+                )
+
+                fake_lyrics = SimpleNamespace(
+                    synced_lyrics="[01:02:03.45]Long intro\n[01:02:05.00][Verse 1]",
+                    plain_lyrics=None,
+                )
+                with patch("ui.services.lyrics_download_service.LrcLibAPI") as api_cls:
+                    api_cls.return_value.get_lyrics.return_value = fake_lyrics
+                    worker.run()
+
+                refreshed = get_track_by_id(db, int(track["id"]))
+                self.assertEqual(refreshed.txt_lyrics, "Long intro\n[Verse 1]")
+            finally:
+                db.close()
