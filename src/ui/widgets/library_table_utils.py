@@ -34,7 +34,8 @@ def build_text_item(
 ) -> QStandardItem:
     item = QStandardItem(text)
     item.setEditable(False)
-    item.setData(tuple(int(v) for v in item_id) if isinstance(item_id, tuple) else int(item_id), Qt.ItemDataRole.UserRole)
+    bucket = normalize_id_bucket(item_id)
+    item.setData(bucket[0] if len(bucket) == 1 else bucket, Qt.ItemDataRole.UserRole)
     item.setTextAlignment(align)
     return item
 

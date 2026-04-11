@@ -14,6 +14,7 @@ from core.embed_lyrics import embed_lyrics_for_track
 from core.lyrics_sidecar import export_lyrics_sidecars
 from db.database import get_config, get_track_by_id, update_track_plain_lyrics, update_track_synced_lyrics
 from db.models import Config, Track
+from ui.services.download_modes import normalize_download_mode
 
 logger = logging.getLogger(__name__)
 
@@ -150,7 +151,7 @@ def download_track_lyrics(
     config: Config | None = None,
     track: Track | None = None,
 ) -> tuple[bool, str, int, str]:
-    mode = (download_mode or "prefer_synced").strip() or "prefer_synced"
+    mode = normalize_download_mode(download_mode)
     notify = progress_callback or (lambda _msg: None)
     owns_db = db is None
     title_for_ui = ""
