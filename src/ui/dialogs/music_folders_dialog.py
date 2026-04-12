@@ -178,7 +178,22 @@ class MusicFoldersDialog(QDialog):
         hint.setWordWrap(True)
         lyrics_layout.addWidget(hint, 6, 0, 1, 4)
         lyrics_tab_layout.addWidget(lyrics_box)
-        lyrics_tab_layout.addStretch(1)
+
+        lookup_box = QGroupBox("Lyrics Lookup")
+        lookup_layout = QGridLayout(lookup_box)
+        self.lookup_subdir_edit = QLineEdit()
+        self.lookup_subdir_edit.setPlaceholderText("lyrics")
+        lookup_layout.addWidget(QLabel("Lookup subfolder"), 0, 0)
+        lookup_layout.addWidget(self.lookup_subdir_edit, 0, 1, 1, 3)
+
+        lookup_hint = QLabel(
+            "Lookup uses the audio filename, not the export filename pattern. "
+            "Order: embedded lyrics first, then sidecars next to the audio file, "
+            "then matching files inside this optional relative subfolder."
+        )
+        lookup_hint.setWordWrap(True)
+        lookup_layout.addWidget(lookup_hint, 1, 0, 1, 4)
+        lyrics_tab_layout.addWidget(lookup_box)
 
         embed_box = QGroupBox("Audio File")
         embed_layout = QGridLayout(embed_box)
@@ -236,6 +251,7 @@ class MusicFoldersDialog(QDialog):
         self.download_mode_combo.setCurrentIndex(max(0, mode_index))
         self.output_dir_edit.setText(config.lyrics_output_dir)
         self.pattern_edit.setText(config.lyrics_file_pattern or DEFAULT_LYRICS_FILE_PATTERN)
+        self.lookup_subdir_edit.setText(config.lyrics_lookup_subdir or "")
         self.embed_chk.setChecked(config.try_embed_lyrics)
         self.reaction_delay_spin.setValue(int(config.reaction_delay_ms or 0))
         self.excluded_paths_edit.setPlainText(config.scan_excluded_paths)
@@ -434,6 +450,17 @@ class MusicFoldersDialog(QDialog):
         cleaned = re.sub(r"\s+", " ", cleaned)
         return cleaned.strip(" .")
 
+    def _normalized_lookup_subdir(self) -> str:
+        raw = (self.lookup_subdir_edit.text() or "").strip().replace("\\", "/")
+        if not raw:
+            return ""
+        if os.path.isabs(raw) or re.match(r"^[a-zA-Z]:", raw):
+            return ""
+        parts = [part.strip() for part in raw.split("/") if part.strip() not in {"", "."}]
+        if not parts or any(part == ".." for part in parts):
+            return ""
+        return "/".join(parts)
+
     def _render_pattern_preview(self) -> tuple[str, bool]:
         pattern = (self.pattern_edit.text().strip() or DEFAULT_LYRICS_FILE_PATTERN)
         values = {
@@ -461,17 +488,19 @@ class MusicFoldersDialog(QDialog):
     def _update_pattern_preview(self) -> None:
         if not self.save_sidecars_chk.isChecked():
             self.pattern_preview_label.setProperty("validationState", "")
-            self.pattern_preview_label.setText("Preview: lyric files will be saved next to the audio file when sidecar saving is disabled.")
+            self.pattern_preview_label.setText(
+                "Export preview: lyric files will be saved next to the audio file when sidecar saving is disabled."
+            )
         else:
             preview, used_fallback = self._render_pattern_preview()
             self.pattern_preview_label.setProperty("validationState", "error" if used_fallback else "success")
             if used_fallback:
                 self.pattern_preview_label.setText(
-                    "Preview (fallback used due to invalid or empty result):\n"
+                    "Export preview (fallback used due to invalid or empty result):\n"
                     f"{preview}"
                 )
             else:
-                self.pattern_preview_label.setText(f"Preview:\n{preview}")
+                self.pattern_preview_label.setText(f"Export preview:\n{preview}")
 
         self.pattern_preview_label.style().unpolish(self.pattern_preview_label)
         self.pattern_preview_label.style().polish(self.pattern_preview_label)
@@ -493,6 +522,7 @@ class MusicFoldersDialog(QDialog):
             try_embed_lyrics=self.embed_chk.isChecked(),
             lyrics_output_dir=self.output_dir_edit.text().strip(),
             lyrics_file_pattern=self.pattern_edit.text().strip() or DEFAULT_LYRICS_FILE_PATTERN,
+            lyrics_lookup_subdir=self._normalized_lookup_subdir(),
             scan_excluded_paths=self.excluded_paths_edit.toPlainText().strip(),
             scan_excluded_patterns=self.excluded_patterns_edit.toPlainText().strip(),
             reaction_delay_ms=int(self.reaction_delay_spin.value()),

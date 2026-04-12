@@ -179,12 +179,55 @@ def preview_audio_path_exclusions(
     return included, excluded
 
 
-def get_audio_file_signature(path: str) -> tuple[float | None, int | None]:
+def get_audio_file_signature(
+    path: str,
+    lyrics_lookup_subdir: str | None = None,
+) -> tuple[float | None, int | None]:
+    return get_audio_file_signature_with_lookup(path, lyrics_lookup_subdir)
+
+
+def _normalized_lyrics_lookup_subdir(lyrics_lookup_subdir: str | None) -> str:
+    raw = (lyrics_lookup_subdir or "").strip().replace("\\", "/")
+    if not raw:
+        return ""
+    if os.path.isabs(raw) or re.match(r"^[a-zA-Z]:", raw):
+        return ""
+    parts = [part.strip() for part in raw.split("/") if part.strip() not in {"", "."}]
+    if not parts or any(part == ".." for part in parts):
+        return ""
+    return os.path.join(*parts)
+
+
+def _sidecar_base_candidates(path: str, lyrics_lookup_subdir: str | None = None) -> list[str]:
+    audio_path = Path(path)
+    candidates: list[Path] = [audio_path.with_suffix("")]
+
+    normalized_subdir = _normalized_lyrics_lookup_subdir(lyrics_lookup_subdir)
+    if normalized_subdir:
+        candidates.append(audio_path.parent / normalized_subdir / audio_path.stem)
+
+    unique: list[str] = []
+    seen: set[str] = set()
+    for candidate in candidates:
+        rendered = os.path.normcase(str(candidate))
+        if rendered in seen:
+            continue
+        seen.add(rendered)
+        unique.append(str(candidate))
+    return unique
+
+
+def get_audio_file_signature_with_lookup(
+    path: str,
+    lyrics_lookup_subdir: str | None = None,
+) -> tuple[float | None, int | None]:
     newest_mtime: float | None = None
     total_size = 0
-    base, _ = os.path.splitext(path)
+    candidates = [path]
+    for base in _sidecar_base_candidates(path, lyrics_lookup_subdir):
+        candidates.extend([base + ".txt", base + ".lrc"])
 
-    for candidate in (path, base + ".txt", base + ".lrc"):
+    for candidate in candidates:
         try:
             stat = os.stat(candidate)
         except OSError:
@@ -213,25 +256,28 @@ def _parse_track_number(raw: str | None) -> int | None:
     except Exception:
         return None
 
-def _read_sidecar(path: str) -> tuple[str | None, str | None]:
-    base, _ = os.path.splitext(path)
-    txt_path = base + ".txt"
-    lrc_path = base + ".lrc"
-
+def _read_sidecar(path: str, lyrics_lookup_subdir: str | None = None) -> tuple[str | None, str | None]:
     txt = None
     lrc = None
 
-    if os.path.isfile(txt_path):
-        try:
-            txt = open(txt_path, "r", encoding="utf-8", errors="replace").read()
-        except Exception:
-            txt = None
+    for base in _sidecar_base_candidates(path, lyrics_lookup_subdir):
+        txt_path = base + ".txt"
+        lrc_path = base + ".lrc"
 
-    if os.path.isfile(lrc_path):
-        try:
-            lrc = open(lrc_path, "r", encoding="utf-8", errors="replace").read()
-        except Exception:
-            lrc = None
+        if txt is None and os.path.isfile(txt_path):
+            try:
+                txt = Path(txt_path).read_text(encoding="utf-8", errors="replace")
+            except Exception:
+                txt = None
+
+        if lrc is None and os.path.isfile(lrc_path):
+            try:
+                lrc = Path(lrc_path).read_text(encoding="utf-8", errors="replace")
+            except Exception:
+                lrc = None
+
+        if txt is not None and lrc is not None:
+            break
 
     txt = txt.strip() if txt else None
     lrc = lrc.strip() if lrc else None
@@ -416,36 +462,11 @@ def read_embedded_lyrics(path: str) -> Tuple[Optional[str], Optional[str]]:
     return _norm(plain), _norm(synced)
 
 
-def _read_sidecar(path: str) -> tuple[Optional[str], Optional[str]]:
-    """(existing function kept for sidecar preference)"""
-    base, _ = os.path.splitext(path)
-    txt_path = base + ".txt"
-    lrc_path = base + ".lrc"
-
-    txt = None
-    lrc = None
-
-    if os.path.isfile(txt_path):
-        try:
-            txt = open(txt_path, "r", encoding="utf-8", errors="replace").read()
-        except Exception:
-            txt = None
-
-    if os.path.isfile(lrc_path):
-        try:
-            lrc = open(lrc_path, "r", encoding="utf-8", errors="replace").read()
-        except Exception:
-            lrc = None
-
-    txt = txt.strip() if txt else None
-    lrc = lrc.strip() if lrc else None
-    return txt, lrc
-
-
 def new_fs_track_from_path(
     path: str,
     *,
     signature: tuple[float | None, int | None] | None = None,
+    lyrics_lookup_subdir: str | None = None,
 ) -> FsTrack | None:
     try:
         audio = MutagenFile(path, easy=True)
@@ -485,14 +506,18 @@ def new_fs_track_from_path(
         except Exception:
             duration = 0.0
 
-        # SIDE-CAR (preferred) then EMBEDDED
-        txt_sidecar, lrc_sidecar = _read_sidecar(path)
+        # Preferred order: embedded, same-folder sidecars, then optional subfolder sidecars.
         txt_embedded, lrc_embedded = read_embedded_lyrics(path)
+        txt_sidecar, lrc_sidecar = _read_sidecar(path, lyrics_lookup_subdir)
 
-        txt_lyrics = txt_sidecar or txt_embedded
-        lrc_lyrics = lrc_sidecar or lrc_embedded
+        txt_lyrics = txt_embedded or txt_sidecar
+        lrc_lyrics = lrc_embedded or lrc_sidecar
 
-        modified_time, file_size = signature if signature is not None else get_audio_file_signature(path)
+        modified_time, file_size = (
+            signature
+            if signature is not None
+            else get_audio_file_signature_with_lookup(path, lyrics_lookup_subdir)
+        )
 
         return FsTrack(
             file_path=path,

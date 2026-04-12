@@ -54,6 +54,7 @@ def get_config(db: sqlite3.Connection) -> Config:
                lrclib_instance,
                lyrics_output_dir,
                lyrics_file_pattern,
+               lyrics_lookup_subdir,
                scan_excluded_paths,
                scan_excluded_patterns,
                reaction_delay_ms,
@@ -75,6 +76,7 @@ def get_config(db: sqlite3.Connection) -> Config:
         lrclib_instance=row["lrclib_instance"],
         lyrics_output_dir=row["lyrics_output_dir"] or "",
         lyrics_file_pattern=row["lyrics_file_pattern"] or "{artist} - {title}",
+        lyrics_lookup_subdir=row["lyrics_lookup_subdir"] or "",
         scan_excluded_paths=row["scan_excluded_paths"] or "",
         scan_excluded_patterns=row["scan_excluded_patterns"] or "",
         reaction_delay_ms=int(row["reaction_delay_ms"] or 0),
@@ -97,6 +99,7 @@ def set_config(db: sqlite3.Connection, config: Config) -> None:
             lrclib_instance = ?,
             lyrics_output_dir = ?,
             lyrics_file_pattern = ?,
+            lyrics_lookup_subdir = ?,
             scan_excluded_paths = ?,
             scan_excluded_patterns = ?,
             reaction_delay_ms = ?,
@@ -115,6 +118,7 @@ def set_config(db: sqlite3.Connection, config: Config) -> None:
         config.lrclib_instance,
         config.lyrics_output_dir,
         config.lyrics_file_pattern,
+        config.lyrics_lookup_subdir,
         config.scan_excluded_paths,
         config.scan_excluded_patterns,
         config.reaction_delay_ms,
@@ -621,7 +625,11 @@ def refresh_track_from_file(db: sqlite3.Connection, track_id: int) -> Track | No
         prune_library(db)
         return None
 
-    refreshed = scan_library.new_fs_track_from_path(source_path)
+    config = get_config(db)
+    refreshed = scan_library.new_fs_track_from_path(
+        source_path,
+        lyrics_lookup_subdir=config.lyrics_lookup_subdir,
+    )
     if refreshed is None:
         raise ValueError(f"Could not refresh track from file: {source_path}")
 

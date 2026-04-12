@@ -297,3 +297,13 @@ def upgrade_database_if_needed(db: sqlite3.Connection, existing_version: int) ->
         """)
         db.commit()
         db.execute("PRAGMA user_version=22")
+
+    # v23
+    if existing_version <= 22:
+        print("Migrate database version 23...")
+        if not _column_exists("config_data", "lyrics_lookup_subdir"):
+            db.execute(
+                "ALTER TABLE config_data ADD COLUMN lyrics_lookup_subdir TEXT DEFAULT ''"
+            )
+        db.commit()
+        db.execute("PRAGMA user_version=23")

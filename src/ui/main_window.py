@@ -493,6 +493,7 @@ class MainWindow(QMainWindow):
             directories,
             excluded_paths=config.scan_excluded_paths,
             excluded_patterns=config.scan_excluded_patterns,
+            lyrics_lookup_subdir=config.lyrics_lookup_subdir,
         )
         self.scanner.progress_signal.connect(self._update_scan_progress)
         self.scanner.finished_signal.connect(self._scan_finished)
