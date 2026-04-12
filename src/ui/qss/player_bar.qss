@@ -203,7 +203,7 @@ QComboBox#SpeedCombo {
 QSlider#VolumeSlider::groove:horizontal {
     height: 5px;
     background: {{color-bg-pressed}};
-    border-sradius: 999px;
+    border-radius: 999px;
     margin: 0;
 }
 
