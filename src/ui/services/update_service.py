@@ -233,13 +233,68 @@ $ErrorActionPreference = 'Stop'
 $pidToWait = {int(pid)}
 $target = {_powershell_single_quoted(str(target_exe))}
 $newExe = {_powershell_single_quoted(str(new_exe))}
+$targetDir = Split-Path -LiteralPath $target -Parent
+$backup = Join-Path $targetDir (([System.IO.Path]::GetFileNameWithoutExtension($target)) + '.previous.exe')
+$logPath = Join-Path $targetDir 'pylrcget-update.log'
+
+function Write-UpdateLog([string]$message) {{
+    $timestamp = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
+    Add-Content -LiteralPath $logPath -Value "[$timestamp] $message"
+}}
+
 while (Get-Process -Id $pidToWait -ErrorAction SilentlyContinue) {{
     Start-Sleep -Milliseconds 400
 }}
-Copy-Item -LiteralPath $newExe -Destination $target -Force
-Start-Process -FilePath $target
-Remove-Item -LiteralPath $newExe -Force -ErrorAction SilentlyContinue
-Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
+Start-Sleep -Milliseconds 300
+
+try {{
+    Write-UpdateLog "Applying staged update from $newExe to $target"
+
+    if (!(Test-Path -LiteralPath $newExe)) {{
+        throw "Staged executable was not found."
+    }}
+
+    if (Test-Path -LiteralPath $backup) {{
+        Remove-Item -LiteralPath $backup -Force -ErrorAction SilentlyContinue
+    }}
+
+    if (Test-Path -LiteralPath $target) {{
+        Move-Item -LiteralPath $target -Destination $backup -Force
+        Write-UpdateLog "Backed up current executable to $backup"
+    }}
+
+    Copy-Item -LiteralPath $newExe -Destination $target -Force
+
+    $sourceHash = (Get-FileHash -LiteralPath $newExe -Algorithm SHA256).Hash
+    $targetHash = (Get-FileHash -LiteralPath $target -Algorithm SHA256).Hash
+    if ($sourceHash -ne $targetHash) {{
+        throw "Copied executable hash does not match the staged update."
+    }}
+
+    Write-UpdateLog "Update copied successfully. Launching new executable."
+    Start-Sleep -Milliseconds 800
+    Start-Process -FilePath $target -WorkingDirectory $targetDir
+}}
+catch {{
+    Write-UpdateLog "Update failed: $($_.Exception.Message)"
+    try {{
+        if (Test-Path -LiteralPath $backup) {{
+            if (Test-Path -LiteralPath $target) {{
+                Remove-Item -LiteralPath $target -Force -ErrorAction SilentlyContinue
+            }}
+            Move-Item -LiteralPath $backup -Destination $target -Force
+            Write-UpdateLog "Restored previous executable."
+        }}
+    }}
+    catch {{
+        Write-UpdateLog "Rollback failed: $($_.Exception.Message)"
+    }}
+    throw
+}}
+finally {{
+    Remove-Item -LiteralPath $newExe -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue
+}}
 """.strip()
     script_path.write_text(script, encoding="utf-8")
     return script_path

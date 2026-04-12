@@ -108,6 +108,10 @@ class UpdateServiceTests(unittest.TestCase):
             self.assertIn("current.exe", script_text)
             self.assertIn("$target = '", script_text)
             self.assertIn("$newExe = '", script_text)
+            self.assertIn("pylrcget-update.log", script_text)
+            self.assertIn("Get-FileHash", script_text)
+            self.assertIn("previous.exe", script_text)
+            self.assertIn("-WorkingDirectory $targetDir", script_text)
             extracted_exe = script_path.parent / "pylrcget.exe"
             self.assertTrue(extracted_exe.exists())
             self.assertEqual(extracted_exe.parent.parent, archive.parent)
