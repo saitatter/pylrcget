@@ -22,6 +22,7 @@ from core.tracklist_models import DownloadState
 
 class TrackListWidget(QWidget):
     playTrack = Signal(int)       # track_id
+    refreshTrack = Signal(int)    # track_id
     downloadLyrics = Signal(int)  # track_id
     exportLyricsFiles = Signal(int)  # track_id
     bulkDownloadRequested = Signal(list, str)  # track_ids, mode
@@ -99,7 +100,7 @@ class TrackListWidget(QWidget):
         self.table.setColumnWidth(0, 520)
         self.table.setColumnWidth(1, 90)
         self.table.setColumnWidth(2, 110)
-        self.table.setColumnWidth(3, 140)
+        self.table.setColumnWidth(3, 180)
         self.header.setStretchLastSection(True)
         self.table.setObjectName("TrackTable")
 
@@ -109,6 +110,7 @@ class TrackListWidget(QWidget):
 
         # Actions delegate (Download button in last column)
         self.actions = ActionsDelegate(self.table)
+        self.actions.refreshClicked.connect(self.refreshTrack.emit)
         self.actions.downloadClicked.connect(self.downloadLyrics.emit)
         self.table.setItemDelegateForColumn(3, self.actions)
 
@@ -306,6 +308,7 @@ class TrackListWidget(QWidget):
         quick = menu.addAction("Quick Actions")
         quick.setEnabled(False)
         act_play = menu.addAction("Play now")
+        act_refresh = menu.addAction("Refresh this track from disk")
         act_dl = menu.addAction("Download lyrics for this track")
         act_export = menu.addAction("Export lyrics files for this track")
 
@@ -323,6 +326,9 @@ class TrackListWidget(QWidget):
         if chosen == act_play:
             if current_track_id is not None:
                 self.playTrack.emit(int(current_track_id))
+        elif chosen == act_refresh:
+            if current_track_id is not None:
+                self.refreshTrack.emit(int(current_track_id))
         elif chosen == act_dl:
             if current_track_id is not None:
                 self.downloadLyrics.emit(int(current_track_id))

@@ -3,13 +3,17 @@ from __future__ import annotations
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
+from tests import test_support as _test_support  # noqa: F401
+from core.models import FsTrack
 from tests.test_support import make_fs_track, touch_text
 from db.database import add_tracks, get_album_rows, initialize_database
 from db.queries import (
     find_artist,
     get_download_history_rows,
     get_publish_history_rows,
+    refresh_track_from_file,
     record_download_history_batch,
     record_download_history,
     record_publish_history,
@@ -209,5 +213,75 @@ class DownloadHistoryQueryTests(unittest.TestCase):
                 self.assertEqual(len(rows), 2)
                 self.assertEqual(rows[0]["download_status"], "synced")
                 self.assertEqual(rows[1]["download_status"], "plain")
+            finally:
+                db.close()
+
+
+class TrackRefreshQueryTests(unittest.TestCase):
+    def test_refresh_track_from_file_updates_existing_track_in_place(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db = initialize_database(tmp)
+            try:
+                audio = Path(tmp) / "song.mp3"
+                touch_text(audio, "a")
+                add_tracks(db, [make_fs_track(audio, artist="Artist A", album="Album A", title="Song A")])
+
+                track_row = db.execute("SELECT id FROM tracks LIMIT 1").fetchone()
+                self.assertIsNotNone(track_row)
+                track_id = int(track_row["id"])
+
+                refreshed_fs = FsTrack(
+                    file_path=str(audio),
+                    file_name=audio.name,
+                    title="Song A (Updated)",
+                    album="Album A",
+                    artist="Artist A",
+                    album_artist="Artist A",
+                    duration=181.0,
+                    txt_lyrics="Fresh plain lyrics",
+                    lrc_lyrics="[00:00.00]Fresh synced lyrics",
+                    track_number=2,
+                    modified_time=123.0,
+                    file_size=456,
+                )
+
+                with patch("db.queries.scan_library.new_fs_track_from_path", return_value=refreshed_fs):
+                    refreshed = refresh_track_from_file(db, track_id)
+
+                self.assertIsNotNone(refreshed)
+                assert refreshed is not None
+                self.assertEqual(refreshed.id, track_id)
+                self.assertEqual(refreshed.title, "Song A (Updated)")
+                self.assertEqual(refreshed.txt_lyrics, "Fresh plain lyrics")
+                self.assertEqual(refreshed.lrc_lyrics, "[00:00.00]Fresh synced lyrics")
+                stored = db.execute(
+                    "SELECT title, txt_lyrics, lrc_lyrics, track_number FROM tracks WHERE id = ?",
+                    (track_id,),
+                ).fetchone()
+                self.assertEqual(stored["title"], "Song A (Updated)")
+                self.assertEqual(stored["txt_lyrics"], "Fresh plain lyrics")
+                self.assertEqual(stored["lrc_lyrics"], "[00:00.00]Fresh synced lyrics")
+                self.assertEqual(int(stored["track_number"]), 2)
+            finally:
+                db.close()
+
+    def test_refresh_track_from_file_removes_missing_track(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db = initialize_database(tmp)
+            try:
+                audio = Path(tmp) / "missing.mp3"
+                touch_text(audio, "a")
+                add_tracks(db, [make_fs_track(audio, artist="Artist A", album="Album A", title="Song A")])
+
+                track_row = db.execute("SELECT id FROM tracks LIMIT 1").fetchone()
+                self.assertIsNotNone(track_row)
+                track_id = int(track_row["id"])
+
+                audio.unlink()
+                refreshed = refresh_track_from_file(db, track_id)
+
+                self.assertIsNone(refreshed)
+                remaining = db.execute("SELECT COUNT(*) AS count FROM tracks").fetchone()
+                self.assertEqual(int(remaining["count"]), 0)
             finally:
                 db.close()

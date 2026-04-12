@@ -23,6 +23,7 @@ from db.queries import (
     get_artist_by_id,
     get_config,
     get_directories,
+    refresh_track_from_file,
     get_track_by_id,
     mark_tracks_instrumental,
     set_config,
@@ -334,6 +335,7 @@ class MainWindow(QMainWindow):
 
         # --- Signals from track list ---
         self.track_list.playTrack.connect(self.on_play_track)
+        self.track_list.refreshTrack.connect(self.on_refresh_track)
         self.track_list.downloadLyrics.connect(self.on_download_lyrics)
         self.track_list.exportLyricsFiles.connect(self._export_track_sidecars)
         self.track_list.bulkDownloadRequested.connect(self._on_bulk_download_requested)
@@ -344,6 +346,7 @@ class MainWindow(QMainWindow):
         self.track_list.configureFoldersRequested.connect(self.open_config_modal)
         self.lyrics_view.downloadRequested.connect(self._download_current_track_lyrics)
         self.albums_tab.playTrack.connect(self.on_play_track)
+        self.albums_tab.refreshTrack.connect(self.on_refresh_track)
         self.albums_tab.downloadLyrics.connect(self.on_download_lyrics)
         self.albums_tab.exportLyricsFiles.connect(self._export_track_sidecars)
         self.albums_tab.bulkDownloadRequested.connect(self._on_bulk_download_requested)
@@ -355,6 +358,7 @@ class MainWindow(QMainWindow):
         self.albums_tab.refreshLibraryRequested.connect(self.refresh_library)
         self.albums_tab.configureFoldersRequested.connect(self.open_config_modal)
         self.artists_tab.playTrack.connect(self.on_play_track)
+        self.artists_tab.refreshTrack.connect(self.on_refresh_track)
         self.artists_tab.downloadLyrics.connect(self.on_download_lyrics)
         self.artists_tab.exportLyricsFiles.connect(self._export_track_sidecars)
         self.artists_tab.bulkDownloadRequested.connect(self._on_bulk_download_requested)
@@ -619,21 +623,48 @@ class MainWindow(QMainWindow):
         track = get_track_by_id(self.app_state.db, track_id)
 
 
-        path = track.file_path
-        if os.path.isdir(path):
-            path = os.path.join(track.file_path, track.file_name)
-
-        meta = NowPlaying(
-            track_id=track.id,
-            title=track.title,
-            artist=track.artist_name,
-            path=path,
-            album=track.album_name,
-        )
+        path = self._track_playback_path(track)
+        meta = self._now_playing_meta(track)
 
         self.app_state.player.play_file(path, meta)
 
         self._set_track_lyrics_views(track)
+
+    def on_refresh_track(self, track_id: int) -> None:
+        try:
+            refreshed = refresh_track_from_file(self.app_state.db, int(track_id))
+        except Exception as exc:
+            log_and_notify(
+                self.app_state,
+                logger,
+                logging.ERROR,
+                exception_message("Failed to refresh track from disk", exc),
+                "error",
+                show_status=self._show_status_message,
+                status_timeout_ms=4000,
+            )
+            return
+
+        self._refresh_visible_library_view_after_downloads()
+
+        current_track_id = self._current_player_track_id()
+        if refreshed is None:
+            if current_track_id == int(track_id):
+                self._clear_current_player_track()
+            notify_user(
+                self.app_state,
+                "Track removed from library because the source file was not found.",
+                "warning",
+                show_status=self._show_status_message,
+                status_timeout_ms=3500,
+            )
+            return
+
+        if current_track_id == int(track_id):
+            self._update_current_player_track_meta(refreshed)
+            self._set_track_lyrics_views(refreshed)
+
+        self._show_status_message("Track refreshed from disk.", 2500)
 
     def play_next(self):
         if not self._queue_ids:
@@ -719,6 +750,39 @@ class MainWindow(QMainWindow):
         if not self.app_state.player or not self.app_state.player.track:
             return None
         return int(self.app_state.player.track.track_id)
+
+    def _track_playback_path(self, track) -> str:
+        path = track.file_path
+        if os.path.isdir(path):
+            path = os.path.join(track.file_path, track.file_name)
+        return path
+
+    def _now_playing_meta(self, track) -> NowPlaying:
+        return NowPlaying(
+            track_id=track.id,
+            title=track.title,
+            artist=track.artist_name,
+            path=self._track_playback_path(track),
+            album=track.album_name,
+        )
+
+    def _update_current_player_track_meta(self, track) -> None:
+        if not self.app_state.player:
+            return
+        self.app_state.player.track = self._now_playing_meta(track)
+        self.app_state.player.trackChanged.emit(self.app_state.player.track)
+
+    def _clear_current_player_track(self) -> None:
+        if not self.app_state.player:
+            return
+        try:
+            self.app_state.player.stop()
+        except Exception:
+            pass
+        self.app_state.player.track = None
+        self.app_state.player.trackChanged.emit(None)
+        for view in self._all_lyrics_views():
+            view.show_none("Select a track to see lyrics")
 
     def _refresh_visible_library_view_after_downloads(self) -> None:
         current = self.tabs.currentWidget()

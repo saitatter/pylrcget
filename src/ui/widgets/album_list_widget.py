@@ -25,6 +25,7 @@ from ui.widgets.track_list_widget import TrackListWidget
 
 class AlbumListWidget(QWidget):
     playTrack = Signal(int)
+    refreshTrack = Signal(int)
     downloadLyrics = Signal(int)
     exportLyricsFiles = Signal(int)
     bulkDownloadRequested = Signal(list, str)
@@ -119,6 +120,7 @@ class AlbumListWidget(QWidget):
         self.track_list = TrackListWidget(self.app_state)
         self.track_list.setScopeBannerEnabled(False)
         self.track_list.playTrack.connect(self.playTrack.emit)
+        self.track_list.refreshTrack.connect(self.refreshTrack.emit)
         self.track_list.downloadLyrics.connect(self.downloadLyrics.emit)
         self.track_list.exportLyricsFiles.connect(self.exportLyricsFiles.emit)
         self.track_list.bulkDownloadRequested.connect(self.bulkDownloadRequested.emit)

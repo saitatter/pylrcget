@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import re
 import sqlite3
 from datetime import datetime, timezone
@@ -7,6 +8,7 @@ from typing import List, Sequence
 
 from core.utils import prepare_input
 from db.models import Album, Artist, Config, Track
+from library import scan_library
 from library.fs_track import FsTrack
 
 # -------------------------------
@@ -594,6 +596,84 @@ def update_track_instrumental(db: sqlite3.Connection, track_id: int) -> Track:
     """, (int(track_id),))
     db.commit()
     return get_track_by_id(db, track_id)
+
+
+def refresh_track_from_file(db: sqlite3.Connection, track_id: int) -> Track | None:
+    row = db.execute(
+        """
+        SELECT id, file_path, file_name
+        FROM tracks
+        WHERE id = ?
+        LIMIT 1
+        """,
+        (int(track_id),),
+    ).fetchone()
+    if row is None:
+        raise KeyError(f"Track not found: {track_id}")
+
+    stored_path = str(row["file_path"] or "").strip()
+    file_name = str(row["file_name"] or "").strip()
+    source_path = os.path.join(stored_path, file_name) if stored_path and os.path.isdir(stored_path) else stored_path
+    source_path = os.path.abspath(source_path) if source_path else ""
+
+    if not source_path or not os.path.isfile(source_path):
+        db.execute("DELETE FROM tracks WHERE id = ?", (int(track_id),))
+        prune_library(db)
+        return None
+
+    refreshed = scan_library.new_fs_track_from_path(source_path)
+    if refreshed is None:
+        raise ValueError(f"Could not refresh track from file: {source_path}")
+
+    try:
+        artist_id = find_artist(db, refreshed.artist)
+    except ValueError:
+        artist_id = add_artist(db, refreshed.artist, commit=False)
+
+    try:
+        album_id = find_album(db, refreshed.album, refreshed.album_artist)
+    except ValueError:
+        album_id = add_album(db, refreshed.album, refreshed.album_artist, commit=False)
+
+    is_instrumental = bool(refreshed.lrc_lyrics and re.search(r"\[au:\s*instrumental\]", refreshed.lrc_lyrics))
+
+    db.execute(
+        """
+        UPDATE tracks
+        SET file_path = ?,
+            file_name = ?,
+            title = ?,
+            title_lower = ?,
+            album_id = ?,
+            artist_id = ?,
+            duration = ?,
+            track_number = ?,
+            txt_lyrics = ?,
+            lrc_lyrics = ?,
+            instrumental = ?,
+            modified_time = ?,
+            file_size = ?
+        WHERE id = ?
+        """,
+        (
+            refreshed.file_path,
+            refreshed.file_name,
+            refreshed.title,
+            prepare_input(refreshed.title),
+            album_id,
+            artist_id,
+            refreshed.duration,
+            refreshed.track_number,
+            refreshed.txt_lyrics,
+            refreshed.lrc_lyrics,
+            is_instrumental,
+            refreshed.modified_time,
+            refreshed.file_size,
+            int(track_id),
+        ),
+    )
+    prune_library(db)
+    return get_track_by_id(db, int(track_id))
 
 
 def mark_tracks_instrumental(db: sqlite3.Connection, track_ids: list[int]) -> None:
