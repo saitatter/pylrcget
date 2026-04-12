@@ -1,6 +1,7 @@
 # src/player/player.py
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from enum import Enum, auto
 from typing import Optional
@@ -151,6 +152,19 @@ class Player(QObject):
             self.status = new_status
             self.statusChanged.emit(self.status)
 
+    @staticmethod
+    def _normalized_source_path(path: str | None) -> str:
+        if not path:
+            return ""
+        return os.path.normcase(os.path.abspath(path))
+
+    def _should_restart_current_track(self, path: str) -> bool:
+        if self.status == PlayerStatus.STOPPED or self.track is None:
+            return False
+        current_path = self._normalized_source_path(getattr(self.track, "path", None))
+        requested_path = self._normalized_source_path(path)
+        return bool(current_path and current_path == requested_path)
+
     def _poll(self) -> None:
         """
         Timer-driven pump:
@@ -200,6 +214,11 @@ class Player(QObject):
     # ----------------------------
 
     def play_file(self, path: str, meta: NowPlaying | None = None) -> None:
+        if self._should_restart_current_track(path):
+            self.seek_ms(0, exact=True)
+            self.play()
+            return
+
         self.track = meta
         self.trackChanged.emit(self.track)
 

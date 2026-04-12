@@ -297,12 +297,21 @@ class MusicFoldersDialog(QDialog):
             return self._last_browse_dir
         return os.path.expanduser("~")
 
+    @staticmethod
+    def _should_use_qt_picker() -> bool:
+        # The native Windows picker exposes mapped drives and network shares
+        # more reliably than the Qt fallback dialog.
+        return os.name != "nt"
+
+    def _configure_picker_dialog(self, dialog: QFileDialog) -> None:
+        dialog.setOption(QFileDialog.Option.DontUseNativeDialog, self._should_use_qt_picker())
+        dialog.setOption(QFileDialog.Option.DontUseCustomDirectoryIcons, True)
+
     def _pick_directory(self, title: str, preferred: str = "") -> str:
         dialog = QFileDialog(self, title, self._dialog_start_dir(preferred))
         dialog.setFileMode(QFileDialog.FileMode.Directory)
         dialog.setOption(QFileDialog.Option.ShowDirsOnly, True)
-        dialog.setOption(QFileDialog.Option.DontUseNativeDialog, True)
-        dialog.setOption(QFileDialog.Option.DontUseCustomDirectoryIcons, True)
+        self._configure_picker_dialog(dialog)
         if dialog.exec():
             selected = dialog.selectedFiles()
             if selected:
@@ -314,8 +323,7 @@ class MusicFoldersDialog(QDialog):
     def _pick_file(self, title: str, preferred: str = "") -> str:
         dialog = QFileDialog(self, title, self._dialog_start_dir(preferred))
         dialog.setFileMode(QFileDialog.FileMode.ExistingFile)
-        dialog.setOption(QFileDialog.Option.DontUseNativeDialog, True)
-        dialog.setOption(QFileDialog.Option.DontUseCustomDirectoryIcons, True)
+        self._configure_picker_dialog(dialog)
         if dialog.exec():
             selected = dialog.selectedFiles()
             if selected:
