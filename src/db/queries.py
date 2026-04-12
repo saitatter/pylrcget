@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import re
 import sqlite3
 from datetime import datetime, timezone
@@ -7,6 +8,7 @@ from typing import List, Sequence
 
 from core.utils import prepare_input
 from db.models import Album, Artist, Config, Track
+from library import scan_library
 from library.fs_track import FsTrack
 
 # -------------------------------
@@ -49,9 +51,14 @@ def get_config(db: sqlite3.Connection) -> Config:
                save_lyrics_sidecars,
                try_embed_lyrics,
                theme_mode,
+               ui_scale_percent,
+               font_size_mode,
+               show_album_art,
+               startup_view,
                lrclib_instance,
                lyrics_output_dir,
                lyrics_file_pattern,
+               lyrics_lookup_subdir,
                scan_excluded_paths,
                scan_excluded_patterns,
                reaction_delay_ms,
@@ -70,9 +77,14 @@ def get_config(db: sqlite3.Connection) -> Config:
         save_lyrics_sidecars=bool(row["save_lyrics_sidecars"]),
         try_embed_lyrics=bool(row["try_embed_lyrics"]),
         theme_mode=row["theme_mode"],
+        ui_scale_percent=int(row["ui_scale_percent"] or 100),
+        font_size_mode=row["font_size_mode"] or "normal",
+        show_album_art=bool(row["show_album_art"] if row["show_album_art"] is not None else 1),
+        startup_view=row["startup_view"] or "remember_last",
         lrclib_instance=row["lrclib_instance"],
         lyrics_output_dir=row["lyrics_output_dir"] or "",
         lyrics_file_pattern=row["lyrics_file_pattern"] or "{artist} - {title}",
+        lyrics_lookup_subdir=row["lyrics_lookup_subdir"] or "",
         scan_excluded_paths=row["scan_excluded_paths"] or "",
         scan_excluded_patterns=row["scan_excluded_patterns"] or "",
         reaction_delay_ms=int(row["reaction_delay_ms"] or 0),
@@ -92,9 +104,14 @@ def set_config(db: sqlite3.Connection, config: Config) -> None:
             save_lyrics_sidecars = ?,
             try_embed_lyrics = ?,
             theme_mode = ?,
+            ui_scale_percent = ?,
+            font_size_mode = ?,
+            show_album_art = ?,
+            startup_view = ?,
             lrclib_instance = ?,
             lyrics_output_dir = ?,
             lyrics_file_pattern = ?,
+            lyrics_lookup_subdir = ?,
             scan_excluded_paths = ?,
             scan_excluded_patterns = ?,
             reaction_delay_ms = ?,
@@ -110,9 +127,14 @@ def set_config(db: sqlite3.Connection, config: Config) -> None:
         config.save_lyrics_sidecars,
         config.try_embed_lyrics,
         config.theme_mode,
+        config.ui_scale_percent,
+        config.font_size_mode,
+        config.show_album_art,
+        config.startup_view,
         config.lrclib_instance,
         config.lyrics_output_dir,
         config.lyrics_file_pattern,
+        config.lyrics_lookup_subdir,
         config.scan_excluded_paths,
         config.scan_excluded_patterns,
         config.reaction_delay_ms,
@@ -594,6 +616,88 @@ def update_track_instrumental(db: sqlite3.Connection, track_id: int) -> Track:
     """, (int(track_id),))
     db.commit()
     return get_track_by_id(db, track_id)
+
+
+def refresh_track_from_file(db: sqlite3.Connection, track_id: int) -> Track | None:
+    row = db.execute(
+        """
+        SELECT id, file_path, file_name
+        FROM tracks
+        WHERE id = ?
+        LIMIT 1
+        """,
+        (int(track_id),),
+    ).fetchone()
+    if row is None:
+        raise KeyError(f"Track not found: {track_id}")
+
+    stored_path = str(row["file_path"] or "").strip()
+    file_name = str(row["file_name"] or "").strip()
+    source_path = os.path.join(stored_path, file_name) if stored_path and os.path.isdir(stored_path) else stored_path
+    source_path = os.path.abspath(source_path) if source_path else ""
+
+    if not source_path or not os.path.isfile(source_path):
+        db.execute("DELETE FROM tracks WHERE id = ?", (int(track_id),))
+        prune_library(db)
+        return None
+
+    config = get_config(db)
+    refreshed = scan_library.new_fs_track_from_path(
+        source_path,
+        lyrics_lookup_subdir=config.lyrics_lookup_subdir,
+    )
+    if refreshed is None:
+        raise ValueError(f"Could not refresh track from file: {source_path}")
+
+    try:
+        artist_id = find_artist(db, refreshed.artist)
+    except ValueError:
+        artist_id = add_artist(db, refreshed.artist, commit=False)
+
+    try:
+        album_id = find_album(db, refreshed.album, refreshed.album_artist)
+    except ValueError:
+        album_id = add_album(db, refreshed.album, refreshed.album_artist, commit=False)
+
+    is_instrumental = bool(refreshed.lrc_lyrics and re.search(r"\[au:\s*instrumental\]", refreshed.lrc_lyrics))
+
+    db.execute(
+        """
+        UPDATE tracks
+        SET file_path = ?,
+            file_name = ?,
+            title = ?,
+            title_lower = ?,
+            album_id = ?,
+            artist_id = ?,
+            duration = ?,
+            track_number = ?,
+            txt_lyrics = ?,
+            lrc_lyrics = ?,
+            instrumental = ?,
+            modified_time = ?,
+            file_size = ?
+        WHERE id = ?
+        """,
+        (
+            refreshed.file_path,
+            refreshed.file_name,
+            refreshed.title,
+            prepare_input(refreshed.title),
+            album_id,
+            artist_id,
+            refreshed.duration,
+            refreshed.track_number,
+            refreshed.txt_lyrics,
+            refreshed.lrc_lyrics,
+            is_instrumental,
+            refreshed.modified_time,
+            refreshed.file_size,
+            int(track_id),
+        ),
+    )
+    prune_library(db)
+    return get_track_by_id(db, int(track_id))
 
 
 def mark_tracks_instrumental(db: sqlite3.Connection, track_ids: list[int]) -> None:

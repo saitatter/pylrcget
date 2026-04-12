@@ -22,6 +22,7 @@ from core.tracklist_models import DownloadState
 
 class TrackListWidget(QWidget):
     playTrack = Signal(int)       # track_id
+    refreshTrack = Signal(int)    # track_id
     downloadLyrics = Signal(int)  # track_id
     exportLyricsFiles = Signal(int)  # track_id
     bulkDownloadRequested = Signal(list, str)  # track_ids, mode
@@ -56,6 +57,7 @@ class TrackListWidget(QWidget):
         self._sort_order = Qt.SortOrder.AscendingOrder
         self._has_more_rows = False
         self._loading_more = False
+        self._ui_scale = 1.0
 
         self.scope_bar = QWidget()
         self.scope_bar.setObjectName("TrackScopeBar")
@@ -99,7 +101,7 @@ class TrackListWidget(QWidget):
         self.table.setColumnWidth(0, 520)
         self.table.setColumnWidth(1, 90)
         self.table.setColumnWidth(2, 110)
-        self.table.setColumnWidth(3, 140)
+        self.table.setColumnWidth(3, 180)
         self.header.setStretchLastSection(True)
         self.table.setObjectName("TrackTable")
 
@@ -109,6 +111,7 @@ class TrackListWidget(QWidget):
 
         # Actions delegate (Download button in last column)
         self.actions = ActionsDelegate(self.table)
+        self.actions.refreshClicked.connect(self.refreshTrack.emit)
         self.actions.downloadClicked.connect(self.downloadLyrics.emit)
         self.table.setItemDelegateForColumn(3, self.actions)
 
@@ -137,6 +140,16 @@ class TrackListWidget(QWidget):
         layout.addWidget(self.stack)
 
         self._empty_action = ""
+
+    def set_ui_scale(self, scale: float) -> None:
+        self._ui_scale = max(0.85, min(1.5, float(scale or 1.0)))
+        self.table.verticalHeader().setDefaultSectionSize(int(round(44 * self._ui_scale)))
+        self.table.setColumnWidth(0, int(round(520 * self._ui_scale)))
+        self.table.setColumnWidth(1, int(round(90 * self._ui_scale)))
+        self.table.setColumnWidth(2, int(round(110 * self._ui_scale)))
+        self.table.setColumnWidth(3, int(round(180 * self._ui_scale)))
+        if hasattr(self.actions, "set_ui_scale"):
+            self.actions.set_ui_scale(self._ui_scale)
 
     # -------------------------
     # External API
@@ -298,6 +311,7 @@ class TrackListWidget(QWidget):
 
         menu = QMenu(self)
         current_track_id = self.model.track_id_at(idx.row())
+        has_focused_track = current_track_id is not None
 
         info = menu.addAction(f"{len(selected_ids)} track selected" if len(selected_ids) == 1 else f"{len(selected_ids)} tracks selected")
         info.setEnabled(False)
@@ -306,12 +320,18 @@ class TrackListWidget(QWidget):
         quick = menu.addAction("Quick Actions")
         quick.setEnabled(False)
         act_play = menu.addAction("Play now")
-        act_dl = menu.addAction("Download lyrics for this track")
-        act_export = menu.addAction("Export lyrics files for this track")
+        act_play.setEnabled(has_focused_track)
 
         menu.addSeparator()
         bulk = menu.addAction("Selection Actions")
         bulk.setEnabled(False)
+        act_refresh = menu.addAction("Refresh focused track from disk")
+        act_dl = menu.addAction("Download lyrics for focused track")
+        act_export = menu.addAction("Export lyrics files for focused track")
+        act_refresh.setEnabled(has_focused_track)
+        act_dl.setEnabled(has_focused_track)
+        act_export.setEnabled(has_focused_track)
+        menu.addSeparator()
         count_suffix = f"({len(selected_ids)})"
         act_dl_selected = menu.addAction(f"Download selection using current mode {count_suffix}")
         act_dl_synced = menu.addAction(f"Download selection as synced only {count_suffix}")
@@ -323,6 +343,9 @@ class TrackListWidget(QWidget):
         if chosen == act_play:
             if current_track_id is not None:
                 self.playTrack.emit(int(current_track_id))
+        elif chosen == act_refresh:
+            if current_track_id is not None:
+                self.refreshTrack.emit(int(current_track_id))
         elif chosen == act_dl:
             if current_track_id is not None:
                 self.downloadLyrics.emit(int(current_track_id))

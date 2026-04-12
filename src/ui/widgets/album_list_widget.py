@@ -25,6 +25,7 @@ from ui.widgets.track_list_widget import TrackListWidget
 
 class AlbumListWidget(QWidget):
     playTrack = Signal(int)
+    refreshTrack = Signal(int)
     downloadLyrics = Signal(int)
     exportLyricsFiles = Signal(int)
     bulkDownloadRequested = Signal(list, str)
@@ -58,6 +59,7 @@ class AlbumListWidget(QWidget):
         self._unknown_album_ids: list[int] = []
         self._unknown_track_count = 0
         self._unknown_artist_names: set[str] = set()
+        self._ui_scale = 1.0
 
         root = QVBoxLayout(self)
         root.setContentsMargins(0, 0, 0, 0)
@@ -119,6 +121,7 @@ class AlbumListWidget(QWidget):
         self.track_list = TrackListWidget(self.app_state)
         self.track_list.setScopeBannerEnabled(False)
         self.track_list.playTrack.connect(self.playTrack.emit)
+        self.track_list.refreshTrack.connect(self.refreshTrack.emit)
         self.track_list.downloadLyrics.connect(self.downloadLyrics.emit)
         self.track_list.exportLyricsFiles.connect(self.exportLyricsFiles.emit)
         self.track_list.bulkDownloadRequested.connect(self.bulkDownloadRequested.emit)
@@ -137,6 +140,11 @@ class AlbumListWidget(QWidget):
 
         self._apply_styles()
         self._empty_action = ""
+
+    def set_ui_scale(self, scale: float) -> None:
+        self._ui_scale = max(0.85, min(1.5, float(scale or 1.0)))
+        self.table.verticalHeader().setDefaultSectionSize(int(round(30 * self._ui_scale)))
+        self.track_list.set_ui_scale(self._ui_scale)
 
     def setActive(self, active: bool):
         self._active = active

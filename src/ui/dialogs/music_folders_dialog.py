@@ -122,8 +122,35 @@ class MusicFoldersDialog(QDialog):
         self.theme_combo = QComboBox()
         for theme_key, theme_name in get_available_themes():
             self.theme_combo.addItem(theme_name, theme_key)
+        self.ui_scale_combo = QComboBox()
+        for percent in (90, 100, 110, 125):
+            self.ui_scale_combo.addItem(f"{percent}%", percent)
+        self.font_size_combo = QComboBox()
+        self.font_size_combo.addItem("Small", "small")
+        self.font_size_combo.addItem("Normal", "normal")
+        self.font_size_combo.addItem("Large", "large")
+        self.album_art_combo = QComboBox()
+        self.album_art_combo.addItem("Show", True)
+        self.album_art_combo.addItem("Hide", False)
+        self.startup_view_combo = QComboBox()
+        self.startup_view_combo.addItem("Remember last view", "remember_last")
+        self.startup_view_combo.addItem("Tracks", "tracks")
+        self.startup_view_combo.addItem("Albums", "albums")
+        self.startup_view_combo.addItem("Artists", "artists")
+        self.startup_view_combo.addItem("My LRCLIB", "my_lrclib")
         appearance_layout.addWidget(QLabel("Theme"), 0, 0)
         appearance_layout.addWidget(self.theme_combo, 0, 1)
+        appearance_layout.addWidget(QLabel("UI scale"), 1, 0)
+        appearance_layout.addWidget(self.ui_scale_combo, 1, 1)
+        appearance_layout.addWidget(QLabel("Font size"), 2, 0)
+        appearance_layout.addWidget(self.font_size_combo, 2, 1)
+        appearance_layout.addWidget(QLabel("Album art"), 3, 0)
+        appearance_layout.addWidget(self.album_art_combo, 3, 1)
+        appearance_layout.addWidget(QLabel("Startup view"), 4, 0)
+        appearance_layout.addWidget(self.startup_view_combo, 4, 1)
+        startup_hint = QLabel("Startup view is applied the next time the app opens.")
+        startup_hint.setWordWrap(True)
+        appearance_layout.addWidget(startup_hint, 5, 0, 1, 2)
         appearance_layout_root.addWidget(appearance_box)
         appearance_layout_root.addStretch(1)
 
@@ -178,7 +205,22 @@ class MusicFoldersDialog(QDialog):
         hint.setWordWrap(True)
         lyrics_layout.addWidget(hint, 6, 0, 1, 4)
         lyrics_tab_layout.addWidget(lyrics_box)
-        lyrics_tab_layout.addStretch(1)
+
+        lookup_box = QGroupBox("Lyrics Lookup")
+        lookup_layout = QGridLayout(lookup_box)
+        self.lookup_subdir_edit = QLineEdit()
+        self.lookup_subdir_edit.setPlaceholderText("lyrics")
+        lookup_layout.addWidget(QLabel("Lookup subfolder"), 0, 0)
+        lookup_layout.addWidget(self.lookup_subdir_edit, 0, 1, 1, 3)
+
+        lookup_hint = QLabel(
+            "Lookup uses the audio filename, not the export filename pattern. "
+            "Order: embedded lyrics first, then sidecars next to the audio file, "
+            "then matching files inside this optional relative subfolder."
+        )
+        lookup_hint.setWordWrap(True)
+        lookup_layout.addWidget(lookup_hint, 1, 0, 1, 4)
+        lyrics_tab_layout.addWidget(lookup_box)
 
         embed_box = QGroupBox("Audio File")
         embed_layout = QGridLayout(embed_box)
@@ -231,11 +273,20 @@ class MusicFoldersDialog(QDialog):
         config = get_config(self.app_state.db)
         theme_idx = self.theme_combo.findData(config.theme_mode or "auto")
         self.theme_combo.setCurrentIndex(max(0, theme_idx))
+        ui_scale_idx = self.ui_scale_combo.findData(int(config.ui_scale_percent or 100))
+        self.ui_scale_combo.setCurrentIndex(max(0, ui_scale_idx))
+        font_size_idx = self.font_size_combo.findData(config.font_size_mode or "normal")
+        self.font_size_combo.setCurrentIndex(max(0, font_size_idx))
+        album_art_idx = self.album_art_combo.findData(bool(config.show_album_art))
+        self.album_art_combo.setCurrentIndex(max(0, album_art_idx))
+        startup_view_idx = self.startup_view_combo.findData(config.startup_view or "remember_last")
+        self.startup_view_combo.setCurrentIndex(max(0, startup_view_idx))
         self.save_sidecars_chk.setChecked(config.save_lyrics_sidecars)
         mode_index = self.download_mode_combo.findData(config.download_lyrics_mode or "prefer_synced")
         self.download_mode_combo.setCurrentIndex(max(0, mode_index))
         self.output_dir_edit.setText(config.lyrics_output_dir)
         self.pattern_edit.setText(config.lyrics_file_pattern or DEFAULT_LYRICS_FILE_PATTERN)
+        self.lookup_subdir_edit.setText(config.lyrics_lookup_subdir or "")
         self.embed_chk.setChecked(config.try_embed_lyrics)
         self.reaction_delay_spin.setValue(int(config.reaction_delay_ms or 0))
         self.excluded_paths_edit.setPlainText(config.scan_excluded_paths)
@@ -297,12 +348,21 @@ class MusicFoldersDialog(QDialog):
             return self._last_browse_dir
         return os.path.expanduser("~")
 
+    @staticmethod
+    def _should_use_qt_picker() -> bool:
+        # The native Windows picker exposes mapped drives and network shares
+        # more reliably than the Qt fallback dialog.
+        return os.name != "nt"
+
+    def _configure_picker_dialog(self, dialog: QFileDialog) -> None:
+        dialog.setOption(QFileDialog.Option.DontUseNativeDialog, self._should_use_qt_picker())
+        dialog.setOption(QFileDialog.Option.DontUseCustomDirectoryIcons, True)
+
     def _pick_directory(self, title: str, preferred: str = "") -> str:
         dialog = QFileDialog(self, title, self._dialog_start_dir(preferred))
         dialog.setFileMode(QFileDialog.FileMode.Directory)
         dialog.setOption(QFileDialog.Option.ShowDirsOnly, True)
-        dialog.setOption(QFileDialog.Option.DontUseNativeDialog, True)
-        dialog.setOption(QFileDialog.Option.DontUseCustomDirectoryIcons, True)
+        self._configure_picker_dialog(dialog)
         if dialog.exec():
             selected = dialog.selectedFiles()
             if selected:
@@ -314,8 +374,7 @@ class MusicFoldersDialog(QDialog):
     def _pick_file(self, title: str, preferred: str = "") -> str:
         dialog = QFileDialog(self, title, self._dialog_start_dir(preferred))
         dialog.setFileMode(QFileDialog.FileMode.ExistingFile)
-        dialog.setOption(QFileDialog.Option.DontUseNativeDialog, True)
-        dialog.setOption(QFileDialog.Option.DontUseCustomDirectoryIcons, True)
+        self._configure_picker_dialog(dialog)
         if dialog.exec():
             selected = dialog.selectedFiles()
             if selected:
@@ -426,6 +485,17 @@ class MusicFoldersDialog(QDialog):
         cleaned = re.sub(r"\s+", " ", cleaned)
         return cleaned.strip(" .")
 
+    def _normalized_lookup_subdir(self) -> str:
+        raw = (self.lookup_subdir_edit.text() or "").strip().replace("\\", "/")
+        if not raw:
+            return ""
+        if os.path.isabs(raw) or re.match(r"^[a-zA-Z]:", raw):
+            return ""
+        parts = [part.strip() for part in raw.split("/") if part.strip() not in {"", "."}]
+        if not parts or any(part == ".." for part in parts):
+            return ""
+        return "/".join(parts)
+
     def _render_pattern_preview(self) -> tuple[str, bool]:
         pattern = (self.pattern_edit.text().strip() or DEFAULT_LYRICS_FILE_PATTERN)
         values = {
@@ -453,17 +523,19 @@ class MusicFoldersDialog(QDialog):
     def _update_pattern_preview(self) -> None:
         if not self.save_sidecars_chk.isChecked():
             self.pattern_preview_label.setProperty("validationState", "")
-            self.pattern_preview_label.setText("Preview: lyric files will be saved next to the audio file when sidecar saving is disabled.")
+            self.pattern_preview_label.setText(
+                "Export preview: lyric files will be saved next to the audio file when sidecar saving is disabled."
+            )
         else:
             preview, used_fallback = self._render_pattern_preview()
             self.pattern_preview_label.setProperty("validationState", "error" if used_fallback else "success")
             if used_fallback:
                 self.pattern_preview_label.setText(
-                    "Preview (fallback used due to invalid or empty result):\n"
+                    "Export preview (fallback used due to invalid or empty result):\n"
                     f"{preview}"
                 )
             else:
-                self.pattern_preview_label.setText(f"Preview:\n{preview}")
+                self.pattern_preview_label.setText(f"Export preview:\n{preview}")
 
         self.pattern_preview_label.style().unpolish(self.pattern_preview_label)
         self.pattern_preview_label.style().polish(self.pattern_preview_label)
@@ -480,11 +552,16 @@ class MusicFoldersDialog(QDialog):
         new_config = replace(
             config,
             theme_mode=str(self.theme_combo.currentData() or "auto"),
+            ui_scale_percent=int(self.ui_scale_combo.currentData() or 100),
+            font_size_mode=str(self.font_size_combo.currentData() or "normal"),
+            show_album_art=bool(self.album_art_combo.currentData()),
+            startup_view=str(self.startup_view_combo.currentData() or "remember_last"),
             save_lyrics_sidecars=self.save_sidecars_chk.isChecked(),
             download_lyrics_mode=str(self.download_mode_combo.currentData() or "prefer_synced"),
             try_embed_lyrics=self.embed_chk.isChecked(),
             lyrics_output_dir=self.output_dir_edit.text().strip(),
             lyrics_file_pattern=self.pattern_edit.text().strip() or DEFAULT_LYRICS_FILE_PATTERN,
+            lyrics_lookup_subdir=self._normalized_lookup_subdir(),
             scan_excluded_paths=self.excluded_paths_edit.toPlainText().strip(),
             scan_excluded_patterns=self.excluded_patterns_edit.toPlainText().strip(),
             reaction_delay_ms=int(self.reaction_delay_spin.value()),

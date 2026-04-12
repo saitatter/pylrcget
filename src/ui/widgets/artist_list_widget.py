@@ -24,6 +24,7 @@ from ui.widgets.sortable_header_view import SortableHeaderView
 
 class ArtistListWidget(QWidget):
     playTrack = Signal(int)
+    refreshTrack = Signal(int)
     downloadLyrics = Signal(int)
     exportLyricsFiles = Signal(int)
     bulkDownloadRequested = Signal(list, str)
@@ -51,6 +52,7 @@ class ArtistListWidget(QWidget):
         self._unknown_artist_ids: list[int] = []
         self._unknown_album_count = 0
         self._unknown_track_count = 0
+        self._ui_scale = 1.0
 
         root = QVBoxLayout(self)
         root.setContentsMargins(0, 0, 0, 0)
@@ -99,6 +101,7 @@ class ArtistListWidget(QWidget):
         self.album_browser = AlbumListWidget(self.app_state)
         self.album_browser.setRouteTab("artists")
         self.album_browser.playTrack.connect(self.playTrack.emit)
+        self.album_browser.refreshTrack.connect(self.refreshTrack.emit)
         self.album_browser.downloadLyrics.connect(self.downloadLyrics.emit)
         self.album_browser.exportLyricsFiles.connect(self.exportLyricsFiles.emit)
         self.album_browser.bulkDownloadRequested.connect(self.bulkDownloadRequested.emit)
@@ -117,6 +120,11 @@ class ArtistListWidget(QWidget):
 
         self._apply_styles()
         self._empty_action = ""
+
+    def set_ui_scale(self, scale: float) -> None:
+        self._ui_scale = max(0.85, min(1.5, float(scale or 1.0)))
+        self.table.verticalHeader().setDefaultSectionSize(int(round(30 * self._ui_scale)))
+        self.album_browser.set_ui_scale(self._ui_scale)
 
     def setActive(self, active: bool):
         self._active = active

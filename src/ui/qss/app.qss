@@ -15,6 +15,7 @@ QLineEdit, QTextEdit, QPlainTextEdit, QTableWidget, QAbstractItemView, QComboBox
 }
 
 QLineEdit, QTextEdit, QPlainTextEdit, QComboBox {
+    background-color: {{color-bg-panel}};
     border-radius: {{radius-md}};
     padding: {{space-2}};
     selection-background-color: {{color-accent}};

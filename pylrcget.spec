@@ -29,6 +29,7 @@ exe = EXE(
     a.datas,
     [],
     name="pylrcget",
+    icon=str(ROOT / "src" / "ui" / "assets" / "app-icon.ico"),
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

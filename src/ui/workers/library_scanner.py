@@ -26,12 +26,14 @@ class LibraryScanner(QThread):
         *,
         excluded_paths: str = "",
         excluded_patterns: str = "",
+        lyrics_lookup_subdir: str = "",
     ):
         super().__init__()
         self.db_path = db_path
         self.directories = directories
         self.excluded_paths = excluded_paths
         self.excluded_patterns = excluded_patterns
+        self.lyrics_lookup_subdir = lyrics_lookup_subdir
 
     def run(self):
         db = None
@@ -67,7 +69,7 @@ class LibraryScanner(QThread):
                     return
 
                 scanned += 1
-                signature = get_audio_file_signature(p)
+                signature = get_audio_file_signature(p, self.lyrics_lookup_subdir)
                 if existing_index.get(p) == signature:
                     unchanged += 1
                     if scanned % 200 == 0:
@@ -77,7 +79,11 @@ class LibraryScanner(QThread):
                 if p in existing_index:
                     pending_replacements.append(p)
 
-                t = new_fs_track_from_path(p, signature=signature)
+                t = new_fs_track_from_path(
+                    p,
+                    signature=signature,
+                    lyrics_lookup_subdir=self.lyrics_lookup_subdir,
+                )
 
                 if t is not None:
                     batch.append(t)

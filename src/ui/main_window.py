@@ -23,6 +23,7 @@ from db.queries import (
     get_artist_by_id,
     get_config,
     get_directories,
+    refresh_track_from_file,
     get_track_by_id,
     mark_tracks_instrumental,
     set_config,
@@ -245,6 +246,7 @@ class MainWindow(QMainWindow):
             view.set_current_position_provider(self.app_state.player.position_ms if self.app_state.player else None)
         self._apply_saved_playback_speed()
         self._apply_saved_playback_volume()
+        self._apply_appearance_preferences(get_config(self.app_state.db))
 
         self.download_overlay = DownloadProgressOverlay(self.central_widget)
         self.download_overlay.sync_to_parent()
@@ -334,6 +336,7 @@ class MainWindow(QMainWindow):
 
         # --- Signals from track list ---
         self.track_list.playTrack.connect(self.on_play_track)
+        self.track_list.refreshTrack.connect(self.on_refresh_track)
         self.track_list.downloadLyrics.connect(self.on_download_lyrics)
         self.track_list.exportLyricsFiles.connect(self._export_track_sidecars)
         self.track_list.bulkDownloadRequested.connect(self._on_bulk_download_requested)
@@ -344,6 +347,7 @@ class MainWindow(QMainWindow):
         self.track_list.configureFoldersRequested.connect(self.open_config_modal)
         self.lyrics_view.downloadRequested.connect(self._download_current_track_lyrics)
         self.albums_tab.playTrack.connect(self.on_play_track)
+        self.albums_tab.refreshTrack.connect(self.on_refresh_track)
         self.albums_tab.downloadLyrics.connect(self.on_download_lyrics)
         self.albums_tab.exportLyricsFiles.connect(self._export_track_sidecars)
         self.albums_tab.bulkDownloadRequested.connect(self._on_bulk_download_requested)
@@ -355,6 +359,7 @@ class MainWindow(QMainWindow):
         self.albums_tab.refreshLibraryRequested.connect(self.refresh_library)
         self.albums_tab.configureFoldersRequested.connect(self.open_config_modal)
         self.artists_tab.playTrack.connect(self.on_play_track)
+        self.artists_tab.refreshTrack.connect(self.on_refresh_track)
         self.artists_tab.downloadLyrics.connect(self.on_download_lyrics)
         self.artists_tab.exportLyricsFiles.connect(self._export_track_sidecars)
         self.artists_tab.bulkDownloadRequested.connect(self._on_bulk_download_requested)
@@ -375,8 +380,7 @@ class MainWindow(QMainWindow):
         self._apply_track_filters()
         self.show_queued_notifications()
         self._update_responsive_layout()
-        self.navigate_to(tracks_all(), record_history=False)
-        QTimer.singleShot(0, self.navigation.restore_last_route)
+        self._apply_startup_view()
         QTimer.singleShot(0, self._maybe_show_first_run_onboarding)
 
         self._apply_styles()
@@ -422,13 +426,10 @@ class MainWindow(QMainWindow):
 
     # ------------------ modals ------------------
     def open_config_modal(self):
-        before = get_config(self.app_state.db).theme_mode
         dlg = MusicFoldersDialog(self.app_state, self)
         if dlg.exec():
             updated_config = get_config(self.app_state.db)
-            after = updated_config.theme_mode
-            if after != before:
-                self._apply_theme(after)
+            self._apply_appearance_preferences(updated_config)
             self._sync_download_mode_ui()
             for view in self._all_lyrics_views():
                 view.set_reaction_delay_ms(updated_config.reaction_delay_ms)
@@ -489,6 +490,7 @@ class MainWindow(QMainWindow):
             directories,
             excluded_paths=config.scan_excluded_paths,
             excluded_patterns=config.scan_excluded_patterns,
+            lyrics_lookup_subdir=config.lyrics_lookup_subdir,
         )
         self.scanner.progress_signal.connect(self._update_scan_progress)
         self.scanner.finished_signal.connect(self._scan_finished)
@@ -619,21 +621,48 @@ class MainWindow(QMainWindow):
         track = get_track_by_id(self.app_state.db, track_id)
 
 
-        path = track.file_path
-        if os.path.isdir(path):
-            path = os.path.join(track.file_path, track.file_name)
-
-        meta = NowPlaying(
-            track_id=track.id,
-            title=track.title,
-            artist=track.artist_name,
-            path=path,
-            album=track.album_name,
-        )
+        path = self._track_playback_path(track)
+        meta = self._now_playing_meta(track)
 
         self.app_state.player.play_file(path, meta)
 
         self._set_track_lyrics_views(track)
+
+    def on_refresh_track(self, track_id: int) -> None:
+        try:
+            refreshed = refresh_track_from_file(self.app_state.db, int(track_id))
+        except Exception as exc:
+            log_and_notify(
+                self.app_state,
+                logger,
+                logging.ERROR,
+                exception_message("Failed to refresh track from disk", exc),
+                "error",
+                show_status=self._show_status_message,
+                status_timeout_ms=4000,
+            )
+            return
+
+        self._refresh_visible_library_view_after_downloads()
+
+        current_track_id = self._current_player_track_id()
+        if refreshed is None:
+            if current_track_id == int(track_id):
+                self._clear_current_player_track()
+            notify_user(
+                self.app_state,
+                "Track removed from library because the source file was not found.",
+                "warning",
+                show_status=self._show_status_message,
+                status_timeout_ms=3500,
+            )
+            return
+
+        if current_track_id == int(track_id):
+            self._update_current_player_track_meta(refreshed)
+            self._set_track_lyrics_views(refreshed)
+
+        self._show_status_message("Track refreshed from disk.", 2500)
 
     def play_next(self):
         if not self._queue_ids:
@@ -719,6 +748,39 @@ class MainWindow(QMainWindow):
         if not self.app_state.player or not self.app_state.player.track:
             return None
         return int(self.app_state.player.track.track_id)
+
+    def _track_playback_path(self, track) -> str:
+        path = track.file_path
+        if os.path.isdir(path):
+            path = os.path.join(track.file_path, track.file_name)
+        return path
+
+    def _now_playing_meta(self, track) -> NowPlaying:
+        return NowPlaying(
+            track_id=track.id,
+            title=track.title,
+            artist=track.artist_name,
+            path=self._track_playback_path(track),
+            album=track.album_name,
+        )
+
+    def _update_current_player_track_meta(self, track) -> None:
+        if not self.app_state.player:
+            return
+        self.app_state.player.track = self._now_playing_meta(track)
+        self.app_state.player.trackChanged.emit(self.app_state.player.track)
+
+    def _clear_current_player_track(self) -> None:
+        if not self.app_state.player:
+            return
+        try:
+            self.app_state.player.stop()
+        except Exception:
+            pass
+        self.app_state.player.track = None
+        self.app_state.player.trackChanged.emit(None)
+        for view in self._all_lyrics_views():
+            view.show_none("Select a track to see lyrics")
 
     def _refresh_visible_library_view_after_downloads(self) -> None:
         current = self.tabs.currentWidget()
@@ -1010,23 +1072,29 @@ class MainWindow(QMainWindow):
     def _apply_styles(self):
         self.setStyleSheet(load_stylesheet("main_window.qss"))
 
-    def navigate_to(self, route: LibraryRoute, *, record_history: bool = True) -> None:
-        self.navigation.navigate_to(route, record_history=record_history)
+    def _appearance_scale(self, ui_scale_percent: int) -> float:
+        return max(0.85, min(1.5, float(int(ui_scale_percent or 100)) / 100.0))
 
-    def _apply_library_route(self, route: LibraryRoute) -> None:
-        if route.tab == "tracks":
-            self.top_bar.clear_library_search()
-            self.track_list.apply_route(route)
-        elif route.tab == "albums":
-            self.albums_tab.apply_route(route)
-        elif route.tab == "artists":
-            self.artists_tab.apply_route(route)
-        self._schedule_library_search()
-
-    def _apply_theme(self, theme_mode: str):
+    def _apply_appearance_preferences(self, config) -> None:
         app = QApplication.instance()
         if app is not None:
-            apply_app_theme(app, theme_mode)
+            apply_app_theme(
+                app,
+                config.theme_mode,
+                ui_scale_percent=config.ui_scale_percent,
+                font_size_mode=config.font_size_mode,
+            )
+
+        scale = self._appearance_scale(config.ui_scale_percent)
+        if hasattr(self, "player_bar"):
+            self.player_bar.set_show_album_art(bool(config.show_album_art))
+            self.player_bar.set_ui_scale(scale)
+        if hasattr(self, "track_list"):
+            self.track_list.set_ui_scale(scale)
+        if hasattr(self, "albums_tab"):
+            self.albums_tab.set_ui_scale(scale)
+        if hasattr(self, "artists_tab"):
+            self.artists_tab.set_ui_scale(scale)
 
         self._apply_styles()
         if hasattr(self, "player_bar"):
@@ -1046,6 +1114,49 @@ class MainWindow(QMainWindow):
             self.albums_lyrics_view._apply_styles()
         if hasattr(self, "artists_lyrics_view"):
             self.artists_lyrics_view._apply_styles()
+        self._update_responsive_layout()
+
+    def _clear_breadcrumbs(self) -> None:
+        while self.breadcrumbs_layout.count():
+            item = self.breadcrumbs_layout.takeAt(0)
+            widget = item.widget()
+            if widget is not None:
+                widget.deleteLater()
+
+    def _apply_startup_view(self) -> None:
+        config = get_config(self.app_state.db)
+        startup_view = str(config.startup_view or "remember_last")
+        if startup_view == "albums":
+            self.navigate_to(LibraryRoute(tab="albums", mode="root"), record_history=False)
+            return
+        if startup_view == "artists":
+            self.navigate_to(LibraryRoute(tab="artists", mode="root"), record_history=False)
+            return
+        if startup_view == "my_lrclib":
+            self.tabs.setCurrentWidget(self.mylrclib_tab)
+            self._clear_breadcrumbs()
+            return
+
+        self.navigate_to(tracks_all(), record_history=False)
+        if startup_view == "remember_last":
+            QTimer.singleShot(0, self.navigation.restore_last_route)
+
+    def navigate_to(self, route: LibraryRoute, *, record_history: bool = True) -> None:
+        self.navigation.navigate_to(route, record_history=record_history)
+
+    def _apply_library_route(self, route: LibraryRoute) -> None:
+        if route.tab == "tracks":
+            self.top_bar.clear_library_search()
+            self.track_list.apply_route(route)
+        elif route.tab == "albums":
+            self.albums_tab.apply_route(route)
+        elif route.tab == "artists":
+            self.artists_tab.apply_route(route)
+        self._schedule_library_search()
+
+    def _apply_theme(self, theme_mode: str):
+        config = get_config(self.app_state.db)
+        self._apply_appearance_preferences(replace(config, theme_mode=theme_mode))
 
     def _on_open_album(self, album_id: int):
         try:

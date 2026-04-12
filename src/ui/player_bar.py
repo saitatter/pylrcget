@@ -155,6 +155,9 @@ class PlayerBar(QWidget):
         self._is_playing = False
         self._speed_step = 0.05
         self._current_track_id: int | None = None
+        self._compact_mode = False
+        self._show_album_art = True
+        self._ui_scale = 1.0
         self._speed_commit_timer = QTimer(self)
         self._speed_commit_timer.setSingleShot(True)
         self._speed_commit_timer.setInterval(450)
@@ -401,7 +404,16 @@ class PlayerBar(QWidget):
     def set_volume_value(self, volume_0_to_1: float) -> None:
         self._set_volume_slider_value(volume_0_to_1)
 
+    def set_show_album_art(self, show: bool) -> None:
+        self._show_album_art = bool(show)
+        self.set_compact_mode(self._compact_mode)
+
+    def set_ui_scale(self, scale: float) -> None:
+        self._ui_scale = max(0.85, min(1.5, float(scale or 1.0)))
+        self.set_compact_mode(self._compact_mode)
+
     def set_compact_mode(self, compact: bool):
+        self._compact_mode = bool(compact)
         self.setProperty("compact", compact)
         self.style().unpolish(self)
         self.style().polish(self)
@@ -411,12 +423,22 @@ class PlayerBar(QWidget):
         self.lbl_speed.setVisible(not compact)
         self.lbl_volume.setVisible(True)
         self.lbl_title.setMinimumWidth(110 if compact else 150)
-        left_width = 240 if compact else 300
+        left_width = 200 if compact else 250
+        if self._show_album_art:
+            left_width += 40
         right_width = 150 if compact else 190
         center_width = 420 if compact else 560
         cover_size = 44 if compact else 52
         bar_height = 92 if compact else 104
+
+        left_width = int(round(left_width * self._ui_scale))
+        right_width = int(round(right_width * self._ui_scale))
+        center_width = int(round(center_width * self._ui_scale))
+        cover_size = int(round(cover_size * self._ui_scale))
+        bar_height = int(round(bar_height * self._ui_scale))
+
         self.lbl_cover.setFixedSize(cover_size, cover_size)
+        self.lbl_cover.setVisible(self._show_album_art)
         self.findChild(QWidget, "PlayerMeta").setFixedWidth(left_width)
         self.findChild(QWidget, "PlayerExtras").setFixedWidth(right_width)
         self.findChild(QWidget, "PlayerCenter").setFixedWidth(center_width)
@@ -426,9 +448,9 @@ class PlayerBar(QWidget):
         now_playing = None
         if self.player:
             now_playing = getattr(self.player, "track", None)
-        if now_playing:
+        if self._show_album_art and now_playing:
             self.lbl_cover.setPixmap(_artwork_pixmap(now_playing.title or "?", now_playing.artist, getattr(now_playing, "path", None), cover_size))
-        else:
+        elif self._show_album_art:
             self.lbl_cover.setPixmap(_artwork_pixmap("?", None, None, cover_size))
 
     def _format_speed_label(self, speed: float) -> str:
@@ -571,13 +593,15 @@ class PlayerBar(QWidget):
             self.lbl_title.setText(title)
             self.lbl_artist.setText(f'<a href="artist">{html.escape(artist)}</a>')
             self.lbl_album.setText(f'<a href="album">{html.escape(album)}</a>' if album else "")
-            self.lbl_cover.setPixmap(_artwork_pixmap(title, artist, getattr(now_playing, "path", None), cover_size))
+            if self._show_album_art:
+                self.lbl_cover.setPixmap(_artwork_pixmap(title, artist, getattr(now_playing, "path", None), cover_size))
         else:
             self._current_track_id = None
             self.lbl_title.setText("Nothing playing")
             self.lbl_artist.setText("Choose a track to start playback")
             self.lbl_album.setText("")
-            self.lbl_cover.setPixmap(_artwork_pixmap("?", None, None, cover_size))
+            if self._show_album_art:
+                self.lbl_cover.setPixmap(_artwork_pixmap("?", None, None, cover_size))
             self.slider.setValue(0)
             self.lbl_time.setText("0:00")
             self.lbl_dur.setText("0:00")

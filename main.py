@@ -98,7 +98,13 @@ def main() -> int:
     qt_app.setApplicationName("LrcGet")
     qt_app.setWindowIcon(load_app_icon())
     app_state = init_app_state(app_data_dir)
-    apply_app_theme(qt_app, get_config(app_state.db).theme_mode)
+    config = get_config(app_state.db)
+    apply_app_theme(
+        qt_app,
+        config.theme_mode,
+        ui_scale_percent=config.ui_scale_percent,
+        font_size_mode=config.font_size_mode,
+    )
     main_window = MainWindow(app_state)
     main_window.show()
 

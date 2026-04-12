@@ -102,9 +102,14 @@ class Config:
     save_lyrics_sidecars: bool
     try_embed_lyrics: bool
     theme_mode: str
+    ui_scale_percent: int
+    font_size_mode: str
+    show_album_art: bool
+    startup_view: str
     lrclib_instance: str
     lyrics_output_dir: str
     lyrics_file_pattern: str
+    lyrics_lookup_subdir: str
     scan_excluded_paths: str
     scan_excluded_patterns: str
     reaction_delay_ms: int
