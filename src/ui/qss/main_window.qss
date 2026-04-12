@@ -3,7 +3,7 @@ QWidget#TopBar {
 }
 
 QWidget#TopBarGroup {
-    background: {{color-bg-panel}};
+    background: transparent;
     border: 1px solid {{color-border-strong}};
     border-radius: {{radius-lg}};
 }
@@ -25,7 +25,7 @@ QLabel#TopBarLabel {
 }
 
 QLineEdit#TopBarSearch {
-    background: {{color-bg-app}};
+    background: transparent;
     border-color: {{color-border}};
 }
 
@@ -133,7 +133,7 @@ QLabel#DownloadOverlayStatus {
 }
 
 QTextEdit#DownloadOverlayLog {
-    background: {{color-bg-app}};
+    background: {{color-bg-panel}};
     border: 1px solid {{color-border}};
     border-radius: {{radius-lg}};
     color: {{color-text}};
@@ -238,7 +238,7 @@ QPushButton#LogPanelClear {
 }
 
 QPlainTextEdit#LogPanelOutput {
-    background: {{color-bg-app}};
+    background: {{color-bg-panel}};
     border: 1px solid {{color-border}};
     border-radius: {{radius-md}};
     color: {{color-text}};

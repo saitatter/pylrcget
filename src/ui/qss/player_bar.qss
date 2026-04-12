@@ -188,7 +188,7 @@ QSlider#PlayerSlider::add-page:horizontal {
 }
 
 QComboBox#SpeedCombo {
-    background: {{color-bg-control}};
+    background: {{color-bg-panel}};
     border: 1px solid {{color-border}};
     border-radius: {{radius-md}};
     padding: 2px 10px 3px 10px;

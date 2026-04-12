@@ -13,7 +13,7 @@ from PySide6.QtWidgets import (
 )
 
 from ui.icon_loader import load_svg_icon
-from ui.spacing import SPACE_1, SPACE_2, set_layout_spacing
+from ui.spacing import SPACE_1, SPACE_2, SPACE_3, set_layout_spacing
 from ui.services.download_modes import download_missing_tooltip
 
 
@@ -41,6 +41,7 @@ class TopBarController(QWidget):
         self.search_group.setObjectName("TopBarGroup")
         search_layout = QVBoxLayout(self.search_group)
         set_layout_spacing(search_layout, margins=SPACE_2, spacing=SPACE_1)
+        search_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
 
         self.search_label = QLabel("Search Library")
         self.search_label.setObjectName("TopBarLabel")
@@ -58,35 +59,40 @@ class TopBarController(QWidget):
         self.filters_group.setObjectName("TopBarGroup")
         filters_layout = QVBoxLayout(self.filters_group)
         set_layout_spacing(filters_layout, margins=SPACE_2, spacing=SPACE_1)
+        filters_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
 
         self.filters_label = QLabel("Filter Lyrics")
         self.filters_label.setObjectName("TopBarLabel")
         filters_layout.addWidget(self.filters_label)
 
         filters_row = QHBoxLayout()
-        set_layout_spacing(filters_row, spacing=SPACE_2)
+        set_layout_spacing(filters_row, margins=(0, SPACE_3, 0, 0), spacing=SPACE_2)
 
         self.chk_synced = QCheckBox("Synced")
         self.chk_synced.setChecked(True)
         self.chk_synced.setAccessibleName("Filter synced lyrics")
+        self.chk_synced.setMinimumHeight(36)
         self.chk_synced.toggled.connect(on_filter_changed)
         filters_row.addWidget(self.chk_synced)
 
         self.chk_plain = QCheckBox("Plain")
         self.chk_plain.setChecked(True)
         self.chk_plain.setAccessibleName("Filter plain lyrics")
+        self.chk_plain.setMinimumHeight(36)
         self.chk_plain.toggled.connect(on_filter_changed)
         filters_row.addWidget(self.chk_plain)
 
         self.chk_instr = QCheckBox("Instrumental")
         self.chk_instr.setChecked(False)
         self.chk_instr.setAccessibleName("Filter instrumental tracks")
+        self.chk_instr.setMinimumHeight(36)
         self.chk_instr.toggled.connect(on_filter_changed)
         filters_row.addWidget(self.chk_instr)
 
         self.chk_none = QCheckBox("No lyrics")
         self.chk_none.setChecked(True)
         self.chk_none.setAccessibleName("Filter tracks without lyrics")
+        self.chk_none.setMinimumHeight(36)
         self.chk_none.toggled.connect(on_filter_changed)
         filters_row.addWidget(self.chk_none)
         filters_row.addStretch(1)
@@ -97,6 +103,7 @@ class TopBarController(QWidget):
         self.actions_group.setObjectName("TopBarGroup")
         actions_layout = QVBoxLayout(self.actions_group)
         set_layout_spacing(actions_layout, margins=SPACE_2, spacing=SPACE_1)
+        actions_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
 
         self.actions_label = QLabel("Global Actions")
         self.actions_label.setObjectName("TopBarLabel")
