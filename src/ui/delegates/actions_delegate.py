@@ -15,15 +15,27 @@ class ActionsDelegate(QStyledItemDelegate):
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
-        self._refresh_icon = load_svg_icon("refresh-cw.svg", 14, "#e5e7eb")
+        self._ui_scale = 1.0
+        self._refresh_icon = None
+        self._update_resources()
 
-    @staticmethod
-    def _button_rects(cell_rect: QRect) -> tuple[QRect, QRect]:
-        refresh_w, refresh_h = 28, 26
-        download_w, download_h = 90, 26
-        gap = 6
+    def set_ui_scale(self, scale: float) -> None:
+        self._ui_scale = max(0.85, min(1.5, float(scale or 1.0)))
+        self._update_resources()
+
+    def _update_resources(self) -> None:
+        size = int(round(14 * self._ui_scale))
+        self._refresh_icon = load_svg_icon("refresh-cw.svg", size, "#e5e7eb")
+
+    def _button_rects(self, cell_rect: QRect) -> tuple[QRect, QRect]:
+        refresh_w = int(round(28 * self._ui_scale))
+        refresh_h = int(round(26 * self._ui_scale))
+        download_w = int(round(90 * self._ui_scale))
+        download_h = int(round(26 * self._ui_scale))
+        gap = int(round(6 * self._ui_scale))
+        margin = int(round(8 * self._ui_scale))
         download_rect = QRect(
-            cell_rect.right() - download_w - 8,
+            cell_rect.right() - download_w - margin,
             cell_rect.center().y() - download_h // 2,
             download_w,
             download_h,
@@ -46,7 +58,8 @@ class ActionsDelegate(QStyledItemDelegate):
         refresh_opt = QStyleOptionButton()
         refresh_opt.rect = refresh_rect
         refresh_opt.icon = self._refresh_icon
-        refresh_opt.iconSize = QSize(14, 14)
+        icon_size = int(round(14 * self._ui_scale))
+        refresh_opt.iconSize = QSize(icon_size, icon_size)
         refresh_opt.state = QStyle.State_Enabled
         if option.state & QStyle.State_MouseOver:
             refresh_opt.state |= QStyle.State_MouseOver

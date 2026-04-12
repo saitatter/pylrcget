@@ -144,6 +144,12 @@ class TrackListWidget(QWidget):
     def set_ui_scale(self, scale: float) -> None:
         self._ui_scale = max(0.85, min(1.5, float(scale or 1.0)))
         self.table.verticalHeader().setDefaultSectionSize(int(round(44 * self._ui_scale)))
+        self.table.setColumnWidth(0, int(round(520 * self._ui_scale)))
+        self.table.setColumnWidth(1, int(round(90 * self._ui_scale)))
+        self.table.setColumnWidth(2, int(round(110 * self._ui_scale)))
+        self.table.setColumnWidth(3, int(round(180 * self._ui_scale)))
+        if hasattr(self.actions, "set_ui_scale"):
+            self.actions.set_ui_scale(self._ui_scale)
 
     # -------------------------
     # External API
