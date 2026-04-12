@@ -57,6 +57,7 @@ class TrackListWidget(QWidget):
         self._sort_order = Qt.SortOrder.AscendingOrder
         self._has_more_rows = False
         self._loading_more = False
+        self._ui_scale = 1.0
 
         self.scope_bar = QWidget()
         self.scope_bar.setObjectName("TrackScopeBar")
@@ -139,6 +140,10 @@ class TrackListWidget(QWidget):
         layout.addWidget(self.stack)
 
         self._empty_action = ""
+
+    def set_ui_scale(self, scale: float) -> None:
+        self._ui_scale = max(0.85, min(1.5, float(scale or 1.0)))
+        self.table.verticalHeader().setDefaultSectionSize(int(round(44 * self._ui_scale)))
 
     # -------------------------
     # External API

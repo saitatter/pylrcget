@@ -307,3 +307,25 @@ def upgrade_database_if_needed(db: sqlite3.Connection, existing_version: int) ->
             )
         db.commit()
         db.execute("PRAGMA user_version=23")
+
+    # v24
+    if existing_version <= 23:
+        print("Migrate database version 24...")
+        if not _column_exists("config_data", "ui_scale_percent"):
+            db.execute(
+                "ALTER TABLE config_data ADD COLUMN ui_scale_percent INTEGER DEFAULT 100"
+            )
+        if not _column_exists("config_data", "font_size_mode"):
+            db.execute(
+                "ALTER TABLE config_data ADD COLUMN font_size_mode TEXT DEFAULT 'normal'"
+            )
+        if not _column_exists("config_data", "show_album_art"):
+            db.execute(
+                "ALTER TABLE config_data ADD COLUMN show_album_art BOOLEAN DEFAULT 1"
+            )
+        if not _column_exists("config_data", "startup_view"):
+            db.execute(
+                "ALTER TABLE config_data ADD COLUMN startup_view TEXT DEFAULT 'remember_last'"
+            )
+        db.commit()
+        db.execute("PRAGMA user_version=24")

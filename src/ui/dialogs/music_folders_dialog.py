@@ -122,8 +122,35 @@ class MusicFoldersDialog(QDialog):
         self.theme_combo = QComboBox()
         for theme_key, theme_name in get_available_themes():
             self.theme_combo.addItem(theme_name, theme_key)
+        self.ui_scale_combo = QComboBox()
+        for percent in (90, 100, 110, 125):
+            self.ui_scale_combo.addItem(f"{percent}%", percent)
+        self.font_size_combo = QComboBox()
+        self.font_size_combo.addItem("Small", "small")
+        self.font_size_combo.addItem("Normal", "normal")
+        self.font_size_combo.addItem("Large", "large")
+        self.album_art_combo = QComboBox()
+        self.album_art_combo.addItem("Show", True)
+        self.album_art_combo.addItem("Hide", False)
+        self.startup_view_combo = QComboBox()
+        self.startup_view_combo.addItem("Remember last view", "remember_last")
+        self.startup_view_combo.addItem("Tracks", "tracks")
+        self.startup_view_combo.addItem("Albums", "albums")
+        self.startup_view_combo.addItem("Artists", "artists")
+        self.startup_view_combo.addItem("My LRCLIB", "my_lrclib")
         appearance_layout.addWidget(QLabel("Theme"), 0, 0)
         appearance_layout.addWidget(self.theme_combo, 0, 1)
+        appearance_layout.addWidget(QLabel("UI scale"), 1, 0)
+        appearance_layout.addWidget(self.ui_scale_combo, 1, 1)
+        appearance_layout.addWidget(QLabel("Font size"), 2, 0)
+        appearance_layout.addWidget(self.font_size_combo, 2, 1)
+        appearance_layout.addWidget(QLabel("Album art"), 3, 0)
+        appearance_layout.addWidget(self.album_art_combo, 3, 1)
+        appearance_layout.addWidget(QLabel("Startup view"), 4, 0)
+        appearance_layout.addWidget(self.startup_view_combo, 4, 1)
+        startup_hint = QLabel("Startup view is applied the next time the app opens.")
+        startup_hint.setWordWrap(True)
+        appearance_layout.addWidget(startup_hint, 5, 0, 1, 2)
         appearance_layout_root.addWidget(appearance_box)
         appearance_layout_root.addStretch(1)
 
@@ -246,6 +273,14 @@ class MusicFoldersDialog(QDialog):
         config = get_config(self.app_state.db)
         theme_idx = self.theme_combo.findData(config.theme_mode or "auto")
         self.theme_combo.setCurrentIndex(max(0, theme_idx))
+        ui_scale_idx = self.ui_scale_combo.findData(int(config.ui_scale_percent or 100))
+        self.ui_scale_combo.setCurrentIndex(max(0, ui_scale_idx))
+        font_size_idx = self.font_size_combo.findData(config.font_size_mode or "normal")
+        self.font_size_combo.setCurrentIndex(max(0, font_size_idx))
+        album_art_idx = self.album_art_combo.findData(bool(config.show_album_art))
+        self.album_art_combo.setCurrentIndex(max(0, album_art_idx))
+        startup_view_idx = self.startup_view_combo.findData(config.startup_view or "remember_last")
+        self.startup_view_combo.setCurrentIndex(max(0, startup_view_idx))
         self.save_sidecars_chk.setChecked(config.save_lyrics_sidecars)
         mode_index = self.download_mode_combo.findData(config.download_lyrics_mode or "prefer_synced")
         self.download_mode_combo.setCurrentIndex(max(0, mode_index))
@@ -517,6 +552,10 @@ class MusicFoldersDialog(QDialog):
         new_config = replace(
             config,
             theme_mode=str(self.theme_combo.currentData() or "auto"),
+            ui_scale_percent=int(self.ui_scale_combo.currentData() or 100),
+            font_size_mode=str(self.font_size_combo.currentData() or "normal"),
+            show_album_art=bool(self.album_art_combo.currentData()),
+            startup_view=str(self.startup_view_combo.currentData() or "remember_last"),
             save_lyrics_sidecars=self.save_sidecars_chk.isChecked(),
             download_lyrics_mode=str(self.download_mode_combo.currentData() or "prefer_synced"),
             try_embed_lyrics=self.embed_chk.isChecked(),
