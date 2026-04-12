@@ -300,6 +300,7 @@ class TrackListWidget(QWidget):
 
         menu = QMenu(self)
         current_track_id = self.model.track_id_at(idx.row())
+        has_focused_track = current_track_id is not None
 
         info = menu.addAction(f"{len(selected_ids)} track selected" if len(selected_ids) == 1 else f"{len(selected_ids)} tracks selected")
         info.setEnabled(False)
@@ -308,13 +309,18 @@ class TrackListWidget(QWidget):
         quick = menu.addAction("Quick Actions")
         quick.setEnabled(False)
         act_play = menu.addAction("Play now")
-        act_refresh = menu.addAction("Refresh this track from disk")
-        act_dl = menu.addAction("Download lyrics for this track")
-        act_export = menu.addAction("Export lyrics files for this track")
+        act_play.setEnabled(has_focused_track)
 
         menu.addSeparator()
         bulk = menu.addAction("Selection Actions")
         bulk.setEnabled(False)
+        act_refresh = menu.addAction("Refresh focused track from disk")
+        act_dl = menu.addAction("Download lyrics for focused track")
+        act_export = menu.addAction("Export lyrics files for focused track")
+        act_refresh.setEnabled(has_focused_track)
+        act_dl.setEnabled(has_focused_track)
+        act_export.setEnabled(has_focused_track)
+        menu.addSeparator()
         count_suffix = f"({len(selected_ids)})"
         act_dl_selected = menu.addAction(f"Download selection using current mode {count_suffix}")
         act_dl_synced = menu.addAction(f"Download selection as synced only {count_suffix}")
