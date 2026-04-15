@@ -11,130 +11,64 @@ from db.migrations import upgrade_database_if_needed
 
 
 class MigrationTests(unittest.TestCase):
-    def test_v21_migrates_legacy_synced_only_flag_when_mode_column_exists(self):
+    def test_fresh_database_initializes_current_schema_at_v1(self):
         with tempfile.TemporaryDirectory() as tmp:
             db_path = Path(tmp) / "db.sqlite3"
             db = sqlite3.connect(str(db_path))
             db.row_factory = sqlite3.Row
             try:
-                db.execute(
-                    """
-                    CREATE TABLE config_data (
-                        download_synced_only INTEGER DEFAULT 0,
-                        download_lyrics_mode TEXT DEFAULT 'prefer_synced'
-                    )
-                    """
-                )
-                db.execute(
-                    "INSERT INTO config_data(download_synced_only, download_lyrics_mode) VALUES (?, ?)",
-                    (1, "prefer_synced"),
-                )
-                db.execute("PRAGMA user_version=20")
-                db.commit()
+                upgrade_database_if_needed(db, 0)
 
-                upgrade_database_if_needed(db, 20)
-
-                row = db.execute("SELECT download_lyrics_mode FROM config_data LIMIT 1").fetchone()
-                self.assertIsNotNone(row)
-                self.assertEqual(row["download_lyrics_mode"], "synced_only")
                 version = int(db.execute("PRAGMA user_version").fetchone()[0])
                 self.assertEqual(version, CURRENT_DB_VERSION)
-            finally:
-                db.close()
 
-    def test_v21_adds_missing_mode_column_and_migrates_legacy_value(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            db_path = Path(tmp) / "db.sqlite3"
-            db = sqlite3.connect(str(db_path))
-            db.row_factory = sqlite3.Row
-            try:
-                db.execute(
-                    """
-                    CREATE TABLE config_data (
-                        download_synced_only INTEGER DEFAULT 0
-                    )
-                    """
+                config_columns = {
+                    row["name"] for row in db.execute("PRAGMA table_info(config_data)").fetchall()
+                }
+                self.assertTrue(
+                    {
+                        "download_lyrics_mode",
+                        "lyrics_lookup_subdir",
+                        "ui_scale_percent",
+                        "font_size_mode",
+                        "show_album_art",
+                        "startup_view",
+                        "playback_speed",
+                        "playback_volume",
+                    }
+                    <= config_columns
                 )
-                db.execute("INSERT INTO config_data(download_synced_only) VALUES (?)", (1,))
-                db.execute("PRAGMA user_version=20")
-                db.commit()
 
-                upgrade_database_if_needed(db, 20)
-
-                columns = {row["name"] for row in db.execute("PRAGMA table_info(config_data)").fetchall()}
-                self.assertIn("download_lyrics_mode", columns)
-                row = db.execute("SELECT download_lyrics_mode FROM config_data LIMIT 1").fetchone()
-                self.assertIsNotNone(row)
-                self.assertEqual(row["download_lyrics_mode"], "synced_only")
-                version = int(db.execute("PRAGMA user_version").fetchone()[0])
-                self.assertEqual(version, CURRENT_DB_VERSION)
-            finally:
-                db.close()
-
-    def test_v23_adds_lyrics_lookup_subdir_column(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            db_path = Path(tmp) / "db.sqlite3"
-            db = sqlite3.connect(str(db_path))
-            db.row_factory = sqlite3.Row
-            try:
-                db.execute(
-                    """
-                    CREATE TABLE config_data (
-                        download_lyrics_mode TEXT DEFAULT 'prefer_synced'
-                    )
-                    """
-                )
-                db.execute("INSERT INTO config_data(download_lyrics_mode) VALUES (?)", ("prefer_synced",))
-                db.execute("PRAGMA user_version=22")
-                db.commit()
-
-                upgrade_database_if_needed(db, 22)
-
-                columns = {row["name"] for row in db.execute("PRAGMA table_info(config_data)").fetchall()}
-                self.assertIn("lyrics_lookup_subdir", columns)
-                row = db.execute("SELECT lyrics_lookup_subdir FROM config_data LIMIT 1").fetchone()
-                self.assertIsNotNone(row)
-                self.assertEqual(row["lyrics_lookup_subdir"], "")
-                version = int(db.execute("PRAGMA user_version").fetchone()[0])
-                self.assertEqual(version, CURRENT_DB_VERSION)
-            finally:
-                db.close()
-
-    def test_v24_adds_appearance_preference_columns(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            db_path = Path(tmp) / "db.sqlite3"
-            db = sqlite3.connect(str(db_path))
-            db.row_factory = sqlite3.Row
-            try:
-                db.execute(
-                    """
-                    CREATE TABLE config_data (
-                        lyrics_lookup_subdir TEXT DEFAULT ''
-                    )
-                    """
-                )
-                db.execute("INSERT INTO config_data(lyrics_lookup_subdir) VALUES ('lyrics')")
-                db.execute("PRAGMA user_version=23")
-                db.commit()
-
-                upgrade_database_if_needed(db, 23)
-
-                columns = {row["name"] for row in db.execute("PRAGMA table_info(config_data)").fetchall()}
-                self.assertTrue({"ui_scale_percent", "font_size_mode", "show_album_art", "startup_view"} <= columns)
                 row = db.execute(
                     """
-                    SELECT ui_scale_percent, font_size_mode, show_album_art, startup_view
+                    SELECT download_lyrics_mode,
+                           lyrics_lookup_subdir,
+                           ui_scale_percent,
+                           font_size_mode,
+                           show_album_art,
+                           startup_view
                     FROM config_data
                     LIMIT 1
                     """
                 ).fetchone()
                 self.assertIsNotNone(row)
+                self.assertEqual(row["download_lyrics_mode"], "prefer_synced")
+                self.assertEqual(row["lyrics_lookup_subdir"], "")
                 self.assertEqual(int(row["ui_scale_percent"]), 100)
                 self.assertEqual(row["font_size_mode"], "normal")
                 self.assertEqual(int(row["show_album_art"]), 1)
                 self.assertEqual(row["startup_view"], "remember_last")
-                version = int(db.execute("PRAGMA user_version").fetchone()[0])
-                self.assertEqual(version, CURRENT_DB_VERSION)
+            finally:
+                db.close()
+
+    def test_nonzero_legacy_version_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db_path = Path(tmp) / "db.sqlite3"
+            db = sqlite3.connect(str(db_path))
+            db.row_factory = sqlite3.Row
+            try:
+                with self.assertRaises(RuntimeError):
+                    upgrade_database_if_needed(db, 24)
             finally:
                 db.close()
 
