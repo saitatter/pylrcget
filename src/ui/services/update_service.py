@@ -268,7 +268,7 @@ def _extract_updated_binary(archive_path: Path) -> Path:
 
 
 def _write_windows_updater_script(target_exe: Path, new_exe: Path, pid: int) -> Path:
-    script_path = new_exe.parent / "apply-update.ps1"
+    script_path = target_exe.parent / "apply-update.ps1"
     script = f"""
 $ErrorActionPreference = 'Stop'
 $pidToWait = {int(pid)}
@@ -342,18 +342,30 @@ finally {{
 
 
 def _write_unix_updater_script(target_exe: Path, new_exe: Path, pid: int) -> Path:
-    script_path = new_exe.parent / "apply-update.sh"
+    script_path = target_exe.parent / "apply-update.sh"
     script = f"""#!/bin/sh
 set -e
 PID_TO_WAIT="{int(pid)}"
 TARGET={shlex_quote(str(target_exe))}
 NEW_EXE={shlex_quote(str(new_exe))}
+TARGET_DIR=$(dirname "$TARGET")
+LOG_PATH="$TARGET_DIR/pylrcget-update.log"
+
+log() {{
+  printf '[%s] %s\\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$1" >> "$LOG_PATH"
+}}
+
 while kill -0 "$PID_TO_WAIT" 2>/dev/null; do
   sleep 1
 done
+log "Applying staged update from $NEW_EXE to $TARGET"
 cp "$NEW_EXE" "$TARGET"
 chmod +x "$TARGET"
-"$TARGET" >/dev/null 2>&1 &
+log "Update copied successfully. Launching new executable."
+(
+  cd "$TARGET_DIR"
+  "$TARGET" >/dev/null 2>&1 &
+)
 rm -f "$NEW_EXE"
 rm -f "$0"
 """
@@ -382,9 +394,24 @@ def stage_self_update(archive_path: Path, *, pid: int | None = None) -> Path:
 
 def launch_staged_update(script_path: Path) -> None:
     if sys.platform.startswith("win"):
+        creationflags = (
+            getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+            | getattr(subprocess, "DETACHED_PROCESS", 0)
+            | getattr(subprocess, "CREATE_NO_WINDOW", 0)
+        )
         subprocess.Popen(
-            ["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(script_path)],
-            creationflags=getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0),
+            [
+                "powershell.exe",
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-WindowStyle",
+                "Hidden",
+                "-File",
+                str(script_path),
+            ],
+            creationflags=creationflags,
+            cwd=str(script_path.parent),
             close_fds=True,
         )
         return
@@ -392,6 +419,7 @@ def launch_staged_update(script_path: Path) -> None:
     subprocess.Popen(
         ["/bin/sh", str(script_path)],
         start_new_session=True,
+        cwd=str(script_path.parent),
         close_fds=True,
     )
 

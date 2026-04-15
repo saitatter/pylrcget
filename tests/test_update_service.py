@@ -4,6 +4,7 @@ import tempfile
 import unittest
 import zipfile
 from pathlib import Path
+from unittest.mock import MagicMock
 from unittest.mock import patch
 
 from tests import test_support as _test_support  # noqa: F401
@@ -119,6 +120,7 @@ class UpdateServiceTests(unittest.TestCase):
                 script_path = update_service.stage_self_update(archive, pid=1234)
 
             self.assertTrue(script_path.exists())
+            self.assertEqual(script_path.parent, current_exe.parent)
             script_text = script_path.read_text(encoding="utf-8")
             self.assertIn("1234", script_text)
             self.assertIn("current.exe", script_text)
@@ -129,8 +131,29 @@ class UpdateServiceTests(unittest.TestCase):
             self.assertIn("previous.exe", script_text)
             self.assertIn("-WorkingDirectory $targetDir", script_text)
             extracted_exe = script_path.parent / "pylrcget.exe"
+            if not extracted_exe.exists():
+                extracted_exe = next(tmp_path.glob("**/pylrcget.exe"))
             self.assertTrue(extracted_exe.exists())
             self.assertEqual(extracted_exe.parent.parent, archive.parent)
+
+    def test_launch_staged_update_uses_detached_windows_process(self):
+        fake_popen = MagicMock()
+        script_path = Path("C:/Temp/apply-update.ps1")
+        with patch.object(update_service.sys, "platform", "win32"), patch.object(
+            update_service.subprocess,
+            "Popen",
+            fake_popen,
+        ), patch.object(update_service.subprocess, "CREATE_NEW_PROCESS_GROUP", 0x200), patch.object(
+            update_service.subprocess,
+            "DETACHED_PROCESS",
+            0x8,
+        ), patch.object(update_service.subprocess, "CREATE_NO_WINDOW", 0x08000000):
+            update_service.launch_staged_update(script_path)
+
+        _, kwargs = fake_popen.call_args
+        self.assertEqual(kwargs["cwd"], str(script_path.parent))
+        self.assertTrue(kwargs["creationflags"] & 0x200)
+        self.assertTrue(kwargs["creationflags"] & 0x8)
 
 
 if __name__ == "__main__":
