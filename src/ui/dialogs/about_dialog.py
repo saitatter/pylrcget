@@ -37,14 +37,14 @@ class AboutDialog(QDialog):
         self._download_worker: UpdateDownloadWorker | None = None
         self._pending_install = False
 
-        self.setWindowTitle("About LrcGet")
+        self.setWindowTitle("About PyLrcGet")
         self.resize(760, 620)
 
         root = QVBoxLayout(self)
         root.setContentsMargins(16, 16, 16, 16)
         root.setSpacing(12)
 
-        title = QLabel("LrcGet")
+        title = QLabel("PyLrcGet")
         title.setObjectName("DialogTitle")
         current_version = QLabel(f"Current version: v{current_app_version()}")
         current_version.setObjectName("DialogSubtle")
@@ -200,7 +200,7 @@ class AboutDialog(QDialog):
             QMessageBox.information(
                 self,
                 "Restarting to update",
-                "The update has been staged. LrcGet will close now and relaunch the new version.",
+                "The update has been staged. PyLrcGet will close now and relaunch the new version.",
             )
             QApplication.quit()
             return

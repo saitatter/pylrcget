@@ -133,7 +133,7 @@ class TopBarController(QWidget):
         self.btn_about = self._make_action_button(
             "info.svg",
             "About",
-            "About LrcGet",
+            "About PyLrcGet",
             on_open_about,
         )
 

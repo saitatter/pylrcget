@@ -394,6 +394,23 @@ class PlayerBar(QWidget):
         self._sync_volume_from_player()
         self.set_compact_mode(False)
 
+    def attach_player(self, player) -> None:
+        if player is None or self.player is player:
+            return
+        self.player = player
+        self.player.trackChanged.connect(self._on_track_changed)
+        self.player.statusChanged.connect(self._on_status_changed)
+        self.player.positionChanged.connect(self._on_position)
+        if hasattr(self.player, "durationChanged"):
+            self.player.durationChanged.connect(self._on_duration)
+        try:
+            self.btn_play.clicked.disconnect()
+        except Exception:
+            pass
+        self.btn_play.clicked.connect(self.player.toggle_play_pause)
+        self._sync_speed_from_player()
+        self._sync_volume_from_player()
+
     def set_prev_next_handlers(self, prev_fn, next_fn):
         self.btn_prev.clicked.connect(prev_fn)
         self.btn_next.clicked.connect(next_fn)

@@ -4,7 +4,7 @@ import logging
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
-from PySide6.QtCore import QStandardPaths
+from PySide6.QtCore import QStandardPaths, QTimer
 from PySide6.QtWidgets import QApplication
 
 ROOT = Path(__file__).resolve().parent
@@ -13,9 +13,8 @@ SRC_DIR = ROOT / "src"
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
-from core.state import AppState, Notify
+from core.state import AppState
 from db.database import get_config, initialize_database
-from player.player import Player
 from ui.app_theme import apply_app_theme
 from ui.icon_loader import load_app_icon
 from ui.main_window import MainWindow
@@ -28,14 +27,18 @@ def debug_print_schema(db) -> None:
             print(f"- {name} ({col_type})")
 
 def get_app_data_dir() -> str:
+    app = QApplication.instance()
+    if app is not None and not app.applicationName():
+        app.setApplicationName("PyLrcGet")
     base = QStandardPaths.writableLocation(QStandardPaths.AppDataLocation)
+
     os.makedirs(base, exist_ok=True)
     return base
 
 def configure_logging(app_data_dir: str) -> str:
     logs_dir = os.path.join(app_data_dir, "logs")
     os.makedirs(logs_dir, exist_ok=True)
-    log_path = os.path.join(logs_dir, "lrcget.log")
+    log_path = os.path.join(logs_dir, "pylrcget.log")
 
     root = logging.getLogger()
     root.setLevel(logging.INFO)
@@ -82,21 +85,13 @@ def init_app_state(app_data_dir: str | None = None) -> AppState:
     if os.getenv("LRCGET_DEBUG_SCHEMA") == "1":
         debug_print_schema(app_state.db)
 
-    try:
-        app_state.player = Player()
-    except Exception as e:
-        app_state.player = None
-        app_state.queued_notifications.append(
-            Notify(message=f"Failed to initialize audio player: {e}", notify_type="error")
-        )
-
     return app_state
-
 def main() -> int:
-    app_data_dir = get_app_data_dir()
     qt_app = QApplication(sys.argv)
-    qt_app.setApplicationName("LrcGet")
+    qt_app.setApplicationName("PyLrcGet")
+    qt_app.setOrganizationName("PyLrcGet")
     qt_app.setWindowIcon(load_app_icon())
+    app_data_dir = get_app_data_dir()
     app_state = init_app_state(app_data_dir)
     config = get_config(app_state.db)
     apply_app_theme(
@@ -107,6 +102,7 @@ def main() -> int:
     )
     main_window = MainWindow(app_state)
     main_window.show()
+    QTimer.singleShot(50, main_window.initialize_player_backend)
 
     return qt_app.exec()
 

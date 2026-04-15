@@ -18,6 +18,7 @@ import os
 
 from dataclasses import replace
 
+from core.state import Notify
 from db.queries import (
     get_album_by_id,
     get_artist_by_id,
@@ -44,7 +45,7 @@ from ui.icon_loader import load_app_icon
 from ui.player_bar import PlayerBar
 from ui.widgets.lyrics_editor_widget import LyricsEditorWidget
 from ui.dialogs.first_run_dialog import FirstRunDialog
-from player.player import NowPlaying
+from player.player import NowPlaying, Player
 from ui.services.lyrics_download_service import sync_track_outputs_with_result
 from ui.services.feedback import exception_message, log_and_notify, normalize_notify_type, notify_user
 from ui.app_theme import apply_app_theme
@@ -78,7 +79,7 @@ class MainWindow(QMainWindow):
 
     def __init__(self, app_state):
         super().__init__()
-        self.setWindowTitle("LrcGet")
+        self.setWindowTitle("PyLrcGet")
         self.setWindowIcon(load_app_icon())
         self.resize(900, 600)
         self.app_state = app_state
@@ -108,7 +109,7 @@ class MainWindow(QMainWindow):
             self.app_state.player.statusChanged.connect(self._on_player_status_changed)
 
         # --- Shortcuts ---
-        QShortcut(QKeySequence("Space"), self, activated=lambda: self.app_state.player.toggle_play_pause())
+        QShortcut(QKeySequence("Space"), self, activated=self._toggle_play_pause)
         QShortcut(QKeySequence("Return"), self, activated=self._play_selected_or_current)
         QShortcut(QKeySequence("Enter"), self, activated=self._play_selected_or_current)
         QShortcut(QKeySequence("Ctrl+Right"), self, activated=self.play_next)
@@ -174,7 +175,7 @@ class MainWindow(QMainWindow):
         self.lyrics_view.saveRequested.connect(self._on_lyrics_save_requested)
 
         splitter.addWidget(self.lyrics_view)
-        self.lyrics_view.seekRequested.connect(lambda ms: self.app_state.player.seek_ms(ms))
+        self.lyrics_view.seekRequested.connect(self._seek_player)
         if self.app_state.player:
             self.app_state.player.positionChanged.connect(self.lyrics_view.on_player_position)
 
@@ -194,7 +195,7 @@ class MainWindow(QMainWindow):
         self.albums_lyrics_view = LyricsEditorWidget()
         self.albums_lyrics_view.show_none("Select a track to see lyrics")
         self.albums_lyrics_view.saveRequested.connect(self._on_lyrics_save_requested)
-        self.albums_lyrics_view.seekRequested.connect(lambda ms: self.app_state.player.seek_ms(ms))
+        self.albums_lyrics_view.seekRequested.connect(self._seek_player)
         self.albums_lyrics_view.downloadRequested.connect(self._download_current_track_lyrics)
         self.albums_lyrics_view.exportFilesRequested.connect(self._export_current_track_sidecars)
         if self.app_state.player:
@@ -213,7 +214,7 @@ class MainWindow(QMainWindow):
         self.artists_lyrics_view = LyricsEditorWidget()
         self.artists_lyrics_view.show_none("Select a track to see lyrics")
         self.artists_lyrics_view.saveRequested.connect(self._on_lyrics_save_requested)
-        self.artists_lyrics_view.seekRequested.connect(lambda ms: self.app_state.player.seek_ms(ms))
+        self.artists_lyrics_view.seekRequested.connect(self._seek_player)
         self.artists_lyrics_view.downloadRequested.connect(self._download_current_track_lyrics)
         self.artists_lyrics_view.exportFilesRequested.connect(self._export_current_track_sidecars)
         if self.app_state.player:
@@ -397,6 +398,36 @@ class MainWindow(QMainWindow):
         self.navigation.flush_pending_route()
         logging.getLogger().removeHandler(self._ui_log_handler)
         super().closeEvent(event)
+
+    def initialize_player_backend(self) -> None:
+        if self.app_state.player is not None:
+            return
+        try:
+            player = Player()
+        except Exception as exc:
+            self.app_state.queued_notifications.append(
+                Notify(message=f"Failed to initialize audio player: {exc}", notify_type="error")
+            )
+            self.show_queued_notifications()
+            return
+
+        self.app_state.player = player
+        self.app_state.player.trackChanged.connect(self._on_player_track_changed)
+        self.app_state.player.statusChanged.connect(self._on_player_status_changed)
+        self.player_bar.attach_player(player)
+        for view in self._all_lyrics_views():
+            view.set_current_position_provider(player.position_ms)
+            player.positionChanged.connect(view.on_player_position)
+        self._apply_saved_playback_speed()
+        self._apply_saved_playback_volume()
+
+    def _toggle_play_pause(self) -> None:
+        if self.app_state.player:
+            self.app_state.player.toggle_play_pause()
+
+    def _seek_player(self, ms: int) -> None:
+        if self.app_state.player:
+            self.app_state.player.seek_ms(ms)
 
     # ------------------ filters ------------------
     def _apply_track_filters(self):
@@ -612,6 +643,16 @@ class MainWindow(QMainWindow):
 
     # ------------------ track actions ------------------
     def on_play_track(self, track_id: int):
+        if not self.app_state.player:
+            notify_user(
+                self.app_state,
+                "Audio backend is still starting. Please try again in a moment.",
+                "warning",
+                show_status=self._show_status_message,
+                status_timeout_ms=2500,
+            )
+            return
+
         self._queue_ids = self.track_list.current_queue_track_ids()
         try:
             self._queue_index = self._queue_ids.index(int(track_id))
