@@ -32,6 +32,22 @@ class _FakeSession:
 
 
 class UpdateServiceTests(unittest.TestCase):
+    def test_current_app_version_reads_bundled_pyproject_for_frozen_builds(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            bundle_root = Path(tmp)
+            (bundle_root / "pyproject.toml").write_text(
+                "[project]\nname = 'pylrcget'\nversion = '9.8.7'\n",
+                encoding="utf-8",
+            )
+            with patch.object(
+                update_service.importlib.metadata,
+                "version",
+                side_effect=update_service.importlib.metadata.PackageNotFoundError,
+            ), patch.object(update_service.sys, "_MEIPASS", str(bundle_root), create=True):
+                version = update_service.current_app_version()
+
+        self.assertEqual(version, "9.8.7")
+
     def test_check_for_updates_detects_newer_release_and_selects_windows_asset(self):
         with tempfile.TemporaryDirectory() as tmp:
             exe_path = Path(tmp) / "pylrcget.exe"

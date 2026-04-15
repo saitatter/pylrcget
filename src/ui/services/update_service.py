@@ -50,16 +50,57 @@ def project_root() -> Path:
     return Path(__file__).resolve().parents[3]
 
 
+def _bundled_resource_root() -> Path | None:
+    base = getattr(sys, "_MEIPASS", None)
+    if not base:
+        return None
+    try:
+        return Path(base).resolve()
+    except Exception:
+        return None
+
+
+def _version_file_candidates() -> list[Path]:
+    candidates: list[Path] = []
+    bundled_root = _bundled_resource_root()
+    if bundled_root is not None:
+        candidates.append(bundled_root / "pyproject.toml")
+
+    try:
+        candidates.append(project_root() / "pyproject.toml")
+    except Exception:
+        pass
+
+    try:
+        candidates.append(Path(sys.executable).resolve().parent / "pyproject.toml")
+    except Exception:
+        pass
+
+    unique: list[Path] = []
+    seen: set[str] = set()
+    for candidate in candidates:
+        rendered = os.path.normcase(str(candidate))
+        if rendered in seen:
+            continue
+        seen.add(rendered)
+        unique.append(candidate)
+    return unique
+
+
 def current_app_version() -> str:
     try:
         return importlib.metadata.version("pylrcget")
     except importlib.metadata.PackageNotFoundError:
         pass
-    try:
-        data = tomllib.loads((project_root() / "pyproject.toml").read_text(encoding="utf-8"))
-        return str(data.get("project", {}).get("version", "0.0.0"))
-    except Exception:
-        return "0.0.0"
+    for candidate in _version_file_candidates():
+        try:
+            data = tomllib.loads(candidate.read_text(encoding="utf-8"))
+            version = str(data.get("project", {}).get("version", "")).strip()
+            if version:
+                return version
+        except Exception:
+            continue
+    return "0.0.0"
 
 
 def current_executable_path() -> Path | None:
