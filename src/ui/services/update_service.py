@@ -528,7 +528,11 @@ PID_TO_WAIT="{int(pid)}"
 TARGET={shlex_quote(str(target_exe))}
 NEW_EXE={shlex_quote(str(new_exe))}
 TARGET_DIR=$(dirname "$TARGET")
-LOG_PATH="$TARGET_DIR/pylrcget-update.log"
+LOG_DIR="${{XDG_STATE_HOME:-$HOME/.local/state}}/PyLrcGet"
+LOG_PATH="$LOG_DIR/pylrcget-update.log"
+BACKUP_PATH="$TARGET.bak"
+
+mkdir -p "$LOG_DIR"
 
 log() {{
   printf '[%s] %s\\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$1" >> "$LOG_PATH"
@@ -538,7 +542,19 @@ while kill -0 "$PID_TO_WAIT" 2>/dev/null; do
   sleep 1
 done
 log "Applying staged update from $NEW_EXE to $TARGET"
-cp "$NEW_EXE" "$TARGET"
+if [ -f "$TARGET" ]; then
+  cp "$TARGET" "$BACKUP_PATH"
+  log "Backed up current executable to $BACKUP_PATH"
+fi
+if ! cp "$NEW_EXE" "$TARGET"; then
+  log "Update copy failed. Attempting rollback from backup."
+  if [ -f "$BACKUP_PATH" ]; then
+    cp "$BACKUP_PATH" "$TARGET"
+    chmod +x "$TARGET"
+    log "Rollback completed."
+  fi
+  exit 1
+fi
 chmod +x "$TARGET"
 log "Update copied successfully. Launching new executable."
 (

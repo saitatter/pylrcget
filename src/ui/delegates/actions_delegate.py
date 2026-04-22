@@ -86,10 +86,7 @@ class ActionsDelegate(QStyledItemDelegate):
             if not row_obj:
                 return False
             if getattr(row_obj, "download_state", DownloadState.IDLE) == DownloadState.LOADING:
-                refresh_rect, download_rect = self._button_rects(option.rect)
-                if refresh_rect.contains(event.pos()):
-                    self.refreshClicked.emit(row_obj.track_id)
-                    return True
+                # Disable both row action buttons while a download is in progress.
                 return False
 
             refresh_rect, download_rect = self._button_rects(option.rect)
