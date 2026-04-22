@@ -199,8 +199,9 @@ class MusicFoldersDialog(QDialog):
         lyrics_layout.addWidget(self.pattern_preview_label, 5, 0, 1, 4)
 
         hint = QLabel(
-            "Available placeholders: {artist}, {title}, {album}, {track}. "
-            "Extensions are added automatically as .lrc and .txt."
+            "Available placeholders: {filename}, {artist}, {title}, {album}, {track}. "
+            "Extensions are added automatically as .lrc and .txt. "
+            "Leave the pattern empty to use the audio filename."
         )
         hint.setWordWrap(True)
         lyrics_layout.addWidget(hint, 6, 0, 1, 4)
@@ -285,7 +286,7 @@ class MusicFoldersDialog(QDialog):
         mode_index = self.download_mode_combo.findData(config.download_lyrics_mode or "prefer_synced")
         self.download_mode_combo.setCurrentIndex(max(0, mode_index))
         self.output_dir_edit.setText(config.lyrics_output_dir)
-        self.pattern_edit.setText(config.lyrics_file_pattern or DEFAULT_LYRICS_FILE_PATTERN)
+        self.pattern_edit.setText(config.lyrics_file_pattern or "")
         self.lookup_subdir_edit.setText(config.lyrics_lookup_subdir or "")
         self.embed_chk.setChecked(config.try_embed_lyrics)
         self.reaction_delay_spin.setValue(int(config.reaction_delay_ms or 0))
@@ -497,22 +498,26 @@ class MusicFoldersDialog(QDialog):
         return "/".join(parts)
 
     def _render_pattern_preview(self) -> tuple[str, bool]:
-        pattern = (self.pattern_edit.text().strip() or DEFAULT_LYRICS_FILE_PATTERN)
+        pattern = self.pattern_edit.text().strip()
         values = {
+            "filename": self._safe_filename_component("01. Everything In Its Right Place"),
             "artist": self._safe_filename_component("Radiohead"),
             "title": self._safe_filename_component("Everything In Its Right Place"),
             "album": self._safe_filename_component("Kid A"),
             "track": self._safe_filename_component("01"),
         }
         used_fallback = False
-        try:
-            rendered = pattern.format(**values).strip()
-        except Exception:
-            rendered = ""
-            used_fallback = True
+        if not pattern:
+            rendered = values["filename"]
+        else:
+            try:
+                rendered = pattern.format(**values).strip()
+            except Exception:
+                rendered = ""
+                used_fallback = True
         rendered = self._safe_filename_component(rendered)
         if not rendered:
-            rendered = "Radiohead - Everything In Its Right Place"
+            rendered = values["filename"]
             used_fallback = True
 
         output_dir = self.output_dir_edit.text().strip()
@@ -544,9 +549,6 @@ class MusicFoldersDialog(QDialog):
     def save(self):
         previous_folders = get_directories(self.app_state.db)
         folders = [self.list_widget.item(i).text() for i in range(self.list_widget.count())]
-        if not folders:
-            QMessageBox.warning(self, "No folders", "Please add at least one music folder.")
-            return
 
         config = get_config(self.app_state.db)
         new_config = replace(
@@ -560,7 +562,7 @@ class MusicFoldersDialog(QDialog):
             download_lyrics_mode=str(self.download_mode_combo.currentData() or "prefer_synced"),
             try_embed_lyrics=self.embed_chk.isChecked(),
             lyrics_output_dir=self.output_dir_edit.text().strip(),
-            lyrics_file_pattern=self.pattern_edit.text().strip() or DEFAULT_LYRICS_FILE_PATTERN,
+            lyrics_file_pattern=self.pattern_edit.text().strip(),
             lyrics_lookup_subdir=self._normalized_lookup_subdir(),
             scan_excluded_paths=self.excluded_paths_edit.toPlainText().strip(),
             scan_excluded_patterns=self.excluded_patterns_edit.toPlainText().strip(),
