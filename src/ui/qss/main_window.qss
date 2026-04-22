@@ -24,6 +24,19 @@ QLabel#TopBarLabel {
     letter-spacing: 0.14em;
 }
 
+QCheckBox#TopBarFilterCheck::indicator:hover {
+    border-color: {{color-border-hover}};
+}
+
+QCheckBox#TopBarFilterCheck::indicator:unchecked:hover {
+    background: {{color-bg-elevated}};
+}
+
+QCheckBox#TopBarFilterCheck::indicator:checked:hover {
+    background: {{color-accent-alt}};
+    border-color: {{color-accent-alt}};
+}
+
 QLineEdit#TopBarSearch {
     background: transparent;
     border-color: {{color-border}};
