@@ -15,6 +15,7 @@ if str(SRC_DIR) not in sys.path:
 
 from core.state import AppState
 from db.database import get_config, initialize_database
+from db.migrations import DB_FILENAME
 from ui.app_theme import apply_app_theme
 from ui.icon_loader import load_app_icon
 from ui.main_window import MainWindow
@@ -77,7 +78,7 @@ def init_app_state(app_data_dir: str | None = None) -> AppState:
 
     app_data_dir = app_data_dir or get_app_data_dir()
     app_state.app_data_dir = app_data_dir
-    app_state.db_path = os.path.join(app_data_dir, "db.sqlite3")
+    app_state.db_path = os.path.join(app_data_dir, DB_FILENAME)
     app_state.log_path = configure_logging(app_data_dir)
 
     app_state.db = initialize_database(app_data_dir)

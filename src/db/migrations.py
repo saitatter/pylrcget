@@ -6,10 +6,12 @@ import sqlite3
 from db.database import CURRENT_DB_VERSION
 from db.schema import SCHEMA_V1_SQL
 
+DB_FILENAME = "pylrcget.db.sqlite3"
+
 
 def initialize_database(app_data_dir: str) -> sqlite3.Connection:
     os.makedirs(app_data_dir, exist_ok=True)
-    sqlite_path = os.path.join(app_data_dir, "db.sqlite3")
+    sqlite_path = os.path.join(app_data_dir, DB_FILENAME)
     print(f"Database file path: {sqlite_path}")
 
     db = sqlite3.connect(sqlite_path)

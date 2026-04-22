@@ -164,7 +164,7 @@ class LibraryScannerIncrementalTests(unittest.TestCase):
     def test_library_scanner_skips_unchanged_reindexes_new_and_removes_missing(self):
         with tempfile.TemporaryDirectory() as tmp:
             db = initialize_database(tmp)
-            db_path = str(Path(tmp) / "db.sqlite3")
+            db_path = str(Path(tmp) / "pylrcget.db.sqlite3")
             music_dir = Path(tmp) / "Music"
             music_dir.mkdir(parents=True, exist_ok=True)
 

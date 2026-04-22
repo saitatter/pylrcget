@@ -102,7 +102,7 @@ class LyricsDownloadControllerTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             db = initialize_database(tmp)
             try:
-                app_state = SimpleNamespace(db=db, db_path=str(Path(tmp) / "db.sqlite3"))
+                app_state = SimpleNamespace(db=db, db_path=str(Path(tmp) / "pylrcget.db.sqlite3"))
                 overlay = _FakeOverlay()
 
                 for mode, label in (
@@ -143,7 +143,7 @@ class LyricsDownloadControllerTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             db = initialize_database(tmp)
             try:
-                app_state = SimpleNamespace(db=db, db_path=str(Path(tmp) / "db.sqlite3"))
+                app_state = SimpleNamespace(db=db, db_path=str(Path(tmp) / "pylrcget.db.sqlite3"))
                 overlay = _FakeOverlay()
                 controller, *_ = self._make_controller(app_state, overlay)
 
@@ -161,7 +161,7 @@ class LyricsDownloadControllerTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             db = initialize_database(tmp)
             try:
-                app_state = SimpleNamespace(db=db, db_path=str(Path(tmp) / "db.sqlite3"))
+                app_state = SimpleNamespace(db=db, db_path=str(Path(tmp) / "pylrcget.db.sqlite3"))
                 overlay = _FakeOverlay()
 
                 config = replace(get_config(db), download_lyrics_mode="plain_only")
@@ -193,7 +193,7 @@ class LyricsDownloadControllerTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             db = initialize_database(tmp)
             try:
-                app_state = SimpleNamespace(db=db, db_path=str(Path(tmp) / "db.sqlite3"))
+                app_state = SimpleNamespace(db=db, db_path=str(Path(tmp) / "pylrcget.db.sqlite3"))
                 overlay = _FakeOverlay()
                 controller, statuses, notifications, download_states, refreshed = self._make_controller(app_state, overlay)
 
