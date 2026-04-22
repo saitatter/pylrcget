@@ -287,7 +287,8 @@ On Windows 11, SmartScreen or Defender may show a warning before launch, especia
 The desktop app can check GitHub Releases for newer versions directly from the `About` dialog.
 
 - source checkouts can view release notes and open / download the latest release
-- packaged builds can also stage and apply self-updates when a matching platform artifact is available
+- Windows packaged builds can auto-install updates when a `pylrcget-windows-installer.exe` asset is published
+- macOS/Linux builds use download-only flow from the same dialog (manual install)
 
 ---
 ## Local Build

@@ -22,8 +22,7 @@ from ui.services.update_service import (
     cleanup_stale_update_downloads,
     current_app_version,
     default_update_download_dir,
-    launch_staged_update,
-    stage_self_update,
+    launch_windows_installer,
 )
 from ui.workers.update_workers import UpdateCheckWorker, UpdateDownloadWorker
 
@@ -105,7 +104,8 @@ class AboutDialog(QDialog):
         root.addLayout(button_row)
 
         note = QLabel(
-            "Automatic apply is available for packaged release builds. In a source checkout, you can still download or open the latest release."
+            "Automatic install is available on Windows packaged builds when a Windows installer asset is published. "
+            "On macOS/Linux, use Download update and install manually."
         )
         note.setWordWrap(True)
         note.setObjectName("DialogSubtle")
@@ -145,7 +145,9 @@ class AboutDialog(QDialog):
             self.asset_label.setText(f"Platform asset: not available for {info.platform_label}")
 
         if info.is_update_available:
-            self.status_label.setText(f"Update available: v{info.latest_version}")
+            self.status_label.setText(
+                f"Update available: v{info.current_version} -> v{info.latest_version}"
+            )
         else:
             self.status_label.setText(f"You're up to date on v{info.current_version}.")
 
@@ -191,8 +193,7 @@ class AboutDialog(QDialog):
         download_path = Path(path)
         if self._pending_install and self._update_info is not None and self._update_info.install_supported:
             try:
-                script_path = stage_self_update(download_path)
-                launch_staged_update(script_path)
+                launch_windows_installer(download_path)
             except Exception as exc:
                 self.status_label.setText(f"Could not stage the update: {exc}")
                 return
@@ -200,7 +201,7 @@ class AboutDialog(QDialog):
             QMessageBox.information(
                 self,
                 "Restarting to update",
-                "The update has been staged. PyLrcGet will close now and relaunch the new version.",
+                "Installer launched. PyLrcGet will close now so the update can proceed.",
             )
             QApplication.quit()
             return
