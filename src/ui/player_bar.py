@@ -158,6 +158,7 @@ class PlayerBar(QWidget):
         self._compact_mode = False
         self._show_album_art = True
         self._ui_scale = 1.0
+        self._play_click_handler = None
         self._speed_commit_timer = QTimer(self)
         self._speed_commit_timer.setSingleShot(True)
         self._speed_commit_timer.setInterval(450)
@@ -382,12 +383,7 @@ class PlayerBar(QWidget):
         self.slider_volume.valueChanged.connect(self._on_volume_changed)
 
         if self.player:
-            self.player.trackChanged.connect(self._on_track_changed)
-            self.player.statusChanged.connect(self._on_status_changed)
-            self.player.positionChanged.connect(self._on_position)
-            if hasattr(self.player, "durationChanged"):
-                self.player.durationChanged.connect(self._on_duration)
-            self.btn_play.clicked.connect(self.player.toggle_play_pause)
+            self._connect_player_signals(self.player)
 
         self._apply_styles()
         self._sync_speed_from_player()
@@ -397,19 +393,47 @@ class PlayerBar(QWidget):
     def attach_player(self, player) -> None:
         if player is None or self.player is player:
             return
+        if self.player:
+            self._disconnect_player_signals(self.player)
         self.player = player
-        self.player.trackChanged.connect(self._on_track_changed)
-        self.player.statusChanged.connect(self._on_status_changed)
-        self.player.positionChanged.connect(self._on_position)
-        if hasattr(self.player, "durationChanged"):
-            self.player.durationChanged.connect(self._on_duration)
-        try:
-            self.btn_play.clicked.disconnect()
-        except Exception:
-            pass
-        self.btn_play.clicked.connect(self.player.toggle_play_pause)
+        self._connect_player_signals(self.player)
         self._sync_speed_from_player()
         self._sync_volume_from_player()
+
+    def _connect_player_signals(self, player) -> None:
+        player.trackChanged.connect(self._on_track_changed)
+        player.statusChanged.connect(self._on_status_changed)
+        player.positionChanged.connect(self._on_position)
+        if hasattr(player, "durationChanged"):
+            player.durationChanged.connect(self._on_duration)
+        self._set_play_click_handler(player.toggle_play_pause)
+
+    def _disconnect_player_signals(self, player) -> None:
+        for signal, slot in (
+            (player.trackChanged, self._on_track_changed),
+            (player.statusChanged, self._on_status_changed),
+            (player.positionChanged, self._on_position),
+        ):
+            try:
+                signal.disconnect(slot)
+            except (RuntimeError, TypeError):
+                pass
+        if hasattr(player, "durationChanged"):
+            try:
+                player.durationChanged.disconnect(self._on_duration)
+            except (RuntimeError, TypeError):
+                pass
+        self._set_play_click_handler(None)
+
+    def _set_play_click_handler(self, handler) -> None:
+        if self._play_click_handler is not None:
+            try:
+                self.btn_play.clicked.disconnect(self._play_click_handler)
+            except (RuntimeError, TypeError):
+                pass
+        self._play_click_handler = handler
+        if handler is not None:
+            self.btn_play.clicked.connect(handler)
 
     def set_prev_next_handlers(self, prev_fn, next_fn):
         self.btn_prev.clicked.connect(prev_fn)
