@@ -51,7 +51,7 @@ from ui.services.feedback import exception_message, log_and_notify, normalize_no
 from ui.app_theme import apply_app_theme
 from ui.widgets.album_list_widget import AlbumListWidget
 from ui.widgets.artist_list_widget import ArtistListWidget
-from ui.library_routes import LibraryRoute, tracks_album, tracks_all, tracks_artist
+from ui.library_routes import LibraryRoute, deserialize_route, tracks_album, tracks_all, tracks_artist
 from ui.spacing import SPACE_1, SPACE_2, SPACE_3, set_layout_spacing
 from ui.style_loader import load_stylesheet
 from ui.widgets.toast import ToastManager
@@ -1178,9 +1178,14 @@ class MainWindow(QMainWindow):
             self._clear_breadcrumbs()
             return
 
+        if startup_view == "remember_last" and deserialize_route(config.last_library_route) is not None:
+            QTimer.singleShot(0, self.navigation.restore_last_route)
+            return
+
         self.navigate_to(tracks_all(), record_history=False)
         if startup_view == "remember_last":
-            QTimer.singleShot(0, self.navigation.restore_last_route)
+            # No persisted route to restore yet; keep the default tracks root view.
+            return
 
     def navigate_to(self, route: LibraryRoute, *, record_history: bool = True) -> None:
         self.navigation.navigate_to(route, record_history=record_history)

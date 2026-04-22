@@ -274,25 +274,16 @@ def launch_windows_installer(installer_path: Path) -> None:
         raise RuntimeError("Installer launch is only supported on Windows.")
     if not installer_path.exists():
         raise FileNotFoundError(f"Installer not found: {installer_path}")
-
-    creationflags = (
-        getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
-        | getattr(subprocess, "DETACHED_PROCESS", 0)
-        | getattr(subprocess, "CREATE_NO_WINDOW", 0)
-    )
-    subprocess.Popen(
-        [
+    startfile = getattr(os, "startfile", None)
+    if startfile is None:
+        raise RuntimeError("os.startfile is unavailable on this Python runtime.")
+    try:
+        startfile(
             str(installer_path),
-            "/VERYSILENT",
-            "/SUPPRESSMSGBOXES",
-            "/NORESTART",
-            "/CLOSEAPPLICATIONS",
-            "/FORCECLOSEAPPLICATIONS",
-        ],
-        creationflags=creationflags,
-        cwd=str(installer_path.parent),
-        close_fds=True,
-    )
+            arguments="/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /CLOSEAPPLICATIONS /FORCECLOSEAPPLICATIONS",
+        )
+    except Exception as exc:
+        raise RuntimeError(f"Failed to launch installer: {exc}") from exc
 
 
 def launch_platform_installer(installer_path: Path) -> None:
@@ -435,7 +426,12 @@ $backup = Join-Path $targetDir (([System.IO.Path]::GetFileNameWithoutExtension($
 $logDir = Join-Path $env:LOCALAPPDATA 'PyLrcGet'
 New-Item -ItemType Directory -Path $logDir -Force | Out-Null
 $logPath = Join-Path $logDir 'pylrcget-update.log'
-$runtimeTempDir = Join-Path $logDir 'runtime-temp'
+$runtimeTempDir = Join-Path $logDir ('runtime-temp-' + [guid]::NewGuid().ToString('N'))
+Get-ChildItem -Path $logDir -Directory -Filter 'runtime-temp-*' -ErrorAction SilentlyContinue | ForEach-Object {{
+    if ($_.FullName -ne $runtimeTempDir) {{
+        Remove-Item -LiteralPath $_.FullName -Recurse -Force -ErrorAction SilentlyContinue
+    }}
+}}
 New-Item -ItemType Directory -Path $runtimeTempDir -Force | Out-Null
 
 function Write-UpdateLog([string]$message) {{

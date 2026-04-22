@@ -220,30 +220,27 @@ class UpdateServiceTests(unittest.TestCase):
         self.assertTrue(kwargs["creationflags"] & 0x8)
 
     def test_launch_windows_installer_uses_silent_flags(self):
-        fake_popen = MagicMock()
+        fake_startfile = MagicMock()
         installer_path = Path("C:/Temp/pylrcget-windows-installer.exe")
         with patch.object(update_service.sys, "platform", "win32"), patch.object(
-            update_service.subprocess,
-            "Popen",
-            fake_popen,
-        ), patch.object(update_service.subprocess, "CREATE_NEW_PROCESS_GROUP", 0x200), patch.object(
-            update_service.subprocess,
-            "DETACHED_PROCESS",
-            0x8,
-        ), patch.object(update_service.subprocess, "CREATE_NO_WINDOW", 0x08000000), patch.object(
+            update_service.os,
+            "startfile",
+            fake_startfile,
+            create=True,
+        ), patch.object(
             update_service.Path,
             "exists",
             return_value=True,
         ):
             update_service.launch_windows_installer(installer_path)
 
-        args, kwargs = fake_popen.call_args
-        self.assertIn("/VERYSILENT", args[0])
-        self.assertIn("/SUPPRESSMSGBOXES", args[0])
-        self.assertIn("/NORESTART", args[0])
-        self.assertIn("/CLOSEAPPLICATIONS", args[0])
-        self.assertIn("/FORCECLOSEAPPLICATIONS", args[0])
-        self.assertEqual(kwargs["cwd"], str(installer_path.parent))
+        args, kwargs = fake_startfile.call_args
+        self.assertEqual(args[0], str(installer_path))
+        self.assertIn("/VERYSILENT", kwargs["arguments"])
+        self.assertIn("/SUPPRESSMSGBOXES", kwargs["arguments"])
+        self.assertIn("/NORESTART", kwargs["arguments"])
+        self.assertIn("/CLOSEAPPLICATIONS", kwargs["arguments"])
+        self.assertIn("/FORCECLOSEAPPLICATIONS", kwargs["arguments"])
 
     def test_check_for_updates_macos_pkg_enables_install(self):
         payload = {
