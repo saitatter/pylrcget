@@ -191,12 +191,30 @@ def is_windows_installer_asset(asset: ReleaseAssetInfo | None) -> bool:
     return str(asset.name).lower().endswith("-installer.exe")
 
 
+def is_macos_installer_asset(asset: ReleaseAssetInfo | None) -> bool:
+    if asset is None:
+        return False
+    name = str(asset.name).lower()
+    return name.endswith(".dmg") or name.endswith(".pkg")
+
+
+def is_linux_installer_asset(asset: ReleaseAssetInfo | None) -> bool:
+    if asset is None:
+        return False
+    name = str(asset.name).lower()
+    return name.endswith(".appimage") or name.endswith(".deb") or name.endswith(".rpm")
+
+
 def can_auto_install_update(asset: ReleaseAssetInfo | None) -> bool:
     if asset is None or not is_frozen_build():
         return False
-    if not sys.platform.startswith("win"):
-        return False
-    return is_windows_installer_asset(asset)
+    if sys.platform.startswith("win"):
+        return is_windows_installer_asset(asset)
+    if sys.platform == "darwin":
+        return is_macos_installer_asset(asset)
+    if sys.platform.startswith("linux"):
+        return is_linux_installer_asset(asset)
+    return False
 
 
 def _powershell_single_quoted(value: str) -> str:
@@ -275,6 +293,49 @@ def launch_windows_installer(installer_path: Path) -> None:
         cwd=str(installer_path.parent),
         close_fds=True,
     )
+
+
+def launch_platform_installer(installer_path: Path) -> None:
+    if not installer_path.exists():
+        raise FileNotFoundError(f"Installer not found: {installer_path}")
+
+    lower_name = installer_path.name.lower()
+    if sys.platform.startswith("win"):
+        if not is_windows_installer_asset(ReleaseAssetInfo(lower_name, "", 0, "")):
+            raise RuntimeError("Windows auto-install requires a Windows installer executable asset.")
+        launch_windows_installer(installer_path)
+        return
+
+    if sys.platform == "darwin":
+        if not (lower_name.endswith(".dmg") or lower_name.endswith(".pkg")):
+            raise RuntimeError("macOS auto-install supports only .dmg and .pkg assets.")
+        subprocess.Popen(
+            ["open", str(installer_path)],
+            start_new_session=True,
+            close_fds=True,
+        )
+        return
+
+    if sys.platform.startswith("linux"):
+        if lower_name.endswith(".appimage"):
+            os.chmod(installer_path, 0o755)
+            subprocess.Popen(
+                [str(installer_path)],
+                cwd=str(installer_path.parent),
+                start_new_session=True,
+                close_fds=True,
+            )
+            return
+        if lower_name.endswith(".deb") or lower_name.endswith(".rpm"):
+            subprocess.Popen(
+                ["xdg-open", str(installer_path)],
+                start_new_session=True,
+                close_fds=True,
+            )
+            return
+        raise RuntimeError("Linux auto-install supports only AppImage, .deb, and .rpm assets.")
+
+    raise RuntimeError("Auto-install is not supported on this platform.")
 
 
 def download_release_asset(

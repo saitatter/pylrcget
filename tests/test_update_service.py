@@ -245,6 +245,74 @@ class UpdateServiceTests(unittest.TestCase):
         self.assertIn("/FORCECLOSEAPPLICATIONS", args[0])
         self.assertEqual(kwargs["cwd"], str(installer_path.parent))
 
+    def test_check_for_updates_macos_pkg_enables_install(self):
+        payload = {
+            "tag_name": "v1.0.0",
+            "name": "v1.0.0",
+            "html_url": "https://example.com",
+            "body": "",
+            "published_at": "2026-04-12T10:00:00Z",
+            "assets": [
+                {
+                    "name": "pylrcget-macos.pkg",
+                    "browser_download_url": "https://example.com/pylrcget-macos.pkg",
+                    "size": 1234,
+                    "content_type": "application/octet-stream",
+                }
+            ],
+        }
+        with patch.object(update_service, "current_app_version", return_value="0.9.0"), patch.object(
+            update_service.sys, "platform", "darwin"
+        ), patch.object(update_service.sys, "frozen", True, create=True):
+            info = update_service.check_for_updates(session=_FakeSession(payload))
+        self.assertTrue(info.install_supported)
+
+    def test_check_for_updates_linux_appimage_enables_install(self):
+        payload = {
+            "tag_name": "v1.0.0",
+            "name": "v1.0.0",
+            "html_url": "https://example.com",
+            "body": "",
+            "published_at": "2026-04-12T10:00:00Z",
+            "assets": [
+                {
+                    "name": "pylrcget-linux.AppImage",
+                    "browser_download_url": "https://example.com/pylrcget-linux.AppImage",
+                    "size": 1234,
+                    "content_type": "application/octet-stream",
+                }
+            ],
+        }
+        with patch.object(update_service, "current_app_version", return_value="0.9.0"), patch.object(
+            update_service.sys, "platform", "linux"
+        ), patch.object(update_service.sys, "frozen", True, create=True):
+            info = update_service.check_for_updates(session=_FakeSession(payload))
+        self.assertTrue(info.install_supported)
+
+    def test_launch_platform_installer_macos_uses_open(self):
+        fake_popen = MagicMock()
+        with tempfile.TemporaryDirectory() as tmp:
+            installer_path = Path(tmp) / "pylrcget-macos.pkg"
+            installer_path.write_bytes(b"pkg")
+            with patch.object(update_service.sys, "platform", "darwin"), patch.object(
+                update_service.subprocess, "Popen", fake_popen
+            ):
+                update_service.launch_platform_installer(installer_path)
+        args, _ = fake_popen.call_args
+        self.assertEqual(args[0][0], "open")
+
+    def test_launch_platform_installer_linux_deb_uses_xdg_open(self):
+        fake_popen = MagicMock()
+        with tempfile.TemporaryDirectory() as tmp:
+            installer_path = Path(tmp) / "pylrcget-linux.deb"
+            installer_path.write_bytes(b"deb")
+            with patch.object(update_service.sys, "platform", "linux"), patch.object(
+                update_service.subprocess, "Popen", fake_popen
+            ):
+                update_service.launch_platform_installer(installer_path)
+        args, _ = fake_popen.call_args
+        self.assertEqual(args[0][0], "xdg-open")
+
     def test_launch_staged_update_debug_uses_visible_console(self):
         fake_popen = MagicMock()
         script_path = Path("C:/Temp/apply-update.ps1")

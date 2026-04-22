@@ -22,7 +22,7 @@ from ui.services.update_service import (
     cleanup_stale_update_downloads,
     current_app_version,
     default_update_download_dir,
-    launch_windows_installer,
+    launch_platform_installer,
 )
 from ui.workers.update_workers import UpdateCheckWorker, UpdateDownloadWorker
 
@@ -193,7 +193,7 @@ class AboutDialog(QDialog):
         download_path = Path(path)
         if self._pending_install and self._update_info is not None and self._update_info.install_supported:
             try:
-                launch_windows_installer(download_path)
+                launch_platform_installer(download_path)
             except Exception as exc:
                 self.status_label.setText(f"Could not stage the update: {exc}")
                 return
