@@ -23,12 +23,15 @@ class DownloadProgressOverlay(QWidget):
     cancelRequested = Signal()
     dismissed = Signal()
 
-    def __init__(self, parent: QWidget | None = None):
+    def __init__(self, parent: QWidget | None = None, *, verb: str = "Download"):
         super().__init__(parent)
         self.setObjectName("DownloadOverlay")
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.hide()
 
+        self._verb = verb  # "Download" or "Publish"
+        self._verb_ing = f"{verb.rstrip('e')}ing" if verb.endswith('e') else f"{verb}ing"
+        self._verb_ed = f"{verb.rstrip('e')}ed" if verb.endswith('e') else f"{verb}ed"
         self._active = False
         self._ok_count = 0
         self._fail_count = 0
@@ -120,10 +123,10 @@ class DownloadProgressOverlay(QWidget):
         self._ok_count = 0
         self._fail_count = 0
         self._total = max(0, int(total))
-        self.title_label.setText(f"Downloading ({mode_label})")
+        self.title_label.setText(f"{self._verb_ing} ({mode_label})")
         self.progress_bar.setRange(0, max(1, self._total))
         self.progress_bar.setValue(0)
-        self.status_label.setText("Preparing download queue…")
+        self.status_label.setText(f"Preparing {self._verb.lower()} queue…")
         self.output.clear()
         self.stop_btn.setText("STOP")
         self.stop_btn.setEnabled(True)
@@ -167,9 +170,9 @@ class DownloadProgressOverlay(QWidget):
         self.stop_btn.setEnabled(True)
         self.stop_btn.setText("CLOSE")
         if cancelled:
-            self.title_label.setText("Download Cancelled")
+            self.title_label.setText(f"{self._verb} Cancelled")
         else:
-            self.title_label.setText("Download Complete")
+            self.title_label.setText(f"{self._verb} Complete")
 
     def queue_auto_close(self, delay_ms: int) -> None:
         if self._active:
@@ -178,7 +181,7 @@ class DownloadProgressOverlay(QWidget):
         self._auto_close_timer.start(timeout)
 
     def _refresh_summary(self) -> None:
-        self.ok_label.setText(f"{self._ok_count} DOWNLOADED")
+        self.ok_label.setText(f"{self._ok_count} {self._verb_ed.upper()}")
         self.fail_label.setText(f"{self._fail_count} FAILED")
 
     def _handle_cancel(self) -> None:

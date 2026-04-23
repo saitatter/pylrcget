@@ -261,7 +261,7 @@ class MainWindow(QMainWindow):
             parent=self,
         )
         self.download_overlay.cancelRequested.connect(self.downloads.cancel)
-        self.publish_overlay = DownloadProgressOverlay(self.central_widget)
+        self.publish_overlay = DownloadProgressOverlay(self.central_widget, verb="Publish")
         self.publish_overlay.sync_to_parent()
         self.publish_history = PublishHistoryController(
             self.app_state,
