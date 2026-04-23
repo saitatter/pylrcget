@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import logging
 import sqlite3
 import time
@@ -9,8 +8,7 @@ from PySide6.QtCore import QThread, Signal
 
 from core.utils import plain_text_from_lrc
 from db.queries import get_config, get_track_by_id
-from lrclib import LrcLibAPI
-from lrclib.exceptions import RateLimitError, ServerError
+from core.lrclib_client import LrcLibAPI, RateLimitError, ServerError
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +46,7 @@ class BulkPublishWorker(QThread):
         try:
             db = sqlite3.connect(self.db_path, timeout=15.0)
             db.row_factory = sqlite3.Row
-            api = LrcLibAPI(user_agent="pylrcget", base_url=self.lrclib_instance)
+            api = LrcLibAPI(self.lrclib_instance)
 
             for idx, track_id in enumerate(self.track_ids, start=1):
                 if self.isInterruptionRequested():
@@ -115,17 +113,14 @@ class BulkPublishWorker(QThread):
         backoff_s = 0.5
         for attempt in range(1, max_retries + 1):
             try:
-                try:
-                    api.publish_lyrics(
-                        track_name=title,
-                        artist_name=artist,
-                        album_name=album,
-                        duration=duration_s,
-                        plain_lyrics=plain.strip() or None,
-                        synced_lyrics=synced.strip() if synced else None,
-                    )
-                except json.JSONDecodeError:
-                    pass  # LRCLIB returns empty 200 on success
+                api.publish_lyrics(
+                    track_name=title,
+                    artist_name=artist,
+                    album_name=album,
+                    duration=duration_s,
+                    plain_lyrics=plain.strip() or None,
+                    synced_lyrics=synced.strip() if synced else None,
+                )
                 return
             except (RateLimitError, ServerError) as exc:
                 if attempt >= max_retries:

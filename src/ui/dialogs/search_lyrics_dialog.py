@@ -17,7 +17,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
-from lrclib import LrcLibAPI
+from core.lrclib_client import LrcLibAPI
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +35,7 @@ class _SearchWorker(QThread):
 
     def run(self):
         try:
-            api = LrcLibAPI(user_agent="pylrcget", base_url=self.lrclib_instance)
+            api = LrcLibAPI(self.lrclib_instance)
             results = api.search_lyrics(
                 query=self.query or None,
                 track_name=self.title or None,

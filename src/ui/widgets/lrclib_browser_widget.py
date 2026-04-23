@@ -27,7 +27,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from lrclib import LrcLibAPI
+from core.lrclib_client import LrcLibAPI
 
 from ui.dialogs.publish_lyrics_dialog import PublishProgress, PublishWorker
 from ui.spacing import SPACE_2, SPACE_3, SPACE_4, set_layout_spacing
@@ -52,7 +52,7 @@ class _SearchWorker(QThread):
 
     def run(self):
         try:
-            api = LrcLibAPI(user_agent="pylrcget", base_url=self.lrclib_instance)
+            api = LrcLibAPI(self.lrclib_instance)
             results = api.search_lyrics(
                 query=self.query or None,
                 track_name=self.title or None,

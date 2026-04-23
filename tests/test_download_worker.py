@@ -6,7 +6,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from lrclib.exceptions import NotFoundError, RateLimitError
+from core.lrclib_client import NotFoundError, RateLimitError
 import requests
 
 from tests import test_support as _test_support  # noqa: F401
@@ -77,16 +77,11 @@ class LyricsDownloadWorkerTests(unittest.TestCase):
                 )
                 worker.finished.connect(lambda ok, msg, tid: finished.append((ok, msg, tid)))
 
-                response = requests.Response()
-                response.status_code = 404
-                response.reason = "Not Found"
-                response.url = "https://lrclib.net/api/get"
-                response._content = b"not found"
                 with (
                     patch("ui.services.lyrics_download_service.time.sleep") as sleep_mock,
                     patch("ui.services.lyrics_download_service.LrcLibAPI") as api_cls,
                 ):
-                    api_cls.return_value.get_lyrics.side_effect = NotFoundError(response)
+                    api_cls.return_value.get_lyrics.side_effect = NotFoundError(404, "Not Found")
                     worker.run()
 
                 self.assertEqual(len(finished), 1)

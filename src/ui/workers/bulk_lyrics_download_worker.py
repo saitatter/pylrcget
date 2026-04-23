@@ -5,7 +5,7 @@ import time
 from typing import TypedDict
 
 from PySide6.QtCore import QObject, QThread, Signal
-from lrclib import LrcLibAPI
+from core.lrclib_client import LrcLibAPI
 
 from db.models import Track
 from db.queries import get_config, get_track_by_id
@@ -53,7 +53,7 @@ class BulkLyricsDownloadWorker(QThread):
             db = sqlite3.connect(self.db_path, timeout=15.0)
             db.row_factory = sqlite3.Row
             config = get_config(db)
-            api = LrcLibAPI(user_agent="pylrcget", base_url=self.lrclib_instance)
+            api = LrcLibAPI(self.lrclib_instance)
             for idx, track_id in enumerate(self.track_ids, start=1):
                 if self.isInterruptionRequested():
                     cancelled = True
