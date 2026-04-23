@@ -402,6 +402,11 @@ class MainWindow(QMainWindow):
         self.top_bar.bind_tab_order(self, self.tabs)
         self._sync_download_mode_ui()
 
+        # --- Selection counter in status bar ---
+        self._selection_label = QLabel("")
+        self.statusBar().addPermanentWidget(self._selection_label)
+        self.track_list.table.selectionModel().selectionChanged.connect(self._update_selection_counter)
+
         # initial load
         self._apply_track_filters()
         self.show_queued_notifications()
@@ -859,6 +864,14 @@ class MainWindow(QMainWindow):
             self.statusBar().showMessage(message)
             return
         self.statusBar().showMessage(message, int(timeout_ms))
+
+    def _update_selection_counter(self):
+        sm = self.track_list.table.selectionModel()
+        count = len(sm.selectedRows()) if sm else 0
+        if count > 1:
+            self._selection_label.setText(f"{count} tracks selected")
+        else:
+            self._selection_label.setText("")
 
     def _current_player_track_id(self) -> int | None:
         if not self.app_state.player or not self.app_state.player.track:
