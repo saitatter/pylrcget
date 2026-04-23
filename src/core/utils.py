@@ -35,11 +35,3 @@ def prepare_input(input_str: str) -> str:
     prepared_input = collapse(prepared_input)
 
     return prepared_input
-
-
-def strip_timestamp(synced_lyrics: str) -> str:
-    """
-    Elimină timestamp-ul de tip [00:00.00] de la începutul unei linii.
-    """
-    plain_lyrics = re.sub(r"^\[.*?\]\s*", "", synced_lyrics)
-    return plain_lyrics

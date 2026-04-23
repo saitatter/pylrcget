@@ -37,16 +37,3 @@ class FsTrack:
     track_number: int | None
     modified_time: float | None = None
     file_size: int | None = None
-
-    def file_path_(self) -> str: return self.file_path
-    def file_name_(self) -> str: return self.file_name
-    def title_(self) -> str: return self.title
-    def album_(self) -> str: return self.album
-    def artist_(self) -> str: return self.artist
-    def album_artist_(self) -> str: return self.album_artist
-    def duration_(self) -> float: return self.duration
-    def txt_lyrics_(self) -> str | None: return self.txt_lyrics
-    def lrc_lyrics_(self) -> str | None: return self.lrc_lyrics
-    def track_number_(self) -> int | None: return self.track_number
-    def modified_time_(self) -> float | None: return self.modified_time
-    def file_size_(self) -> int | None: return self.file_size
