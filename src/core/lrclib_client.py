@@ -172,7 +172,7 @@ def solve_challenge(prefix: str, target_hex: str) -> str:
     num_threads = os.cpu_count() or 1
     result: list[int | None] = [None]
     threads = [
-        threading.Thread(target=_find_nonce, args=(prefix, target, result, i, num_threads))
+        threading.Thread(target=_find_nonce, args=(prefix, target, result, i, num_threads), daemon=True)
         for i in range(num_threads)
     ]
     for t in threads:

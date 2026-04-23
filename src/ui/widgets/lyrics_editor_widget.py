@@ -703,14 +703,15 @@ class LyricsEditorWidget(QWidget):
         self.table.editItem(self.table.item(insert_at, 1))
 
     def _delete_selected_line(self):
-        row = self.table.currentRow()
-        if row < 0:
+        rows = self._selected_rows()
+        if not rows:
             return
         self._push_undo()
         self.table.blockSignals(True)
-        self.table.removeRow(row)
+        for row in reversed(rows):
+            self.table.removeRow(row)
         self.table.blockSignals(False)
-        self._invalid_rows = {idx - 1 if idx > row else idx for idx in self._invalid_rows if idx != row}
+        self._invalid_rows.clear()
         self._rebuild_times_cache()
         if self._invalid_rows:
             next_row = min(self._invalid_rows)
