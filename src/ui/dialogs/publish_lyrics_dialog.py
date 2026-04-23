@@ -43,15 +43,12 @@ class PublishWorker(QThread):
 
     def run(self):
         try:
-            api = LrcLibAPI(user_agent="pylrcget/1.0", base_url=self.lrclib_instance)
+            api = LrcLibAPI(user_agent="pylrcget", base_url=self.lrclib_instance)
 
             self.progress.emit(PublishProgress("In progress...", "Pending", "Pending"))
-            challenge = api.request_challenge()
             self.progress.emit(PublishProgress("Done", "Pending", "Pending"))
 
             self.progress.emit(PublishProgress("Done", "In progress...", "Pending"))
-            from lrclib.cryptographic_challenge_solver import find_nonce
-            solution = find_nonce(challenge.prefix, bytes.fromhex(challenge.target))
             publish_token = api._obtain_publish_token()
             self.progress.emit(PublishProgress("Done", "Done", "Pending"))
 
@@ -63,6 +60,7 @@ class PublishWorker(QThread):
                 duration=int(self.payload["duration"]),
                 plain_lyrics=self.payload.get("plainLyrics") or None,
                 synced_lyrics=self.payload.get("syncedLyrics") or None,
+                publish_token=publish_token,
             )
             self.progress.emit(PublishProgress("Done", "Done", "Done"))
 

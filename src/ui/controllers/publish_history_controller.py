@@ -82,6 +82,7 @@ class PublishHistoryController(QObject):
                     lrclib_instance=self._normalize_lrclib_base(get_config(self._app_state.db).lrclib_instance),
                 )
             except (sqlite3.Error, AttributeError) as exc:
+                logger.warning("Failed to record publish history: %s", exc)
             else:
                 self._refresh_history()
             for view in self._lyrics_views():

@@ -176,7 +176,7 @@ def download_track_lyrics(
         if not title or not artist:
             return False, "Missing title/artist; cannot search lyrics.", track_id, title_for_ui
 
-        api_instance = api or LrcLibAPI(user_agent="lrcget-python/0.1", base_url=lrclib_instance)
+        api_instance = api or LrcLibAPI(user_agent="pylrcget", base_url=lrclib_instance)
         lyrics = fetch_lyrics_with_retry(
             api_instance,
             notify=notify,
