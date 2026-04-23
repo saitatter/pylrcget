@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 import time
 from dataclasses import dataclass
@@ -128,15 +129,18 @@ class PublishWorker(QThread):
                 self.progress.emit(PublishProgress("Done", "Done", "Pending"))
 
                 self.progress.emit(PublishProgress("Done", "Done", "In progress..."))
-                api.publish_lyrics(
-                    track_name=self.payload["title"],
-                    artist_name=self.payload["artistName"],
-                    album_name=self.payload["albumName"],
-                    duration=int(self.payload["duration"]),
-                    plain_lyrics=self.payload.get("plainLyrics") or None,
-                    synced_lyrics=self.payload.get("syncedLyrics") or None,
-                    publish_token=publish_token,
-                )
+                try:
+                    api.publish_lyrics(
+                        track_name=self.payload["title"],
+                        artist_name=self.payload["artistName"],
+                        album_name=self.payload["albumName"],
+                        duration=int(self.payload["duration"]),
+                        plain_lyrics=self.payload.get("plainLyrics") or None,
+                        synced_lyrics=self.payload.get("syncedLyrics") or None,
+                        publish_token=publish_token,
+                    )
+                except json.JSONDecodeError:
+                    pass  # LRCLIB returns empty 200 on success
                 self.progress.emit(PublishProgress("Done", "Done", "Done"))
 
                 self.finished.emit(True, "Lyrics were published successfully.")

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 import sqlite3
 import time
@@ -83,14 +84,17 @@ class BulkPublishInstrumentalWorker(QThread):
         backoff_s = 0.5
         for attempt in range(1, max_retries + 1):
             try:
-                api.publish_lyrics(
-                    track_name=title,
-                    artist_name=artist,
-                    album_name=album,
-                    duration=duration_s,
-                    plain_lyrics=None,
-                    synced_lyrics=None,
-                )
+                try:
+                    api.publish_lyrics(
+                        track_name=title,
+                        artist_name=artist,
+                        album_name=album,
+                        duration=duration_s,
+                        plain_lyrics=None,
+                        synced_lyrics=None,
+                    )
+                except json.JSONDecodeError:
+                    pass  # LRCLIB returns empty 200 on success
                 return
             except (RateLimitError, ServerError) as exc:
                 if attempt >= max_retries:
