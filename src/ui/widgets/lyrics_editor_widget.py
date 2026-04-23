@@ -7,7 +7,7 @@ from bisect import bisect_right
 from typing import List, Optional, Tuple
 
 from PySide6.QtCore import Qt, Signal, QTimer
-from PySide6.QtGui import QColor
+from PySide6.QtGui import QColor, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QStackedWidget,
     QTextEdit, QTableWidget, QTableWidgetItem,
@@ -154,6 +154,10 @@ class LyricsEditorWidget(QWidget):
         self._reaction_delay_ms: int = 0
         self._current_position_provider = None
 
+        # Snapshot-based undo/redo for the synced table editor
+        self._undo_stack: list[list[tuple[int, str]]] = []
+        self._redo_stack: list[list[tuple[int, str]]] = []
+
         root = QVBoxLayout(self)
         set_layout_spacing(root, margins=SPACE_3, spacing=SPACE_2)
 
@@ -262,6 +266,12 @@ class LyricsEditorWidget(QWidget):
         self.table.horizontalHeader().setStretchLastSection(True)
 
         self.stack.addWidget(self.table)
+
+        # Undo/redo shortcuts for the synced table
+        self._shortcut_undo = QShortcut(QKeySequence.StandardKey.Undo, self)
+        self._shortcut_undo.activated.connect(self._undo)
+        self._shortcut_redo = QShortcut(QKeySequence.StandardKey.Redo, self)
+        self._shortcut_redo.activated.connect(self._redo)
 
         self._default_button_text = {
             self.btn_save: "Save",
@@ -378,6 +388,8 @@ class LyricsEditorWidget(QWidget):
         self._publish_synced_available = False
         self._publish_plain_available = False
         self._invalid_rows.clear()
+        self._undo_stack.clear()
+        self._redo_stack.clear()
         self.table.blockSignals(True)
         self.table.setRowCount(0)
         self.table.blockSignals(False)
@@ -416,6 +428,75 @@ class LyricsEditorWidget(QWidget):
         """Switch to an empty plain editor so the user can write lyrics from scratch."""
         self._set_plain("")
         self.plain.setFocus()
+
+    # --- Undo / Redo (snapshot-based for synced table) ---
+    def _take_snapshot(self) -> list[tuple[int, str]]:
+        """Capture all (ms, text) pairs from the synced table."""
+        pairs: list[tuple[int, str]] = []
+        for r in range(self.table.rowCount()):
+            it_time = self.table.item(r, 0)
+            it_text = self.table.item(r, 1)
+            ms = int(it_time.data(TIMESTAMP_MS_ROLE) or 0) if it_time else 0
+            text = it_text.text() if it_text else ""
+            pairs.append((ms, text))
+        return pairs
+
+    def _push_undo(self):
+        """Save current state to undo stack before a mutating operation."""
+        if self.stack.currentWidget() is not self.table:
+            return
+        self._undo_stack.append(self._take_snapshot())
+        self._redo_stack.clear()
+        # Cap undo stack at 50 levels
+        if len(self._undo_stack) > 50:
+            self._undo_stack.pop(0)
+
+    def _restore_snapshot(self, pairs: list[tuple[int, str]]):
+        """Restore the synced table from a snapshot."""
+        self.table.blockSignals(True)
+        self.table.setRowCount(len(pairs))
+        self._times = []
+        self._invalid_rows.clear()
+        for row, (ms, text) in enumerate(pairs):
+            it_time = QTableWidgetItem(_ms_to_ts(ms))
+            it_time.setData(TIMESTAMP_MS_ROLE, ms)
+            it_time.setData(TIMESTAMP_VALID_ROLE, True)
+            it_time.setFlags(it_time.flags() | Qt.ItemIsEditable)
+            it_text = QTableWidgetItem(text)
+            it_text.setFlags(it_text.flags() | Qt.ItemIsEditable)
+            self.table.setItem(row, 0, it_time)
+            self.table.setItem(row, 1, it_text)
+            self._times.append(ms)
+        self.table.blockSignals(False)
+        self._rebuild_times_cache()
+        self._update_save_enabled()
+        self._refresh_row_styles()
+
+    def _undo(self):
+        if self.stack.currentWidget() is self.plain:
+            self.plain.undo()
+            return
+        if self.stack.currentWidget() is not self.table:
+            return
+        if not self._undo_stack:
+            return
+        self._redo_stack.append(self._take_snapshot())
+        snapshot = self._undo_stack.pop()
+        self._restore_snapshot(snapshot)
+        self._set_validation_message("Undo", state="success")
+
+    def _redo(self):
+        if self.stack.currentWidget() is self.plain:
+            self.plain.redo()
+            return
+        if self.stack.currentWidget() is not self.table:
+            return
+        if not self._redo_stack:
+            return
+        self._undo_stack.append(self._take_snapshot())
+        snapshot = self._redo_stack.pop()
+        self._restore_snapshot(snapshot)
+        self._set_validation_message("Redo", state="success")
 
     def _set_synced(self, pairs: List[Tuple[int, str]]):
         self._reset_state()
@@ -581,6 +662,7 @@ class LyricsEditorWidget(QWidget):
         self._refresh_row_styles()
 
     def _add_line_after_selection(self):
+        self._push_undo()
         row = self.table.currentRow()
         insert_at = row + 1 if row >= 0 else self.table.rowCount()
 
@@ -612,6 +694,7 @@ class LyricsEditorWidget(QWidget):
         row = self.table.currentRow()
         if row < 0:
             return
+        self._push_undo()
         self.table.blockSignals(True)
         self.table.removeRow(row)
         self.table.blockSignals(False)
@@ -637,6 +720,7 @@ class LyricsEditorWidget(QWidget):
         if not it_time:
             return
 
+        self._push_undo()
         ms = max(0, int(self._current_playback_ms()) + int(self._reaction_delay_ms))
         self.table.blockSignals(True)
         it_time.setData(TIMESTAMP_MS_ROLE, ms)
@@ -710,6 +794,7 @@ class LyricsEditorWidget(QWidget):
                 state="error",
             )
             return False
+        self._push_undo()
         self.table.blockSignals(True)
         for row in rows:
             it_time = self.table.item(row, 0)
