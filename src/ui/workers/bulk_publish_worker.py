@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import json
 import logging
-import re
 import sqlite3
 import time
 
 from PySide6.QtCore import QThread, Signal
 
+from core.utils import plain_text_from_lrc
 from db.queries import get_config, get_track_by_id
 from lrclib import LrcLibAPI
 from lrclib.exceptions import RateLimitError, ServerError
@@ -79,10 +79,7 @@ class BulkPublishWorker(QThread):
                     continue
 
                 if self.is_synced:
-                    plain = "\n".join(
-                        re.sub(r"\[\d{1,3}:\d{2}[.:]\d{2,3}\]", "", line).strip()
-                        for line in lyrics_text.splitlines()
-                    ).strip()
+                    plain = plain_text_from_lrc(lyrics_text)
                     synced = lyrics_text
                 else:
                     plain = lyrics_text

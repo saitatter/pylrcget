@@ -35,3 +35,23 @@ def prepare_input(input_str: str) -> str:
     prepared_input = collapse(prepared_input)
 
     return prepared_input
+
+
+_LRC_TS_RE = re.compile(r"\[(\d+):(\d+)(?:\.(\d+))?\]")
+_LRC_META_PREFIXES = ("[ar:", "[ti:", "[al:", "[by:", "[offset:", "[au:")
+
+
+def plain_text_from_lrc(lrc_text: str) -> str:
+    """Strip timestamps and metadata tags from synced LRC, returning plain text."""
+    lines: list[str] = []
+    for raw in lrc_text.splitlines():
+        line = raw.strip()
+        if not line:
+            continue
+        if any(line.startswith(p) for p in _LRC_META_PREFIXES):
+            continue
+        if not _LRC_TS_RE.search(line):
+            continue
+        text = _LRC_TS_RE.sub("", line).strip()
+        lines.append(text)
+    return "\n".join(lines).rstrip()

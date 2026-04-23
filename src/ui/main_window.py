@@ -1130,9 +1130,8 @@ class MainWindow(QMainWindow):
                 update_track_plain_lyrics(self.app_state.db, track_id, plain)
             elif synced.strip() and not plain.strip():
                 # Derive plain from synced
-                from ui.widgets.lyrics_editor_widget import parse_lrc
-                pairs = parse_lrc(synced)
-                derived = "\n".join(text.rstrip() for _, text in pairs).rstrip()
+                from core.utils import plain_text_from_lrc
+                derived = plain_text_from_lrc(synced)
                 if derived:
                     update_track_plain_lyrics(self.app_state.db, track_id, derived)
             if not synced.strip() and not plain.strip():

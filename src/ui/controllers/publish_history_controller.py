@@ -162,7 +162,7 @@ class PublishHistoryController(QObject):
                 try:
                     track = get_track_by_id(self._app_state.db, int(track_id))
                     track_label = f"{track.artist_name} - {track.title}".strip(" -") or track_label
-                except Exception:
+                except (sqlite3.Error, AttributeError):
                     pass
             if self._overlay is not None:
                 self._overlay.append_result(track_label, message, ok)
