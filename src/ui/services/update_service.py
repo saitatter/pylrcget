@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import hashlib
 import importlib.metadata
 import os
 from pathlib import Path
@@ -358,11 +359,13 @@ def download_release_asset(
             response.raise_for_status()
             total = int(response.headers.get("Content-Length") or asset.size or 0)
             downloaded = 0
+            hasher = hashlib.sha256()
             with destination.open("wb") as handle:
                 for chunk in response.iter_content(chunk_size=1024 * 128):
                     if not chunk:
                         continue
                     handle.write(chunk)
+                    hasher.update(chunk)
                     downloaded += len(chunk)
                     if progress_callback is not None:
                         progress_callback(downloaded, total)
