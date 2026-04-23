@@ -1325,6 +1325,20 @@ class MainWindow(QMainWindow):
             self._apply_track_filters()
             self.track_list.restore_selection(selected_before)
         except sqlite3.Error as e:
+            log_and_notify(
+                self.app_state,
+                logger,
+                logging.ERROR,
+                exception_message("Failed to mark tracks as instrumental", e),
+                "error",
+                show_status=self._show_status_message,
+                status_timeout_ms=4000,
+            )
+            return
+
+        self._publish_instrumental_to_lrclib(track_ids)
+
+    def _on_unmark_instrumental(self, track_ids: list[int]):
         track_ids = [int(x) for x in track_ids if x is not None]
         if not track_ids:
             return
@@ -1349,3 +1363,42 @@ class MainWindow(QMainWindow):
                 show_status=self._show_status_message,
                 status_timeout_ms=4000,
             )
+
+    def _publish_instrumental_to_lrclib(self, track_ids: list[int]) -> None:
+        from PySide6.QtWidgets import QMessageBox
+
+        reply = QMessageBox.question(
+            self,
+            "Publish Instrumental",
+            f"Also mark {len(track_ids)} track(s) as instrumental on LRCLIB?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+
+        from ui.workers.bulk_publish_instrumental_worker import BulkPublishInstrumentalWorker
+
+        config = get_config(self.app_state.db)
+        lrclib_url = self._normalize_lrclib_base(config.lrclib_instance)
+
+        self._instrumental_worker = BulkPublishInstrumentalWorker(
+            db_path=self.app_state.db_path,
+            track_ids=track_ids,
+            lrclib_instance=lrclib_url,
+            parent=self,
+        )
+
+        def _on_finished(ok: bool, summary: str, stats: dict):
+            self._instrumental_worker = None
+            notify_user(
+                self.app_state,
+                summary,
+                "success" if ok else "warning",
+                show_status=self._show_status_message,
+                status_timeout_ms=5000,
+            )
+
+        self._instrumental_worker.finished.connect(_on_finished)
+        self._show_status_message(f"Publishing instrumental status for {len(track_ids)} track(s)...", 3000)
+        self._instrumental_worker.start()
