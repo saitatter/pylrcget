@@ -44,10 +44,13 @@ jobs:
         include:
           - os: windows-latest
             archive_name: pylrcget-windows.zip
+            installer_name: pylrcget-windows-installer.exe
           - os: ubuntu-latest
             archive_name: pylrcget-linux.tar.gz
+            installer_name: pylrcget-linux.deb
           - os: macos-latest
             archive_name: pylrcget-macos.tar.gz
+            installer_name: pylrcget-macos.pkg
 
     steps:
       - uses: actions/checkout@v4
@@ -76,13 +79,87 @@ jobs:
         if: runner.os != 'Windows'
         run: tar -czf "${{ matrix.archive_name }}" -C dist pylrcget
 
-      - name: Upload workflow artifact
+      - name: Build Windows installer (Inno Setup)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          @"
+          [Setup]
+          AppId={7A93F8B8-FA1D-4D4A-B2CC-1A9A6688D52C}
+          AppName=PyLrcGet
+          AppVersion=${{ needs.release.outputs.version }}
+          DefaultDirName={autopf}\PyLrcGet
+          DefaultGroupName=PyLrcGet
+          UninstallDisplayIcon={app}\pylrcget.exe
+          OutputBaseFilename=pylrcget-windows-installer
+          Compression=lzma
+          SolidCompression=yes
+          ArchitecturesInstallIn64BitMode=x64compatible
+          DisableProgramGroupPage=yes
+          WizardStyle=modern
+
+          [Languages]
+          Name: "english"; MessagesFile: "compiler:Default.isl"
+
+          [Files]
+          Source: "dist\pylrcget.exe"; DestDir: "{app}"; Flags: ignoreversion
+
+          [Icons]
+          Name: "{autoprograms}\PyLrcGet"; Filename: "{app}\pylrcget.exe"
+
+          [Run]
+          Filename: "{app}\pylrcget.exe"; Description: "Launch PyLrcGet"; Flags: nowait postinstall skipifsilent
+          "@ | Set-Content -Path pylrcget-installer.iss -Encoding ascii
+          choco install innosetup --no-progress -y
+          iscc /Qp pylrcget-installer.iss
+
+      - name: Build Linux installer (.deb)
+        if: runner.os == 'Linux'
+        run: |
+          mkdir -p pkgroot/DEBIAN
+          mkdir -p pkgroot/usr/local/bin
+          install -m 0755 dist/pylrcget pkgroot/usr/local/bin/pylrcget
+          cat > pkgroot/DEBIAN/control <<EOF
+          Package: pylrcget
+          Version: ${{ needs.release.outputs.version }}
+          Section: utils
+          Priority: optional
+          Architecture: amd64
+          Maintainer: PyLrcGet Maintainers <noreply@github.com>
+          Description: Desktop-native lyrics manager and player built with PySide6.
+          EOF
+          dpkg-deb --build pkgroot "${{ matrix.installer_name }}"
+
+      - name: Build macOS installer (.pkg)
+        if: runner.os == 'macOS'
+        run: |
+          mkdir -p pkgroot/usr/local/bin
+          install -m 0755 dist/pylrcget pkgroot/usr/local/bin/pylrcget
+          pkgbuild \
+            --root pkgroot \
+            --identifier com.saitatter.pylrcget \
+            --version "${{ needs.release.outputs.version }}" \
+            --install-location / \
+            "${{ matrix.installer_name }}"
+
+      - name: Upload workflow artifact (archive)
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.archive_name }}
           path: ${{ matrix.archive_name }}
 
-      - name: Upload release asset
+      - name: Upload workflow artifact (installer)
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.installer_name }}
+          path: ${{ matrix.installer_name }}
+
+      - name: Upload release asset (archive)
         env:
           GITHUB_TOKEN: ${{ secrets.RELEASE_PAT }}
         run: gh release upload "${{ needs.release.outputs.tag }}" "${{ matrix.archive_name }}" --clobber
+
+      - name: Upload release asset (installer)
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_PAT }}
+        run: gh release upload "${{ needs.release.outputs.tag }}" "${{ matrix.installer_name }}" --clobber
