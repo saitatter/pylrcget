@@ -9,6 +9,7 @@ from PySide6.QtCore import QThread, Signal
 
 from db.queries import get_config, get_track_by_id
 from lrclib import LrcLibAPI
+from lrclib.exceptions import RateLimitError, ServerError
 
 logger = logging.getLogger(__name__)
 
@@ -84,14 +85,7 @@ class BulkPublishWorker(QThread):
                     synced = None
 
                 try:
-                    api.publish_lyrics(
-                        track_name=title,
-                        artist_name=artist,
-                        album_name=album,
-                        duration=duration_s,
-                        plain_lyrics=plain.strip() or None,
-                        synced_lyrics=synced.strip() if synced else None,
-                    )
+                    self._publish_with_retry(api, title, artist, album, duration_s, plain, synced)
                     ok_count += 1
                     self.itemFinished.emit(track_id, True, "Published.")
                 except Exception as exc:
@@ -113,3 +107,28 @@ class BulkPublishWorker(QThread):
         else:
             summary = f"Published {ok_count} of {total} tracks. {fail_count} failed, {skipped} skipped."
         self.finished.emit(not cancelled and fail_count == 0, summary, stats)
+
+    @staticmethod
+    def _publish_with_retry(api, title, artist, album, duration_s, plain, synced):
+        max_retries = 3
+        backoff_s = 0.5
+        for attempt in range(1, max_retries + 1):
+            try:
+                api.publish_lyrics(
+                    track_name=title,
+                    artist_name=artist,
+                    album_name=album,
+                    duration=duration_s,
+                    plain_lyrics=plain.strip() or None,
+                    synced_lyrics=synced.strip() if synced else None,
+                )
+                return
+            except (RateLimitError, ServerError) as exc:
+                if attempt >= max_retries:
+                    raise
+                logger.warning(
+                    "Publish attempt %d/%d failed (%s), retrying in %.1fs...",
+                    attempt, max_retries, type(exc).__name__, backoff_s,
+                )
+                time.sleep(backoff_s)
+                backoff_s *= 2

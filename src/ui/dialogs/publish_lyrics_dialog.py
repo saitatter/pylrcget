@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from dataclasses import dataclass
 from typing import List, Optional
 
@@ -12,7 +13,7 @@ from PySide6.QtWidgets import (
 import re
 
 from lrclib import LrcLibAPI
-from lrclib.exceptions import APIError, IncorrectPublishTokenError, RateLimitError
+from lrclib.exceptions import APIError, IncorrectPublishTokenError, RateLimitError, ServerError
 
 from ui.spacing import SPACE_2, SPACE_3, SPACE_4, set_layout_spacing
 
@@ -112,41 +113,59 @@ class PublishWorker(QThread):
         self.lrclib_instance = lrclib_instance
 
     def run(self):
-        try:
-            api = LrcLibAPI(user_agent="pylrcget", base_url=self.lrclib_instance)
+        max_retries = 3
+        backoff_s = 0.5
 
-            self.progress.emit(PublishProgress("In progress...", "Pending", "Pending"))
-            self.progress.emit(PublishProgress("Done", "Pending", "Pending"))
+        for attempt in range(1, max_retries + 1):
+            try:
+                api = LrcLibAPI(user_agent="pylrcget", base_url=self.lrclib_instance)
 
-            self.progress.emit(PublishProgress("Done", "In progress...", "Pending"))
-            publish_token = api._obtain_publish_token()
-            self.progress.emit(PublishProgress("Done", "Done", "Pending"))
+                self.progress.emit(PublishProgress("In progress...", "Pending", "Pending"))
+                self.progress.emit(PublishProgress("Done", "Pending", "Pending"))
 
-            self.progress.emit(PublishProgress("Done", "Done", "In progress..."))
-            api.publish_lyrics(
-                track_name=self.payload["title"],
-                artist_name=self.payload["artistName"],
-                album_name=self.payload["albumName"],
-                duration=int(self.payload["duration"]),
-                plain_lyrics=self.payload.get("plainLyrics") or None,
-                synced_lyrics=self.payload.get("syncedLyrics") or None,
-                publish_token=publish_token,
-            )
-            self.progress.emit(PublishProgress("Done", "Done", "Done"))
+                self.progress.emit(PublishProgress("Done", "In progress...", "Pending"))
+                publish_token = api._obtain_publish_token()
+                self.progress.emit(PublishProgress("Done", "Done", "Pending"))
 
-            self.finished.emit(True, "Lyrics were published successfully.")
-        except IncorrectPublishTokenError:
-            logger.exception("Publish token rejected by LRCLIB")
-            self.finished.emit(False, "Publish token was rejected. Try again.")
-        except RateLimitError:
-            logger.warning("Rate limited by LRCLIB during publish")
-            self.finished.emit(False, "Rate limited by LRCLIB. Please wait and try again.")
-        except APIError as e:
-            logger.exception("LRCLIB API error during publish")
-            self.finished.emit(False, f"LRCLIB error: {e}")
-        except Exception as e:
-            logger.exception("Unexpected error during publish")
-            self.finished.emit(False, f"Publish failed: {e}")
+                self.progress.emit(PublishProgress("Done", "Done", "In progress..."))
+                api.publish_lyrics(
+                    track_name=self.payload["title"],
+                    artist_name=self.payload["artistName"],
+                    album_name=self.payload["albumName"],
+                    duration=int(self.payload["duration"]),
+                    plain_lyrics=self.payload.get("plainLyrics") or None,
+                    synced_lyrics=self.payload.get("syncedLyrics") or None,
+                    publish_token=publish_token,
+                )
+                self.progress.emit(PublishProgress("Done", "Done", "Done"))
+
+                self.finished.emit(True, "Lyrics were published successfully.")
+                return
+            except IncorrectPublishTokenError:
+                logger.exception("Publish token rejected by LRCLIB")
+                self.finished.emit(False, "Publish token was rejected. Try again.")
+                return
+            except (RateLimitError, ServerError) as e:
+                if attempt < max_retries:
+                    logger.warning(
+                        "Publish attempt %d/%d failed (%s), retrying in %.1fs...",
+                        attempt, max_retries, type(e).__name__, backoff_s,
+                    )
+                    self.progress.emit(PublishProgress("Done", "Done", f"Retrying in {backoff_s:.0f}s..."))
+                    time.sleep(backoff_s)
+                    backoff_s *= 2
+                    continue
+                logger.warning("Publish failed after %d attempts: %s", max_retries, e)
+                self.finished.emit(False, f"Publish failed after {max_retries} attempts: {e}")
+                return
+            except APIError as e:
+                logger.exception("LRCLIB API error during publish")
+                self.finished.emit(False, f"LRCLIB error: {e}")
+                return
+            except Exception as e:
+                logger.exception("Unexpected error during publish")
+                self.finished.emit(False, f"Publish failed: {e}")
+                return
 
 
 class PublishLyricsDialog(QDialog):
