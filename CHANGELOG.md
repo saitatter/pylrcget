@@ -66,7 +66,15 @@
 
 
 
+
+
+
+
+
+
 ### 🔧 Other Changes
+
+- Switch pyinstaller packaging to onedir for installer workflows ([`205d4d7`](https://github.com/saitatter/pylrcget/commit/205d4d77860a65322abb713399a92e91950ab777))
 
 - Stabilize release pipeline, installers, and github notes ([`347abde`](https://github.com/saitatter/pylrcget/commit/347abde20e169fecea8d1ecf879fd7ec7cf2ab81))
 
