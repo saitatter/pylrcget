@@ -120,10 +120,13 @@ class PublishWorker(QThread):
                 api = LrcLibAPI(self.lrclib_instance)
 
                 self.progress.emit(PublishProgress("In progress...", "Pending", "Pending"))
+                prefix, target_hex = api.request_challenge()
                 self.progress.emit(PublishProgress("Done", "Pending", "Pending"))
 
                 self.progress.emit(PublishProgress("Done", "In progress...", "Pending"))
-                publish_token = api.obtain_publish_token()
+                from core.lrclib_client import solve_challenge
+                nonce = solve_challenge(prefix, target_hex)
+                publish_token = f"{prefix}:{nonce}"
                 self.progress.emit(PublishProgress("Done", "Done", "Pending"))
 
                 self.progress.emit(PublishProgress("Done", "Done", "In progress..."))

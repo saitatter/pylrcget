@@ -42,13 +42,13 @@ def get_app_data_dir() -> str:
             if not os.path.exists(dst):
                 try:
                     os.rename(src, dst)
-                except OSError:
-                    pass
+                except OSError as exc:
+                    logging.warning("Failed to migrate app data from %s to %s: %s", src, dst, exc)
         # Remove old subfolder if empty
         try:
             os.rmdir(old_nested)
-        except OSError:
-            pass
+        except OSError as exc:
+            logging.warning("Failed to remove old app data directory %s: %s", old_nested, exc)
 
     os.makedirs(base, exist_ok=True)
     return base
