@@ -4,6 +4,7 @@ import logging
 from typing import Optional
 
 from PySide6.QtCore import Qt, QThread, Signal
+from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QDialog,
     QHBoxLayout,
@@ -140,7 +141,7 @@ class SearchLyricsDialog(QDialog):
         self.use_btn.clicked.connect(self._use_selected)
         self.cancel_btn.clicked.connect(self.reject)
 
-        if initial_query.strip():
+        if initial_query.strip() or initial_artist.strip() or initial_title.strip():
             self._do_search()
 
     def _do_search(self):
@@ -161,6 +162,24 @@ class SearchLyricsDialog(QDialog):
         self._worker.finished.connect(self._on_search_finished)
         self._worker.start()
 
+    _TYPE_COLORS = {
+        "Synced": "#4CAF50",       # green
+        "Plain": "#2196F3",        # blue
+        "Instrumental": "#9C27B0", # purple
+        "—": "#888888",            # grey
+    }
+
+    @staticmethod
+    def _match_rank(r) -> int:
+        """Lower = better match. Synced > Plain > Instrumental > none."""
+        if r.synced_lyrics:
+            return 0
+        if r.plain_lyrics:
+            return 1
+        if r.instrumental:
+            return 2
+        return 3
+
     def _on_search_finished(self, results: list, error: str):
         self.search_btn.setEnabled(True)
         self._worker = None
@@ -169,10 +188,13 @@ class SearchLyricsDialog(QDialog):
             self.status_label.setText(f"Search failed: {error}")
             return
 
-        self._results = results
         if not results:
+            self._results = []
             self.status_label.setText("No results found.")
             return
+
+        results.sort(key=self._match_rank)
+        self._results = results
 
         self.status_label.setText(f"{len(results)} result(s) found.")
         self.table.setRowCount(len(results))
@@ -190,7 +212,9 @@ class SearchLyricsDialog(QDialog):
                 kind = "Plain"
             else:
                 kind = "—"
-            self.table.setItem(row, 4, QTableWidgetItem(kind))
+            type_item = QTableWidgetItem(kind)
+            type_item.setForeground(QColor(self._TYPE_COLORS.get(kind, "#888888")))
+            self.table.setItem(row, 4, type_item)
 
     def _on_selection_changed(self):
         has_selection = bool(self.table.selectionModel().selectedRows())
