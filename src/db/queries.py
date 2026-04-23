@@ -420,8 +420,10 @@ def add_track(db: sqlite3.Connection, track: FsTrack, *, commit: bool = True) ->
     except ValueError:
         album_id = add_album(db, track.album, track.album_artist, commit=False)
 
-    # Detect instrumental
-    is_instrumental = bool(track.lrc_lyrics and re.search(r"\[au:\s*instrumental\]", track.lrc_lyrics))
+    # Detect instrumental (explicit flag from orphan reattachment, or auto-detect from LRC)
+    is_instrumental = track.instrumental or bool(
+        track.lrc_lyrics and re.search(r"\[au:\s*instrumental\]", track.lrc_lyrics)
+    )
 
     db.execute("""
         INSERT INTO tracks (
@@ -869,22 +871,25 @@ def get_orphan_lyrics_index(
     """
     if not paths:
         return {}
-    placeholders = ",".join("?" for _ in paths)
-    rows = db.execute(
-        f"""
-        SELECT t.title_lower, a.name_lower AS artist_lower,
-               t.duration, t.txt_lyrics, t.lrc_lyrics, t.instrumental
-        FROM tracks t
-        JOIN artists a ON t.artist_id = a.id
-        WHERE t.file_path IN ({placeholders})
-          AND (t.txt_lyrics IS NOT NULL OR t.lrc_lyrics IS NOT NULL OR t.instrumental = 1)
-        """,
-        paths,
-    ).fetchall()
+    _CHUNK = 900  # stay below SQLite SQLITE_MAX_VARIABLE_NUMBER (default 999)
     index: dict[tuple[str, str, int], tuple[str | None, str | None, bool]] = {}
-    for r in rows:
-        key = (r["title_lower"] or "", r["artist_lower"] or "", round(r["duration"] or 0))
-        index[key] = (r["txt_lyrics"], r["lrc_lyrics"], bool(r["instrumental"]))
+    for start in range(0, len(paths), _CHUNK):
+        chunk = paths[start:start + _CHUNK]
+        placeholders = ",".join("?" for _ in chunk)
+        rows = db.execute(
+            f"""
+            SELECT t.title_lower, a.name_lower AS artist_lower,
+                   t.duration, t.txt_lyrics, t.lrc_lyrics, t.instrumental
+            FROM tracks t
+            JOIN artists a ON t.artist_id = a.id
+            WHERE t.file_path IN ({placeholders})
+              AND (t.txt_lyrics IS NOT NULL OR t.lrc_lyrics IS NOT NULL OR t.instrumental = 1)
+            """,
+            chunk,
+        ).fetchall()
+        for r in rows:
+            key = (r["title_lower"] or "", r["artist_lower"] or "", round(r["duration"] or 0))
+            index[key] = (r["txt_lyrics"], r["lrc_lyrics"], bool(r["instrumental"]))
     return index
 
 

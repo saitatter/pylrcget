@@ -1,4 +1,5 @@
 # ui/library_scanner.py (or wherever LibraryScanner is defined)
+import dataclasses
 import logging
 import sqlite3
 import time
@@ -103,7 +104,12 @@ class LibraryScanner(QThread):
                         )
                         orphan = orphan_index.pop(key, None)
                         if orphan is not None:
-                            t.txt_lyrics, t.lrc_lyrics = orphan[0], orphan[1]
+                            t = dataclasses.replace(
+                                t,
+                                txt_lyrics=orphan[0],
+                                lrc_lyrics=orphan[1],
+                                instrumental=orphan[2],
+                            )
                             reattached += 1
                             logger.info("Reattached orphan lyrics to: %s", p)
 

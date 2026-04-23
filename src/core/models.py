@@ -37,3 +37,4 @@ class FsTrack:
     track_number: int | None
     modified_time: float | None = None
     file_size: int | None = None
+    instrumental: bool = False
