@@ -1,8 +1,10 @@
 # ui/library_scanner.py (or wherever LibraryScanner is defined)
+import logging
 import sqlite3
 import time
 from PySide6.QtCore import QThread, Signal
 
+from core.utils import prepare_input
 from library.scan_library import (
     get_audio_file_signature,
     iter_audio_paths,
@@ -12,6 +14,7 @@ from db.database import (
     add_tracks,
     delete_tracks_by_paths,
     get_library_file_index,
+    get_orphan_lyrics_index,
     prune_library,
 )
 
@@ -59,6 +62,11 @@ class LibraryScanner(QThread):
             removed_paths = [path for path in existing_index.keys() if path not in current_path_set]
             removed = len(removed_paths)
 
+            # Build orphan index *before* deleting removed tracks so we can
+            # transfer lyrics to new tracks that match by metadata.
+            orphan_index = get_orphan_lyrics_index(db, removed_paths)
+            reattached = 0
+
             batch = []
             pending_replacements: list[str] = []
             for p in paths:
@@ -86,6 +94,19 @@ class LibraryScanner(QThread):
                 )
 
                 if t is not None:
+                    # Try to reattach orphan lyrics if the new track has none
+                    if orphan_index and not t.txt_lyrics and not t.lrc_lyrics:
+                        key = (
+                            prepare_input(t.title),
+                            prepare_input(t.artist),
+                            round(t.duration),
+                        )
+                        orphan = orphan_index.pop(key, None)
+                        if orphan is not None:
+                            t.txt_lyrics, t.lrc_lyrics = orphan[0], orphan[1]
+                            reattached += 1
+                            logger.info("Reattached orphan lyrics to: %s", p)
+
                     batch.append(t)
                     updated += 1
 
@@ -110,10 +131,11 @@ class LibraryScanner(QThread):
 
             prune_library(db)
             self.progress_signal.emit(scanned, total, "", time.perf_counter() - started_at)
-            self.finished_signal.emit(
-                True,
-                f"Library scanning complete. Updated {updated}, unchanged {unchanged}, removed {removed}.",
-            )
+
+            msg = f"Library scanning complete. Updated {updated}, unchanged {unchanged}, removed {removed}."
+            if reattached:
+                msg += f" Reattached lyrics for {reattached} moved file(s)."
+            self.finished_signal.emit(True, msg)
         except Exception as e:
             self.finished_signal.emit(False, f"Scan failed: {e}")
         finally:

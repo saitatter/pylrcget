@@ -859,6 +859,35 @@ def delete_tracks_by_paths(db: sqlite3.Connection, paths: list[str], *, commit: 
         db.commit()
 
 
+def get_orphan_lyrics_index(
+    db: sqlite3.Connection, paths: list[str],
+) -> dict[tuple[str, str, int], tuple[str | None, str | None, bool]]:
+    """Return a match-key → (txt_lyrics, lrc_lyrics, instrumental) dict
+    for tracks at *paths* that carry lyrics or instrumental flag.
+
+    Match key is (title_lower, artist_name_lower, duration_rounded_int).
+    """
+    if not paths:
+        return {}
+    placeholders = ",".join("?" for _ in paths)
+    rows = db.execute(
+        f"""
+        SELECT t.title_lower, a.name_lower AS artist_lower,
+               t.duration, t.txt_lyrics, t.lrc_lyrics, t.instrumental
+        FROM tracks t
+        JOIN artists a ON t.artist_id = a.id
+        WHERE t.file_path IN ({placeholders})
+          AND (t.txt_lyrics IS NOT NULL OR t.lrc_lyrics IS NOT NULL OR t.instrumental = 1)
+        """,
+        paths,
+    ).fetchall()
+    index: dict[tuple[str, str, int], tuple[str | None, str | None, bool]] = {}
+    for r in rows:
+        key = (r["title_lower"] or "", r["artist_lower"] or "", round(r["duration"] or 0))
+        index[key] = (r["txt_lyrics"], r["lrc_lyrics"], bool(r["instrumental"]))
+    return index
+
+
 def prune_library(db: sqlite3.Connection) -> None:
     db.execute("DELETE FROM albums WHERE NOT EXISTS (SELECT 1 FROM tracks WHERE tracks.album_id = albums.id)")
     db.execute("DELETE FROM artists WHERE NOT EXISTS (SELECT 1 FROM tracks WHERE tracks.artist_id = artists.id)")
