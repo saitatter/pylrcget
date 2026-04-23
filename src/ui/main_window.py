@@ -1284,7 +1284,7 @@ class MainWindow(QMainWindow):
 
     # --- Window state persistence ---
     def _get_settings(self) -> QSettings:
-        return QSettings("pylrcget", "pylrcget")
+        return QSettings("PyLrcGet", "PyLrcGet")
 
     def _save_window_state(self):
         s = self._get_settings()
