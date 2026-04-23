@@ -118,6 +118,8 @@ class MainWindow(QMainWindow):
         QShortcut(QKeySequence("Enter"), self, activated=self._play_selected_or_current)
         QShortcut(QKeySequence("Ctrl+Right"), self, activated=self.play_next)
         QShortcut(QKeySequence("Ctrl+Left"), self, activated=self.play_prev)
+        QShortcut(QKeySequence.StandardKey.Save, self, activated=self._save_active_lyrics)
+        QShortcut(QKeySequence.StandardKey.Find, self, activated=self._focus_search)
 
         self.central_widget = QWidget()
         self.setCentralWidget(self.central_widget)
@@ -1190,6 +1192,25 @@ class MainWindow(QMainWindow):
             )
             for view in self._all_lyrics_views():
                 view.set_export_feedback("error", "Export Failed")
+
+    def _save_active_lyrics(self):
+        """Ctrl+S: trigger save on the currently visible lyrics editor."""
+        current = self.tabs.currentWidget()
+        if current is self.tracks_tab:
+            view = self.lyrics_view
+        elif current is self.albums_page:
+            view = self.albums_lyrics_view
+        elif current is self.artists_page:
+            view = self.artists_lyrics_view
+        else:
+            return
+        if view.btn_save.isEnabled():
+            view._emit_save()
+
+    def _focus_search(self):
+        """Ctrl+F: focus the search box."""
+        self.top_bar.search_box.setFocus()
+        self.top_bar.search_box.selectAll()
 
     def _all_lyrics_views(self) -> list[LyricsEditorWidget]:
         return [self.lyrics_view, self.albums_lyrics_view, self.artists_lyrics_view]
