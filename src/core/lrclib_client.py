@@ -71,7 +71,7 @@ def _raise_for_status(response: requests.Response) -> None:
     if code == 429:
         raise RateLimitError(code, reason, message)
     if code == 400:
-        raise IncorrectPublishTokenError(code, reason, message)
+        raise IncorrectPublishTokenError(code, reason, message) if "token" in message.lower() else LrcLibError(code, reason, message)
     if 500 <= code < 600:
         raise ServerError(code, reason, message)
     raise LrcLibError(code, reason, message)

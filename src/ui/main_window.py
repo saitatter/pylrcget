@@ -456,8 +456,8 @@ class MainWindow(QMainWindow):
         event.acceptProposedAction()
 
         existing = get_directories(self.app_state.db)
-        existing_set = {os.path.normpath(d) for d in existing}
-        new_dirs = [d for d in dropped_dirs if d not in existing_set]
+        existing_set = {os.path.normcase(os.path.normpath(d)) for d in existing}
+        new_dirs = [d for d in dropped_dirs if os.path.normcase(os.path.normpath(d)) not in existing_set]
 
         if not new_dirs:
             notify_user(

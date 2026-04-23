@@ -711,7 +711,10 @@ class LyricsEditorWidget(QWidget):
         for row in reversed(rows):
             self.table.removeRow(row)
         self.table.blockSignals(False)
-        self._invalid_rows.clear()
+        self._invalid_rows = {
+            r for r in range(self.table.rowCount())
+            if self.table.item(r, 0) and self.table.item(r, 0).data(TIMESTAMP_VALID_ROLE) is False
+        }
         self._rebuild_times_cache()
         if self._invalid_rows:
             next_row = min(self._invalid_rows)
