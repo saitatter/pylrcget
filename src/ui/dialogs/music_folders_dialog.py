@@ -240,6 +240,23 @@ class MusicFoldersDialog(QDialog):
         reaction_hint.setWordWrap(True)
         embed_layout.addWidget(reaction_hint, 2, 0, 1, 2)
         lyrics_tab_layout.addWidget(embed_box)
+
+        lrclib_box = QGroupBox("LRCLIB")
+        lrclib_layout = QGridLayout(lrclib_box)
+        self.lrclib_instance_edit = QLineEdit()
+        self.lrclib_instance_edit.setPlaceholderText("https://lrclib.net")
+        lrclib_layout.addWidget(QLabel("Server URL"), 0, 0)
+        lrclib_layout.addWidget(self.lrclib_instance_edit, 0, 1)
+        self.lrclib_reset_btn = QPushButton("Reset to Default")
+        lrclib_layout.addWidget(self.lrclib_reset_btn, 0, 2)
+        lrclib_hint = QLabel(
+            "The LRCLIB server used for downloading and publishing lyrics. "
+            "Leave empty to use the default public server (lrclib.net)."
+        )
+        lrclib_hint.setWordWrap(True)
+        lrclib_layout.addWidget(lrclib_hint, 1, 0, 1, 3)
+        lyrics_tab_layout.addWidget(lrclib_box)
+
         lyrics_tab_layout.addStretch(1)
 
         self.tabs.addTab(library_tab, "Library")
@@ -265,6 +282,7 @@ class MusicFoldersDialog(QDialog):
         self.remove_excluded_path_btn.clicked.connect(self._remove_selected_excluded_path_lines)
         self.test_exclusions_btn.clicked.connect(self._test_exclusions)
         self.excluded_patterns_edit.textChanged.connect(self._validate_regex_patterns)
+        self.lrclib_reset_btn.clicked.connect(lambda: self.lrclib_instance_edit.setText(""))
 
     def _load(self):
         self.list_widget.clear()
@@ -290,6 +308,8 @@ class MusicFoldersDialog(QDialog):
         self.lookup_subdir_edit.setText(config.lyrics_lookup_subdir or "")
         self.embed_chk.setChecked(config.try_embed_lyrics)
         self.reaction_delay_spin.setValue(int(config.reaction_delay_ms or 0))
+        lrclib_url = (config.lrclib_instance or "").strip()
+        self.lrclib_instance_edit.setText("" if lrclib_url == "https://lrclib.net" else lrclib_url)
         self.excluded_paths_edit.setPlainText(config.scan_excluded_paths)
         self.excluded_patterns_edit.setPlainText(config.scan_excluded_patterns)
         directories = get_directories(self.app_state.db)
@@ -567,6 +587,7 @@ class MusicFoldersDialog(QDialog):
             scan_excluded_paths=self.excluded_paths_edit.toPlainText().strip(),
             scan_excluded_patterns=self.excluded_patterns_edit.toPlainText().strip(),
             reaction_delay_ms=int(self.reaction_delay_spin.value()),
+            lrclib_instance=self.lrclib_instance_edit.text().strip() or "https://lrclib.net",
         )
 
         set_directories(self.app_state.db, folders)
