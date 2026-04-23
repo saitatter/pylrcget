@@ -182,6 +182,10 @@ class MainWindow(QMainWindow):
 
         splitter.setStretchFactor(0, 3)
         splitter.setStretchFactor(1, 2)
+        splitter.setCollapsible(0, False)
+        splitter.setCollapsible(1, False)
+        self.track_list.setMinimumWidth(300)
+        self.lyrics_view.setMinimumWidth(280)
 
         tracks_layout.addWidget(splitter)
 
@@ -201,6 +205,10 @@ class MainWindow(QMainWindow):
         self.albums_splitter.addWidget(self.albums_lyrics_view)
         self.albums_splitter.setStretchFactor(0, 3)
         self.albums_splitter.setStretchFactor(1, 2)
+        self.albums_splitter.setCollapsible(0, False)
+        self.albums_splitter.setCollapsible(1, False)
+        self.albums_tab.setMinimumWidth(300)
+        self.albums_lyrics_view.setMinimumWidth(280)
         albums_layout.addWidget(self.albums_splitter)
 
         self.artists_tab = ArtistListWidget(self.app_state)
@@ -219,6 +227,10 @@ class MainWindow(QMainWindow):
         self.artists_splitter.addWidget(self.artists_lyrics_view)
         self.artists_splitter.setStretchFactor(0, 3)
         self.artists_splitter.setStretchFactor(1, 2)
+        self.artists_splitter.setCollapsible(0, False)
+        self.artists_splitter.setCollapsible(1, False)
+        self.artists_tab.setMinimumWidth(300)
+        self.artists_lyrics_view.setMinimumWidth(280)
         artists_layout.addWidget(self.artists_splitter)
 
         self.mylrclib_tab = MyLrclibWidget(self.app_state)
@@ -1153,11 +1165,11 @@ class MainWindow(QMainWindow):
             if width < 980:
                 if self.content_splitter.orientation() != Qt.Orientation.Vertical:
                     self.content_splitter.setOrientation(Qt.Orientation.Vertical)
-                self.content_splitter.setSizes([int(self.height() * 0.54), int(self.height() * 0.46)])
+                    self.content_splitter.setSizes([int(self.height() * 0.54), int(self.height() * 0.46)])
             else:
                 if self.content_splitter.orientation() != Qt.Orientation.Horizontal:
                     self.content_splitter.setOrientation(Qt.Orientation.Horizontal)
-                self.content_splitter.setSizes([int(width * 0.58), int(width * 0.42)])
+                    self.content_splitter.setSizes([int(width * 0.58), int(width * 0.42)])
 
         for splitter_name in ("albums_splitter", "artists_splitter"):
             splitter = getattr(self, splitter_name, None)
@@ -1166,11 +1178,11 @@ class MainWindow(QMainWindow):
             if width < 980:
                 if splitter.orientation() != Qt.Orientation.Vertical:
                     splitter.setOrientation(Qt.Orientation.Vertical)
-                splitter.setSizes([int(self.height() * 0.54), int(self.height() * 0.46)])
+                    splitter.setSizes([int(self.height() * 0.54), int(self.height() * 0.46)])
             else:
                 if splitter.orientation() != Qt.Orientation.Horizontal:
                     splitter.setOrientation(Qt.Orientation.Horizontal)
-                splitter.setSizes([int(width * 0.58), int(width * 0.42)])
+                    splitter.setSizes([int(width * 0.58), int(width * 0.42)])
 
         if hasattr(self, "player_bar"):
             self.player_bar.set_compact_mode(width < 980)
