@@ -1,305 +1,155 @@
 # PyLrcGet
 
-A desktop-native reimplementation of **LRCGET** focused on **local library browsing**, **lyrics editing**, **playback**, and **LRCLIB integration**.
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+![GitHub Release](https://img.shields.io/github/v/release/saitatter/pylrcget)
+[![Issues](https://img.shields.io/github/issues/saitatter/pylrcget)](https://github.com/saitatter/pylrcget/issues)
+![Made with Python](https://img.shields.io/badge/Made%20with-Python-3776AB?logo=python&logoColor=white)
+![PySide6](https://img.shields.io/badge/PySide6-Qt-41CD52?logo=qt&logoColor=white)
+![SQLite](https://img.shields.io/badge/SQLite-003B57?logo=sqlite&logoColor=white)
+![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)
 
-PyLrcGet goes beyond bulk lyric downloads and turns the app into a full desktop workflow for:
+> Desktop-native lyrics manager and player with local library browsing, editing, playback, and **LRCLIB** integration.
 
-- scanning local music folders
-- downloading and editing synced or plain lyrics
-- saving sidecar lyric files
-- embedding lyrics into audio files
-- publishing lyrics back to LRCLIB
-
----
-
-## Highlights
-
-### Integrated player
-
-- native desktop playback with PySide6 / Qt
-- play / pause / seek
-- previous / next track
-- queue based on the current visible track list
-- adjustable playback speed, including custom values
-- playback volume control with mute-safe persistence across sessions
-- keyboard shortcuts such as `Space`, `Enter`, `Ctrl+Left`, `Ctrl+Right`
-
-### Lyrics workflow
-
-- synced lyrics (`.lrc`) and plain lyrics support
-- configurable download modes for `Prefer synced`, `Synced only`, and `Plain only`
-- bulk `Download missing lyrics` action based on the active download mode
-- per-selection download overrides from the track context menu
-- real-time synced lyrics editor
-- per-line snapping while audio is playing
-- configurable reaction delay for timestamping
-- shift selected lines by preset or custom time offsets
-- shift the entire lyric sheet from the first line based on the current playback position
-- live lyric highlighting during playback
-- explicit `Export Files` action for generating sidecar lyrics from local / embedded lyrics
-- publish synced or plain lyrics to LRCLIB
-
-### Library workflow
-
-- recursive library scan into a local SQLite database
-- incremental refresh using per-file signature checks (`mtime` + `size`)
-- scan exclusion rules by path and regex
-- automatic re-scan after changing library folders in Settings
-- drilldown browsing for `Tracks`, `Albums`, and `Artists`
-- breadcrumb-based navigation across library views
-
-### Export and embedding
-
-- configurable lyric export directory
-- configurable filename pattern using placeholders
-- opt-in sidecar export (`.lrc` / `.txt`)
-- opt-in embedding into supported audio formats
-
-### Desktop UI
-
-- PySide6 / Qt desktop UI
-- multiple built-in themes
-- clickable artist / album navigation from the player bar and track list
-- native Windows file dialogs for better mapped-drive and network-share support
-- built-in log panel with live filtering, copy/save actions, and on-disk log files
-- in-app update checker with release notes, download links, and packaged-build installer launch support
+PyLrcGet goes beyond bulk lyric downloads and turns the app into a full desktop workflow for scanning local music folders, downloading and editing synced or plain lyrics, saving sidecar lyric files, embedding lyrics into audio files, and publishing lyrics back to LRCLIB.
 
 ---
 
-## Supported Audio Formats
+## ✨ Features
 
-The library scanner currently detects these formats:
+### 🎵 Integrated Player
 
-- MP3
-- M4A
-- FLAC
-- OGG / OGA
-- OPUS
-- WAV
-- WMA
-- ASF
-- DSF
-- DFF
-- MPC / Musepack
+- Native desktop playback with PySide6 / Qt
+- Play / pause / seek / previous / next track
+- Queue based on the current visible track list
+- Adjustable playback speed, including custom values
+- Playback volume control with mute-safe persistence across sessions
+- Keyboard shortcuts: `Space`, `Enter`, `Ctrl+Left`, `Ctrl+Right`
 
-Notes:
+### 📝 Lyrics Workflow
 
-- playback support still depends on the active playback backend and codecs available on the system
-- lyric embedding support is broader than playback support for some formats
+- Synced lyrics (`.lrc`) and plain lyrics support
+- Configurable download modes: `Prefer synced`, `Synced only`, `Plain only`
+- Bulk `Download missing lyrics` action based on the active download mode
+- Per-selection download overrides from the track context menu
+- Real-time synced lyrics editor with per-line snapping while audio is playing
+- Configurable reaction delay for timestamping
+- Shift selected lines by preset or custom time offsets
+- Shift the entire lyric sheet from the first line based on the current playback position
+- Live lyric highlighting during playback
+- Explicit `Export Files` action for generating sidecar lyrics from local / embedded lyrics
+- Publish synced or plain lyrics to LRCLIB
 
----
+### 📚 Library
 
-## Lyrics Read / Write Support
+- Recursive library scan into a local SQLite database
+- Incremental refresh using per-file signature checks (`mtime` + `size`)
+- Scan exclusion rules by path and regex
+- Automatic re-scan after changing library folders in Settings
+- Drilldown browsing for `Tracks`, `Albums`, and `Artists`
+- Breadcrumb-based navigation across library views
 
-The app can read lyrics from embedded tags and sidecar files, then save them back as sidecars and, for supported formats, embed them into the audio file.
+### 💾 Export & Embedding
 
-Embedded lyric handling is implemented for:
+- Configurable lyric export directory
+- Configurable filename pattern using placeholders (`{filename}`, `{artist}`, `{title}`, `{album}`, `{track}`)
+- Opt-in sidecar export (`.lrc` / `.txt`)
+- Opt-in embedding into supported audio formats
 
-- MP3
-- FLAC
-- M4A / MP4
-- OGG Vorbis
-- OPUS
-- WMA / ASF
-- DSF
-- DFF
-- MPC / Musepack
+### 🎨 Desktop UI
 
-Sidecar lyric export supports:
-
-- `.lrc`
-- `.txt`
-
-Filename pattern placeholders:
-
-- `{filename}`
-- `{artist}`
-- `{title}`
-- `{album}`
-- `{track}`
+- PySide6 / Qt desktop UI with multiple built-in themes
+- Clickable artist / album navigation from the player bar and track list
+- Native Windows file dialogs for better mapped-drive and network-share support
+- Built-in log panel with live filtering, copy/save actions, and on-disk log files
+- In-app update checker with release notes, download links, and installer launch support
 
 ---
 
-## Settings
+## 🎧 Supported Audio Formats
 
-The Settings dialog is organized by category and includes:
+| Format | Library Scan | Lyrics Read/Write | Sidecar Export |
+|--------|:---:|:---:|:---:|
+| MP3 | ✅ | ✅ | ✅ |
+| M4A / MP4 | ✅ | ✅ | ✅ |
+| FLAC | ✅ | ✅ | ✅ |
+| OGG / OGA | ✅ | ✅ | ✅ |
+| OPUS | ✅ | ✅ | ✅ |
+| WMA / ASF | ✅ | ✅ | ✅ |
+| DSF | ✅ | ✅ | ✅ |
+| DFF | ✅ | ✅ | ✅ |
+| MPC / Musepack | ✅ | ✅ | ✅ |
+| WAV | ✅ | — | ✅ |
 
-### Library
-
-- music folders
-- excluded paths
-- excluded regex patterns
-- exclusion preview / test
-- automatic library refresh after folder changes
-
-### Lyrics
-
-- download mode:
-  - `Prefer synced, fallback to plain`
-  - `Synced only`
-  - `Plain only`
-- save lyrics files
-- embed lyrics into audio files
-- download directory
-- filename pattern with live preview
-- reaction delay
-- shift selected lines by preset or custom offset
-- shift all lines from the first timestamp anchor
-
-### Appearance
-
-- theme selection
-- UI scale (`90%`, `100%`, `110%`, `125%`)
-- font size (`Small`, `Normal`, `Large`)
-- album art visibility toggle (`Show` / `Hide`)
-- startup view (`Remember last view`, `Tracks`, `Albums`, `Artists`, `My LRCLIB`)
-
-### Updates
-
-- in-app `About` dialog with version info and update check
-- latest GitHub release comparison against the running build
-- release notes / changelog preview before updating
-- `Open release page`, `Download update`, and packaged-build `Install update` actions when supported
+> **Note:** Playback support depends on the active playback backend and codecs available on the system. Lyric embedding support is broader than playback support for some formats.
 
 ---
 
-## Download Modes
+## ⚙️ Settings
 
-Lyrics downloads can be configured in three modes:
-
-- `Prefer synced, fallback to plain`
-  - the app tries to download synced lyrics first
-  - if no synced lyrics exist, it saves plain lyrics instead
-- `Synced only`
-  - the app saves only synced lyrics
-  - plain-only matches are skipped
-- `Plain only`
-  - the app saves only plain lyrics
-  - if LRCLIB only returns synced lyrics, the app derives plain text by stripping timestamps
-
-The track context menu also supports temporary mode overrides for the current selection:
-
-- `Download selection using current mode`
-- `Download selection as synced only`
-- `Download selection as plain only`
-
-The `Tracks` table also color-codes lyric state for faster scanning:
-
-- red for `No lyrics`
-- orange for `Plain`
-- green for `Synced`
-- blue for `Instrumental`
-
-### Download Missing Lyrics
-
-The global `Download missing lyrics` action respects the active download mode:
-
-- in `Prefer synced, fallback to plain`, a track is considered missing if it has no synced lyrics yet
-- in `Synced only`, a track is considered missing if it has no synced lyrics
-- in `Plain only`, a track is considered missing if it has no plain lyrics
-
-This means the bulk action can be used not only to fill empty tracks, but also to upgrade plain-only tracks to synced lyrics when synced lyrics become available.
+| Category | Options |
+|----------|---------|
+| **Library** | Music folders, excluded paths, excluded regex patterns, exclusion preview/test, auto-refresh after folder changes |
+| **Lyrics** | Download mode, save lyrics files, embed lyrics, download directory, filename pattern with live preview, reaction delay, line shift presets |
+| **Appearance** | Theme selection, UI scale (90–125%), font size (Small/Normal/Large), album art toggle, startup view |
+| **Updates** | In-app version check, release notes preview, download/install actions |
 
 ---
 
-## Navigation
+## 🔄 Download Modes
 
-Library navigation is route-based and supports:
+| Mode | Behavior |
+|------|----------|
+| **Prefer synced, fallback to plain** | Tries synced first, saves plain if synced unavailable |
+| **Synced only** | Saves only synced lyrics, skips plain-only matches |
+| **Plain only** | Saves only plain lyrics, derives plain from synced by stripping timestamps if needed |
 
-- drilldown browsing inside `Albums` and `Artists`
-- breadcrumb navigation
-- restoring the last library route between sessions
+The track context menu supports temporary mode overrides for the current selection. The `Tracks` table color-codes lyric state: 🔴 No lyrics · 🟠 Plain · 🟢 Synced · 🔵 Instrumental.
 
-Unknown metadata buckets are normalized as `N/A` in the UI.
-
-`My LRCLIB` also includes local history views for:
-
-- published lyrics from this app
-- lyrics download history with per-track outcome details
+The global `Download missing lyrics` action can also upgrade plain-only tracks to synced when synced lyrics become available on LRCLIB.
 
 ---
 
-## Diagnostics
+## 🧭 Navigation
 
-The desktop app includes built-in diagnostics features:
+- Route-based drilldown inside `Albums` and `Artists`
+- Breadcrumb navigation with session restore
+- Unknown metadata normalized as `N/A`
+- `My LRCLIB` views for published lyrics and download history
 
-- a toggleable in-app `Logs` panel
-- level filters for `INFO`, `WARNING`, and `ERROR`
+---
+
+## 🔍 Diagnostics
+
+- Toggleable in-app `Logs` panel with level filters (`INFO`, `WARNING`, `ERROR`)
 - `Copy`, `Save`, and `Open Folder` actions for logs
-- automatic log panel opening for errors
-- rotating log files stored in the app data directory
-
-Important errors can also surface as toast notifications so they are harder to miss.
-
-Bulk lyrics downloads also show a dedicated progress overlay with:
-
-- current track and live status messages
-- per-track success / failure results
-- cancel support
-- session summary when the batch completes
-
-Download history is also persisted locally so recent batch outcomes remain visible after the overlay closes.
+- Automatic log panel opening for errors
+- Toast notifications for important errors
+- Rotating log files stored in the app data directory
+- Dedicated progress overlay for bulk downloads with per-track results, cancel support, and session summary
 
 ---
 
-## Performance Notes
+## ⚡ Performance
 
-Recent performance-focused improvements include:
-
-- incremental library refreshes using stored file signatures
-- batched DB updates during scan
-- path and regex exclusion pruning during scan
-- debounced search input
-- incremental UI loading for large `Tracks`, `Albums`, and `Artists` lists
+- Incremental library refreshes using stored file signatures
+- Batched DB updates during scan
+- Path and regex exclusion pruning during scan
+- Debounced search input
+- Incremental UI loading for large track/album/artist lists
 - DB indexes for common browsing filters
 
 ---
 
-## Releases
+## 🚀 Quick Start
 
-This repository includes GitHub Actions automation for:
+### Run from source
 
-- building standalone executables for Windows, Linux, and macOS via PyInstaller
-- creating semantic versions and GitHub releases with `python-semantic-release`
-- generating release notes from Conventional Commits
-- uploading built artifacts to GitHub Releases
+```bash
+python -m pip install -r requirements.txt
+python main.py
+```
 
-### Commit format
-
-Use Conventional Commits, for example:
-
-- `feat: add lyrics export action`
-- `fix: prevent slider jump while seeking`
-- `chore: update workflow dependencies`
-
-Use `!` or a `BREAKING CHANGE:` footer for breaking changes.
-
-### Release flow
-
-1. Merge Conventional Commits into `main`.
-2. The release workflow runs on pushes to `main`.
-3. If a version bump is needed, semantic-release creates the tag and GitHub release.
-4. Build artifacts are attached to that release.
-
-### Windows note
-
-Windows release builds are currently unsigned.
-
-On Windows 11, SmartScreen or Defender may show a warning before launch, especially on newly downloaded builds. If you trust the release source, you can usually continue through `More info` -> `Run anyway`.
-
-### In-app updates
-
-The desktop app can check GitHub Releases for newer versions directly from the `About` dialog.
-
-- source checkouts can view release notes and open / download the latest release
-- packaged builds can launch platform installers from the dialog when a supported asset is published
-- Windows auto-install expects `pylrcget-windows-installer.exe`
-- macOS supports installer launch for `.dmg` and `.pkg` assets
-- Linux supports installer launch for `.AppImage`, `.deb`, and `.rpm` assets
-- local feed testing supports `PYLRCGET_UPDATE_LATEST_URL` and `PYLRCGET_UPDATE_DEBUG` environment overrides
-
----
-## Local Build
+### Build standalone executable
 
 ```bash
 python -m pip install -r requirements.txt pyinstaller
@@ -308,19 +158,60 @@ pyinstaller --noconfirm pylrcget.spec
 
 The generated executable is placed in `dist/`.
 
-Note: the app falls back to Qt Multimedia when `mpv` is unavailable, so packaged builds remain usable without an external `mpv` binary.
+> **Note:** The app falls back to Qt Multimedia when `mpv` is unavailable, so packaged builds remain usable without an external `mpv` binary.
 
 ---
 
-## Status
+## 🔄 Releases
 
-- core desktop workflow is implemented
-- actively evolving
-- designed for extensibility around themes, navigation, scanning, and lyrics workflows
+Uses **semantic-release** with Conventional Commits. On every push to `main`, CI checks if a new version should be published.
+
+- Use Conventional Commits: `feat: ...`, `fix: ...`, `chore: ...`
+- Breaking changes: use `!` or a `BREAKING CHANGE:` footer
+- Build artifacts for Windows, Linux, and macOS are attached to GitHub Releases
+
+### 🛡️ Windows note
+
+Windows release builds are currently unsigned. SmartScreen may show a warning on newly downloaded builds — continue through `More info` → `Run anyway` if you trust the release source.
+
+### 📦 In-app updates
+
+The `About` dialog checks GitHub Releases for newer versions:
+
+| Platform | Supported assets |
+|----------|-----------------|
+| Windows | `pylrcget-windows-installer.exe` (Inno Setup) |
+| macOS | `.dmg`, `.pkg` |
+| Linux | `.AppImage`, `.deb`, `.rpm` |
+
+Local feed testing is supported via `PYLRCGET_UPDATE_LATEST_URL` and `PYLRCGET_UPDATE_DEBUG` environment overrides.
 
 ---
 
-## Credits
+## 🛠 Troubleshooting
+
+- **SmartScreen warning on Windows** — See [Windows note](#️-windows-note) above.
+- **No lyrics found** — Verify track metadata (title, artist) matches LRCLIB entries.
+- **Playback not working for a format** — Check that the required codec is available on your system.
+- **Update installer not launching** — Ensure you confirm the administrator/UAC prompt when it appears.
+
+---
+
+## 🤝 Contributing
+
+PRs are welcome! Please:
+- Keep commits small and conventional.
+- Run `python -m pytest tests/` before submitting.
+
+---
+
+## 📄 License
+
+MIT © saitatter
+
+---
+
+## 🙏 Credits
 
 - Original idea and LRCLIB ecosystem: **tranxuanthang / LRCGET**
 - This project is an independent desktop reimplementation, not a fork of the original codebase

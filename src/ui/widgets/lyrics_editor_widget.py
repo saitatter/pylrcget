@@ -7,7 +7,7 @@ from bisect import bisect_right
 from typing import List, Optional, Tuple
 
 from PySide6.QtCore import Qt, Signal, QTimer
-from PySide6.QtGui import QColor
+from PySide6.QtGui import QColor, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QStackedWidget,
     QTextEdit, QTableWidget, QTableWidgetItem,
@@ -77,7 +77,7 @@ def _parse_ts_str(ts: str) -> Optional[int]:
     # reuse _ts_to_ms frac logic: but it expects strings
     try:
         return _ts_to_ms(mm, ss, frac)
-    except Exception:
+    except (ValueError, TypeError):
         return None
 
 
@@ -138,6 +138,7 @@ class LyricsEditorWidget(QWidget):
     publishPlainRequested = Signal()
     saveRequested = Signal(str, str)     # lrc_text, plain_text
     downloadRequested = Signal()
+    searchRequested = Signal()
     exportFilesRequested = Signal()
 
     def __init__(self, parent=None):
@@ -153,6 +154,10 @@ class LyricsEditorWidget(QWidget):
         self._reaction_delay_ms: int = 0
         self._current_position_provider = None
 
+        # Snapshot-based undo/redo for the synced table editor
+        self._undo_stack: list[list[tuple[int, str]]] = []
+        self._redo_stack: list[list[tuple[int, str]]] = []
+
         root = QVBoxLayout(self)
         set_layout_spacing(root, margins=SPACE_3, spacing=SPACE_2)
 
@@ -166,20 +171,30 @@ class LyricsEditorWidget(QWidget):
         header.addWidget(self.title, 1)
 
         self.btn_snap = QPushButton("Snap")
+        self.btn_snap.setToolTip("Set the selected line's timestamp to the current playback position")
         self.btn_shift_minus = QPushButton("-0.1s")
+        self.btn_shift_minus.setToolTip("Shift selected lines 100ms earlier")
         self.btn_shift_plus = QPushButton("+0.1s")
+        self.btn_shift_plus.setToolTip("Shift selected lines 100ms later")
         self.shift_spin = QDoubleSpinBox()
         self.shift_spin.setRange(-30.0, 30.0)
         self.shift_spin.setDecimals(2)
         self.shift_spin.setSingleStep(0.05)
         self.shift_spin.setValue(0.10)
         self.shift_spin.setSuffix(" s")
+        self.shift_spin.setToolTip("Custom shift amount in seconds")
         self.btn_shift_selected = QPushButton("Shift Selected")
+        self.btn_shift_selected.setToolTip("Shift selected lines by the custom amount")
         self.btn_shift_all_from_first = QPushButton("Shift All from First")
+        self.btn_shift_all_from_first.setToolTip("Align all lines so the first line matches the current playback position")
         self.btn_add = QPushButton("+ Line")
+        self.btn_add.setToolTip("Insert a new line after the current selection")
         self.btn_del = QPushButton("Delete")
+        self.btn_del.setToolTip("Delete the selected line")
         self.btn_save = QPushButton("Save")
+        self.btn_save.setToolTip("Save lyrics to the library (Ctrl+S)")
         self.btn_export_files = QPushButton("Export Files")
+        self.btn_export_files.setToolTip("Export .lrc and .txt sidecar files next to the audio file")
 
         self.btn_snap.setEnabled(False)
         self.btn_shift_minus.setEnabled(False)
@@ -214,7 +229,9 @@ class LyricsEditorWidget(QWidget):
         header.addWidget(self.btn_export_files)
 
         self.btn_publish_synced = QPushButton("Publish Synced")
+        self.btn_publish_synced.setToolTip("Publish synced (LRC) lyrics to LRCLIB")
         self.btn_publish_plain = QPushButton("Publish Plain")
+        self.btn_publish_plain.setToolTip("Publish plain text lyrics to LRCLIB")
         self.btn_publish_synced.setEnabled(False)
         self.btn_publish_plain.setEnabled(False)
         self.btn_publish_synced.clicked.connect(lambda: self.publishSyncedRequested.emit())
@@ -236,6 +253,8 @@ class LyricsEditorWidget(QWidget):
 
         self.empty_state = EmptyStateWidget()
         self.empty_state.actionTriggered.connect(self.downloadRequested.emit)
+        self.empty_state.secondaryActionTriggered.connect(self.searchRequested.emit)
+        self.empty_state.tertiaryActionTriggered.connect(self._start_writing_lyrics)
         self.stack.addWidget(self.empty_state)
 
         # Plain editor (editable if you want)
@@ -259,6 +278,12 @@ class LyricsEditorWidget(QWidget):
         self.table.horizontalHeader().setStretchLastSection(True)
 
         self.stack.addWidget(self.table)
+
+        # Undo/redo shortcuts for the synced table
+        self._shortcut_undo = QShortcut(QKeySequence.StandardKey.Undo, self)
+        self._shortcut_undo.activated.connect(self._undo)
+        self._shortcut_redo = QShortcut(QKeySequence.StandardKey.Redo, self)
+        self._shortcut_redo.activated.connect(self._redo)
 
         self._default_button_text = {
             self.btn_save: "Save",
@@ -361,8 +386,10 @@ class LyricsEditorWidget(QWidget):
             self.empty_state.configure(
                 icon_name="audio-lines.svg",
                 title="No lyrics available yet",
-                body="Download lyrics from LRCLIB to start editing, or leave this track lyric-free.",
+                body="Download lyrics from LRCLIB to start editing, or search manually.",
                 action_text="Download Lyrics",
+                secondary_action_text="Search LRCLIB",
+                tertiary_action_text="Write Lyrics",
             )
             self.stack.setCurrentWidget(self.empty_state)
 
@@ -373,6 +400,8 @@ class LyricsEditorWidget(QWidget):
         self._publish_synced_available = False
         self._publish_plain_available = False
         self._invalid_rows.clear()
+        self._undo_stack.clear()
+        self._redo_stack.clear()
         self.table.blockSignals(True)
         self.table.setRowCount(0)
         self.table.blockSignals(False)
@@ -406,6 +435,80 @@ class LyricsEditorWidget(QWidget):
         self.btn_shift_selected.setEnabled(False)
         self.btn_shift_all_from_first.setEnabled(False)
         self.btn_export_files.setEnabled(True)
+
+    def _start_writing_lyrics(self):
+        """Switch to an empty plain editor so the user can write lyrics from scratch."""
+        self._set_plain("")
+        self.plain.setFocus()
+
+    # --- Undo / Redo (snapshot-based for synced table) ---
+    def _take_snapshot(self) -> list[tuple[int, str]]:
+        """Capture all (ms, text) pairs from the synced table."""
+        pairs: list[tuple[int, str]] = []
+        for r in range(self.table.rowCount()):
+            it_time = self.table.item(r, 0)
+            it_text = self.table.item(r, 1)
+            ms = int(it_time.data(TIMESTAMP_MS_ROLE) or 0) if it_time else 0
+            text = it_text.text() if it_text else ""
+            pairs.append((ms, text))
+        return pairs
+
+    def _push_undo(self):
+        """Save current state to undo stack before a mutating operation."""
+        if self.stack.currentWidget() is not self.table:
+            return
+        self._undo_stack.append(self._take_snapshot())
+        self._redo_stack.clear()
+        # Cap undo stack at 50 levels
+        if len(self._undo_stack) > 50:
+            self._undo_stack.pop(0)
+
+    def _restore_snapshot(self, pairs: list[tuple[int, str]]):
+        """Restore the synced table from a snapshot."""
+        self.table.blockSignals(True)
+        self.table.setRowCount(len(pairs))
+        self._times = []
+        self._invalid_rows.clear()
+        for row, (ms, text) in enumerate(pairs):
+            it_time = QTableWidgetItem(_ms_to_ts(ms))
+            it_time.setData(TIMESTAMP_MS_ROLE, ms)
+            it_time.setData(TIMESTAMP_VALID_ROLE, True)
+            it_time.setFlags(it_time.flags() | Qt.ItemIsEditable)
+            it_text = QTableWidgetItem(text)
+            it_text.setFlags(it_text.flags() | Qt.ItemIsEditable)
+            self.table.setItem(row, 0, it_time)
+            self.table.setItem(row, 1, it_text)
+            self._times.append(ms)
+        self.table.blockSignals(False)
+        self._rebuild_times_cache()
+        self._update_save_enabled()
+        self._refresh_row_styles()
+
+    def _undo(self):
+        if self.stack.currentWidget() is self.plain:
+            self.plain.undo()
+            return
+        if self.stack.currentWidget() is not self.table:
+            return
+        if not self._undo_stack:
+            return
+        self._redo_stack.append(self._take_snapshot())
+        snapshot = self._undo_stack.pop()
+        self._restore_snapshot(snapshot)
+        self._set_validation_message("Undo", state="success")
+
+    def _redo(self):
+        if self.stack.currentWidget() is self.plain:
+            self.plain.redo()
+            return
+        if self.stack.currentWidget() is not self.table:
+            return
+        if not self._redo_stack:
+            return
+        self._undo_stack.append(self._take_snapshot())
+        snapshot = self._redo_stack.pop()
+        self._restore_snapshot(snapshot)
+        self._set_validation_message("Redo", state="success")
 
     def _set_synced(self, pairs: List[Tuple[int, str]]):
         self._reset_state()
@@ -571,6 +674,7 @@ class LyricsEditorWidget(QWidget):
         self._refresh_row_styles()
 
     def _add_line_after_selection(self):
+        self._push_undo()
         row = self.table.currentRow()
         insert_at = row + 1 if row >= 0 else self.table.rowCount()
 
@@ -599,13 +703,18 @@ class LyricsEditorWidget(QWidget):
         self.table.editItem(self.table.item(insert_at, 1))
 
     def _delete_selected_line(self):
-        row = self.table.currentRow()
-        if row < 0:
+        rows = self._selected_rows()
+        if not rows:
             return
+        self._push_undo()
         self.table.blockSignals(True)
-        self.table.removeRow(row)
+        for row in reversed(rows):
+            self.table.removeRow(row)
         self.table.blockSignals(False)
-        self._invalid_rows = {idx - 1 if idx > row else idx for idx in self._invalid_rows if idx != row}
+        self._invalid_rows = {
+            r for r in range(self.table.rowCount())
+            if self.table.item(r, 0) and self.table.item(r, 0).data(TIMESTAMP_VALID_ROLE) is False
+        }
         self._rebuild_times_cache()
         if self._invalid_rows:
             next_row = min(self._invalid_rows)
@@ -627,6 +736,7 @@ class LyricsEditorWidget(QWidget):
         if not it_time:
             return
 
+        self._push_undo()
         ms = max(0, int(self._current_playback_ms()) + int(self._reaction_delay_ms))
         self.table.blockSignals(True)
         it_time.setData(TIMESTAMP_MS_ROLE, ms)
@@ -700,6 +810,7 @@ class LyricsEditorWidget(QWidget):
                 state="error",
             )
             return False
+        self._push_undo()
         self.table.blockSignals(True)
         for row in rows:
             it_time = self.table.item(row, 0)
@@ -735,7 +846,7 @@ class LyricsEditorWidget(QWidget):
         if provider is not None:
             try:
                 return int(provider())
-            except Exception as exc:
+            except (TypeError, ValueError, AttributeError) as exc:
                 logger.warning("Failed to get playback position from provider: %s", exc)
         return int(self._current_pos_ms)
 

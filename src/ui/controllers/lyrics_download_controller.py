@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timezone
 import logging
+import sqlite3
 from typing import Callable
 
 from PySide6.QtCore import QObject, QTimer
@@ -155,7 +156,7 @@ class LyricsDownloadController(QObject):
             if current_track_id is not None and current_track_id == int(track_id):
                 track = get_track_by_id(self._app_state.db, int(track_id))
                 self._set_track_lyrics_views(track)
-        except Exception as exc:
+        except (sqlite3.Error, AttributeError, TypeError) as exc:
             logger.warning("Failed to update track after lyrics download for %s: %s", track_id, exc)
 
         self._active_track_ids.discard(int(track_id))
@@ -188,11 +189,11 @@ class LyricsDownloadController(QObject):
 
         try:
             self._refresh_visible_library_view()
-        except Exception as exc:
+        except (AttributeError, RuntimeError) as exc:
             logger.warning("Failed to refresh current view after lyrics download: %s", exc)
         try:
             self._refresh_history()
-        except Exception as exc:
+        except (sqlite3.Error, AttributeError) as exc:
             logger.warning("Failed to refresh history after lyrics download: %s", exc)
 
         stats_dict: BulkDownloadStats = {
@@ -250,7 +251,7 @@ class LyricsDownloadController(QObject):
             title = str(track.title or "").strip()
             artist_name = str(track.artist_name or "").strip()
             album_name = str(track.album_name or "").strip()
-        except Exception:
+        except (sqlite3.Error, AttributeError, TypeError):
             title = ""
             artist_name = ""
             album_name = ""
@@ -298,7 +299,7 @@ class LyricsDownloadController(QObject):
             return
         try:
             record_download_history_batch(self._app_state.db, self._pending_history_entries)
-        except Exception as exc:
+        except (sqlite3.Error, AttributeError) as exc:
             logger.warning("Failed to record batch download history: %s", exc)
         finally:
             self._pending_history_entries = []

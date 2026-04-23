@@ -11,10 +11,11 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import Qt, QByteArray, QSettings, QTimer
 from PySide6.QtGui import QCloseEvent, QShortcut, QKeySequence
 import logging
 import os
+import sqlite3
 
 from dataclasses import replace
 
@@ -28,6 +29,7 @@ from db.queries import (
     get_track_by_id,
     mark_tracks_instrumental,
     set_config,
+    set_directories,
     unmark_tracks_instrumental,
     update_track_null_lyrics,
     update_track_plain_lyrics,
@@ -57,6 +59,7 @@ from ui.style_loader import load_stylesheet
 from ui.widgets.toast import ToastManager
 from ui.widgets.log_panel import LogPanel, QtLogHandler
 from ui.widgets.my_lrclib_widget import MyLrclibWidget
+from ui.widgets.lrclib_browser_widget import LrclibBrowserWidget
 from ui.widgets.download_progress_overlay import DownloadProgressOverlay
 
 logger = logging.getLogger(__name__)
@@ -82,6 +85,7 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("PyLrcGet")
         self.setWindowIcon(load_app_icon())
         self.resize(900, 600)
+        self.setAcceptDrops(True)
         self.app_state = app_state
 
         self._queue_ids: list[int] = []
@@ -114,6 +118,8 @@ class MainWindow(QMainWindow):
         QShortcut(QKeySequence("Enter"), self, activated=self._play_selected_or_current)
         QShortcut(QKeySequence("Ctrl+Right"), self, activated=self.play_next)
         QShortcut(QKeySequence("Ctrl+Left"), self, activated=self.play_prev)
+        QShortcut(QKeySequence.StandardKey.Save, self, activated=self._save_active_lyrics)
+        QShortcut(QKeySequence.StandardKey.Find, self, activated=self._focus_search)
 
         self.central_widget = QWidget()
         self.setCentralWidget(self.central_widget)
@@ -180,6 +186,10 @@ class MainWindow(QMainWindow):
 
         splitter.setStretchFactor(0, 3)
         splitter.setStretchFactor(1, 2)
+        splitter.setCollapsible(0, False)
+        splitter.setCollapsible(1, False)
+        self.track_list.setMinimumWidth(300)
+        self.lyrics_view.setMinimumWidth(280)
 
         tracks_layout.addWidget(splitter)
 
@@ -194,10 +204,15 @@ class MainWindow(QMainWindow):
         self.albums_lyrics_view.saveRequested.connect(self._on_lyrics_save_requested)
         self.albums_lyrics_view.seekRequested.connect(self._seek_player)
         self.albums_lyrics_view.downloadRequested.connect(self._download_current_track_lyrics)
+        self.albums_lyrics_view.searchRequested.connect(self._search_current_track_lyrics)
         self.albums_lyrics_view.exportFilesRequested.connect(self._export_current_track_sidecars)
         self.albums_splitter.addWidget(self.albums_lyrics_view)
         self.albums_splitter.setStretchFactor(0, 3)
         self.albums_splitter.setStretchFactor(1, 2)
+        self.albums_splitter.setCollapsible(0, False)
+        self.albums_splitter.setCollapsible(1, False)
+        self.albums_tab.setMinimumWidth(300)
+        self.albums_lyrics_view.setMinimumWidth(280)
         albums_layout.addWidget(self.albums_splitter)
 
         self.artists_tab = ArtistListWidget(self.app_state)
@@ -211,17 +226,28 @@ class MainWindow(QMainWindow):
         self.artists_lyrics_view.saveRequested.connect(self._on_lyrics_save_requested)
         self.artists_lyrics_view.seekRequested.connect(self._seek_player)
         self.artists_lyrics_view.downloadRequested.connect(self._download_current_track_lyrics)
+        self.artists_lyrics_view.searchRequested.connect(self._search_current_track_lyrics)
         self.artists_lyrics_view.exportFilesRequested.connect(self._export_current_track_sidecars)
         self.artists_splitter.addWidget(self.artists_lyrics_view)
         self.artists_splitter.setStretchFactor(0, 3)
         self.artists_splitter.setStretchFactor(1, 2)
+        self.artists_splitter.setCollapsible(0, False)
+        self.artists_splitter.setCollapsible(1, False)
+        self.artists_tab.setMinimumWidth(300)
+        self.artists_lyrics_view.setMinimumWidth(280)
         artists_layout.addWidget(self.artists_splitter)
 
         self.mylrclib_tab = MyLrclibWidget(self.app_state)
 
+        self.lrclib_browser_tab = LrclibBrowserWidget(self.app_state)
+        self.lrclib_browser_tab.set_lrclib_url(
+            self._normalize_lrclib_base(get_config(self.app_state.db).lrclib_instance)
+        )
+
         self.tabs.addTab(self.tracks_tab, "Tracks")
         self.tabs.addTab(self.albums_page, "Albums")
         self.tabs.addTab(self.artists_page, "Artists")
+        self.tabs.addTab(self.lrclib_browser_tab, "LRCLIB Browser")
         self.tabs.addTab(self.mylrclib_tab, "My LRCLIB")
         self.tabs.setAccessibleName("Library navigation tabs")
 
@@ -258,6 +284,8 @@ class MainWindow(QMainWindow):
             parent=self,
         )
         self.download_overlay.cancelRequested.connect(self.downloads.cancel)
+        self.publish_overlay = DownloadProgressOverlay(self.central_widget, verb="Publish")
+        self.publish_overlay.sync_to_parent()
         self.publish_history = PublishHistoryController(
             self.app_state,
             normalize_lrclib_base=self._normalize_lrclib_base,
@@ -265,8 +293,20 @@ class MainWindow(QMainWindow):
             lyrics_views=self._all_lyrics_views,
             refresh_history=self.mylrclib_tab.refresh,
             show_status=self._show_status_message,
+            publish_overlay=self.publish_overlay,
             parent=self,
         )
+        self.publish_overlay.cancelRequested.connect(self._cancel_bulk_publish)
+
+        # Background activity button — shows when an overlay is minimized
+        self.download_overlay.activeChanged.connect(self._update_bg_activity_button)
+        self.publish_overlay.activeChanged.connect(self._update_bg_activity_button)
+        self.download_overlay.minimized.connect(self._update_bg_activity_button)
+        self.publish_overlay.minimized.connect(self._update_bg_activity_button)
+        self.download_overlay.dismissed.connect(self._update_bg_activity_button)
+        self.publish_overlay.dismissed.connect(self._update_bg_activity_button)
+        self.top_bar.btn_bg_activity.clicked.connect(self._reopen_bg_overlay)
+
         self.lyrics_view.publishSyncedRequested.connect(self.publish_history.publish_synced)
         self.lyrics_view.publishPlainRequested.connect(self.publish_history.publish_plain)
         self.albums_lyrics_view.publishSyncedRequested.connect(self.publish_history.publish_synced)
@@ -334,12 +374,14 @@ class MainWindow(QMainWindow):
         self.track_list.downloadLyrics.connect(self.on_download_lyrics)
         self.track_list.exportLyricsFiles.connect(self._export_track_sidecars)
         self.track_list.bulkDownloadRequested.connect(self._on_bulk_download_requested)
+        self.track_list.bulkPublishRequested.connect(self.publish_history.publish_batch)
         self.track_list.navigateRequested.connect(self.navigate_to)
         self.track_list.markInstrumental.connect(self._on_mark_instrumental)
         self.track_list.unmarkInstrumental.connect(self._on_unmark_instrumental)
         self.track_list.clearFiltersRequested.connect(self._reset_track_filters)
         self.track_list.configureFoldersRequested.connect(self.open_config_modal)
         self.lyrics_view.downloadRequested.connect(self._download_current_track_lyrics)
+        self.lyrics_view.searchRequested.connect(self._search_current_track_lyrics)
         self.albums_tab.playTrack.connect(self.on_play_track)
         self.albums_tab.refreshTrack.connect(self.on_refresh_track)
         self.albums_tab.downloadLyrics.connect(self.on_download_lyrics)
@@ -370,6 +412,11 @@ class MainWindow(QMainWindow):
         self.top_bar.bind_tab_order(self, self.tabs)
         self._sync_download_mode_ui()
 
+        # --- Selection counter in status bar ---
+        self._selection_label = QLabel("")
+        self.statusBar().addPermanentWidget(self._selection_label)
+        self.track_list.table.selectionModel().selectionChanged.connect(self._update_selection_counter)
+
         # initial load
         self._apply_track_filters()
         self.show_queued_notifications()
@@ -379,13 +426,63 @@ class MainWindow(QMainWindow):
 
         self._apply_styles()
 
+        # Restore persisted window state (geometry, splitter sizes, tab index)
+        self._restore_window_state()
+
     def resizeEvent(self, event):
         super().resizeEvent(event)
         self._update_responsive_layout()
         if hasattr(self, "download_overlay"):
             self.download_overlay.sync_to_parent()
+        if hasattr(self, "publish_overlay"):
+            self.publish_overlay.sync_to_parent()
+
+    def dragEnterEvent(self, event):
+        if event.mimeData().hasUrls():
+            # Accept if at least one URL is a directory
+            for url in event.mimeData().urls():
+                if url.isLocalFile() and os.path.isdir(url.toLocalFile()):
+                    event.acceptProposedAction()
+                    return
+
+    def dropEvent(self, event):
+        dropped_dirs = []
+        for url in event.mimeData().urls():
+            path = url.toLocalFile()
+            if os.path.isdir(path):
+                dropped_dirs.append(os.path.normpath(path))
+        if not dropped_dirs:
+            return
+        event.acceptProposedAction()
+
+        existing = get_directories(self.app_state.db)
+        existing_set = {os.path.normcase(os.path.normpath(d)) for d in existing}
+        new_dirs = [d for d in dropped_dirs if os.path.normcase(os.path.normpath(d)) not in existing_set]
+
+        if not new_dirs:
+            notify_user(
+                self.app_state,
+                "Dropped folder(s) are already in the library.",
+                "info",
+                show_status=self._show_status_message,
+                status_timeout_ms=3000,
+            )
+            return
+
+        merged = existing + new_dirs
+        set_directories(self.app_state.db, merged)
+        label = ", ".join(os.path.basename(d) for d in new_dirs)
+        notify_user(
+            self.app_state,
+            f"Added {len(new_dirs)} folder(s): {label}",
+            "success",
+            show_status=self._show_status_message,
+            status_timeout_ms=4000,
+        )
+        self.refresh_library()
 
     def closeEvent(self, event: QCloseEvent) -> None:
+        self._save_window_state()
         self._flush_playback_speed()
         self._flush_playback_volume()
         self.navigation.flush_pending_route()
@@ -397,10 +494,7 @@ class MainWindow(QMainWindow):
             return
         try:
             player = Player()
-        except Exception as exc:
-            self.app_state.queued_notifications.append(
-                Notify(message=f"Failed to initialize audio player: {exc}", notify_type="error")
-            )
+        except (RuntimeError, OSError) as exc:
             self.show_queued_notifications()
             return
 
@@ -434,6 +528,7 @@ class MainWindow(QMainWindow):
         )
         if self.app_state.player and self.app_state.player.track:
             self.track_list.set_now_playing(self.app_state.player.track.track_id)
+        self._update_search_feedback()
 
     def _schedule_library_search(self):
         self._search_apply_timer.start()
@@ -455,6 +550,9 @@ class MainWindow(QMainWindow):
             updated_config = get_config(self.app_state.db)
             self._apply_appearance_preferences(updated_config)
             self._sync_download_mode_ui()
+            self.lrclib_browser_tab.set_lrclib_url(
+                self._normalize_lrclib_base(updated_config.lrclib_instance)
+            )
             for view in self._all_lyrics_views():
                 view.set_reaction_delay_ms(updated_config.reaction_delay_ms)
             self._apply_track_filters()
@@ -665,7 +763,7 @@ class MainWindow(QMainWindow):
     def on_refresh_track(self, track_id: int) -> None:
         try:
             refreshed = refresh_track_from_file(self.app_state.db, int(track_id))
-        except Exception as exc:
+        except (sqlite3.Error, OSError, ValueError) as exc:
             log_and_notify(
                 self.app_state,
                 logger,
@@ -778,6 +876,24 @@ class MainWindow(QMainWindow):
             return
         self.statusBar().showMessage(message, int(timeout_ms))
 
+    def _update_selection_counter(self):
+        sm = self.track_list.table.selectionModel()
+        count = len(sm.selectedRows()) if sm else 0
+        if count > 1:
+            self._selection_label.setText(f"{count} tracks selected")
+        else:
+            self._selection_label.setText("")
+
+    def _update_search_feedback(self):
+        query = self.top_bar.search_text()
+        if query:
+            count = self.track_list.model.rowCount()
+            has_more = getattr(self.track_list, '_has_more_rows', False)
+            suffix = "+" if has_more else ""
+            self._show_status_message(f"{count}{suffix} result{'s' if count != 1 else ''} for \"{query}\"")
+        else:
+            self.statusBar().clearMessage()
+
     def _current_player_track_id(self) -> int | None:
         if not self.app_state.player or not self.app_state.player.track:
             return None
@@ -809,7 +925,7 @@ class MainWindow(QMainWindow):
             return
         try:
             self.app_state.player.stop()
-        except Exception:
+        except (RuntimeError, AttributeError):
             pass
         self.app_state.player.track = None
         self.app_state.player.trackChanged.emit(None)
@@ -860,7 +976,7 @@ class MainWindow(QMainWindow):
             self._show_status_message("Lyrics saved.", 2500)
             for view in self._all_lyrics_views():
                 view.set_save_feedback("success", "Saved")
-        except Exception as exc:
+        except (sqlite3.Error, OSError, ValueError) as exc:
             log_and_notify(
                 self.app_state,
                 logger,
@@ -917,7 +1033,7 @@ class MainWindow(QMainWindow):
         if self.app_state.player and hasattr(self.app_state.player, "set_playback_speed"):
             try:
                 self.app_state.player.set_playback_speed(speed)
-            except Exception:
+            except (AttributeError, RuntimeError):
                 speed = 1.0
         self.player_bar.set_playback_speed_value(speed)
 
@@ -927,7 +1043,7 @@ class MainWindow(QMainWindow):
         if self.app_state.player and hasattr(self.app_state.player, "set_volume"):
             try:
                 self.app_state.player.set_volume(volume)
-            except Exception as exc:
+            except (AttributeError, RuntimeError) as exc:
                 logger.warning("Failed to apply saved volume: %s", exc)
                 volume = 0.7
         self.player_bar.set_volume_value(volume)
@@ -985,6 +1101,57 @@ class MainWindow(QMainWindow):
             )
             return
         self.on_download_lyrics(int(self.app_state.player.track.track_id))
+
+    def _search_current_track_lyrics(self):
+        if not self.app_state.player or not self.app_state.player.track:
+            notify_user(
+                self.app_state,
+                "Select a track before searching lyrics.",
+                "warning",
+                show_status=self._show_status_message,
+                status_timeout_ms=3000,
+            )
+            return
+
+        track_meta = self.app_state.player.track
+        artist = getattr(track_meta, "artist", "") or ""
+        title = getattr(track_meta, "title", "") or ""
+        album = getattr(track_meta, "album", "") or ""
+
+        config = get_config(self.app_state.db)
+        lrclib_url = self._normalize_lrclib_base(config.lrclib_instance)
+
+        from ui.dialogs.search_lyrics_dialog import SearchLyricsDialog
+
+        dlg = SearchLyricsDialog(
+            lrclib_url,
+            initial_artist=artist,
+            initial_title=title,
+            initial_album=album,
+            parent=self,
+        )
+
+        track_id = int(track_meta.track_id)
+
+        def _on_lyrics_selected(plain: str, synced: str):
+            s_text, p_text = synced.strip(), plain.strip()
+            if s_text:
+                if not p_text:
+                    from core.utils import plain_text_from_lrc
+                    p_text = plain_text_from_lrc(s_text)
+                update_track_synced_lyrics(self.app_state.db, track_id, s_text, p_text)
+            elif p_text:
+                update_track_plain_lyrics(self.app_state.db, track_id, p_text)
+            if not s_text and not p_text:
+                return
+
+            track = get_track_by_id(self.app_state.db, track_id)
+            self._sync_track_lyrics_outputs(track)
+            self._set_track_lyrics_views(track)
+            self._show_status_message("Lyrics applied from search.", 3000)
+
+        dlg.lyricsSelected.connect(_on_lyrics_selected)
+        dlg.exec()
 
     def _export_current_track_sidecars(self):
         if not self.app_state.player or not self.app_state.player.track:
@@ -1044,7 +1211,7 @@ class MainWindow(QMainWindow):
             self._show_status_message(f"Lyrics files exported to {output_dir}", 3000)
             for view in self._all_lyrics_views():
                 view.set_export_feedback("success", "Exported")
-        except Exception as exc:
+        except (sqlite3.Error, OSError, ValueError) as exc:
             log_and_notify(
                 self.app_state,
                 logger,
@@ -1056,6 +1223,25 @@ class MainWindow(QMainWindow):
             )
             for view in self._all_lyrics_views():
                 view.set_export_feedback("error", "Export Failed")
+
+    def _save_active_lyrics(self):
+        """Ctrl+S: trigger save on the currently visible lyrics editor."""
+        current = self.tabs.currentWidget()
+        if current is self.tracks_tab:
+            view = self.lyrics_view
+        elif current is self.albums_page:
+            view = self.albums_lyrics_view
+        elif current is self.artists_page:
+            view = self.artists_lyrics_view
+        else:
+            return
+        if view.btn_save.isEnabled():
+            view._emit_save()
+
+    def _focus_search(self):
+        """Ctrl+F: focus the search box."""
+        self.top_bar.search_box.setFocus()
+        self.top_bar.search_box.selectAll()
 
     def _all_lyrics_views(self) -> list[LyricsEditorWidget]:
         return [self.lyrics_view, self.albums_lyrics_view, self.artists_lyrics_view]
@@ -1081,11 +1267,11 @@ class MainWindow(QMainWindow):
             if width < 980:
                 if self.content_splitter.orientation() != Qt.Orientation.Vertical:
                     self.content_splitter.setOrientation(Qt.Orientation.Vertical)
-                self.content_splitter.setSizes([int(self.height() * 0.54), int(self.height() * 0.46)])
+                    self.content_splitter.setSizes([int(self.height() * 0.54), int(self.height() * 0.46)])
             else:
                 if self.content_splitter.orientation() != Qt.Orientation.Horizontal:
                     self.content_splitter.setOrientation(Qt.Orientation.Horizontal)
-                self.content_splitter.setSizes([int(width * 0.58), int(width * 0.42)])
+                    self.content_splitter.setSizes([int(width * 0.58), int(width * 0.42)])
 
         for splitter_name in ("albums_splitter", "artists_splitter"):
             splitter = getattr(self, splitter_name, None)
@@ -1094,14 +1280,62 @@ class MainWindow(QMainWindow):
             if width < 980:
                 if splitter.orientation() != Qt.Orientation.Vertical:
                     splitter.setOrientation(Qt.Orientation.Vertical)
-                splitter.setSizes([int(self.height() * 0.54), int(self.height() * 0.46)])
+                    splitter.setSizes([int(self.height() * 0.54), int(self.height() * 0.46)])
             else:
                 if splitter.orientation() != Qt.Orientation.Horizontal:
                     splitter.setOrientation(Qt.Orientation.Horizontal)
-                splitter.setSizes([int(width * 0.58), int(width * 0.42)])
+                    splitter.setSizes([int(width * 0.58), int(width * 0.42)])
 
         if hasattr(self, "player_bar"):
             self.player_bar.set_compact_mode(width < 980)
+
+    # --- Window state persistence ---
+    def _get_settings(self) -> QSettings:
+        return QSettings("PyLrcGet", "PyLrcGet")
+
+    def _save_window_state(self):
+        s = self._get_settings()
+        s.setValue("window/geometry", self.saveGeometry())
+        if hasattr(self, "content_splitter"):
+            s.setValue("window/tracks_splitter", self.content_splitter.sizes())
+        if hasattr(self, "albums_splitter"):
+            s.setValue("window/albums_splitter", self.albums_splitter.sizes())
+        if hasattr(self, "artists_splitter"):
+            s.setValue("window/artists_splitter", self.artists_splitter.sizes())
+        s.setValue("window/tab_index", self.tabs.currentIndex())
+
+    def _restore_window_state(self):
+        s = self._get_settings()
+
+        geometry = s.value("window/geometry")
+        if geometry is not None:
+            self.restoreGeometry(geometry)
+
+        for attr, key in [
+            ("content_splitter", "window/tracks_splitter"),
+            ("albums_splitter", "window/albums_splitter"),
+            ("artists_splitter", "window/artists_splitter"),
+        ]:
+            splitter = getattr(self, attr, None)
+            if splitter is None:
+                continue
+            saved = s.value(key)
+            if saved is not None:
+                try:
+                    sizes = [int(v) for v in saved]
+                    if len(sizes) == 2 and all(v > 0 for v in sizes):
+                        splitter.setSizes(sizes)
+                except (TypeError, ValueError):
+                    pass
+
+        tab_index = s.value("window/tab_index")
+        if tab_index is not None:
+            try:
+                idx = int(tab_index)
+                if 0 <= idx < self.tabs.count():
+                    self.tabs.setCurrentIndex(idx)
+            except (TypeError, ValueError):
+                pass
 
     def _apply_styles(self):
         self.setStyleSheet(load_stylesheet("main_window.qss"))
@@ -1201,7 +1435,7 @@ class MainWindow(QMainWindow):
         try:
             album = get_album_by_id(self.app_state.db, int(album_id))
             label = self._display_album_name(album.get("album_name", ""))
-        except Exception:
+        except (sqlite3.Error, KeyError, TypeError):
             label = ""
         self.navigate_to(tracks_album((int(album_id),), label=label))
     
@@ -1209,7 +1443,7 @@ class MainWindow(QMainWindow):
         try:
             artist = get_artist_by_id(self.app_state.db, int(artist_id))
             label = self._display_artist_name(artist.get("artist_name", ""))
-        except Exception:
+        except (sqlite3.Error, KeyError, TypeError):
             label = ""
         self.navigate_to(tracks_artist((int(artist_id),), label=label))
 
@@ -1219,7 +1453,7 @@ class MainWindow(QMainWindow):
             if track.album_id is None:
                 return None
             return tracks_album((int(track.album_id),), label=self._display_album_name(track.album_name))
-        except Exception:
+        except (sqlite3.Error, AttributeError, TypeError):
             return None
 
     def _route_for_current_track_artist(self, track_id: int) -> LibraryRoute | None:
@@ -1228,7 +1462,7 @@ class MainWindow(QMainWindow):
             if track.artist_id is None:
                 return None
             return tracks_artist((int(track.artist_id),), label=self._display_artist_name(track.artist_name))
-        except Exception:
+        except (sqlite3.Error, AttributeError, TypeError):
             return None
 
     def _navigate_current_track_album(self, track_id: int) -> None:
@@ -1270,17 +1504,19 @@ class MainWindow(QMainWindow):
             self._show_status_message(f"Marked {len(track_ids)} track(s) as instrumental.", 3000)
             self._apply_track_filters()
             self.track_list.restore_selection(selected_before)
-        except Exception as e:
+        except sqlite3.Error as e:
             log_and_notify(
                 self.app_state,
                 logger,
                 logging.ERROR,
-                exception_message("Failed to update tracks", e),
+                exception_message("Failed to mark tracks as instrumental", e),
                 "error",
                 show_status=self._show_status_message,
                 status_timeout_ms=4000,
             )
+            return
 
+        self._publish_instrumental_to_lrclib(track_ids)
 
     def _on_unmark_instrumental(self, track_ids: list[int]):
         track_ids = [int(x) for x in track_ids if x is not None]
@@ -1297,7 +1533,7 @@ class MainWindow(QMainWindow):
             self._show_status_message(f"Unmarked {len(track_ids)} track(s).", 3000)
             self._apply_track_filters()
             self.track_list.restore_selection(selected_before)
-        except Exception as e:
+        except sqlite3.Error as e:
             log_and_notify(
                 self.app_state,
                 logger,
@@ -1307,3 +1543,60 @@ class MainWindow(QMainWindow):
                 show_status=self._show_status_message,
                 status_timeout_ms=4000,
             )
+
+    def _cancel_bulk_publish(self) -> None:
+        worker = getattr(self.publish_history, "_bulk_worker", None)
+        if worker is not None and worker.isRunning():
+            worker.requestInterruption()
+
+    def _update_bg_activity_button(self, *_args) -> None:
+        """Show the background-activity button when any overlay is active but hidden."""
+        dl_bg = self.download_overlay.is_active and not self.download_overlay.isVisible()
+        pub_bg = self.publish_overlay.is_active and not self.publish_overlay.isVisible()
+        self.top_bar.btn_bg_activity.setVisible(dl_bg or pub_bg)
+
+    def _reopen_bg_overlay(self) -> None:
+        """Re-show whichever overlay is running in the background."""
+        if self.download_overlay.is_active:
+            self.download_overlay.reopen()
+        elif self.publish_overlay.is_active:
+            self.publish_overlay.reopen()
+
+    def _publish_instrumental_to_lrclib(self, track_ids: list[int]) -> None:
+        from PySide6.QtWidgets import QMessageBox
+
+        reply = QMessageBox.question(
+            self,
+            "Publish Instrumental",
+            f"Also mark {len(track_ids)} track(s) as instrumental on LRCLIB?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+
+        from ui.workers.bulk_publish_instrumental_worker import BulkPublishInstrumentalWorker
+
+        config = get_config(self.app_state.db)
+        lrclib_url = self._normalize_lrclib_base(config.lrclib_instance)
+
+        self._instrumental_worker = BulkPublishInstrumentalWorker(
+            db_path=self.app_state.db_path,
+            track_ids=track_ids,
+            lrclib_instance=lrclib_url,
+            parent=self,
+        )
+
+        def _on_finished(ok: bool, summary: str, stats: dict):
+            self._instrumental_worker = None
+            notify_user(
+                self.app_state,
+                summary,
+                "success" if ok else "warning",
+                show_status=self._show_status_message,
+                status_timeout_ms=5000,
+            )
+
+        self._instrumental_worker.finished.connect(_on_finished)
+        self._show_status_message(f"Publishing instrumental status for {len(track_ids)} track(s)...", 3000)
+        self._instrumental_worker.start()

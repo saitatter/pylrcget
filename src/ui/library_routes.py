@@ -34,7 +34,7 @@ def deserialize_route(payload: str) -> LibraryRoute | None:
         return None
     try:
         data = json.loads(payload)
-    except Exception:
+    except (json.JSONDecodeError, ValueError):
         return None
     try:
         return LibraryRoute(
@@ -45,7 +45,7 @@ def deserialize_route(payload: str) -> LibraryRoute | None:
             artist_label=str(data.get("artist_label") or ""),
             album_label=str(data.get("album_label") or ""),
         )
-    except Exception:
+    except (ValueError, TypeError, KeyError):
         return None
 
 

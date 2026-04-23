@@ -37,9 +37,21 @@ def prepare_input(input_str: str) -> str:
     return prepared_input
 
 
-def strip_timestamp(synced_lyrics: str) -> str:
-    """
-    Elimină timestamp-ul de tip [00:00.00] de la începutul unei linii.
-    """
-    plain_lyrics = re.sub(r"^\[.*?\]\s*", "", synced_lyrics)
-    return plain_lyrics
+_LRC_TS_RE = re.compile(r"\[(\d+):(\d+)(?:\.(\d+))?\]")
+_LRC_META_PREFIXES = ("[ar:", "[ti:", "[al:", "[by:", "[offset:", "[au:")
+
+
+def plain_text_from_lrc(lrc_text: str) -> str:
+    """Strip timestamps and metadata tags from synced LRC, returning plain text."""
+    lines: list[str] = []
+    for raw in lrc_text.splitlines():
+        line = raw.strip()
+        if not line:
+            continue
+        if any(line.startswith(p) for p in _LRC_META_PREFIXES):
+            continue
+        if not _LRC_TS_RE.search(line):
+            continue
+        text = _LRC_TS_RE.sub("", line).strip()
+        lines.append(text)
+    return "\n".join(lines).rstrip()

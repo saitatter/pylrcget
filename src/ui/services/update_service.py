@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import hashlib
 import importlib.metadata
 import os
 from pathlib import Path
@@ -13,6 +14,7 @@ import sys
 import tarfile
 import tempfile
 import tomllib
+import uuid
 import zipfile
 
 import requests
@@ -60,7 +62,7 @@ def _bundled_resource_root() -> Path | None:
         return None
     try:
         return Path(base).resolve()
-    except Exception:
+    except (OSError, ValueError):
         return None
 
 
@@ -72,12 +74,12 @@ def _version_file_candidates() -> list[Path]:
 
     try:
         candidates.append(project_root() / "pyproject.toml")
-    except Exception:
+    except (OSError, ValueError):
         pass
 
     try:
         candidates.append(Path(sys.executable).resolve().parent / "pyproject.toml")
-    except Exception:
+    except (OSError, ValueError):
         pass
 
     unique: list[Path] = []
@@ -102,7 +104,7 @@ def current_app_version() -> str:
             version = str(data.get("project", {}).get("version", "")).strip()
             if version:
                 return version
-        except Exception:
+        except (OSError, tomllib.TOMLDecodeError, UnicodeDecodeError):
             continue
     return "0.0.0"
 
@@ -110,7 +112,7 @@ def current_app_version() -> str:
 def current_executable_path() -> Path | None:
     try:
         return Path(sys.executable).resolve()
-    except Exception:
+    except (OSError, ValueError):
         return None
 
 
@@ -121,7 +123,7 @@ def _can_write_directory(path: Path) -> bool:
         probe.write_text("ok", encoding="utf-8")
         probe.unlink(missing_ok=True)
         return True
-    except Exception:
+    except OSError:
         return False
 
 
@@ -207,7 +209,9 @@ def is_linux_installer_asset(asset: ReleaseAssetInfo | None) -> bool:
 
 
 def can_auto_install_update(asset: ReleaseAssetInfo | None) -> bool:
-    if asset is None or not is_frozen_build():
+    if asset is None:
+        return False
+    if not is_frozen_build() and not is_update_debug_enabled():
         return False
     if sys.platform.startswith("win"):
         return is_windows_installer_asset(asset)
@@ -279,13 +283,21 @@ def launch_windows_installer(installer_path: Path) -> None:
     if startfile is None:
         raise RuntimeError("os.startfile is unavailable on this Python runtime.")
     try:
-        # Current Windows releases use Inno Setup installers, so these silent flags are intentional.
+        # Current Windows releases use Inno Setup installers.
+        # Keep installer UI visible so users can see progress, and explicitly request
+        # application restart after install when supported by the installer script.
         # If packaging switches to MSI/NSIS, this should branch by installer type.
         startfile(
             str(installer_path),
-            arguments="/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /CLOSEAPPLICATIONS /FORCECLOSEAPPLICATIONS",
+            operation="runas",
+            arguments="/CLOSEAPPLICATIONS /FORCECLOSEAPPLICATIONS /RESTARTAPPLICATIONS",
         )
-    except Exception as exc:
+    except OSError as exc:
+        # 1223: "The operation was canceled by the user" (typically UAC prompt canceled).
+        if getattr(exc, "winerror", None) == 1223:
+            raise RuntimeError("Installer launch was canceled in the UAC confirmation dialog.") from exc
+        raise RuntimeError(f"Failed to launch installer: {exc}") from exc
+    except (TypeError, AttributeError) as exc:
         raise RuntimeError(f"Failed to launch installer: {exc}") from exc
 
 
@@ -347,14 +359,18 @@ def download_release_asset(
             response.raise_for_status()
             total = int(response.headers.get("Content-Length") or asset.size or 0)
             downloaded = 0
+            hasher = hashlib.sha256()
             with destination.open("wb") as handle:
                 for chunk in response.iter_content(chunk_size=1024 * 128):
                     if not chunk:
                         continue
                     handle.write(chunk)
+                    hasher.update(chunk)
                     downloaded += len(chunk)
                     if progress_callback is not None:
                         progress_callback(downloaded, total)
+    digest = hasher.hexdigest()
+    logger.info("Download complete: %s (SHA-256: %s, %d bytes)", destination.name, digest, downloaded)
     if total > 0 and downloaded != total:
         raise IOError(f"Incomplete download: expected {total} bytes, got {downloaded} bytes.")
     if asset.size > 0 and destination.stat().st_size != asset.size:
@@ -406,7 +422,7 @@ def _is_probably_valid_pyinstaller_binary(path: Path) -> bool:
             handle.seek(max(0, path.stat().st_size - 8192))
             tail = handle.read()
             return b"MEI\x0c\x0b\x0a\x0b\x0e" in tail
-    except Exception:
+    except OSError:
         return False
 
 
@@ -643,10 +659,43 @@ def launch_staged_update(script_path: Path) -> None:
 
 
 def default_update_download_dir(app_data_dir: str | None = None) -> Path:
-    base = Path(app_data_dir) if app_data_dir else Path(tempfile.gettempdir())
-    target = base / "updates"
-    target.mkdir(parents=True, exist_ok=True)
-    return target
+    candidates: list[Path] = []
+    if app_data_dir:
+        candidates.append(Path(app_data_dir) / "updates")
+    candidates.append(Path(tempfile.gettempdir()) / APP_PATH_NAME / "updates")
+
+    unique_candidates: list[Path] = []
+    seen: set[str] = set()
+    for candidate in candidates:
+        rendered = os.path.normcase(str(candidate))
+        if rendered in seen:
+            continue
+        seen.add(rendered)
+        unique_candidates.append(candidate)
+
+    for candidate in unique_candidates:
+        if _can_write_directory(candidate):
+            return candidate
+
+    raise PermissionError(
+        "No writable update download directory is available. "
+        f"Tried: {', '.join(str(path) for path in unique_candidates)}"
+    )
+
+
+def choose_update_download_path(download_dir: Path, asset_name: str) -> Path:
+    destination = download_dir / asset_name
+    if not destination.exists():
+        return destination
+
+    try:
+        destination.unlink()
+        return destination
+    except OSError:
+        stem = Path(asset_name).stem or "update"
+        suffix = Path(asset_name).suffix
+        unique_name = f"{stem}-{os.getpid()}-{uuid.uuid4().hex[:8]}{suffix}"
+        return download_dir / unique_name
 
 
 def cleanup_stale_update_downloads(download_dir: Path) -> None:

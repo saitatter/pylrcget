@@ -6,10 +6,10 @@ import sqlite3
 from datetime import datetime, timezone
 from typing import List, Sequence
 
+from core.models import FsTrack
 from core.utils import prepare_input
 from db.models import Album, Artist, Config, Track
 from library import scan_library
-from library.fs_track import FsTrack
 
 # -------------------------------
 # DIRECTORIES
@@ -420,8 +420,10 @@ def add_track(db: sqlite3.Connection, track: FsTrack, *, commit: bool = True) ->
     except ValueError:
         album_id = add_album(db, track.album, track.album_artist, commit=False)
 
-    # Detect instrumental
-    is_instrumental = bool(track.lrc_lyrics and re.search(r"\[au:\s*instrumental\]", track.lrc_lyrics))
+    # Detect instrumental (explicit flag from orphan reattachment, or auto-detect from LRC)
+    is_instrumental = track.instrumental or bool(
+        track.lrc_lyrics and re.search(r"\[au:\s*instrumental\]", track.lrc_lyrics)
+    )
 
     db.execute("""
         INSERT INTO tracks (
@@ -717,7 +719,7 @@ def mark_tracks_instrumental(db: sqlite3.Connection, track_ids: list[int]) -> No
             WHERE id = ?
         """, [(i,) for i in ids])
         db.commit()
-    except Exception:
+    except sqlite3.Error:
         db.rollback()
         raise
 
@@ -739,7 +741,7 @@ def unmark_tracks_instrumental(db: sqlite3.Connection, track_ids: list[int]) -> 
             WHERE id = ?
         """, [(i,) for i in ids])
         db.commit()
-    except Exception:
+    except sqlite3.Error:
         db.rollback()
         raise
 
@@ -857,6 +859,38 @@ def delete_tracks_by_paths(db: sqlite3.Connection, paths: list[str], *, commit: 
     db.executemany("DELETE FROM tracks WHERE file_path = ?", [(path,) for path in paths])
     if commit:
         db.commit()
+
+
+def get_orphan_lyrics_index(
+    db: sqlite3.Connection, paths: list[str],
+) -> dict[tuple[str, str, int], tuple[str | None, str | None, bool]]:
+    """Return a match-key → (txt_lyrics, lrc_lyrics, instrumental) dict
+    for tracks at *paths* that carry lyrics or instrumental flag.
+
+    Match key is (title_lower, artist_name_lower, duration_rounded_int).
+    """
+    if not paths:
+        return {}
+    _CHUNK = 900  # stay below SQLite SQLITE_MAX_VARIABLE_NUMBER (default 999)
+    index: dict[tuple[str, str, int], tuple[str | None, str | None, bool]] = {}
+    for start in range(0, len(paths), _CHUNK):
+        chunk = paths[start:start + _CHUNK]
+        placeholders = ",".join("?" for _ in chunk)
+        rows = db.execute(
+            f"""
+            SELECT t.title_lower, a.name_lower AS artist_lower,
+                   t.duration, t.txt_lyrics, t.lrc_lyrics, t.instrumental
+            FROM tracks t
+            JOIN artists a ON t.artist_id = a.id
+            WHERE t.file_path IN ({placeholders})
+              AND (t.txt_lyrics IS NOT NULL OR t.lrc_lyrics IS NOT NULL OR t.instrumental = 1)
+            """,
+            chunk,
+        ).fetchall()
+        for r in rows:
+            key = (r["title_lower"] or "", r["artist_lower"] or "", round(r["duration"] or 0))
+            index[key] = (r["txt_lyrics"], r["lrc_lyrics"], bool(r["instrumental"]))
+    return index
 
 
 def prune_library(db: sqlite3.Connection) -> None:

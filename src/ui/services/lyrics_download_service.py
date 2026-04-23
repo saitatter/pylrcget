@@ -7,9 +7,9 @@ import sqlite3
 import time
 from typing import Callable
 
-from lrclib import LrcLibAPI
-from lrclib.exceptions import APIError, NotFoundError, RateLimitError, ServerError
 from requests import exceptions as requests_exceptions
+
+from core.lrclib_client import LrcLibAPI, LrcLibError, NotFoundError, RateLimitError, ServerError
 
 from core.embed_lyrics import embed_lyrics_for_track
 from core.lyrics_sidecar import export_lyrics_sidecars
@@ -55,9 +55,8 @@ def _should_retry_lrclib_error(exc: Exception) -> bool:
         return False
     if isinstance(exc, _RETRYABLE_API_ERRORS):
         return True
-    if isinstance(exc, APIError):
-        status_code = int(getattr(exc, "status_code", 0) or 0)
-        return status_code == 429 or status_code >= 500
+    if isinstance(exc, LrcLibError):
+        return exc.status_code == 429 or exc.status_code >= 500
     return False
 
 
@@ -78,8 +77,8 @@ def fetch_lyrics_with_retry(
             return api.get_lyrics(
                 track_name=title,
                 artist_name=artist,
-                album_name=album or None,
-                duration=duration_s or None,
+                album_name=album or "",
+                duration=duration_s or 0,
             )
         except Exception as exc:
             last_error = exc
@@ -121,7 +120,7 @@ def sync_track_outputs_with_result(
         try:
             notify_cb("Writing lyrics sidecar files...")
             sidecar_paths = tuple(export_lyrics_sidecars(track, config))
-        except Exception as exc:
+        except (OSError, PermissionError, ValueError) as exc:
             sidecar_error = exc
             logger.warning("Failed to export lyrics sidecars for track %s: %s", track.id, exc)
 
@@ -130,7 +129,7 @@ def sync_track_outputs_with_result(
             notify_cb("Embedding lyrics into the audio file...")
             embed_lyrics_for_track(track)
             embedded = True
-        except Exception as exc:
+        except (OSError, ValueError) as exc:
             embed_error = exc
             logger.warning("Failed to embed lyrics for track %s: %s", track.id, exc)
 
@@ -176,7 +175,7 @@ def download_track_lyrics(
         if not title or not artist:
             return False, "Missing title/artist; cannot search lyrics.", track_id, title_for_ui
 
-        api_instance = api or LrcLibAPI(user_agent="lrcget-python/0.1", base_url=lrclib_instance)
+        api_instance = api or LrcLibAPI(lrclib_instance)
         lyrics = fetch_lyrics_with_retry(
             api_instance,
             notify=notify,

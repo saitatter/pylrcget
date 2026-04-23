@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+import time
 from dataclasses import dataclass
 from typing import List, Optional
 
@@ -10,13 +12,87 @@ from PySide6.QtWidgets import (
 )
 import re
 
+from core.lrclib_client import LrcLibAPI, IncorrectPublishTokenError, LrcLibError, RateLimitError, ServerError
+
 from ui.spacing import SPACE_2, SPACE_3, SPACE_4, set_layout_spacing
+
+logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class LintProblem:
     line: int
-    severity: str  # "error" (you can extend later)
+    severity: str  # "error" | "warning"
     message: str
+
+
+_LRC_TS_RE = re.compile(r"\[\d{1,3}:\d{2}[.:]\d{2,3}\]")
+
+
+def lint_lyrics(text: str, *, is_synced: bool) -> list[LintProblem]:
+    """Validate lyrics text before publishing to LRCLIB."""
+    problems: list[LintProblem] = []
+    lines = text.splitlines()
+    content_lines = [l for l in lines if l.strip()]
+
+    if not content_lines:
+        problems.append(LintProblem(line=1, severity="error", message="Lyrics are empty."))
+        return problems
+
+    if len(content_lines) < 2:
+        problems.append(LintProblem(line=1, severity="warning", message="Very short lyrics (fewer than 2 lines)."))
+
+    if is_synced:
+        timestamps: list[tuple[int, int]] = []  # (line_num, ms)
+        for i, raw in enumerate(lines, start=1):
+            stripped = raw.strip()
+            if not stripped:
+                continue
+            # skip metadata tags
+            if re.match(r"^\[(ar|ti|al|by|offset|au):", stripped):
+                continue
+            matches = list(_LRC_TS_RE.finditer(stripped))
+            if not matches:
+                problems.append(LintProblem(line=i, severity="error", message="Line has no timestamp."))
+                continue
+            for m in matches:
+                ts_text = m.group(0)[1:-1]  # strip [ ]
+                parts = re.split(r"[:.]", ts_text)
+                if len(parts) >= 3:
+                    mins = int(parts[0])
+                    secs = int(parts[1])
+                    frac = parts[2]
+                    if len(frac) == 2:
+                        ms = int(frac) * 10
+                    else:
+                        ms = int(frac)
+                    total_ms = mins * 60000 + secs * 1000 + ms
+                    timestamps.append((i, total_ms))
+
+        # Check ordering
+        for j in range(1, len(timestamps)):
+            prev_line, prev_ms = timestamps[j - 1]
+            cur_line, cur_ms = timestamps[j]
+            if cur_ms < prev_ms:
+                problems.append(LintProblem(
+                    line=cur_line,
+                    severity="warning",
+                    message=f"Timestamp is out of order (earlier than line {prev_line}).",
+                ))
+                break  # one warning is enough
+
+        # Check duplicates
+        seen_ms: dict[int, int] = {}
+        for line_num, ms in timestamps:
+            if ms in seen_ms:
+                problems.append(LintProblem(
+                    line=line_num,
+                    severity="warning",
+                    message=f"Duplicate timestamp (same as line {seen_ms[ms]}).",
+                ))
+            else:
+                seen_ms[ms] = line_num
+
+    return problems
 
 
 @dataclass(frozen=True)
@@ -30,24 +106,68 @@ class PublishWorker(QThread):
     progress = Signal(object)     # PublishProgress
     finished = Signal(bool, str)  # ok, message
 
-    def __init__(self, payload: dict, parent=None):
+    def __init__(self, payload: dict, lrclib_instance: str, parent=None):
         super().__init__(parent)
         self.payload = payload
+        self.lrclib_instance = lrclib_instance
 
     def run(self):
-        try:
-            # TODO: implement real LRCLIB publishing
-            # For now we simulate the 3 phases.
-            self.progress.emit(PublishProgress("Done", "Pending", "Pending"))
-            self.msleep(400)
-            self.progress.emit(PublishProgress("Done", "Done", "Pending"))
-            self.msleep(400)
-            self.progress.emit(PublishProgress("Done", "Done", "Done"))
-            self.msleep(300)
+        max_retries = 3
+        backoff_s = 0.5
 
-            self.finished.emit(True, "Lyrics were published successfully (stub).")
-        except Exception as e:
-            self.finished.emit(False, f"Publish failed: {e}")
+        for attempt in range(1, max_retries + 1):
+            try:
+                api = LrcLibAPI(self.lrclib_instance)
+
+                self.progress.emit(PublishProgress("In progress...", "Pending", "Pending"))
+                prefix, target_hex = api.request_challenge()
+                self.progress.emit(PublishProgress("Done", "Pending", "Pending"))
+
+                self.progress.emit(PublishProgress("Done", "In progress...", "Pending"))
+                from core.lrclib_client import solve_challenge
+                nonce = solve_challenge(prefix, target_hex)
+                publish_token = f"{prefix}:{nonce}"
+                self.progress.emit(PublishProgress("Done", "Done", "Pending"))
+
+                self.progress.emit(PublishProgress("Done", "Done", "In progress..."))
+                api.publish_lyrics(
+                    track_name=self.payload["title"],
+                    artist_name=self.payload["artistName"],
+                    album_name=self.payload["albumName"],
+                    duration=int(self.payload["duration"]),
+                    plain_lyrics=self.payload.get("plainLyrics") or None,
+                    synced_lyrics=self.payload.get("syncedLyrics") or None,
+                    publish_token=publish_token,
+                )
+                self.progress.emit(PublishProgress("Done", "Done", "Done"))
+
+                self.finished.emit(True, "Lyrics were published successfully.")
+                return
+            except IncorrectPublishTokenError:
+                logger.exception("Publish token rejected by LRCLIB")
+                self.finished.emit(False, "Publish token was rejected. Try again.")
+                return
+            except (RateLimitError, ServerError) as e:
+                if attempt < max_retries:
+                    logger.warning(
+                        "Publish attempt %d/%d failed (%s), retrying in %.1fs...",
+                        attempt, max_retries, type(e).__name__, backoff_s,
+                    )
+                    self.progress.emit(PublishProgress("Done", "Done", f"Retrying in {backoff_s:.0f}s..."))
+                    time.sleep(backoff_s)
+                    backoff_s *= 2
+                    continue
+                logger.warning("Publish failed after %d attempts: %s", max_retries, e)
+                self.finished.emit(False, f"Publish failed after {max_retries} attempts: {e}")
+                return
+            except LrcLibError as e:
+                logger.exception("LRCLIB API error during publish")
+                self.finished.emit(False, f"LRCLIB error: {e}")
+                return
+            except Exception as e:
+                logger.exception("Unexpected error during publish")
+                self.finished.emit(False, f"Publish failed: {e}")
+                return
 
 
 class PublishLyricsDialog(QDialog):
@@ -66,6 +186,7 @@ class PublishLyricsDialog(QDialog):
         lyrics_text: str,
         is_synced: bool,
         lint_result: Optional[List[LintProblem]] = None,
+        lrclib_instance: str = "https://lrclib.net",
         parent=None
     ):
         super().__init__(parent)
@@ -77,6 +198,7 @@ class PublishLyricsDialog(QDialog):
         self.publish_result: bool | None = None
         self._lint = lint_result or []
         self._is_synced = is_synced
+        self._lrclib_instance = lrclib_instance
 
         self.resize(650, 420)
 
@@ -147,11 +269,20 @@ class PublishLyricsDialog(QDialog):
         root.addLayout(footer)
 
         # decide which page
-        if self._lint:
+        errors = [p for p in self._lint if p.severity == "error"]
+        warnings = [p for p in self._lint if p.severity != "error"]
+        if errors:
             self._populate_lint(self._lint)
             self.stack.setCurrentIndex(0)
             self.btn_primary.setText("Close")
             self.btn_secondary.hide()
+        elif warnings:
+            self._populate_lint(warnings)
+            self.lint_header.setText("Warnings found — you can still publish")
+            self.stack.setCurrentIndex(0)
+            self.btn_primary.setText("Publish Anyway")
+            self._warnings_only = True
+            self.btn_secondary.show()
         else:
             self.stack.setCurrentIndex(1)
             kind = "synchronized" if is_synced else "unsynchronized"
@@ -184,8 +315,18 @@ class PublishLyricsDialog(QDialog):
         self.progress_table.setItem(2, 1, QTableWidgetItem(prog.publishLyrics))
 
     def _on_primary(self):
-        if self._lint:
+        if self._lint and not getattr(self, '_warnings_only', False):
             self.reject()
+            return
+        if getattr(self, '_warnings_only', False) and not self._is_publishing:
+            self._warnings_only = False
+            self._lint = []
+            kind = "synchronized" if self._is_synced else "unsynchronized"
+            self.info_label.setText(
+                f"Publish the {kind} lyrics for <b>{self._payload['title']} - {self._payload['artistName']}</b> to the current LRCLIB instance?"
+            )
+            self.stack.setCurrentIndex(1)
+            self.btn_primary.setText("Publish Now")
             return
         if not self._is_publishing:
             self._start_publish()
@@ -228,7 +369,7 @@ class PublishLyricsDialog(QDialog):
             "syncedLyrics": synced,
         }
 
-        self.worker = PublishWorker(payload, self)
+        self.worker = PublishWorker(payload, self._lrclib_instance, self)
         self.worker.progress.connect(self._set_progress)
         self.worker.finished.connect(self._publish_done)
         self.worker.start()

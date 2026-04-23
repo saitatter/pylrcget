@@ -33,6 +33,23 @@ def get_app_data_dir() -> str:
         app.setApplicationName("PyLrcGet")
     base = QStandardPaths.writableLocation(QStandardPaths.AppDataLocation)
 
+    # Migrate from old nested layout (PyLrcGet/PyLrcGet → PyLrcGet)
+    old_nested = os.path.join(base, "PyLrcGet")
+    if os.path.isdir(old_nested):
+        for item in os.listdir(old_nested):
+            src = os.path.join(old_nested, item)
+            dst = os.path.join(base, item)
+            if not os.path.exists(dst):
+                try:
+                    os.rename(src, dst)
+                except OSError as exc:
+                    logging.warning("Failed to migrate app data from %s to %s: %s", src, dst, exc)
+        # Remove old subfolder if empty
+        try:
+            os.rmdir(old_nested)
+        except OSError as exc:
+            logging.warning("Failed to remove old app data directory %s: %s", old_nested, exc)
+
     os.makedirs(base, exist_ok=True)
     return base
 
@@ -90,7 +107,7 @@ def init_app_state(app_data_dir: str | None = None) -> AppState:
 def main() -> int:
     qt_app = QApplication(sys.argv)
     qt_app.setApplicationName("PyLrcGet")
-    qt_app.setOrganizationName("PyLrcGet")
+    qt_app.setOrganizationName("")
     qt_app.setWindowIcon(load_app_icon())
     app_data_dir = get_app_data_dir()
     app_state = init_app_state(app_data_dir)

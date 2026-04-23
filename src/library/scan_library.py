@@ -253,7 +253,7 @@ def _parse_track_number(raw: str | None) -> int | None:
     try:
         head = str(raw).split("/")[0].strip()
         return int(head)
-    except Exception:
+    except (ValueError, IndexError):
         return None
 
 def _read_sidecar(path: str, lyrics_lookup_subdir: str | None = None) -> tuple[str | None, str | None]:
@@ -267,13 +267,13 @@ def _read_sidecar(path: str, lyrics_lookup_subdir: str | None = None) -> tuple[s
         if txt is None and os.path.isfile(txt_path):
             try:
                 txt = Path(txt_path).read_text(encoding="utf-8", errors="replace")
-            except Exception:
+            except OSError:
                 txt = None
 
         if lrc is None and os.path.isfile(lrc_path):
             try:
                 lrc = Path(lrc_path).read_text(encoding="utf-8", errors="replace")
-            except Exception:
+            except OSError:
                 lrc = None
 
         if txt is not None and lrc is not None:
@@ -384,7 +384,7 @@ def read_embedded_lyrics(path: str) -> Tuple[Optional[str], Optional[str]]:
                 if isinstance(first, (bytes, bytearray)):
                     try:
                         synced = first.decode("utf-8", errors="replace")
-                    except Exception:
+                    except (UnicodeDecodeError, AttributeError):
                         synced = None
                 else:
                     synced = str(first)
@@ -445,7 +445,7 @@ def read_embedded_lyrics(path: str) -> Tuple[Optional[str], Optional[str]]:
                         else:
                             try:
                                 plain = str(val)
-                            except Exception:
+                            except (TypeError, ValueError):
                                 plain = None
                         if plain:
                             break
@@ -503,7 +503,7 @@ def new_fs_track_from_path(
         try:
             if getattr(audio, "info", None) and getattr(audio.info, "length", None):
                 duration = float(audio.info.length)
-        except Exception:
+        except (TypeError, ValueError):
             duration = 0.0
 
         # Preferred order: embedded, same-folder sidecars, then optional subfolder sidecars.

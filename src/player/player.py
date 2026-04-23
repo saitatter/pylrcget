@@ -101,7 +101,7 @@ class Player(QObject):
 
             self._mpv = backend
             self._use_mpv = True
-        except Exception:
+        except (FileNotFoundError, OSError, RuntimeError):
             self._mpv = None
             self._use_mpv = False
 
@@ -140,7 +140,7 @@ class Player(QObject):
         """
         try:
             self._mpv_last_eof = bool(value)
-        except Exception:
+        except (TypeError, ValueError):
             self._mpv_last_eof = False
 
     # ----------------------------
@@ -177,7 +177,7 @@ class Player(QObject):
         # Pump mpv incoming messages
         try:
             self._mpv.process_messages(max_messages=500)
-        except Exception:
+        except (OSError, RuntimeError, AttributeError):
             # If mpv dies, fall back to Qt (optional).
             # For now, we just stop using mpv.
             self._use_mpv = False
@@ -313,7 +313,7 @@ class Player(QObject):
         # Qt fallback (best-effort)
         try:
             self.media.setPlaybackRate(speed)
-        except Exception:
+        except (AttributeError, TypeError):
             pass
 
     def playback_speed(self) -> float:
@@ -321,5 +321,5 @@ class Player(QObject):
             return float(self._mpv.get_property("speed") or 1.0)
         try:
             return float(self.media.playbackRate())
-        except Exception:
+        except (AttributeError, TypeError, ValueError):
             return float(self._playback_speed)
