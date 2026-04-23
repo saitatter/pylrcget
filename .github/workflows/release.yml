@@ -34,6 +34,18 @@ jobs:
           git_committer_email: 41898282+github-actions[bot]@users.noreply.github.com
           build: false
 
+      - name: Regenerate release notes from GitHub categories
+        if: ${{ steps.semantic-release.outputs.released == 'true' }}
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_PAT }}
+        run: |
+          gh api \
+            repos/${{ github.repository }}/releases/generate-notes \
+            -f tag_name="${{ steps.semantic-release.outputs.tag }}" \
+            -f target_commitish="${{ steps.semantic-release.outputs.commit_sha }}" \
+            --jq .body > RELEASE_NOTES.md
+          gh release edit "${{ steps.semantic-release.outputs.tag }}" --notes-file RELEASE_NOTES.md
+
   build-release-assets:
     needs: release
     if: ${{ needs.release.outputs.released == 'true' }}
@@ -85,7 +97,7 @@ jobs:
         run: |
           @"
           [Setup]
-          AppId={7A93F8B8-FA1D-4D4A-B2CC-1A9A6688D52C}
+          AppId=com.saitatter.pylrcget
           AppName=PyLrcGet
           AppVersion=${{ needs.release.outputs.version }}
           DefaultDirName={autopf}\PyLrcGet
