@@ -267,11 +267,20 @@ class PublishLyricsDialog(QDialog):
         root.addLayout(footer)
 
         # decide which page
-        if self._lint:
+        errors = [p for p in self._lint if p.severity == "error"]
+        warnings = [p for p in self._lint if p.severity != "error"]
+        if errors:
             self._populate_lint(self._lint)
             self.stack.setCurrentIndex(0)
             self.btn_primary.setText("Close")
             self.btn_secondary.hide()
+        elif warnings:
+            self._populate_lint(warnings)
+            self.lint_header.setText("Warnings found — you can still publish")
+            self.stack.setCurrentIndex(0)
+            self.btn_primary.setText("Publish Anyway")
+            self._warnings_only = True
+            self.btn_secondary.show()
         else:
             self.stack.setCurrentIndex(1)
             kind = "synchronized" if is_synced else "unsynchronized"
@@ -304,8 +313,18 @@ class PublishLyricsDialog(QDialog):
         self.progress_table.setItem(2, 1, QTableWidgetItem(prog.publishLyrics))
 
     def _on_primary(self):
-        if self._lint:
+        if self._lint and not getattr(self, '_warnings_only', False):
             self.reject()
+            return
+        if getattr(self, '_warnings_only', False) and not self._is_publishing:
+            self._warnings_only = False
+            self._lint = []
+            kind = "synchronized" if self._is_synced else "unsynchronized"
+            self.info_label.setText(
+                f"Publish the {kind} lyrics for <b>{self._payload['title']} - {self._payload['artistName']}</b> to the current LRCLIB instance?"
+            )
+            self.stack.setCurrentIndex(1)
+            self.btn_primary.setText("Publish Now")
             return
         if not self._is_publishing:
             self._start_publish()

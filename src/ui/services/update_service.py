@@ -369,6 +369,8 @@ def download_release_asset(
                     downloaded += len(chunk)
                     if progress_callback is not None:
                         progress_callback(downloaded, total)
+    digest = hasher.hexdigest()
+    logger.info("Download complete: %s (SHA-256: %s, %d bytes)", destination.name, digest, downloaded)
     if total > 0 and downloaded != total:
         raise IOError(f"Incomplete download: expected {total} bytes, got {downloaded} bytes.")
     if asset.size > 0 and destination.stat().st_size != asset.size:
