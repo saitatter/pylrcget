@@ -40,7 +40,10 @@ def get_app_data_dir() -> str:
             src = os.path.join(old_nested, item)
             dst = os.path.join(base, item)
             if not os.path.exists(dst):
-                os.rename(src, dst)
+                try:
+                    os.rename(src, dst)
+                except OSError:
+                    pass
         # Remove old subfolder if empty
         try:
             os.rmdir(old_nested)

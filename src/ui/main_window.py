@@ -1134,17 +1134,15 @@ class MainWindow(QMainWindow):
         track_id = int(track_meta.track_id)
 
         def _on_lyrics_selected(plain: str, synced: str):
-            if synced.strip():
-                update_track_synced_lyrics(self.app_state.db, track_id, synced)
-            if plain.strip():
-                update_track_plain_lyrics(self.app_state.db, track_id, plain)
-            elif synced.strip() and not plain.strip():
-                # Derive plain from synced
-                from core.utils import plain_text_from_lrc
-                derived = plain_text_from_lrc(synced)
-                if derived:
-                    update_track_plain_lyrics(self.app_state.db, track_id, derived)
-            if not synced.strip() and not plain.strip():
+            s_text, p_text = synced.strip(), plain.strip()
+            if s_text:
+                if not p_text:
+                    from core.utils import plain_text_from_lrc
+                    p_text = plain_text_from_lrc(s_text)
+                update_track_synced_lyrics(self.app_state.db, track_id, s_text, p_text)
+            elif p_text:
+                update_track_plain_lyrics(self.app_state.db, track_id, p_text)
+            if not s_text and not p_text:
                 return
 
             track = get_track_by_id(self.app_state.db, track_id)

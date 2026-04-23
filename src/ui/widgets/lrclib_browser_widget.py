@@ -190,6 +190,17 @@ class _BrowserPublishDialog(QDialog):
                 QMessageBox.warning(self, "No Lyrics", "Provide synced or plain lyrics to publish.")
                 return
 
+            from ui.dialogs.publish_lyrics_dialog import lint_lyrics
+            for text, is_synced in [(synced, True), (plain, False)]:
+                if not text:
+                    continue
+                problems = lint_lyrics(text, is_synced=is_synced)
+                errors = [p for p in problems if p.severity == "error"]
+                if errors:
+                    msg = "\n".join(f"Line {p.line}: {p.message}" for p in errors)
+                    QMessageBox.warning(self, "Lyrics Issues", msg)
+                    return
+
             self._payload = {
                 "title": title,
                 "artistName": artist,
