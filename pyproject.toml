@@ -14,5 +14,5 @@ major_on_zero = true
 [tool.semantic_release.commit_parser_options]
 minor_tags = ["feat"]
 patch_tags = ["fix", "perf", "refactor"]
-parse_squash_commits = true
+parse_squash_commits = false
 ignore_merge_commits = true
