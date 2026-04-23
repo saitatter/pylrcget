@@ -104,3 +104,72 @@ class PublishHistoryController(QObject):
 
         for view in self._lyrics_views():
             view.set_publish_feedback(is_synced=is_synced, state="idle")
+
+    def publish_batch(self, track_ids: list[int], is_synced: bool) -> None:
+        if not track_ids:
+            return
+
+        from PySide6.QtWidgets import QMessageBox
+
+        kind = "synced" if is_synced else "plain"
+        reply = QMessageBox.question(
+            self.parent(),
+            "Bulk Publish",
+            f"Publish {kind} lyrics for {len(track_ids)} track(s) to LRCLIB?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+
+        from ui.workers.bulk_publish_worker import BulkPublishWorker
+
+        config = get_config(self._app_state.db)
+        lrclib_url = self._normalize_lrclib_base(config.lrclib_instance)
+
+        self._bulk_worker = BulkPublishWorker(
+            db_path=self._app_state.db_path,
+            track_ids=track_ids,
+            is_synced=is_synced,
+            lrclib_instance=lrclib_url,
+            parent=self,
+        )
+
+        def _on_item_finished(track_id: int, ok: bool, message: str):
+            if ok:
+                try:
+                    track = get_track_by_id(self._app_state.db, int(track_id))
+                    record_publish_history(
+                        self._app_state.db,
+                        track_id=int(track_id),
+                        title=track.title,
+                        artist_name=track.artist_name,
+                        album_name=track.album_name,
+                        publish_kind=kind,
+                        lrclib_instance=lrclib_url,
+                    )
+                except (sqlite3.Error, AttributeError) as exc:
+                    logger.warning("Failed to record publish history for track %s: %s", track_id, exc)
+
+        def _on_finished(ok: bool, summary: str, stats: dict):
+            self._bulk_worker = None
+            self._refresh_history()
+            notify_user(
+                self._app_state,
+                summary,
+                "success" if ok else "warning",
+                show_status=self._show_status,
+                status_timeout_ms=5000,
+            )
+
+        self._bulk_worker.itemFinished.connect(_on_item_finished)
+        self._bulk_worker.finished.connect(_on_finished)
+
+        notify_user(
+            self._app_state,
+            f"Publishing {kind} lyrics for {len(track_ids)} track(s)...",
+            "info",
+            show_status=self._show_status,
+            status_timeout_ms=3000,
+        )
+        self._bulk_worker.start()

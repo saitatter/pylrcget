@@ -26,6 +26,7 @@ class TrackListWidget(QWidget):
     downloadLyrics = Signal(int)  # track_id
     exportLyricsFiles = Signal(int)  # track_id
     bulkDownloadRequested = Signal(list, str)  # track_ids, mode
+    bulkPublishRequested = Signal(list, bool)   # track_ids, is_synced
     openArtist = Signal(int)
     openAlbum = Signal(int)
     navigateRequested = Signal(object)
@@ -338,6 +339,9 @@ class TrackListWidget(QWidget):
         act_dl_plain = menu.addAction(f"Download selection as plain only {count_suffix}")
         act_instr = menu.addAction(f"Mark selection as instrumental {count_suffix}")
         act_uninstr = menu.addAction(f"Unmark instrumental on selection {count_suffix}")
+        menu.addSeparator()
+        act_pub_synced = menu.addAction(f"Publish selection synced {count_suffix}")
+        act_pub_plain = menu.addAction(f"Publish selection plain {count_suffix}")
 
         chosen = menu.exec(self.table.viewport().mapToGlobal(pos))
         if chosen == act_play:
@@ -362,6 +366,10 @@ class TrackListWidget(QWidget):
             self.markInstrumental.emit(selected_ids)
         elif chosen == act_uninstr:
             self.unmarkInstrumental.emit(selected_ids)
+        elif chosen == act_pub_synced:
+            self.bulkPublishRequested.emit(selected_ids, True)
+        elif chosen == act_pub_plain:
+            self.bulkPublishRequested.emit(selected_ids, False)
 
     def _emit_artist_navigation(self, artist_id: int) -> None:
         self.openArtist.emit(int(artist_id))
