@@ -78,7 +78,10 @@ class BulkPublishWorker(QThread):
                     continue
 
                 if self.is_synced:
-                    plain = re.sub(r"\[\d{1,3}:\d{2}[.:]\d{2,3}\]", "", lyrics_text).strip()
+                    plain = "\n".join(
+                        re.sub(r"\[\d{1,3}:\d{2}[.:]\d{2,3}\]", "", line).strip()
+                        for line in lyrics_text.splitlines()
+                    ).strip()
                     synced = lyrics_text
                 else:
                     plain = lyrics_text
