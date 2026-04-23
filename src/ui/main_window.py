@@ -58,6 +58,7 @@ from ui.style_loader import load_stylesheet
 from ui.widgets.toast import ToastManager
 from ui.widgets.log_panel import LogPanel, QtLogHandler
 from ui.widgets.my_lrclib_widget import MyLrclibWidget
+from ui.widgets.lrclib_browser_widget import LrclibBrowserWidget
 from ui.widgets.download_progress_overlay import DownloadProgressOverlay
 
 logger = logging.getLogger(__name__)
@@ -222,9 +223,15 @@ class MainWindow(QMainWindow):
 
         self.mylrclib_tab = MyLrclibWidget(self.app_state)
 
+        self.lrclib_browser_tab = LrclibBrowserWidget(self.app_state)
+        self.lrclib_browser_tab.set_lrclib_url(
+            self._normalize_lrclib_base(get_config(self.app_state.db).lrclib_instance)
+        )
+
         self.tabs.addTab(self.tracks_tab, "Tracks")
         self.tabs.addTab(self.albums_page, "Albums")
         self.tabs.addTab(self.artists_page, "Artists")
+        self.tabs.addTab(self.lrclib_browser_tab, "LRCLIB Browser")
         self.tabs.addTab(self.mylrclib_tab, "My LRCLIB")
         self.tabs.setAccessibleName("Library navigation tabs")
 
@@ -463,6 +470,9 @@ class MainWindow(QMainWindow):
             updated_config = get_config(self.app_state.db)
             self._apply_appearance_preferences(updated_config)
             self._sync_download_mode_ui()
+            self.lrclib_browser_tab.set_lrclib_url(
+                self._normalize_lrclib_base(updated_config.lrclib_instance)
+            )
             for view in self._all_lyrics_views():
                 view.set_reaction_delay_ms(updated_config.reaction_delay_ms)
             self._apply_track_filters()
