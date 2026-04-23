@@ -176,9 +176,6 @@ class MainWindow(QMainWindow):
 
         splitter.addWidget(self.lyrics_view)
         self.lyrics_view.seekRequested.connect(self._seek_player)
-        if self.app_state.player:
-            self.app_state.player.positionChanged.connect(self.lyrics_view.on_player_position)
-
         self.lyrics_view.exportFilesRequested.connect(self._export_current_track_sidecars)
 
         splitter.setStretchFactor(0, 3)
@@ -198,8 +195,6 @@ class MainWindow(QMainWindow):
         self.albums_lyrics_view.seekRequested.connect(self._seek_player)
         self.albums_lyrics_view.downloadRequested.connect(self._download_current_track_lyrics)
         self.albums_lyrics_view.exportFilesRequested.connect(self._export_current_track_sidecars)
-        if self.app_state.player:
-            self.app_state.player.positionChanged.connect(self.albums_lyrics_view.on_player_position)
         self.albums_splitter.addWidget(self.albums_lyrics_view)
         self.albums_splitter.setStretchFactor(0, 3)
         self.albums_splitter.setStretchFactor(1, 2)
@@ -217,8 +212,6 @@ class MainWindow(QMainWindow):
         self.artists_lyrics_view.seekRequested.connect(self._seek_player)
         self.artists_lyrics_view.downloadRequested.connect(self._download_current_track_lyrics)
         self.artists_lyrics_view.exportFilesRequested.connect(self._export_current_track_sidecars)
-        if self.app_state.player:
-            self.app_state.player.positionChanged.connect(self.artists_lyrics_view.on_player_position)
         self.artists_splitter.addWidget(self.artists_lyrics_view)
         self.artists_splitter.setStretchFactor(0, 3)
         self.artists_splitter.setStretchFactor(1, 2)
