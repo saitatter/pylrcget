@@ -6,10 +6,10 @@ import sqlite3
 from datetime import datetime, timezone
 from typing import List, Sequence
 
+from core.models import FsTrack
 from core.utils import prepare_input
 from db.models import Album, Artist, Config, Track
 from library import scan_library
-from library.fs_track import FsTrack
 
 # -------------------------------
 # DIRECTORIES
