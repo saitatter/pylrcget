@@ -62,6 +62,7 @@ class PublishHistoryController(QObject):
             lyrics_text=lyrics_text,
             is_synced=is_synced,
             lint_result=[],
+            lrclib_instance=self._normalize_lrclib_base(get_config(self._app_state.db).lrclib_instance),
             parent=self.parent(),
         )
         for view in self._lyrics_views():

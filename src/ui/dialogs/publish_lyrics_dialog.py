@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from typing import List, Optional
 
@@ -10,7 +11,12 @@ from PySide6.QtWidgets import (
 )
 import re
 
+from lrclib import LrcLibAPI
+from lrclib.exceptions import APIError, IncorrectPublishTokenError, RateLimitError
+
 from ui.spacing import SPACE_2, SPACE_3, SPACE_4, set_layout_spacing
+
+logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class LintProblem:
@@ -30,23 +36,48 @@ class PublishWorker(QThread):
     progress = Signal(object)     # PublishProgress
     finished = Signal(bool, str)  # ok, message
 
-    def __init__(self, payload: dict, parent=None):
+    def __init__(self, payload: dict, lrclib_instance: str, parent=None):
         super().__init__(parent)
         self.payload = payload
+        self.lrclib_instance = lrclib_instance
 
     def run(self):
         try:
-            # TODO: implement real LRCLIB publishing
-            # For now we simulate the 3 phases.
-            self.progress.emit(PublishProgress("Done", "Pending", "Pending"))
-            self.msleep(400)
-            self.progress.emit(PublishProgress("Done", "Done", "Pending"))
-            self.msleep(400)
-            self.progress.emit(PublishProgress("Done", "Done", "Done"))
-            self.msleep(300)
+            api = LrcLibAPI(user_agent="pylrcget/1.0", base_url=self.lrclib_instance)
 
-            self.finished.emit(True, "Lyrics were published successfully (stub).")
+            self.progress.emit(PublishProgress("In progress...", "Pending", "Pending"))
+            challenge = api.request_challenge()
+            self.progress.emit(PublishProgress("Done", "Pending", "Pending"))
+
+            self.progress.emit(PublishProgress("Done", "In progress...", "Pending"))
+            from lrclib.cryptographic_challenge_solver import find_nonce
+            solution = find_nonce(challenge.prefix, bytes.fromhex(challenge.target))
+            publish_token = api._obtain_publish_token()
+            self.progress.emit(PublishProgress("Done", "Done", "Pending"))
+
+            self.progress.emit(PublishProgress("Done", "Done", "In progress..."))
+            api.publish_lyrics(
+                track_name=self.payload["title"],
+                artist_name=self.payload["artistName"],
+                album_name=self.payload["albumName"],
+                duration=int(self.payload["duration"]),
+                plain_lyrics=self.payload.get("plainLyrics") or None,
+                synced_lyrics=self.payload.get("syncedLyrics") or None,
+            )
+            self.progress.emit(PublishProgress("Done", "Done", "Done"))
+
+            self.finished.emit(True, "Lyrics were published successfully.")
+        except IncorrectPublishTokenError:
+            logger.exception("Publish token rejected by LRCLIB")
+            self.finished.emit(False, "Publish token was rejected. Try again.")
+        except RateLimitError:
+            logger.warning("Rate limited by LRCLIB during publish")
+            self.finished.emit(False, "Rate limited by LRCLIB. Please wait and try again.")
+        except APIError as e:
+            logger.exception("LRCLIB API error during publish")
+            self.finished.emit(False, f"LRCLIB error: {e}")
         except Exception as e:
+            logger.exception("Unexpected error during publish")
             self.finished.emit(False, f"Publish failed: {e}")
 
 
@@ -66,6 +97,7 @@ class PublishLyricsDialog(QDialog):
         lyrics_text: str,
         is_synced: bool,
         lint_result: Optional[List[LintProblem]] = None,
+        lrclib_instance: str = "https://lrclib.net",
         parent=None
     ):
         super().__init__(parent)
@@ -77,6 +109,7 @@ class PublishLyricsDialog(QDialog):
         self.publish_result: bool | None = None
         self._lint = lint_result or []
         self._is_synced = is_synced
+        self._lrclib_instance = lrclib_instance
 
         self.resize(650, 420)
 
@@ -228,7 +261,7 @@ class PublishLyricsDialog(QDialog):
             "syncedLyrics": synced,
         }
 
-        self.worker = PublishWorker(payload, self)
+        self.worker = PublishWorker(payload, self._lrclib_instance, self)
         self.worker.progress.connect(self._set_progress)
         self.worker.finished.connect(self._publish_done)
         self.worker.start()
