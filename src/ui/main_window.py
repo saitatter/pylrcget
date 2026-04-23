@@ -29,6 +29,7 @@ from db.queries import (
     get_track_by_id,
     mark_tracks_instrumental,
     set_config,
+    set_directories,
     unmark_tracks_instrumental,
     update_track_null_lyrics,
     update_track_plain_lyrics,
@@ -84,6 +85,7 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("PyLrcGet")
         self.setWindowIcon(load_app_icon())
         self.resize(900, 600)
+        self.setAcceptDrops(True)
         self.app_state = app_state
 
         self._queue_ids: list[int] = []
@@ -417,6 +419,50 @@ class MainWindow(QMainWindow):
             self.download_overlay.sync_to_parent()
         if hasattr(self, "publish_overlay"):
             self.publish_overlay.sync_to_parent()
+
+    def dragEnterEvent(self, event):
+        if event.mimeData().hasUrls():
+            # Accept if at least one URL is a directory
+            for url in event.mimeData().urls():
+                if url.isLocalFile() and os.path.isdir(url.toLocalFile()):
+                    event.acceptProposedAction()
+                    return
+
+    def dropEvent(self, event):
+        dropped_dirs = []
+        for url in event.mimeData().urls():
+            path = url.toLocalFile()
+            if os.path.isdir(path):
+                dropped_dirs.append(os.path.normpath(path))
+        if not dropped_dirs:
+            return
+        event.acceptProposedAction()
+
+        existing = get_directories(self.app_state.db)
+        existing_set = {os.path.normpath(d) for d in existing}
+        new_dirs = [d for d in dropped_dirs if d not in existing_set]
+
+        if not new_dirs:
+            notify_user(
+                self.app_state,
+                "Dropped folder(s) are already in the library.",
+                "info",
+                show_status=self._show_status_message,
+                status_timeout_ms=3000,
+            )
+            return
+
+        merged = existing + new_dirs
+        set_directories(self.app_state.db, merged)
+        label = ", ".join(os.path.basename(d) for d in new_dirs)
+        notify_user(
+            self.app_state,
+            f"Added {len(new_dirs)} folder(s): {label}",
+            "success",
+            show_status=self._show_status_message,
+            status_timeout_ms=4000,
+        )
+        self.refresh_library()
 
     def closeEvent(self, event: QCloseEvent) -> None:
         self._save_window_state()
