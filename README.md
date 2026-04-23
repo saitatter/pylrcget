@@ -1,8 +1,8 @@
-# LRCGET (Python / Desktop Edition)
+# PyLrcGet
 
 A desktop-native reimplementation of **LRCGET** focused on **local library browsing**, **lyrics editing**, **playback**, and **LRCLIB integration**.
 
-This version goes beyond bulk lyric downloads and turns the app into a full desktop workflow for:
+PyLrcGet goes beyond bulk lyric downloads and turns the app into a full desktop workflow for:
 
 - scanning local music folders
 - downloading and editing synced or plain lyrics
@@ -60,9 +60,9 @@ This version goes beyond bulk lyric downloads and turns the app into a full desk
 - PySide6 / Qt desktop UI
 - multiple built-in themes
 - clickable artist / album navigation from the player bar and track list
-- fast non-native file dialogs on Windows for better browsing performance
+- native Windows file dialogs for better mapped-drive and network-share support
 - built-in log panel with live filtering, copy/save actions, and on-disk log files
-- in-app update checker with release notes, download links, and packaged-build self-update support where available
+- in-app update checker with release notes, download links, and packaged-build installer launch support
 
 ---
 
@@ -112,6 +112,7 @@ Sidecar lyric export supports:
 
 Filename pattern placeholders:
 
+- `{filename}`
 - `{artist}`
 - `{title}`
 - `{album}`
@@ -148,6 +149,10 @@ The Settings dialog is organized by category and includes:
 ### Appearance
 
 - theme selection
+- UI scale (`90%`, `100%`, `110%`, `125%`)
+- font size (`Small`, `Normal`, `Large`)
+- album art visibility toggle (`Show` / `Hide`)
+- startup view (`Remember last view`, `Tracks`, `Albums`, `Artists`, `My LRCLIB`)
 
 ### Updates
 
@@ -287,7 +292,11 @@ On Windows 11, SmartScreen or Defender may show a warning before launch, especia
 The desktop app can check GitHub Releases for newer versions directly from the `About` dialog.
 
 - source checkouts can view release notes and open / download the latest release
-- packaged builds can also stage and apply self-updates when a matching platform artifact is available
+- packaged builds can launch platform installers from the dialog when a supported asset is published
+- Windows auto-install expects `pylrcget-windows-installer.exe`
+- macOS supports installer launch for `.dmg` and `.pkg` assets
+- Linux supports installer launch for `.AppImage`, `.deb`, and `.rpm` assets
+- local feed testing supports `PYLRCGET_UPDATE_LATEST_URL` and `PYLRCGET_UPDATE_DEBUG` environment overrides
 
 ---
 ## Local Build

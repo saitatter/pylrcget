@@ -639,6 +639,7 @@ def refresh_track_from_file(db: sqlite3.Connection, track_id: int) -> Track | No
     if not source_path or not os.path.isfile(source_path):
         db.execute("DELETE FROM tracks WHERE id = ?", (int(track_id),))
         prune_library(db)
+        db.commit()
         return None
 
     config = get_config(db)
@@ -697,6 +698,7 @@ def refresh_track_from_file(db: sqlite3.Connection, track_id: int) -> Track | No
         ),
     )
     prune_library(db)
+    db.commit()
     return get_track_by_id(db, int(track_id))
 
 

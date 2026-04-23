@@ -12,6 +12,7 @@ a = Analysis(
     datas=[
         (str(ROOT / "src" / "ui" / "qss"), "ui/qss"),
         (str(ROOT / "src" / "ui" / "assets"), "ui/assets"),
+        (str(ROOT / "pyproject.toml"), "."),
     ],
     hiddenimports=[],
     hookspath=[],

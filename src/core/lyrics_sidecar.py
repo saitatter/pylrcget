@@ -20,8 +20,8 @@ def export_lyrics_sidecars(track: Track, config: Config) -> list[str]:
     base_path.parent.mkdir(parents=True, exist_ok=True)
 
     written_paths: list[str] = []
-    txt_path = base_path.with_suffix(".txt")
-    lrc_path = base_path.with_suffix(".lrc")
+    txt_path = base_path.parent / f"{base_path.name}.txt"
+    lrc_path = base_path.parent / f"{base_path.name}.lrc"
 
     if plain:
         txt_path.write_text(plain, encoding="utf-8")
@@ -41,8 +41,11 @@ def export_lyrics_sidecars(track: Track, config: Config) -> list[str]:
 def _resolve_output_base(track: Track, config: Config) -> Path:
     output_dir = (config.lyrics_output_dir or "").strip()
     if output_dir:
-        pattern = (config.lyrics_file_pattern or DEFAULT_LYRICS_FILE_PATTERN).strip() or DEFAULT_LYRICS_FILE_PATTERN
-        filename = _render_pattern(pattern, track)
+        pattern = (config.lyrics_file_pattern or "").strip()
+        if pattern:
+            filename = _render_pattern(pattern, track)
+        else:
+            filename = _default_output_name(track)
         return Path(output_dir) / filename
 
     return Path(track.file_path).with_suffix("")
@@ -54,13 +57,30 @@ def _render_pattern(pattern: str, track: Track) -> str:
         "title": _safe_component(track.title),
         "album": _safe_component(track.album_name),
         "track": _safe_component(str(track.track_number) if track.track_number is not None else ""),
+        "filename": _default_output_name(track),
     }
     try:
         rendered = pattern.format(**values).strip()
     except Exception:
         rendered = ""
 
-    return _safe_component(rendered) or _safe_component(f"{track.artist_name} - {track.title}") or "lyrics"
+    return _safe_component(rendered) or _default_output_name(track)
+
+
+def _default_output_name(track: Track) -> str:
+    file_path = (track.file_path or "").strip()
+    if file_path:
+        from_path = _safe_component(Path(file_path).stem)
+        if from_path:
+            return from_path
+
+    file_name = (track.file_name or "").strip()
+    if file_name:
+        from_name = _safe_component(Path(file_name).stem)
+        if from_name:
+            return from_name
+
+    return _safe_component(f"{track.artist_name} - {track.title}") or "lyrics"
 
 
 def _safe_component(value: str) -> str:

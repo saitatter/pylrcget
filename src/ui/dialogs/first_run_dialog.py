@@ -9,7 +9,7 @@ from ui.spacing import SPACE_2, SPACE_3, SPACE_4, set_layout_spacing
 class FirstRunDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Welcome to LrcGet")
+        self.setWindowTitle("Welcome to PyLrcGet")
         self.setModal(True)
         self.resize(520, 260)
 
@@ -21,7 +21,7 @@ class FirstRunDialog(QDialog):
         root.addWidget(title)
 
         body = QLabel(
-            "LrcGet needs one or more music folders before it can scan tracks, download lyrics, "
+            "PyLrcGet needs one or more music folders before it can scan tracks, download lyrics, "
             "and open the synced editor. Start by choosing the folders that contain your library."
         )
         body.setWordWrap(True)

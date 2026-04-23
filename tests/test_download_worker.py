@@ -29,7 +29,7 @@ class LyricsDownloadWorkerTests(unittest.TestCase):
                 finished: list[tuple[bool, str, int]] = []
                 progress: list[str] = []
                 worker = LyricsDownloadWorker(
-                    db_path=str(Path(tmp) / "db.sqlite3"),
+                    db_path=str(Path(tmp) / "pylrcget.db.sqlite3"),
                     track_id=int(track["id"]),
                     download_mode="prefer_synced",
                 )
@@ -71,7 +71,7 @@ class LyricsDownloadWorkerTests(unittest.TestCase):
 
                 finished: list[tuple[bool, str, int]] = []
                 worker = LyricsDownloadWorker(
-                    db_path=str(Path(tmp) / "db.sqlite3"),
+                    db_path=str(Path(tmp) / "pylrcget.db.sqlite3"),
                     track_id=int(track["id"]),
                     download_mode="prefer_synced",
                 )
@@ -111,7 +111,7 @@ class LyricsDownloadWorkerTests(unittest.TestCase):
 
                 finished: list[tuple[bool, str, int]] = []
                 worker = LyricsDownloadWorker(
-                    db_path=str(Path(tmp) / "db.sqlite3"),
+                    db_path=str(Path(tmp) / "pylrcget.db.sqlite3"),
                     track_id=int(track["id"]),
                     download_mode="synced_only",
                 )
@@ -146,7 +146,7 @@ class LyricsDownloadWorkerTests(unittest.TestCase):
 
                 finished: list[tuple[bool, str, int]] = []
                 worker = LyricsDownloadWorker(
-                    db_path=str(Path(tmp) / "db.sqlite3"),
+                    db_path=str(Path(tmp) / "pylrcget.db.sqlite3"),
                     track_id=int(track["id"]),
                     download_mode="prefer_synced",
                 )
@@ -181,7 +181,7 @@ class LyricsDownloadWorkerTests(unittest.TestCase):
 
                 finished: list[tuple[bool, str, int]] = []
                 worker = LyricsDownloadWorker(
-                    db_path=str(Path(tmp) / "db.sqlite3"),
+                    db_path=str(Path(tmp) / "pylrcget.db.sqlite3"),
                     track_id=int(track["id"]),
                     download_mode="plain_only",
                 )
@@ -219,7 +219,7 @@ class LyricsDownloadWorkerTests(unittest.TestCase):
 
                 finished: list[tuple[bool, str, int]] = []
                 worker = LyricsDownloadWorker(
-                    db_path=str(Path(tmp) / "db.sqlite3"),
+                    db_path=str(Path(tmp) / "pylrcget.db.sqlite3"),
                     track_id=int(track["id"]),
                     download_mode="plain_only",
                 )
@@ -250,7 +250,7 @@ class LyricsDownloadWorkerTests(unittest.TestCase):
                 self.assertIsNotNone(track)
 
                 worker = LyricsDownloadWorker(
-                    db_path=str(Path(tmp) / "db.sqlite3"),
+                    db_path=str(Path(tmp) / "pylrcget.db.sqlite3"),
                     track_id=int(track["id"]),
                     download_mode="plain_only",
                 )
@@ -279,7 +279,7 @@ class LyricsDownloadWorkerTests(unittest.TestCase):
                 self.assertIsNotNone(track)
 
                 worker = LyricsDownloadWorker(
-                    db_path=str(Path(tmp) / "db.sqlite3"),
+                    db_path=str(Path(tmp) / "pylrcget.db.sqlite3"),
                     track_id=int(track["id"]),
                     download_mode="plain_only",
                 )

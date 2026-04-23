@@ -129,7 +129,7 @@ class LogPanel(QWidget):
         path, _ = QFileDialog.getSaveFileName(
             self,
             "Save Logs",
-            "lrcget.log",
+            "pylrcget.log",
             "Log Files (*.log);;Text Files (*.txt);;All Files (*)",
         )
         if not path:
