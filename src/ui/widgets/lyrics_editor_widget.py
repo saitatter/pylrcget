@@ -238,6 +238,7 @@ class LyricsEditorWidget(QWidget):
         self.empty_state = EmptyStateWidget()
         self.empty_state.actionTriggered.connect(self.downloadRequested.emit)
         self.empty_state.secondaryActionTriggered.connect(self.searchRequested.emit)
+        self.empty_state.tertiaryActionTriggered.connect(self._start_writing_lyrics)
         self.stack.addWidget(self.empty_state)
 
         # Plain editor (editable if you want)
@@ -366,6 +367,7 @@ class LyricsEditorWidget(QWidget):
                 body="Download lyrics from LRCLIB to start editing, or search manually.",
                 action_text="Download Lyrics",
                 secondary_action_text="Search LRCLIB",
+                tertiary_action_text="Write Lyrics",
             )
             self.stack.setCurrentWidget(self.empty_state)
 
@@ -409,6 +411,11 @@ class LyricsEditorWidget(QWidget):
         self.btn_shift_selected.setEnabled(False)
         self.btn_shift_all_from_first.setEnabled(False)
         self.btn_export_files.setEnabled(True)
+
+    def _start_writing_lyrics(self):
+        """Switch to an empty plain editor so the user can write lyrics from scratch."""
+        self._set_plain("")
+        self.plain.setFocus()
 
     def _set_synced(self, pairs: List[Tuple[int, str]]):
         self._reset_state()
