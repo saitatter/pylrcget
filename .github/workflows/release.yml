@@ -34,18 +34,6 @@ jobs:
           git_committer_email: 41898282+github-actions[bot]@users.noreply.github.com
           build: false
 
-      - name: Regenerate release notes from GitHub categories
-        if: ${{ steps.semantic-release.outputs.released == 'true' }}
-        env:
-          GH_TOKEN: ${{ secrets.RELEASE_PAT }}
-        run: |
-          gh api \
-            repos/${{ github.repository }}/releases/generate-notes \
-            -f tag_name="${{ steps.semantic-release.outputs.tag }}" \
-            -f target_commitish="${{ steps.semantic-release.outputs.commit_sha }}" \
-            --jq .body > RELEASE_NOTES.md
-          gh release edit "${{ steps.semantic-release.outputs.tag }}" --notes-file RELEASE_NOTES.md
-
   build-release-assets:
     needs: release
     if: ${{ needs.release.outputs.released == 'true' }}
@@ -85,7 +73,7 @@ jobs:
       - name: Package archive (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
-        run: Compress-Archive -Path dist/pylrcget.exe -DestinationPath ${{ matrix.archive_name }}
+        run: Compress-Archive -Path dist/pylrcget -DestinationPath ${{ matrix.archive_name }}
 
       - name: Package archive (Unix)
         if: runner.os != 'Windows'
@@ -115,7 +103,7 @@ jobs:
           Name: "english"; MessagesFile: "compiler:Default.isl"
 
           [Files]
-          Source: "dist\pylrcget.exe"; DestDir: "{app}"; Flags: ignoreversion
+          Source: "dist\pylrcget\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
           [Icons]
           Name: "{autoprograms}\PyLrcGet"; Filename: "{app}\pylrcget.exe"
@@ -130,8 +118,10 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           mkdir -p pkgroot/DEBIAN
+          mkdir -p pkgroot/opt/PyLrcGet
           mkdir -p pkgroot/usr/local/bin
-          install -m 0755 dist/pylrcget pkgroot/usr/local/bin/pylrcget
+          cp -R dist/pylrcget/. pkgroot/opt/PyLrcGet/
+          ln -s /opt/PyLrcGet/pylrcget pkgroot/usr/local/bin/pylrcget
           cat > pkgroot/DEBIAN/control <<EOF
           Package: pylrcget
           Version: ${{ needs.release.outputs.version }}
@@ -146,8 +136,10 @@ jobs:
       - name: Build macOS installer (.pkg)
         if: runner.os == 'macOS'
         run: |
+          mkdir -p pkgroot/usr/local/lib/PyLrcGet
           mkdir -p pkgroot/usr/local/bin
-          install -m 0755 dist/pylrcget pkgroot/usr/local/bin/pylrcget
+          cp -R dist/pylrcget/. pkgroot/usr/local/lib/PyLrcGet/
+          ln -s ../lib/PyLrcGet/pylrcget pkgroot/usr/local/bin/pylrcget
           pkgbuild \
             --root pkgroot \
             --identifier com.saitatter.pylrcget \
