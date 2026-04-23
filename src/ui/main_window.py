@@ -518,6 +518,7 @@ class MainWindow(QMainWindow):
         )
         if self.app_state.player and self.app_state.player.track:
             self.track_list.set_now_playing(self.app_state.player.track.track_id)
+        self._update_search_feedback()
 
     def _schedule_library_search(self):
         self._search_apply_timer.start()
@@ -872,6 +873,16 @@ class MainWindow(QMainWindow):
             self._selection_label.setText(f"{count} tracks selected")
         else:
             self._selection_label.setText("")
+
+    def _update_search_feedback(self):
+        query = self.top_bar.search_text()
+        if query:
+            count = self.track_list.model.rowCount()
+            has_more = getattr(self.track_list, '_has_more_rows', False)
+            suffix = "+" if has_more else ""
+            self._show_status_message(f"{count}{suffix} result{'s' if count != 1 else ''} for \"{query}\"")
+        else:
+            self.statusBar().clearMessage()
 
     def _current_player_track_id(self) -> int | None:
         if not self.app_state.player or not self.app_state.player.track:
