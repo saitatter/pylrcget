@@ -104,8 +104,8 @@ class AboutDialog(QDialog):
         root.addLayout(button_row)
 
         note = QLabel(
-            "Automatic install is available on Windows packaged builds when a Windows installer asset is published. "
-            "On macOS/Linux, use Download update and install manually."
+            "Automatic install is available for packaged builds when a supported platform installer asset is "
+            "published."
         )
         note.setWordWrap(True)
         note.setObjectName("DialogSubtle")

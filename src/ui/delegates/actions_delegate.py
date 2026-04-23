@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from PySide6.QtCore import QEvent, Qt, QRect, Signal, QSize
-from PySide6.QtGui import QPainter
+from PySide6.QtGui import QCursor, QPainter
 from PySide6.QtWidgets import QApplication, QStyle, QStyledItemDelegate, QStyleOptionButton
 
 from core.tracklist_models import DownloadState, TrackListRow
@@ -54,6 +54,9 @@ class ActionsDelegate(QStyledItemDelegate):
         state = getattr(row_obj, "download_state", DownloadState.IDLE) if row_obj else DownloadState.IDLE
 
         refresh_rect, download_rect = self._button_rects(option.rect)
+        hover_pos = option.widget.mapFromGlobal(QCursor.pos()) if option.widget is not None else None
+        hover_refresh = bool(hover_pos is not None and refresh_rect.contains(hover_pos))
+        hover_download = bool(hover_pos is not None and download_rect.contains(hover_pos))
 
         refresh_opt = QStyleOptionButton()
         refresh_opt.rect = refresh_rect
@@ -61,7 +64,7 @@ class ActionsDelegate(QStyledItemDelegate):
         icon_size = int(round(14 * self._ui_scale))
         refresh_opt.iconSize = QSize(icon_size, icon_size)
         refresh_opt.state = QStyle.State_Enabled
-        if option.state & QStyle.State_MouseOver:
+        if hover_refresh:
             refresh_opt.state |= QStyle.State_MouseOver
 
         download_opt = QStyleOptionButton()
@@ -72,7 +75,7 @@ class ActionsDelegate(QStyledItemDelegate):
             DownloadState.ERROR: "Retry",
         }.get(state, "Download")
         download_opt.state = QStyle.State_None if state == DownloadState.LOADING else QStyle.State_Enabled
-        if option.state & QStyle.State_MouseOver and state != DownloadState.LOADING:
+        if hover_download and state != DownloadState.LOADING:
             download_opt.state |= QStyle.State_MouseOver
         QApplication.style().drawControl(QStyle.CE_PushButton, refresh_opt, painter)
         QApplication.style().drawControl(QStyle.CE_PushButton, download_opt, painter)

@@ -29,12 +29,19 @@ def upgrade_database_if_needed(db: sqlite3.Connection, existing_version: int) ->
     if existing_version == CURRENT_DB_VERSION:
         return
 
-    if existing_version > 0:
-        print("Non-zero schema version detected for the new DB file. Skipping migration.")
+    if existing_version > CURRENT_DB_VERSION:
+        print("Database version is newer than this build. Skipping migration.")
         return
 
-    print("Initialize database version 1...")
-    db.execute("PRAGMA journal_mode=WAL")
-    db.executescript(SCHEMA_V1_SQL)
-    db.execute(f"PRAGMA user_version={CURRENT_DB_VERSION}")
-    db.commit()
+    if existing_version == 0:
+        print("Initialize database version 1...")
+        db.execute("PRAGMA journal_mode=WAL")
+        db.executescript(SCHEMA_V1_SQL)
+        db.execute(f"PRAGMA user_version={CURRENT_DB_VERSION}")
+        db.commit()
+        return
+
+    raise RuntimeError(
+        f"Unsupported database upgrade path: {existing_version} -> {CURRENT_DB_VERSION}. "
+        "Add an explicit migration step before increasing CURRENT_DB_VERSION."
+    )
