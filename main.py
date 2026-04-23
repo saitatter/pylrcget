@@ -103,7 +103,10 @@ def main() -> int:
     )
     main_window = MainWindow(app_state)
     main_window.show()
-    QTimer.singleShot(50, main_window.initialize_player_backend)
+    main_window._startup_player_timer = QTimer(main_window)
+    main_window._startup_player_timer.setSingleShot(True)
+    main_window._startup_player_timer.timeout.connect(main_window.initialize_player_backend)
+    main_window._startup_player_timer.start(50)
 
     return qt_app.exec()
 

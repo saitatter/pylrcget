@@ -426,7 +426,8 @@ $target = {_powershell_single_quoted(str(target_exe))}
 $newExe = {_powershell_single_quoted(str(new_exe))}
 $targetDir = Split-Path -Path $target -Parent
 $backup = Join-Path $targetDir (([System.IO.Path]::GetFileNameWithoutExtension($target)) + '.previous.exe')
-$logDir = Join-Path $env:LOCALAPPDATA {_powershell_single_quoted(APP_PATH_NAME)}
+$baseAppData = if ($env:LOCALAPPDATA) {{ $env:LOCALAPPDATA }} elseif ($env:APPDATA) {{ $env:APPDATA }} else {{ $env:TEMP }}
+$logDir = Join-Path $baseAppData {_powershell_single_quoted(APP_PATH_NAME)}
 New-Item -ItemType Directory -Path $logDir -Force | Out-Null
 $logPath = Join-Path $logDir 'pylrcget-update.log'
 $runtimeTempDir = Join-Path $logDir ('runtime-temp-' + [guid]::NewGuid().ToString('N'))
