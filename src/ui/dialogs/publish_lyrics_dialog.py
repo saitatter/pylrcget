@@ -21,8 +21,78 @@ logger = logging.getLogger(__name__)
 @dataclass(frozen=True)
 class LintProblem:
     line: int
-    severity: str  # "error" (you can extend later)
+    severity: str  # "error" | "warning"
     message: str
+
+
+_LRC_TS_RE = re.compile(r"\[\d{1,3}:\d{2}[.:]\d{2,3}\]")
+
+
+def lint_lyrics(text: str, *, is_synced: bool) -> list[LintProblem]:
+    """Validate lyrics text before publishing to LRCLIB."""
+    problems: list[LintProblem] = []
+    lines = text.splitlines()
+    content_lines = [l for l in lines if l.strip()]
+
+    if not content_lines:
+        problems.append(LintProblem(line=1, severity="error", message="Lyrics are empty."))
+        return problems
+
+    if len(content_lines) < 2:
+        problems.append(LintProblem(line=1, severity="warning", message="Very short lyrics (fewer than 2 lines)."))
+
+    if is_synced:
+        timestamps: list[tuple[int, int]] = []  # (line_num, ms)
+        for i, raw in enumerate(lines, start=1):
+            stripped = raw.strip()
+            if not stripped:
+                continue
+            # skip metadata tags
+            if re.match(r"^\[(ar|ti|al|by|offset|au):", stripped):
+                continue
+            matches = list(_LRC_TS_RE.finditer(stripped))
+            if not matches:
+                problems.append(LintProblem(line=i, severity="error", message="Line has no timestamp."))
+                continue
+            for m in matches:
+                ts_text = m.group(0)[1:-1]  # strip [ ]
+                parts = re.split(r"[:.]", ts_text)
+                if len(parts) >= 3:
+                    mins = int(parts[0])
+                    secs = int(parts[1])
+                    frac = parts[2]
+                    if len(frac) == 2:
+                        ms = int(frac) * 10
+                    else:
+                        ms = int(frac)
+                    total_ms = mins * 60000 + secs * 1000 + ms
+                    timestamps.append((i, total_ms))
+
+        # Check ordering
+        for j in range(1, len(timestamps)):
+            prev_line, prev_ms = timestamps[j - 1]
+            cur_line, cur_ms = timestamps[j]
+            if cur_ms < prev_ms:
+                problems.append(LintProblem(
+                    line=cur_line,
+                    severity="warning",
+                    message=f"Timestamp is out of order (earlier than line {prev_line}).",
+                ))
+                break  # one warning is enough
+
+        # Check duplicates
+        seen_ms: dict[int, int] = {}
+        for line_num, ms in timestamps:
+            if ms in seen_ms:
+                problems.append(LintProblem(
+                    line=line_num,
+                    severity="warning",
+                    message=f"Duplicate timestamp (same as line {seen_ms[ms]}).",
+                ))
+            else:
+                seen_ms[ms] = line_num
+
+    return problems
 
 
 @dataclass(frozen=True)

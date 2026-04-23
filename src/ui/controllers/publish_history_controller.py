@@ -7,7 +7,7 @@ from typing import Callable
 from PySide6.QtCore import QObject
 
 from db.queries import get_config, get_track_by_id, record_publish_history
-from ui.dialogs.publish_lyrics_dialog import PublishLyricsDialog
+from ui.dialogs.publish_lyrics_dialog import PublishLyricsDialog, lint_lyrics
 from ui.services.feedback import notify_user
 
 logger = logging.getLogger(__name__)
@@ -55,6 +55,7 @@ class PublishHistoryController(QObject):
 
         track = get_track_by_id(self._app_state.db, int(track_id))
         lyrics_text = (track.lrc_lyrics or "") if is_synced else (track.txt_lyrics or "")
+        lint_result = lint_lyrics(lyrics_text, is_synced=is_synced)
         dlg = PublishLyricsDialog(
             title=track.title,
             artist_name=track.artist_name,
@@ -62,7 +63,7 @@ class PublishHistoryController(QObject):
             duration_s=float(track.duration or 0.0),
             lyrics_text=lyrics_text,
             is_synced=is_synced,
-            lint_result=[],
+            lint_result=[p for p in lint_result if p.severity == "error"],
             lrclib_instance=self._normalize_lrclib_base(get_config(self._app_state.db).lrclib_instance),
             parent=self.parent(),
         )
