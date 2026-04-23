@@ -509,7 +509,7 @@ class PlayerBar(QWidget):
         if self.player and hasattr(self.player, "set_playback_speed"):
             try:
                 self.player.set_playback_speed(normalized)
-            except Exception:
+            except (AttributeError, RuntimeError):
                 self._sync_speed_from_player()
                 return
         self._set_speed_combo_value(normalized)
@@ -529,7 +529,7 @@ class PlayerBar(QWidget):
         if self.player and hasattr(self.player, "set_volume"):
             try:
                 self.player.set_volume(normalized)
-            except Exception as exc:
+            except (AttributeError, RuntimeError) as exc:
                 logger.warning("Failed to set volume from slider: %s", exc)
                 self._sync_volume_from_player()
                 return
@@ -567,7 +567,7 @@ class PlayerBar(QWidget):
         if self.player and hasattr(self.player, "playback_speed"):
             try:
                 current = float(self.player.playback_speed() or 1.0)
-            except Exception:
+            except (TypeError, ValueError, AttributeError):
                 current = 1.0
         self._apply_speed(current + delta)
 
@@ -576,7 +576,7 @@ class PlayerBar(QWidget):
             return
         try:
             speed = float(self.player.playback_speed() or 1.0)
-        except Exception:
+        except (TypeError, ValueError, AttributeError):
             speed = 1.0
 
         self._set_speed_combo_value(speed)
@@ -586,7 +586,7 @@ class PlayerBar(QWidget):
             return
         try:
             volume = float(self.player.volume())
-        except Exception as exc:
+        except (TypeError, ValueError, AttributeError) as exc:
             logger.warning("Failed to sync volume from player: %s", exc)
             volume = 0.7
         self._set_volume_slider_value(volume)

@@ -717,7 +717,7 @@ def mark_tracks_instrumental(db: sqlite3.Connection, track_ids: list[int]) -> No
             WHERE id = ?
         """, [(i,) for i in ids])
         db.commit()
-    except Exception:
+    except sqlite3.Error:
         db.rollback()
         raise
 
@@ -739,7 +739,7 @@ def unmark_tracks_instrumental(db: sqlite3.Connection, track_ids: list[int]) -> 
             WHERE id = ?
         """, [(i,) for i in ids])
         db.commit()
-    except Exception:
+    except sqlite3.Error:
         db.rollback()
         raise
 

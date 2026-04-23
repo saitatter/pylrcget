@@ -512,7 +512,7 @@ class MusicFoldersDialog(QDialog):
         else:
             try:
                 rendered = pattern.format(**values).strip()
-            except Exception:
+            except (KeyError, ValueError, IndexError):
                 rendered = ""
                 used_fallback = True
         rendered = self._safe_filename_component(rendered)

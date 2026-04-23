@@ -62,7 +62,7 @@ def _bundled_resource_root() -> Path | None:
         return None
     try:
         return Path(base).resolve()
-    except Exception:
+    except (OSError, ValueError):
         return None
 
 
@@ -74,12 +74,12 @@ def _version_file_candidates() -> list[Path]:
 
     try:
         candidates.append(project_root() / "pyproject.toml")
-    except Exception:
+    except (OSError, ValueError):
         pass
 
     try:
         candidates.append(Path(sys.executable).resolve().parent / "pyproject.toml")
-    except Exception:
+    except (OSError, ValueError):
         pass
 
     unique: list[Path] = []
@@ -104,7 +104,7 @@ def current_app_version() -> str:
             version = str(data.get("project", {}).get("version", "")).strip()
             if version:
                 return version
-        except Exception:
+        except (OSError, tomllib.TOMLDecodeError, UnicodeDecodeError):
             continue
     return "0.0.0"
 
@@ -112,7 +112,7 @@ def current_app_version() -> str:
 def current_executable_path() -> Path | None:
     try:
         return Path(sys.executable).resolve()
-    except Exception:
+    except (OSError, ValueError):
         return None
 
 
@@ -123,7 +123,7 @@ def _can_write_directory(path: Path) -> bool:
         probe.write_text("ok", encoding="utf-8")
         probe.unlink(missing_ok=True)
         return True
-    except Exception:
+    except OSError:
         return False
 
 
@@ -297,7 +297,7 @@ def launch_windows_installer(installer_path: Path) -> None:
         if getattr(exc, "winerror", None) == 1223:
             raise RuntimeError("Installer launch was canceled in the UAC confirmation dialog.") from exc
         raise RuntimeError(f"Failed to launch installer: {exc}") from exc
-    except Exception as exc:
+    except (TypeError, AttributeError) as exc:
         raise RuntimeError(f"Failed to launch installer: {exc}") from exc
 
 
@@ -420,7 +420,7 @@ def _is_probably_valid_pyinstaller_binary(path: Path) -> bool:
             handle.seek(max(0, path.stat().st_size - 8192))
             tail = handle.read()
             return b"MEI\x0c\x0b\x0a\x0b\x0e" in tail
-    except Exception:
+    except OSError:
         return False
 
 
@@ -689,7 +689,7 @@ def choose_update_download_path(download_dir: Path, asset_name: str) -> Path:
     try:
         destination.unlink()
         return destination
-    except Exception:
+    except OSError:
         stem = Path(asset_name).stem or "update"
         suffix = Path(asset_name).suffix
         unique_name = f"{stem}-{os.getpid()}-{uuid.uuid4().hex[:8]}{suffix}"

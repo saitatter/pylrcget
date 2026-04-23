@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import base64
+import binascii
+import struct
 from pathlib import Path
 
 from mutagen import File as MutagenFile
@@ -50,7 +52,7 @@ def extract_embedded_cover_bytes(audio_path: str | None) -> bytes | None:
 
     try:
         audio = MutagenFile(audio_path, easy=False)
-    except Exception:
+    except (OSError, ValueError):
         return None
 
     if audio is None:
@@ -98,7 +100,7 @@ def extract_embedded_cover_bytes(audio_path: str | None) -> bytes | None:
                     picture = Picture(base64.b64decode(raw))
                     if picture.data:
                         return bytes(picture.data)
-                except Exception:
+                except (ValueError, struct.error):
                     continue
 
             coverart_blocks = audio.tags.get("coverart", [])
@@ -107,9 +109,9 @@ def extract_embedded_cover_bytes(audio_path: str | None) -> bytes | None:
                     data = base64.b64decode(raw)
                     if data:
                         return data
-                except Exception:
+                except (ValueError, binascii.Error):
                     continue
-    except Exception:
+    except (OSError, ValueError, KeyError):
         return None
 
     return None

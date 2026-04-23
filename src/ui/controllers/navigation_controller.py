@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sqlite3
 from collections.abc import Callable
 from dataclasses import replace
 
@@ -132,7 +133,7 @@ class NavigationController(QObject):
                     artist_label = self._display_artist_name(artist.get("artist_name", ""))
                     if artist_label:
                         self._artist_label_cache[artist_id] = artist_label
-                except Exception:
+                except (sqlite3.Error, KeyError):
                     pass
 
         if not album_label and len(route.album_ids) == 1:
@@ -151,7 +152,7 @@ class NavigationController(QObject):
                         artist_id = album.get("artist_id")
                         if artist_label and artist_id is not None:
                             self._artist_label_cache[int(artist_id)] = artist_label
-                except Exception:
+                except (sqlite3.Error, KeyError):
                     pass
 
         if artist_label == route.artist_label and album_label == route.album_label:

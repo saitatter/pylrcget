@@ -121,7 +121,7 @@ def sync_track_outputs_with_result(
         try:
             notify_cb("Writing lyrics sidecar files...")
             sidecar_paths = tuple(export_lyrics_sidecars(track, config))
-        except Exception as exc:
+        except (OSError, PermissionError, ValueError) as exc:
             sidecar_error = exc
             logger.warning("Failed to export lyrics sidecars for track %s: %s", track.id, exc)
 
@@ -130,7 +130,7 @@ def sync_track_outputs_with_result(
             notify_cb("Embedding lyrics into the audio file...")
             embed_lyrics_for_track(track)
             embedded = True
-        except Exception as exc:
+        except (OSError, ValueError) as exc:
             embed_error = exc
             logger.warning("Failed to embed lyrics for track %s: %s", track.id, exc)
 

@@ -201,7 +201,7 @@ class AboutDialog(QDialog):
             )
             try:
                 launch_platform_installer(download_path)
-            except Exception as exc:
+            except (RuntimeError, FileNotFoundError, OSError) as exc:
                 self.status_label.setText(f"Could not stage the update: {exc}")
                 return
 

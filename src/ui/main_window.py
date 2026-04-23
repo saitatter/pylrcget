@@ -15,6 +15,7 @@ from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QCloseEvent, QShortcut, QKeySequence
 import logging
 import os
+import sqlite3
 
 from dataclasses import replace
 
@@ -397,10 +398,7 @@ class MainWindow(QMainWindow):
             return
         try:
             player = Player()
-        except Exception as exc:
-            self.app_state.queued_notifications.append(
-                Notify(message=f"Failed to initialize audio player: {exc}", notify_type="error")
-            )
+        except (RuntimeError, OSError) as exc:
             self.show_queued_notifications()
             return
 
@@ -665,7 +663,7 @@ class MainWindow(QMainWindow):
     def on_refresh_track(self, track_id: int) -> None:
         try:
             refreshed = refresh_track_from_file(self.app_state.db, int(track_id))
-        except Exception as exc:
+        except (sqlite3.Error, OSError, ValueError) as exc:
             log_and_notify(
                 self.app_state,
                 logger,
@@ -809,7 +807,7 @@ class MainWindow(QMainWindow):
             return
         try:
             self.app_state.player.stop()
-        except Exception:
+        except (RuntimeError, AttributeError):
             pass
         self.app_state.player.track = None
         self.app_state.player.trackChanged.emit(None)
@@ -860,7 +858,7 @@ class MainWindow(QMainWindow):
             self._show_status_message("Lyrics saved.", 2500)
             for view in self._all_lyrics_views():
                 view.set_save_feedback("success", "Saved")
-        except Exception as exc:
+        except (sqlite3.Error, OSError, ValueError) as exc:
             log_and_notify(
                 self.app_state,
                 logger,
@@ -917,7 +915,7 @@ class MainWindow(QMainWindow):
         if self.app_state.player and hasattr(self.app_state.player, "set_playback_speed"):
             try:
                 self.app_state.player.set_playback_speed(speed)
-            except Exception:
+            except (AttributeError, RuntimeError):
                 speed = 1.0
         self.player_bar.set_playback_speed_value(speed)
 
@@ -927,7 +925,7 @@ class MainWindow(QMainWindow):
         if self.app_state.player and hasattr(self.app_state.player, "set_volume"):
             try:
                 self.app_state.player.set_volume(volume)
-            except Exception as exc:
+            except (AttributeError, RuntimeError) as exc:
                 logger.warning("Failed to apply saved volume: %s", exc)
                 volume = 0.7
         self.player_bar.set_volume_value(volume)
@@ -1044,7 +1042,7 @@ class MainWindow(QMainWindow):
             self._show_status_message(f"Lyrics files exported to {output_dir}", 3000)
             for view in self._all_lyrics_views():
                 view.set_export_feedback("success", "Exported")
-        except Exception as exc:
+        except (sqlite3.Error, OSError, ValueError) as exc:
             log_and_notify(
                 self.app_state,
                 logger,
@@ -1201,7 +1199,7 @@ class MainWindow(QMainWindow):
         try:
             album = get_album_by_id(self.app_state.db, int(album_id))
             label = self._display_album_name(album.get("album_name", ""))
-        except Exception:
+        except (sqlite3.Error, KeyError, TypeError):
             label = ""
         self.navigate_to(tracks_album((int(album_id),), label=label))
     
@@ -1209,7 +1207,7 @@ class MainWindow(QMainWindow):
         try:
             artist = get_artist_by_id(self.app_state.db, int(artist_id))
             label = self._display_artist_name(artist.get("artist_name", ""))
-        except Exception:
+        except (sqlite3.Error, KeyError, TypeError):
             label = ""
         self.navigate_to(tracks_artist((int(artist_id),), label=label))
 
@@ -1219,7 +1217,7 @@ class MainWindow(QMainWindow):
             if track.album_id is None:
                 return None
             return tracks_album((int(track.album_id),), label=self._display_album_name(track.album_name))
-        except Exception:
+        except (sqlite3.Error, AttributeError, TypeError):
             return None
 
     def _route_for_current_track_artist(self, track_id: int) -> LibraryRoute | None:
@@ -1228,7 +1226,7 @@ class MainWindow(QMainWindow):
             if track.artist_id is None:
                 return None
             return tracks_artist((int(track.artist_id),), label=self._display_artist_name(track.artist_name))
-        except Exception:
+        except (sqlite3.Error, AttributeError, TypeError):
             return None
 
     def _navigate_current_track_album(self, track_id: int) -> None:
@@ -1270,19 +1268,7 @@ class MainWindow(QMainWindow):
             self._show_status_message(f"Marked {len(track_ids)} track(s) as instrumental.", 3000)
             self._apply_track_filters()
             self.track_list.restore_selection(selected_before)
-        except Exception as e:
-            log_and_notify(
-                self.app_state,
-                logger,
-                logging.ERROR,
-                exception_message("Failed to update tracks", e),
-                "error",
-                show_status=self._show_status_message,
-                status_timeout_ms=4000,
-            )
-
-
-    def _on_unmark_instrumental(self, track_ids: list[int]):
+        except sqlite3.Error as e:
         track_ids = [int(x) for x in track_ids if x is not None]
         if not track_ids:
             return
@@ -1297,7 +1283,7 @@ class MainWindow(QMainWindow):
             self._show_status_message(f"Unmarked {len(track_ids)} track(s).", 3000)
             self._apply_track_filters()
             self.track_list.restore_selection(selected_before)
-        except Exception as e:
+        except sqlite3.Error as e:
             log_and_notify(
                 self.app_state,
                 logger,

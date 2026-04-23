@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import sqlite3
 from typing import Callable
 
 from PySide6.QtCore import QObject
@@ -80,8 +81,7 @@ class PublishHistoryController(QObject):
                     publish_kind="synced" if is_synced else "plain",
                     lrclib_instance=self._normalize_lrclib_base(get_config(self._app_state.db).lrclib_instance),
                 )
-            except Exception as exc:
-                logger.warning("Failed to record publish history: %s", exc)
+            except (sqlite3.Error, AttributeError) as exc:
             else:
                 self._refresh_history()
             for view in self._lyrics_views():

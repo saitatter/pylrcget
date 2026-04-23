@@ -70,7 +70,7 @@ class BulkLyricsDownloadWorker(QThread):
                     label = f"{artist} - {title}".strip(" -")
                     if label:
                         current_label["value"] = label
-                except Exception:
+                except (sqlite3.Error, AttributeError, TypeError):
                     pass
 
                 self.progress.emit(

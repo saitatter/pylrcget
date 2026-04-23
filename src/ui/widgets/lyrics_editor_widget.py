@@ -77,7 +77,7 @@ def _parse_ts_str(ts: str) -> Optional[int]:
     # reuse _ts_to_ms frac logic: but it expects strings
     try:
         return _ts_to_ms(mm, ss, frac)
-    except Exception:
+    except (ValueError, TypeError):
         return None
 
 
@@ -735,7 +735,7 @@ class LyricsEditorWidget(QWidget):
         if provider is not None:
             try:
                 return int(provider())
-            except Exception as exc:
+            except (TypeError, ValueError, AttributeError) as exc:
                 logger.warning("Failed to get playback position from provider: %s", exc)
         return int(self._current_pos_ms)
 

@@ -61,7 +61,7 @@ def _render_pattern(pattern: str, track: Track) -> str:
     }
     try:
         rendered = pattern.format(**values).strip()
-    except Exception:
+    except (KeyError, ValueError, IndexError):
         rendered = ""
 
     return _safe_component(rendered) or _default_output_name(track)

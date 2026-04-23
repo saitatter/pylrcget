@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import platform
 import queue
@@ -10,6 +11,8 @@ import threading
 import time
 from dataclasses import dataclass
 from typing import Any, Callable, Optional
+
+logger = logging.getLogger(__name__)
 
 
 # -----------------------------
@@ -142,7 +145,7 @@ class _MpvJsonIpcTransport:
                     self._pipe_fh = open(self.endpoint, "r+b", buffering=0)
                     last_err = None
                     break
-                except Exception as e:
+                except (FileNotFoundError, OSError, PermissionError) as e:
                     last_err = e
                     time.sleep(0.05)
             if self._pipe_fh is None:
@@ -156,7 +159,7 @@ class _MpvJsonIpcTransport:
                     self._sock = s
                     last_err = None
                     break
-                except Exception as e:
+                except (OSError, ConnectionRefusedError) as e:
                     last_err = e
                     time.sleep(0.05)
             if self._sock is None:
@@ -172,7 +175,7 @@ class _MpvJsonIpcTransport:
             if self._sock:
                 try:
                     self._sock.shutdown(socket.SHUT_RDWR)
-                except Exception:
+                except OSError:
                     pass
                 self._sock.close()
         finally:
@@ -182,7 +185,7 @@ class _MpvJsonIpcTransport:
             if self._pipe_fh:
                 try:
                     self._pipe_fh.close()
-                except Exception:
+                except OSError:
                     pass
         finally:
             self._pipe_fh = None
@@ -223,14 +226,14 @@ class _MpvJsonIpcTransport:
                         break
                     try:
                         chunk = self._pipe_fh.read(4096)
-                    except Exception:
+                    except OSError:
                         break
                 else:
                     if not self._sock:
                         break
                     try:
                         chunk = self._sock.recv(4096)
-                    except Exception:
+                    except OSError:
                         break
 
                 if not chunk:
@@ -375,7 +378,7 @@ class MpvIpcBackend:
         """
         try:
             self.command("stop")
-        except Exception:
+        except (RuntimeError, OSError):
             pass
 
         self._transport.close()
@@ -383,7 +386,7 @@ class MpvIpcBackend:
         if self._proc is not None:
             try:
                 self._proc.terminate()
-            except Exception:
+            except (OSError, ProcessLookupError):
                 pass
             self._proc = None
 
@@ -464,7 +467,7 @@ class MpvIpcBackend:
                 if isinstance(rid, int) and rid in self._pending:
                     try:
                         self._pending[rid].put_nowait(msg)
-                    except Exception:
+                    except queue.Full:
                         pass
                     # Clean it up
                     self._pending.pop(rid, None)
@@ -479,7 +482,7 @@ class MpvIpcBackend:
                         try:
                             cb(data)
                         except Exception:
-                            # Never let a bad observer break processing
+                            logger.debug("Observer callback error for %s", name, exc_info=True)
                             continue
 
             # You can optionally handle other events like:
@@ -491,13 +494,13 @@ class MpvIpcBackend:
     def _on_time_pos(self, value: Any) -> None:
         try:
             self._time_pos_s = float(value) if value is not None else 0.0
-        except Exception:
+        except (TypeError, ValueError):
             self._time_pos_s = 0.0
 
     def _on_duration(self, value: Any) -> None:
         try:
             self._duration_s = float(value) if value is not None else 0.0
-        except Exception:
+        except (TypeError, ValueError):
             self._duration_s = 0.0
 
     def _on_pause(self, value: Any) -> None:

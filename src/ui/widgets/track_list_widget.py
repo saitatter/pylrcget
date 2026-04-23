@@ -282,7 +282,7 @@ class TrackListWidget(QWidget):
             return None
         try:
             return int(self.model.track_id_at(idxs[0].row()))
-        except Exception:
+        except (ValueError, IndexError, AttributeError):
             return None
 
     # -------------------------

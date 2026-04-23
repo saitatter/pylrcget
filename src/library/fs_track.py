@@ -48,7 +48,7 @@ class FsTrack:
             if 'tracknumber' in audio:
                 try:
                     track_number = int(audio['tracknumber'][0].split('/')[0])
-                except Exception:
+                except (KeyError, IndexError, ValueError):
                     track_number = None
 
             track = FsTrack(
@@ -64,7 +64,7 @@ class FsTrack:
             track.txt_lyrics = track.get_txt_lyrics()
             track.lrc_lyrics = track.get_lrc_lyrics()
             return track
-        except Exception as e:
+        except (OSError, ValueError, KeyError) as e:
             logger.debug("Error processing %s: %s", path, e)
             return None
 
