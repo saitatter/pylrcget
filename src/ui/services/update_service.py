@@ -13,6 +13,7 @@ import sys
 import tarfile
 import tempfile
 import tomllib
+import uuid
 import zipfile
 
 import requests
@@ -207,7 +208,9 @@ def is_linux_installer_asset(asset: ReleaseAssetInfo | None) -> bool:
 
 
 def can_auto_install_update(asset: ReleaseAssetInfo | None) -> bool:
-    if asset is None or not is_frozen_build():
+    if asset is None:
+        return False
+    if not is_frozen_build() and not is_update_debug_enabled():
         return False
     if sys.platform.startswith("win"):
         return is_windows_installer_asset(asset)
@@ -279,12 +282,20 @@ def launch_windows_installer(installer_path: Path) -> None:
     if startfile is None:
         raise RuntimeError("os.startfile is unavailable on this Python runtime.")
     try:
-        # Current Windows releases use Inno Setup installers, so these silent flags are intentional.
+        # Current Windows releases use Inno Setup installers.
+        # Keep installer UI visible so users can see progress, and explicitly request
+        # application restart after install when supported by the installer script.
         # If packaging switches to MSI/NSIS, this should branch by installer type.
         startfile(
             str(installer_path),
-            arguments="/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /CLOSEAPPLICATIONS /FORCECLOSEAPPLICATIONS",
+            operation="runas",
+            arguments="/CLOSEAPPLICATIONS /FORCECLOSEAPPLICATIONS /RESTARTAPPLICATIONS",
         )
+    except OSError as exc:
+        # 1223: "The operation was canceled by the user" (typically UAC prompt canceled).
+        if getattr(exc, "winerror", None) == 1223:
+            raise RuntimeError("Installer launch was canceled in the UAC confirmation dialog.") from exc
+        raise RuntimeError(f"Failed to launch installer: {exc}") from exc
     except Exception as exc:
         raise RuntimeError(f"Failed to launch installer: {exc}") from exc
 
@@ -643,10 +654,43 @@ def launch_staged_update(script_path: Path) -> None:
 
 
 def default_update_download_dir(app_data_dir: str | None = None) -> Path:
-    base = Path(app_data_dir) if app_data_dir else Path(tempfile.gettempdir())
-    target = base / "updates"
-    target.mkdir(parents=True, exist_ok=True)
-    return target
+    candidates: list[Path] = []
+    if app_data_dir:
+        candidates.append(Path(app_data_dir) / "updates")
+    candidates.append(Path(tempfile.gettempdir()) / APP_PATH_NAME / "updates")
+
+    unique_candidates: list[Path] = []
+    seen: set[str] = set()
+    for candidate in candidates:
+        rendered = os.path.normcase(str(candidate))
+        if rendered in seen:
+            continue
+        seen.add(rendered)
+        unique_candidates.append(candidate)
+
+    for candidate in unique_candidates:
+        if _can_write_directory(candidate):
+            return candidate
+
+    raise PermissionError(
+        "No writable update download directory is available. "
+        f"Tried: {', '.join(str(path) for path in unique_candidates)}"
+    )
+
+
+def choose_update_download_path(download_dir: Path, asset_name: str) -> Path:
+    destination = download_dir / asset_name
+    if not destination.exists():
+        return destination
+
+    try:
+        destination.unlink()
+        return destination
+    except Exception:
+        stem = Path(asset_name).stem or "update"
+        suffix = Path(asset_name).suffix
+        unique_name = f"{stem}-{os.getpid()}-{uuid.uuid4().hex[:8]}{suffix}"
+        return download_dir / unique_name
 
 
 def cleanup_stale_update_downloads(download_dir: Path) -> None:

@@ -166,6 +166,27 @@ class UpdateServiceTests(unittest.TestCase):
         self.assertEqual(session.calls[0]["url"], local_url)
         self.assertEqual(session.calls[0]["headers"]["User-Agent"], update_service.GITHUB_API_USER_AGENT)
 
+    def test_default_update_download_dir_falls_back_when_preferred_not_writable(self):
+        with patch.object(update_service.tempfile, "gettempdir", return_value="C:/Temp"), patch.object(
+            update_service, "_can_write_directory", side_effect=[False, True]
+        ) as can_write:
+            selected = update_service.default_update_download_dir("C:/Users/test/AppData/Roaming/PyLrcGet")
+
+        self.assertEqual(selected, Path("C:/Temp") / update_service.APP_PATH_NAME / "updates")
+        self.assertEqual(can_write.call_count, 2)
+
+    def test_choose_update_download_path_uses_unique_name_when_target_not_replaceable(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            download_dir = Path(tmp)
+            blocked_target = download_dir / "pylrcget-windows-installer.exe"
+            blocked_target.mkdir()
+
+            selected = update_service.choose_update_download_path(download_dir, "pylrcget-windows-installer.exe")
+
+        self.assertEqual(selected.parent, download_dir)
+        self.assertNotEqual(selected.name, "pylrcget-windows-installer.exe")
+        self.assertEqual(selected.suffix, ".exe")
+
     def test_stage_self_update_creates_windows_updater_script(self):
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
@@ -219,7 +240,7 @@ class UpdateServiceTests(unittest.TestCase):
         self.assertTrue(kwargs["creationflags"] & 0x200)
         self.assertTrue(kwargs["creationflags"] & 0x8)
 
-    def test_launch_windows_installer_uses_silent_flags(self):
+    def test_launch_windows_installer_uses_visible_progress_flags(self):
         fake_startfile = MagicMock()
         installer_path = Path("C:/Temp/pylrcget-windows-installer.exe")
         with patch.object(update_service.sys, "platform", "win32"), patch.object(
@@ -236,11 +257,11 @@ class UpdateServiceTests(unittest.TestCase):
 
         args, kwargs = fake_startfile.call_args
         self.assertEqual(args[0], str(installer_path))
-        self.assertIn("/VERYSILENT", kwargs["arguments"])
-        self.assertIn("/SUPPRESSMSGBOXES", kwargs["arguments"])
-        self.assertIn("/NORESTART", kwargs["arguments"])
+        self.assertEqual(kwargs["operation"], "runas")
         self.assertIn("/CLOSEAPPLICATIONS", kwargs["arguments"])
         self.assertIn("/FORCECLOSEAPPLICATIONS", kwargs["arguments"])
+        self.assertIn("/RESTARTAPPLICATIONS", kwargs["arguments"])
+        self.assertNotIn("/VERYSILENT", kwargs["arguments"])
 
     def test_check_for_updates_macos_pkg_enables_install(self):
         payload = {

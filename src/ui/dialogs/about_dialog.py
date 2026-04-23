@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
 )
 
 from ui.services.update_service import (
+    choose_update_download_path,
     UpdateInfo,
     cleanup_stale_update_downloads,
     current_app_version,
@@ -164,7 +165,7 @@ class AboutDialog(QDialog):
 
         download_dir = default_update_download_dir(getattr(self.app_state, "app_data_dir", None))
         cleanup_stale_update_downloads(download_dir)
-        destination = download_dir / info.asset.name
+        destination = choose_update_download_path(download_dir, info.asset.name)
         self._pending_install = bool(install)
         self.progress.setVisible(True)
         self.progress.setRange(0, 100)
@@ -192,17 +193,18 @@ class AboutDialog(QDialog):
 
         download_path = Path(path)
         if self._pending_install and self._update_info is not None and self._update_info.install_supported:
+            QMessageBox.information(
+                self,
+                "Ready to install",
+                "The update installer will now launch.\n"
+                "Follow the on-screen prompts to proceed with the installation.",
+            )
             try:
                 launch_platform_installer(download_path)
             except Exception as exc:
                 self.status_label.setText(f"Could not stage the update: {exc}")
                 return
 
-            QMessageBox.information(
-                self,
-                "Restarting to update",
-                "Installer launched. PyLrcGet will close now so the update can proceed.",
-            )
             QApplication.quit()
             return
 
