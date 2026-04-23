@@ -61,14 +61,29 @@ class MigrationTests(unittest.TestCase):
             finally:
                 db.close()
 
-    def test_nonzero_legacy_version_is_rejected(self):
+    def test_nonzero_legacy_version_is_left_unchanged(self):
         with tempfile.TemporaryDirectory() as tmp:
             db_path = Path(tmp) / "pylrcget.db.sqlite3"
             db = sqlite3.connect(str(db_path))
             db.row_factory = sqlite3.Row
             try:
-                with self.assertRaises(RuntimeError):
-                    upgrade_database_if_needed(db, 24)
+                db.execute("CREATE TABLE legacy_table (id INTEGER PRIMARY KEY, value TEXT)")
+                db.execute("INSERT INTO legacy_table (value) VALUES ('old')")
+                db.execute("PRAGMA user_version=24")
+                db.commit()
+
+                upgrade_database_if_needed(db, 24)
+
+                version = int(db.execute("PRAGMA user_version").fetchone()[0])
+                self.assertEqual(version, 24)
+                legacy = db.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table' AND name='legacy_table'"
+                ).fetchone()
+                self.assertIsNotNone(legacy)
+                config = db.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table' AND name='config_data'"
+                ).fetchone()
+                self.assertIsNone(config)
             finally:
                 db.close()
 

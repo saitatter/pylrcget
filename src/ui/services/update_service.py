@@ -24,6 +24,7 @@ GITHUB_RELEASES_LATEST_URL = f"https://api.github.com/repos/{GITHUB_REPOSITORY}/
 GITHUB_API_USER_AGENT = "pylrcget-updater/1.0"
 UPDATE_LATEST_URL_ENV = "PYLRCGET_UPDATE_LATEST_URL"
 UPDATE_DEBUG_ENV = "PYLRCGET_UPDATE_DEBUG"
+APP_PATH_NAME = "PyLrcGet"
 
 
 @dataclass(frozen=True)
@@ -278,6 +279,8 @@ def launch_windows_installer(installer_path: Path) -> None:
     if startfile is None:
         raise RuntimeError("os.startfile is unavailable on this Python runtime.")
     try:
+        # Current Windows releases use Inno Setup installers, so these silent flags are intentional.
+        # If packaging switches to MSI/NSIS, this should branch by installer type.
         startfile(
             str(installer_path),
             arguments="/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /CLOSEAPPLICATIONS /FORCECLOSEAPPLICATIONS",
@@ -423,7 +426,7 @@ $target = {_powershell_single_quoted(str(target_exe))}
 $newExe = {_powershell_single_quoted(str(new_exe))}
 $targetDir = Split-Path -Path $target -Parent
 $backup = Join-Path $targetDir (([System.IO.Path]::GetFileNameWithoutExtension($target)) + '.previous.exe')
-$logDir = Join-Path $env:LOCALAPPDATA 'PyLrcGet'
+$logDir = Join-Path $env:LOCALAPPDATA {_powershell_single_quoted(APP_PATH_NAME)}
 New-Item -ItemType Directory -Path $logDir -Force | Out-Null
 $logPath = Join-Path $logDir 'pylrcget-update.log'
 $runtimeTempDir = Join-Path $logDir ('runtime-temp-' + [guid]::NewGuid().ToString('N'))
@@ -524,7 +527,7 @@ PID_TO_WAIT="{int(pid)}"
 TARGET={shlex_quote(str(target_exe))}
 NEW_EXE={shlex_quote(str(new_exe))}
 TARGET_DIR=$(dirname "$TARGET")
-LOG_DIR="${{XDG_STATE_HOME:-$HOME/.local/state}}/PyLrcGet"
+LOG_DIR="${{XDG_STATE_HOME:-$HOME/.local/state}}/{APP_PATH_NAME}"
 LOG_PATH="$LOG_DIR/pylrcget-update.log"
 BACKUP_PATH="$TARGET.bak"
 

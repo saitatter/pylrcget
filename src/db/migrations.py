@@ -30,9 +30,8 @@ def upgrade_database_if_needed(db: sqlite3.Connection, existing_version: int) ->
         return
 
     if existing_version > 0:
-        raise RuntimeError(
-            "Unsupported legacy database version. This release starts from a clean database."
-        )
+        print("Non-zero schema version detected for the new DB file. Skipping migration.")
+        return
 
     print("Initialize database version 1...")
     db.execute("PRAGMA journal_mode=WAL")
