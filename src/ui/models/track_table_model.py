@@ -50,9 +50,18 @@ class TrackTableModel(QAbstractTableModel):
         orientation: Qt.Orientation,
         role: int = int(Qt.ItemDataRole.DisplayRole),
     ) -> str | None:
-        if role != Qt.DisplayRole or orientation != Qt.Horizontal:
+        if orientation != Qt.Horizontal:
             return None
-        return ["Track", "Duration", "Lyrics", ""][section]
+        if role == Qt.DisplayRole:
+            return ["Track", "Duration", "Lyrics", ""][section]
+        if role == Qt.ToolTipRole:
+            return [
+                "Artist — Title",
+                "Track duration",
+                "Lyrics status: None / Plain / Synced / Instrumental",
+                "Actions",
+            ][section]
+        return None
 
     def data(self, index: QModelIndex, role: int = int(Qt.ItemDataRole.DisplayRole)) -> object:
         if not index.isValid():
