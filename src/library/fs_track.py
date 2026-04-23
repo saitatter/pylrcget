@@ -1,3 +1,4 @@
+import logging
 import os
 import glob
 from pathlib import Path
@@ -5,6 +6,8 @@ from dataclasses import dataclass
 from typing import Optional, List
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
+
+logger = logging.getLogger(__name__)
 
 from mutagen import File as MutagenFile
 
@@ -62,7 +65,7 @@ class FsTrack:
             track.lrc_lyrics = track.get_lrc_lyrics()
             return track
         except Exception as e:
-            print(f"Error processing {path}: {e}")
+            logger.debug("Error processing %s: %s", path, e)
             return None
 
     def get_txt_path(self) -> str:
@@ -112,7 +115,7 @@ def load_tracks_from_directories(directories: List[str], db_add_tracks_callback,
     """
     start_time = time.time()
     files_count = count_files_from_directories(directories)
-    print(f"Files count: {files_count}")
+    logger.debug("Files count: %d", files_count)
 
     files_scanned = 0
     for directory in directories:
@@ -135,7 +138,7 @@ def load_tracks_from_directories(directories: List[str], db_add_tracks_callback,
             files_scanned += len(entry_batch)
             emit_progress_callback(ScanProgress(None, files_scanned, files_count))
 
-    print(f"==> Scanning tracks took: {int((time.time() - start_time)*1000)}ms")
+    logger.debug("Scanning tracks took: %dms", int((time.time() - start_time) * 1000))
 
 
 def count_files_from_directories(directories: List[str]) -> int:
