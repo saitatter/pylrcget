@@ -297,6 +297,16 @@ class MainWindow(QMainWindow):
             parent=self,
         )
         self.publish_overlay.cancelRequested.connect(self._cancel_bulk_publish)
+
+        # Background activity button — shows when an overlay is minimized
+        self.download_overlay.activeChanged.connect(self._update_bg_activity_button)
+        self.publish_overlay.activeChanged.connect(self._update_bg_activity_button)
+        self.download_overlay.minimized.connect(self._update_bg_activity_button)
+        self.publish_overlay.minimized.connect(self._update_bg_activity_button)
+        self.download_overlay.dismissed.connect(self._update_bg_activity_button)
+        self.publish_overlay.dismissed.connect(self._update_bg_activity_button)
+        self.top_bar.btn_bg_activity.clicked.connect(self._reopen_bg_overlay)
+
         self.lyrics_view.publishSyncedRequested.connect(self.publish_history.publish_synced)
         self.lyrics_view.publishPlainRequested.connect(self.publish_history.publish_plain)
         self.albums_lyrics_view.publishSyncedRequested.connect(self.publish_history.publish_synced)
@@ -1540,6 +1550,19 @@ class MainWindow(QMainWindow):
         worker = getattr(self.publish_history, "_bulk_worker", None)
         if worker is not None and worker.isRunning():
             worker.requestInterruption()
+
+    def _update_bg_activity_button(self, *_args) -> None:
+        """Show the background-activity button when any overlay is active but hidden."""
+        dl_bg = self.download_overlay.is_active and not self.download_overlay.isVisible()
+        pub_bg = self.publish_overlay.is_active and not self.publish_overlay.isVisible()
+        self.top_bar.btn_bg_activity.setVisible(dl_bg or pub_bg)
+
+    def _reopen_bg_overlay(self) -> None:
+        """Re-show whichever overlay is running in the background."""
+        if self.download_overlay.is_active:
+            self.download_overlay.reopen()
+        elif self.publish_overlay.is_active:
+            self.publish_overlay.reopen()
 
     def _publish_instrumental_to_lrclib(self, track_ids: list[int]) -> None:
         from PySide6.QtWidgets import QMessageBox

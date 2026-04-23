@@ -22,6 +22,8 @@ from ui.theme_tokens import STYLE_TOKENS
 class DownloadProgressOverlay(QWidget):
     cancelRequested = Signal()
     dismissed = Signal()
+    minimized = Signal()           # overlay hidden while operation still running
+    activeChanged = Signal(bool)   # True = batch started, False = batch finished/cancelled
 
     def __init__(self, parent: QWidget | None = None, *, verb: str = "Download"):
         super().__init__(parent)
@@ -135,6 +137,7 @@ class DownloadProgressOverlay(QWidget):
         self.sync_to_parent()
         self.show()
         self.raise_()
+        self.activeChanged.emit(True)
 
     def update_progress(self, current: int, total: int, track_label: str, status: str) -> None:
         self._total = max(0, int(total))
@@ -173,6 +176,7 @@ class DownloadProgressOverlay(QWidget):
             self.title_label.setText(f"{self._verb} Cancelled")
         else:
             self.title_label.setText(f"{self._verb} Complete")
+        self.activeChanged.emit(False)
 
     def queue_auto_close(self, delay_ms: int) -> None:
         if self._active:
@@ -195,9 +199,21 @@ class DownloadProgressOverlay(QWidget):
 
     def _handle_close(self) -> None:
         if self._active:
-            self._handle_cancel()
+            # Minimize — hide overlay but keep operation running
+            self.hide()
+            self.minimized.emit()
             return
         self._dismiss_overlay()
+
+    @property
+    def is_active(self) -> bool:
+        return self._active
+
+    def reopen(self) -> None:
+        """Show the overlay again (e.g. from a header button)."""
+        self.sync_to_parent()
+        self.show()
+        self.raise_()
 
     def _dismiss_overlay(self) -> None:
         self._auto_close_timer.stop()
