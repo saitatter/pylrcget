@@ -28,23 +28,11 @@ jobs:
         id: semantic-release
         uses: python-semantic-release/python-semantic-release@v10.5.3
         with:
-          changelog: false
+          changelog: true
           github_token: ${{ secrets.RELEASE_PAT }}
           git_committer_name: github-actions[bot]
           git_committer_email: 41898282+github-actions[bot]@users.noreply.github.com
           build: false
-
-      - name: Regenerate release notes from GitHub categories
-        if: ${{ steps.semantic-release.outputs.released == 'true' }}
-        env:
-          GH_TOKEN: ${{ secrets.RELEASE_PAT }}
-        run: |
-          gh api \
-            repos/${{ github.repository }}/releases/generate-notes \
-            -f tag_name="${{ steps.semantic-release.outputs.tag }}" \
-            -f target_commitish="${{ steps.semantic-release.outputs.commit_sha }}" \
-            --jq .body > RELEASE_NOTES.md
-          gh release edit "${{ steps.semantic-release.outputs.tag }}" --notes-file RELEASE_NOTES.md
 
   build-release-assets:
     needs: release
@@ -103,6 +91,7 @@ jobs:
           DefaultDirName={autopf}\PyLrcGet
           DefaultGroupName=PyLrcGet
           UninstallDisplayIcon={app}\pylrcget.exe
+          OutputDir=.
           OutputBaseFilename=pylrcget-windows-installer
           Compression=lzma
           SolidCompression=yes

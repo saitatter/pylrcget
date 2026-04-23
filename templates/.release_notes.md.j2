@@ -1,0 +1,49 @@
+## What's Changed
+
+{% set category_map = [
+  ("✨ Features", ["feat", "feature"]),
+  ("🐛 Fixes", ["fix", "perf"]),
+  ("♻️ Refactors", ["refactor"]),
+  ("🧰 CI & Build", ["build", "ci", "chore"]),
+  ("📚 Docs", ["docs"]),
+] %}
+{% set known_types = ["feat", "feature", "fix", "perf", "refactor", "build", "ci", "chore", "docs"] %}
+{% set any_changes = namespace(value=false) %}
+
+{% for heading, types in category_map %}
+{% set bucket = namespace(items=[]) %}
+{% for type_name in types %}
+{% for commit in release["elements"].get(type_name, []) %}
+{% set _ = bucket.items.append(commit) %}
+{% endfor %}
+{% endfor %}
+{% if bucket.items %}
+### {{ heading }}
+{% for commit in bucket.items %}
+- {{ commit.descriptions[0] | capitalize }} ([`{{ commit.hexsha[:7] }}`]({{ commit.hexsha | commit_hash_url }}))
+{% endfor %}
+
+{% set any_changes.value = true %}
+{% endif %}
+{% endfor %}
+
+{% set other = namespace(items=[]) %}
+{% for type_name, commits in release["elements"] | dictsort %}
+{% if type_name not in known_types and type_name != "unknown" %}
+{% for commit in commits %}
+{% set _ = other.items.append(commit) %}
+{% endfor %}
+{% endif %}
+{% endfor %}
+{% if other.items %}
+### 🔧 Other Changes
+{% for commit in other.items %}
+- {{ commit.descriptions[0] | capitalize }} ([`{{ commit.hexsha[:7] }}`]({{ commit.hexsha | commit_hash_url }}))
+{% endfor %}
+
+{% set any_changes.value = true %}
+{% endif %}
+
+{% if not any_changes.value %}
+No user-facing changes in this release.
+{% endif %}
