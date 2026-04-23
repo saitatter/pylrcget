@@ -1,6 +1,72 @@
 # Changelog
 
 
+## v1.0.2 (2026-04-23)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+### 🔧 Other Changes
+
+- Enforce semantic pr titles for squash merges ([`25cdb77`](https://github.com/saitatter/pylrcget/commit/25cdb770c17c20ab49d1b8a5dd92feeb5a38685b))
+
+
+
+
+
+
+
+
 ## v1.0.1 (2026-04-23)
 
 
