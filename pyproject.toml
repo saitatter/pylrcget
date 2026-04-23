@@ -21,6 +21,6 @@ exclude_commit_patterns = [
 
 [tool.semantic_release.commit_parser_options]
 minor_tags = ["feat"]
-patch_tags = ["fix", "perf", "refactor"]
+patch_tags = ["fix", "perf", "refactor", "ci", "chore"]
 parse_squash_commits = false
 ignore_merge_commits = true
