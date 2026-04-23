@@ -28,7 +28,7 @@ jobs:
         id: semantic-release
         uses: python-semantic-release/python-semantic-release@v10.5.3
         with:
-          changelog: false
+          changelog: true
           github_token: ${{ secrets.RELEASE_PAT }}
           git_committer_name: github-actions[bot]
           git_committer_email: 41898282+github-actions[bot]@users.noreply.github.com
@@ -103,6 +103,7 @@ jobs:
           DefaultDirName={autopf}\PyLrcGet
           DefaultGroupName=PyLrcGet
           UninstallDisplayIcon={app}\pylrcget.exe
+          OutputDir=.
           OutputBaseFilename=pylrcget-windows-installer
           Compression=lzma
           SolidCompression=yes

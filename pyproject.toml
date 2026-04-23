@@ -11,6 +11,14 @@ tag_format = "v{version}"
 allow_zero_version = true
 major_on_zero = true
 
+[tool.semantic_release.changelog]
+template_dir = "templates"
+mode = "init"
+exclude_commit_patterns = [
+  "^chore\\(release\\):",
+  "^Merge ",
+]
+
 [tool.semantic_release.commit_parser_options]
 minor_tags = ["feat"]
 patch_tags = ["fix", "perf", "refactor"]
