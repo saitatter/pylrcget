@@ -5,7 +5,6 @@ from pathlib import Path
 from PySide6.QtCore import QTimer, QUrl
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
-    QApplication,
     QDialog,
     QHBoxLayout,
     QLabel,
@@ -197,6 +196,7 @@ class AboutDialog(QDialog):
                 self,
                 "Ready to install",
                 "The update installer will now launch.\n"
+                "The application will close automatically.\n"
                 "Follow the on-screen prompts to proceed with the installation.",
             )
             try:
@@ -205,7 +205,10 @@ class AboutDialog(QDialog):
                 self.status_label.setText(f"Could not stage the update: {exc}")
                 return
 
-            QApplication.quit()
+            # Do NOT quit here — let the Inno Setup installer close the app
+            # via /CLOSEAPPLICATIONS so that Restart Manager can reopen it
+            # after the update finishes.
+            self.status_label.setText("Waiting for installer…")
             return
 
         self.status_label.setText(f"Update downloaded to {download_path}")
