@@ -1002,7 +1002,7 @@ class MainWindow(QMainWindow):
         track_meta = self.app_state.player.track
         artist = getattr(track_meta, "artist", "") or ""
         title = getattr(track_meta, "title", "") or ""
-        query = f"{artist} {title}".strip()
+        album = getattr(track_meta, "album", "") or ""
 
         config = get_config(self.app_state.db)
         lrclib_url = self._normalize_lrclib_base(config.lrclib_instance)
@@ -1011,7 +1011,9 @@ class MainWindow(QMainWindow):
 
         dlg = SearchLyricsDialog(
             lrclib_url,
-            initial_query=query,
+            initial_artist=artist,
+            initial_title=title,
+            initial_album=album,
             parent=self,
         )
 

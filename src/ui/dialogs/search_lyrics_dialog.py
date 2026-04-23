@@ -24,15 +24,23 @@ logger = logging.getLogger(__name__)
 class _SearchWorker(QThread):
     finished = Signal(list, str)  # results, error
 
-    def __init__(self, query: str, lrclib_instance: str, parent=None):
+    def __init__(self, query: str, artist: str, title: str, album: str, lrclib_instance: str, parent=None):
         super().__init__(parent)
         self.query = query
+        self.artist = artist
+        self.title = title
+        self.album = album
         self.lrclib_instance = lrclib_instance
 
     def run(self):
         try:
             api = LrcLibAPI(user_agent="pylrcget", base_url=self.lrclib_instance)
-            results = api.search_lyrics(query=self.query)
+            results = api.search_lyrics(
+                query=self.query or None,
+                track_name=self.title or None,
+                artist_name=self.artist or None,
+                album_name=self.album or None,
+            )
             self.finished.emit(list(results), "")
         except Exception as exc:
             logger.warning("LRCLIB search failed: %s", exc)
@@ -49,6 +57,9 @@ class SearchLyricsDialog(QDialog):
         lrclib_instance: str,
         *,
         initial_query: str = "",
+        initial_artist: str = "",
+        initial_title: str = "",
+        initial_album: str = "",
         parent=None,
     ):
         super().__init__(parent)
@@ -60,14 +71,38 @@ class SearchLyricsDialog(QDialog):
 
         layout = QVBoxLayout(self)
 
-        search_row = QHBoxLayout()
+        # Free-text query row
+        query_row = QHBoxLayout()
+        query_row.addWidget(QLabel("Query:"))
         self.query_edit = QLineEdit()
-        self.query_edit.setPlaceholderText("Search by artist, title, album...")
+        self.query_edit.setPlaceholderText("Free-text search (optional if fields below are filled)")
         self.query_edit.setText(initial_query)
+        query_row.addWidget(self.query_edit, 1)
+        layout.addLayout(query_row)
+
+        # Structured fields row
+        fields_row = QHBoxLayout()
+        fields_row.addWidget(QLabel("Artist:"))
+        self.artist_edit = QLineEdit()
+        self.artist_edit.setPlaceholderText("Artist name")
+        self.artist_edit.setText(initial_artist)
+        fields_row.addWidget(self.artist_edit, 1)
+
+        fields_row.addWidget(QLabel("Title:"))
+        self.title_edit = QLineEdit()
+        self.title_edit.setPlaceholderText("Track title")
+        self.title_edit.setText(initial_title)
+        fields_row.addWidget(self.title_edit, 1)
+
+        fields_row.addWidget(QLabel("Album:"))
+        self.album_edit = QLineEdit()
+        self.album_edit.setPlaceholderText("Album name")
+        self.album_edit.setText(initial_album)
+        fields_row.addWidget(self.album_edit, 1)
+
         self.search_btn = QPushButton("Search")
-        search_row.addWidget(self.query_edit, 1)
-        search_row.addWidget(self.search_btn)
-        layout.addLayout(search_row)
+        fields_row.addWidget(self.search_btn)
+        layout.addLayout(fields_row)
 
         self.status_label = QLabel("")
         layout.addWidget(self.status_label)
@@ -97,6 +132,9 @@ class SearchLyricsDialog(QDialog):
 
         self.search_btn.clicked.connect(self._do_search)
         self.query_edit.returnPressed.connect(self._do_search)
+        self.artist_edit.returnPressed.connect(self._do_search)
+        self.title_edit.returnPressed.connect(self._do_search)
+        self.album_edit.returnPressed.connect(self._do_search)
         self.table.selectionModel().selectionChanged.connect(self._on_selection_changed)
         self.table.doubleClicked.connect(self._on_double_click)
         self.use_btn.clicked.connect(self._use_selected)
@@ -107,8 +145,11 @@ class SearchLyricsDialog(QDialog):
 
     def _do_search(self):
         query = self.query_edit.text().strip()
-        if not query:
-            self.status_label.setText("Enter a search query.")
+        artist = self.artist_edit.text().strip()
+        title = self.title_edit.text().strip()
+        album = self.album_edit.text().strip()
+        if not query and not artist and not title and not album:
+            self.status_label.setText("Enter a search query or fill in at least one field.")
             return
 
         self.search_btn.setEnabled(False)
@@ -116,7 +157,7 @@ class SearchLyricsDialog(QDialog):
         self.table.setRowCount(0)
         self._results.clear()
 
-        self._worker = _SearchWorker(query, self.lrclib_instance, self)
+        self._worker = _SearchWorker(query, artist, title, album, self.lrclib_instance, self)
         self._worker.finished.connect(self._on_search_finished)
         self._worker.start()
 
