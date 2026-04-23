@@ -1,6 +1,80 @@
 # Changelog
 
 
+## v1.0.1 (2026-04-23)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+### 🔧 Other Changes
+
+- Treat ci and chore commits as patch ([`cb217e7`](https://github.com/saitatter/pylrcget/commit/cb217e7dd5d25a5c13a8251ddbe5f7b6b2772e98))
+
+- Add codeowners to require owner approval ([`05e0c5d`](https://github.com/saitatter/pylrcget/commit/05e0c5d6c3d5c0e1f54de2b76b4877cda8783f74))
+
+
+
+
+
+
+
+
 ## v1.0.0 (2026-04-23)
 
 
