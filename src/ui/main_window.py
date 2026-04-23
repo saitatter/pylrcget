@@ -11,7 +11,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import Qt, QByteArray, QSettings, QTimer
 from PySide6.QtGui import QCloseEvent, QShortcut, QKeySequence
 import logging
 import os
@@ -407,6 +407,9 @@ class MainWindow(QMainWindow):
 
         self._apply_styles()
 
+        # Restore persisted window state (geometry, splitter sizes, tab index)
+        self._restore_window_state()
+
     def resizeEvent(self, event):
         super().resizeEvent(event)
         self._update_responsive_layout()
@@ -416,6 +419,7 @@ class MainWindow(QMainWindow):
             self.publish_overlay.sync_to_parent()
 
     def closeEvent(self, event: QCloseEvent) -> None:
+        self._save_window_state()
         self._flush_playback_speed()
         self._flush_playback_volume()
         self.navigation.flush_pending_route()
@@ -1186,6 +1190,54 @@ class MainWindow(QMainWindow):
 
         if hasattr(self, "player_bar"):
             self.player_bar.set_compact_mode(width < 980)
+
+    # --- Window state persistence ---
+    def _get_settings(self) -> QSettings:
+        return QSettings("pylrcget", "pylrcget")
+
+    def _save_window_state(self):
+        s = self._get_settings()
+        s.setValue("window/geometry", self.saveGeometry())
+        if hasattr(self, "content_splitter"):
+            s.setValue("window/tracks_splitter", self.content_splitter.sizes())
+        if hasattr(self, "albums_splitter"):
+            s.setValue("window/albums_splitter", self.albums_splitter.sizes())
+        if hasattr(self, "artists_splitter"):
+            s.setValue("window/artists_splitter", self.artists_splitter.sizes())
+        s.setValue("window/tab_index", self.tabs.currentIndex())
+
+    def _restore_window_state(self):
+        s = self._get_settings()
+
+        geometry = s.value("window/geometry")
+        if geometry is not None:
+            self.restoreGeometry(geometry)
+
+        for attr, key in [
+            ("content_splitter", "window/tracks_splitter"),
+            ("albums_splitter", "window/albums_splitter"),
+            ("artists_splitter", "window/artists_splitter"),
+        ]:
+            splitter = getattr(self, attr, None)
+            if splitter is None:
+                continue
+            saved = s.value(key)
+            if saved is not None:
+                try:
+                    sizes = [int(v) for v in saved]
+                    if len(sizes) == 2 and all(v > 0 for v in sizes):
+                        splitter.setSizes(sizes)
+                except (TypeError, ValueError):
+                    pass
+
+        tab_index = s.value("window/tab_index")
+        if tab_index is not None:
+            try:
+                idx = int(tab_index)
+                if 0 <= idx < self.tabs.count():
+                    self.tabs.setCurrentIndex(idx)
+            except (TypeError, ValueError):
+                pass
 
     def _apply_styles(self):
         self.setStyleSheet(load_stylesheet("main_window.qss"))
