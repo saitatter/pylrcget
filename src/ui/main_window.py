@@ -195,6 +195,7 @@ class MainWindow(QMainWindow):
         self.albums_lyrics_view.saveRequested.connect(self._on_lyrics_save_requested)
         self.albums_lyrics_view.seekRequested.connect(self._seek_player)
         self.albums_lyrics_view.downloadRequested.connect(self._download_current_track_lyrics)
+        self.albums_lyrics_view.searchRequested.connect(self._search_current_track_lyrics)
         self.albums_lyrics_view.exportFilesRequested.connect(self._export_current_track_sidecars)
         self.albums_splitter.addWidget(self.albums_lyrics_view)
         self.albums_splitter.setStretchFactor(0, 3)
@@ -212,6 +213,7 @@ class MainWindow(QMainWindow):
         self.artists_lyrics_view.saveRequested.connect(self._on_lyrics_save_requested)
         self.artists_lyrics_view.seekRequested.connect(self._seek_player)
         self.artists_lyrics_view.downloadRequested.connect(self._download_current_track_lyrics)
+        self.artists_lyrics_view.searchRequested.connect(self._search_current_track_lyrics)
         self.artists_lyrics_view.exportFilesRequested.connect(self._export_current_track_sidecars)
         self.artists_splitter.addWidget(self.artists_lyrics_view)
         self.artists_splitter.setStretchFactor(0, 3)
@@ -341,6 +343,7 @@ class MainWindow(QMainWindow):
         self.track_list.clearFiltersRequested.connect(self._reset_track_filters)
         self.track_list.configureFoldersRequested.connect(self.open_config_modal)
         self.lyrics_view.downloadRequested.connect(self._download_current_track_lyrics)
+        self.lyrics_view.searchRequested.connect(self._search_current_track_lyrics)
         self.albums_tab.playTrack.connect(self.on_play_track)
         self.albums_tab.refreshTrack.connect(self.on_refresh_track)
         self.albums_tab.downloadLyrics.connect(self.on_download_lyrics)
@@ -983,6 +986,58 @@ class MainWindow(QMainWindow):
             )
             return
         self.on_download_lyrics(int(self.app_state.player.track.track_id))
+
+    def _search_current_track_lyrics(self):
+        if not self.app_state.player or not self.app_state.player.track:
+            notify_user(
+                self.app_state,
+                "Select a track before searching lyrics.",
+                "warning",
+                show_status=self._show_status_message,
+                status_timeout_ms=3000,
+            )
+            return
+
+        track_meta = self.app_state.player.track
+        artist = getattr(track_meta, "artist", "") or ""
+        title = getattr(track_meta, "title", "") or ""
+        query = f"{artist} {title}".strip()
+
+        config = get_config(self.app_state.db)
+        lrclib_url = self._normalize_lrclib_base(config.lrclib_instance)
+
+        from ui.dialogs.search_lyrics_dialog import SearchLyricsDialog
+
+        dlg = SearchLyricsDialog(
+            lrclib_url,
+            initial_query=query,
+            parent=self,
+        )
+
+        track_id = int(track_meta.track_id)
+
+        def _on_lyrics_selected(plain: str, synced: str):
+            if synced.strip():
+                update_track_synced_lyrics(self.app_state.db, track_id, synced)
+            if plain.strip():
+                update_track_plain_lyrics(self.app_state.db, track_id, plain)
+            elif synced.strip() and not plain.strip():
+                # Derive plain from synced
+                from ui.widgets.lyrics_editor_widget import parse_lrc
+                pairs = parse_lrc(synced)
+                derived = "\n".join(text.rstrip() for _, text in pairs).rstrip()
+                if derived:
+                    update_track_plain_lyrics(self.app_state.db, track_id, derived)
+            if not synced.strip() and not plain.strip():
+                return
+
+            track = get_track_by_id(self.app_state.db, track_id)
+            self._sync_track_lyrics_outputs(track)
+            self._set_track_lyrics_views(track)
+            self._show_status_message("Lyrics applied from search.", 3000)
+
+        dlg.lyricsSelected.connect(_on_lyrics_selected)
+        dlg.exec()
 
     def _export_current_track_sidecars(self):
         if not self.app_state.player or not self.app_state.player.track:

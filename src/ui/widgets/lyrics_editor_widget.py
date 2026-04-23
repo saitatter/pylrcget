@@ -138,6 +138,7 @@ class LyricsEditorWidget(QWidget):
     publishPlainRequested = Signal()
     saveRequested = Signal(str, str)     # lrc_text, plain_text
     downloadRequested = Signal()
+    searchRequested = Signal()
     exportFilesRequested = Signal()
 
     def __init__(self, parent=None):
@@ -236,6 +237,7 @@ class LyricsEditorWidget(QWidget):
 
         self.empty_state = EmptyStateWidget()
         self.empty_state.actionTriggered.connect(self.downloadRequested.emit)
+        self.empty_state.secondaryActionTriggered.connect(self.searchRequested.emit)
         self.stack.addWidget(self.empty_state)
 
         # Plain editor (editable if you want)
@@ -361,8 +363,9 @@ class LyricsEditorWidget(QWidget):
             self.empty_state.configure(
                 icon_name="audio-lines.svg",
                 title="No lyrics available yet",
-                body="Download lyrics from LRCLIB to start editing, or leave this track lyric-free.",
+                body="Download lyrics from LRCLIB to start editing, or search manually.",
                 action_text="Download Lyrics",
+                secondary_action_text="Search LRCLIB",
             )
             self.stack.setCurrentWidget(self.empty_state)
 
