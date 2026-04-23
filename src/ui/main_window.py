@@ -261,6 +261,8 @@ class MainWindow(QMainWindow):
             parent=self,
         )
         self.download_overlay.cancelRequested.connect(self.downloads.cancel)
+        self.publish_overlay = DownloadProgressOverlay(self.central_widget)
+        self.publish_overlay.sync_to_parent()
         self.publish_history = PublishHistoryController(
             self.app_state,
             normalize_lrclib_base=self._normalize_lrclib_base,
@@ -268,8 +270,10 @@ class MainWindow(QMainWindow):
             lyrics_views=self._all_lyrics_views,
             refresh_history=self.mylrclib_tab.refresh,
             show_status=self._show_status_message,
+            publish_overlay=self.publish_overlay,
             parent=self,
         )
+        self.publish_overlay.cancelRequested.connect(self._cancel_bulk_publish)
         self.lyrics_view.publishSyncedRequested.connect(self.publish_history.publish_synced)
         self.lyrics_view.publishPlainRequested.connect(self.publish_history.publish_plain)
         self.albums_lyrics_view.publishSyncedRequested.connect(self.publish_history.publish_synced)
@@ -389,6 +393,8 @@ class MainWindow(QMainWindow):
         self._update_responsive_layout()
         if hasattr(self, "download_overlay"):
             self.download_overlay.sync_to_parent()
+        if hasattr(self, "publish_overlay"):
+            self.publish_overlay.sync_to_parent()
 
     def closeEvent(self, event: QCloseEvent) -> None:
         self._flush_playback_speed()
@@ -1365,6 +1371,11 @@ class MainWindow(QMainWindow):
                 show_status=self._show_status_message,
                 status_timeout_ms=4000,
             )
+
+    def _cancel_bulk_publish(self) -> None:
+        worker = getattr(self.publish_history, "_bulk_worker", None)
+        if worker is not None and worker.isRunning():
+            worker.requestInterruption()
 
     def _publish_instrumental_to_lrclib(self, track_ids: list[int]) -> None:
         from PySide6.QtWidgets import QMessageBox

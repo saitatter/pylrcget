@@ -23,6 +23,7 @@ class PublishHistoryController(QObject):
         lyrics_views: Callable[[], list],
         refresh_history: Callable[[], None],
         show_status: Callable[[str, int | None], None] | None = None,
+        publish_overlay=None,
         parent=None,
     ) -> None:
         super().__init__(parent)
@@ -32,6 +33,7 @@ class PublishHistoryController(QObject):
         self._lyrics_views = lyrics_views
         self._refresh_history = refresh_history
         self._show_status = show_status
+        self._overlay = publish_overlay
 
     def publish_synced(self) -> None:
         self._open_publish_dialog(is_synced=True)
@@ -135,10 +137,16 @@ class PublishHistoryController(QObject):
             parent=self,
         )
 
+        def _on_progress(current: int, total: int, label: str, status: str):
+            if self._overlay is not None:
+                self._overlay.update_progress(current, total, label, status)
+
         def _on_item_finished(track_id: int, ok: bool, message: str):
+            track_label = f"Track {track_id}"
             if ok:
                 try:
                     track = get_track_by_id(self._app_state.db, int(track_id))
+                    track_label = f"{track.artist_name} - {track.title}".strip(" -") or track_label
                     record_publish_history(
                         self._app_state.db,
                         track_id=int(track_id),
@@ -150,10 +158,21 @@ class PublishHistoryController(QObject):
                     )
                 except (sqlite3.Error, AttributeError) as exc:
                     logger.warning("Failed to record publish history for track %s: %s", track_id, exc)
+            else:
+                try:
+                    track = get_track_by_id(self._app_state.db, int(track_id))
+                    track_label = f"{track.artist_name} - {track.title}".strip(" -") or track_label
+                except Exception:
+                    pass
+            if self._overlay is not None:
+                self._overlay.append_result(track_label, message, ok)
 
         def _on_finished(ok: bool, summary: str, stats: dict):
             self._bulk_worker = None
             self._refresh_history()
+            if self._overlay is not None:
+                self._overlay.finish_batch(summary, cancelled=stats.get("cancelled", False))
+                self._overlay.queue_auto_close(5000)
             notify_user(
                 self._app_state,
                 summary,
@@ -162,14 +181,11 @@ class PublishHistoryController(QObject):
                 status_timeout_ms=5000,
             )
 
+        self._bulk_worker.progress.connect(_on_progress)
         self._bulk_worker.itemFinished.connect(_on_item_finished)
         self._bulk_worker.finished.connect(_on_finished)
 
-        notify_user(
-            self._app_state,
-            f"Publishing {kind} lyrics for {len(track_ids)} track(s)...",
-            "info",
-            show_status=self._show_status,
-            status_timeout_ms=3000,
-        )
+        if self._overlay is not None:
+            self._overlay.start_batch(f"{kind} publish", len(track_ids))
+
         self._bulk_worker.start()
