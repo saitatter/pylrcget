@@ -139,11 +139,12 @@ class LyricsRetrySearchWorker(QThread):
 
     def _search_retry_track(self, track: _RetryTrack) -> LyricsMatchCandidate | None:
         best: LyricsMatchCandidate | None = None
+        api = LrcLibAPI(self.lrclib_instance)
         for query in build_retry_search_queries(artist=track.artist, title=track.title, album=track.album):
             if self.isInterruptionRequested():
                 break
             try:
-                candidate = self._search_retry_query(track, query)
+                candidate = self._search_retry_query(api, track, query)
             except Exception:
                 continue
             if candidate is not None and (best is None or candidate.score > best.score):
@@ -154,10 +155,10 @@ class LyricsRetrySearchWorker(QThread):
 
     def _search_retry_query(
         self,
+        api: LrcLibAPI,
         track: _RetryTrack,
         query: RetrySearchQuery,
     ) -> LyricsMatchCandidate | None:
-        api = LrcLibAPI(self.lrclib_instance)
         results = api.search_lyrics(
             query=query.query or None,
             track_name=query.title or None,

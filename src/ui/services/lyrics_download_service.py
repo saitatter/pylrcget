@@ -164,6 +164,8 @@ def find_best_lyrics_match(
             )
         except Exception as exc:
             logger.warning("Alternative LRCLIB search failed for %s via %s: %s", track_label, query.label, exc)
+            if _should_retry_lrclib_error(exc):
+                raise
             continue
         candidate = choose_best_candidate(
             track_id=track_id,
