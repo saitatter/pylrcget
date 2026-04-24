@@ -16,6 +16,7 @@ from core.lyrics_sidecar import export_lyrics_sidecars
 from db.database import get_config, get_track_by_id, update_track_plain_lyrics, update_track_synced_lyrics
 from db.models import Config, Track
 from ui.services.download_modes import normalize_download_mode
+from ui.services.lyrics_match_retry import build_retry_search_queries, choose_best_candidate
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +33,13 @@ class TrackOutputSyncResult:
     sidecar_error: Exception | None = None
     embedded: bool = False
     embed_error: Exception | None = None
+
+
+@dataclass(frozen=True)
+class LyricsDownloadMatch:
+    result: object
+    score: int
+    query_label: str
 
 
 def _strip_empty(s: str | None) -> str | None:
@@ -92,6 +100,62 @@ def fetch_lyrics_with_retry(
         raise last_error
 
 
+def find_best_lyrics_match(
+    api: LrcLibAPI,
+    *,
+    notify: ProgressCallback,
+    track_id: int,
+    track_label: str,
+    title: str,
+    artist: str,
+    album: str,
+    duration_s: int | None,
+) -> LyricsDownloadMatch | None:
+    try:
+        lyrics = fetch_lyrics_with_retry(
+            api,
+            notify=notify,
+            title=title,
+            artist=artist,
+            album=album or None,
+            duration_s=duration_s or None,
+        )
+        if _strip_empty(getattr(lyrics, "synced_lyrics", None)) or _strip_empty(getattr(lyrics, "plain_lyrics", None)):
+            return LyricsDownloadMatch(lyrics, 100, "exact metadata")
+        notify("Exact LRCLIB match has no usable lyrics; trying alternatives...")
+    except NotFoundError:
+        notify("Exact LRCLIB match not found; trying alternatives...")
+
+    best = None
+    for query in build_retry_search_queries(artist=artist, title=title, album=album):
+        try:
+            notify(f"Searching LRCLIB with {query.label}...")
+            results = api.search_lyrics(
+                query=query.query or None,
+                track_name=query.title or None,
+                artist_name=query.artist or None,
+                album_name=query.album or None,
+            )
+        except Exception as exc:
+            logger.warning("Alternative LRCLIB search failed for %s via %s: %s", track_label, query.label, exc)
+            continue
+        candidate = choose_best_candidate(
+            track_id=track_id,
+            track_label=track_label,
+            artist=artist,
+            title=title,
+            album=album,
+            query_label=query.label,
+            results=results,
+        )
+        if candidate is not None and (best is None or candidate.score > best.score):
+            best = candidate
+
+    if best is None:
+        return None
+    return LyricsDownloadMatch(best, int(best.score), best.query_label)
+
+
 def sync_track_outputs(
     db: sqlite3.Connection,
     track: Track,
@@ -141,6 +205,55 @@ def sync_track_outputs_with_result(
     )
 
 
+def apply_lyrics_match_to_track(
+    db: sqlite3.Connection,
+    *,
+    track_id: int,
+    match: LyricsDownloadMatch,
+    download_mode: str,
+    notify: ProgressCallback,
+    config: Config | None = None,
+) -> tuple[bool, str, Track | None]:
+    mode = normalize_download_mode(download_mode)
+    lyrics = match.result
+    synced = _strip_empty(getattr(lyrics, "synced_lyrics", None))
+    plain = _strip_empty(getattr(lyrics, "plain_lyrics", None))
+    score_note = f" Match: {match.score}%."
+
+    if mode == "plain_only":
+        if plain:
+            notify("Saving plain lyrics...")
+            track = update_track_plain_lyrics(db, track_id, plain)
+            sync_track_outputs(db, track, notify, config=config)
+            return True, f"Downloaded plain lyrics.{score_note}", track
+        if synced:
+            derived_plain = _strip_empty(_strip_timestamps(synced))
+            if derived_plain:
+                notify("Saving plain lyrics derived from synced lyrics...")
+                track = update_track_plain_lyrics(db, track_id, derived_plain)
+                sync_track_outputs(db, track, notify, config=config)
+                return True, f"Downloaded plain lyrics.{score_note}", track
+        return False, f"No plain lyrics found on LRCLIB for this track.{score_note}", None
+
+    if synced:
+        if not plain:
+            plain = _strip_empty(_strip_timestamps(synced))
+        notify("Saving synced + plain lyrics...")
+        track = update_track_synced_lyrics(db, track_id, synced, plain or "")
+        sync_track_outputs(db, track, notify, config=config)
+        return True, f"Downloaded synced lyrics.{score_note}", track
+
+    if plain:
+        if mode == "synced_only":
+            return False, f"Only plain lyrics were found; synced-only mode is enabled.{score_note}", None
+        notify("Saving plain lyrics...")
+        track = update_track_plain_lyrics(db, track_id, plain)
+        sync_track_outputs(db, track, notify, config=config)
+        return True, f"Downloaded plain lyrics.{score_note}", track
+
+    return False, f"No lyrics found on LRCLIB for this track.{score_note}", None
+
+
 def download_track_lyrics(
     db_path: str,
     track_id: int,
@@ -176,50 +289,27 @@ def download_track_lyrics(
             return False, "Missing title/artist; cannot search lyrics.", track_id, title_for_ui
 
         api_instance = api or LrcLibAPI(lrclib_instance)
-        lyrics = fetch_lyrics_with_retry(
+        match = find_best_lyrics_match(
             api_instance,
             notify=notify,
+            track_id=track_id,
+            track_label=title_for_ui,
             title=title,
             artist=artist,
-            album=album or None,
+            album=album,
             duration_s=duration_s or None,
         )
-
-        synced = _strip_empty(getattr(lyrics, "synced_lyrics", None))
-        plain = _strip_empty(getattr(lyrics, "plain_lyrics", None))
-
-        if mode == "plain_only":
-            if plain:
-                notify("Saving plain lyrics...")
-                track = update_track_plain_lyrics(db, track_id, plain)
-                sync_track_outputs(db, track, notify, config=config)
-                return True, "Downloaded plain lyrics.", track_id, title_for_ui
-            if synced:
-                derived_plain = _strip_empty(_strip_timestamps(synced))
-                if derived_plain:
-                    notify("Saving plain lyrics derived from synced lyrics...")
-                    track = update_track_plain_lyrics(db, track_id, derived_plain)
-                    sync_track_outputs(db, track, notify, config=config)
-                    return True, "Downloaded plain lyrics.", track_id, title_for_ui
-            return False, "No plain lyrics found on LRCLIB for this track.", track_id, title_for_ui
-
-        if synced:
-            if not plain:
-                plain = _strip_empty(_strip_timestamps(synced))
-            notify("Saving synced + plain lyrics...")
-            track = update_track_synced_lyrics(db, track_id, synced, plain or "")
-            sync_track_outputs(db, track, notify, config=config)
-            return True, "Downloaded synced lyrics.", track_id, title_for_ui
-
-        if plain:
-            if mode == "synced_only":
-                return False, "Only plain lyrics were found; synced-only mode is enabled.", track_id, title_for_ui
-            notify("Saving plain lyrics...")
-            track = update_track_plain_lyrics(db, track_id, plain)
-            sync_track_outputs(db, track, notify, config=config)
-            return True, "Downloaded plain lyrics.", track_id, title_for_ui
-
-        return False, "No lyrics found on LRCLIB for this track.", track_id, title_for_ui
+        if match is None:
+            return False, "No lyrics found on LRCLIB for this track.", track_id, title_for_ui
+        ok, msg, _track = apply_lyrics_match_to_track(
+            db,
+            track_id=track_id,
+            match=match,
+            download_mode=mode,
+            notify=notify,
+            config=config,
+        )
+        return ok, msg, track_id, title_for_ui
     except Exception as exc:
         return False, f"Download failed: {exc}", track_id, title_for_ui
     finally:
