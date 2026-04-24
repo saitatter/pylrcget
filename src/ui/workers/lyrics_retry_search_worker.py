@@ -18,6 +18,7 @@ from ui.services.lyrics_match_retry import (
 
 RELAXED_RETRY_ACCEPT_SCORE = 90
 MAX_PARALLEL_RETRY_WORKERS = 4
+RETRY_CANCEL_POLL_INTERVAL_S = 0.05
 
 
 @dataclass(frozen=True)
@@ -82,11 +83,26 @@ class LyricsRetrySearchWorker(QThread):
 
             worker_count = min(MAX_PARALLEL_RETRY_WORKERS, max(1, len(retry_tracks)))
             self.progress.emit(completed, total, "Retry search", f"Searching failed tracks ({worker_count} at a time)...")
-            with ThreadPoolExecutor(max_workers=worker_count) as executor:
+            cancelled = False
+            executor = ThreadPoolExecutor(max_workers=worker_count)
+            pending = {}
+            try:
                 pending = {executor.submit(self._search_retry_track, track): track for track in retry_tracks}
-                while pending and not self.isInterruptionRequested():
-                    done, _ = wait(pending, return_when=FIRST_COMPLETED)
+                while pending:
+                    if self.isInterruptionRequested():
+                        cancelled = True
+                        break
+                    done, _ = wait(
+                        pending,
+                        timeout=RETRY_CANCEL_POLL_INTERVAL_S,
+                        return_when=FIRST_COMPLETED,
+                    )
+                    if not done:
+                        continue
                     for future in done:
+                        if self.isInterruptionRequested():
+                            cancelled = True
+                            break
                         track = pending.pop(future)
                         completed += 1
                         try:
@@ -105,8 +121,14 @@ class LyricsRetrySearchWorker(QThread):
                         self.progress.emit(completed, total, "Retry search", status)
 
                 if self.isInterruptionRequested():
+                    cancelled = True
+            finally:
+                if cancelled or self.isInterruptionRequested():
                     for pending_future in pending:
                         pending_future.cancel()
+                    executor.shutdown(wait=False, cancel_futures=True)
+                else:
+                    executor.shutdown(wait=True)
 
             self.finishedSearch.emit(candidates, "")
         except Exception as exc:

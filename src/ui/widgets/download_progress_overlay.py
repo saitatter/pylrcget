@@ -212,7 +212,7 @@ class DownloadProgressOverlay(QWidget):
     def _handle_cancel(self) -> None:
         if self._active:
             self.stop_btn.setEnabled(False)
-            self.status_label.setText("Cancelling after the current track…")
+            self.status_label.setText("Cancelling now...")
             self.cancelRequested.emit()
             return
         self.hide()

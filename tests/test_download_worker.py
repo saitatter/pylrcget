@@ -215,10 +215,11 @@ class LyricsDownloadWorkerTests(unittest.TestCase):
                     "ui.workers.bulk_lyrics_download_worker.ThreadPoolExecutor"
                 ) as executor_cls:
                     api_cls.return_value.get_lyrics.return_value = fake_lyrics
-                    executor_cls.return_value.__enter__.return_value.submit.side_effect = _ImmediateFuture
+                    executor_cls.return_value.submit.side_effect = _ImmediateFuture
 
                     with patch("ui.workers.bulk_lyrics_download_worker.wait") as wait_mock:
-                        def fake_wait(pending, return_when):
+                        def fake_wait(pending, timeout, return_when):
+                            del timeout
                             del return_when
                             future = next(iter(pending))
                             return {future}, set(pending) - {future}
@@ -238,6 +239,38 @@ class LyricsDownloadWorkerTests(unittest.TestCase):
                     refreshed = get_track_by_id(db, int(track_id))
                     self.assertIsNone(refreshed.txt_lyrics)
                     self.assertIsNone(refreshed.lrc_lyrics)
+            finally:
+                db.close()
+
+    def test_bulk_download_cancel_does_not_wait_for_running_searches(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db = initialize_database(tmp)
+            try:
+                audio = Path(tmp) / "cancel.mp3"
+                touch_text(audio, "a")
+                add_tracks(db, [make_fs_track(audio, artist="Artist", album="Album", title="Song")])
+                track_ids = [int(row["id"]) for row in db.execute("SELECT id FROM tracks ORDER BY id").fetchall()]
+
+                worker = BulkLyricsDownloadWorker(
+                    db_path=str(Path(tmp) / "pylrcget.db.sqlite3"),
+                    track_ids=track_ids,
+                    lrclib_instance="https://lrclib.net/api",
+                    download_mode="prefer_synced",
+                )
+                finished: list[tuple[bool, str, dict]] = []
+                worker.finishedBatch.connect(lambda ok, msg, stats: finished.append((ok, msg, stats)))
+
+                with patch("ui.workers.bulk_lyrics_download_worker.ThreadPoolExecutor") as executor_cls:
+                    future = executor_cls.return_value.submit.return_value
+
+                    with patch.object(worker, "isInterruptionRequested", side_effect=[False, True, True, True]):
+                        worker.run()
+
+                future.cancel.assert_called_once()
+                executor_cls.return_value.shutdown.assert_called_once_with(wait=False, cancel_futures=True)
+                self.assertEqual(len(finished), 1)
+                self.assertFalse(finished[0][0])
+                self.assertTrue(finished[0][2]["cancelled"])
             finally:
                 db.close()
 

@@ -55,9 +55,9 @@ class LyricsRetrySearchWorkerTests(unittest.TestCase):
         ), patch("ui.workers.lyrics_retry_search_worker.LrcLibAPI", return_value=fake_api), patch(
             "ui.workers.lyrics_retry_search_worker.ThreadPoolExecutor"
         ) as executor_cls:
-            executor_cls.return_value.__enter__.return_value.submit.side_effect = _ImmediateFuture
+            executor_cls.return_value.submit.side_effect = _ImmediateFuture
             with patch("ui.workers.lyrics_retry_search_worker.wait") as wait_mock:
-                wait_mock.side_effect = lambda pending, return_when: ({next(iter(pending))}, set())
+                wait_mock.side_effect = lambda pending, timeout, return_when: ({next(iter(pending))}, set())
                 connect_mock.return_value.close.return_value = None
                 worker.run()
 
@@ -96,9 +96,9 @@ class LyricsRetrySearchWorkerTests(unittest.TestCase):
         ), patch("ui.workers.lyrics_retry_search_worker.LrcLibAPI", return_value=fake_api), patch(
             "ui.workers.lyrics_retry_search_worker.ThreadPoolExecutor"
         ) as executor_cls:
-            executor_cls.return_value.__enter__.return_value.submit.side_effect = _ImmediateFuture
+            executor_cls.return_value.submit.side_effect = _ImmediateFuture
             with patch("ui.workers.lyrics_retry_search_worker.wait") as wait_mock:
-                wait_mock.side_effect = lambda pending, return_when: ({next(iter(pending))}, set())
+                wait_mock.side_effect = lambda pending, timeout, return_when: ({next(iter(pending))}, set())
                 connect_mock.return_value.close.return_value = None
                 worker.run()
 
@@ -127,9 +127,10 @@ class LyricsRetrySearchWorkerTests(unittest.TestCase):
         ), patch("ui.workers.lyrics_retry_search_worker.LrcLibAPI", return_value=fake_api), patch(
             "ui.workers.lyrics_retry_search_worker.ThreadPoolExecutor"
         ) as executor_cls:
-            executor_cls.return_value.__enter__.return_value.submit.side_effect = _ImmediateFuture
+            executor_cls.return_value.submit.side_effect = _ImmediateFuture
             with patch("ui.workers.lyrics_retry_search_worker.wait") as wait_mock:
-                def fake_wait(pending, return_when):
+                def fake_wait(pending, timeout, return_when):
+                    del timeout
                     del return_when
                     future = next(iter(pending))
                     return {future}, set(pending) - {future}

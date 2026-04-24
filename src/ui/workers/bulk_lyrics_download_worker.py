@@ -18,6 +18,7 @@ from ui.services.lyrics_download_service import (
 from ui.services.lyrics_match_retry import LyricsMatchCandidate
 
 MAX_PARALLEL_DOWNLOAD_WORKERS = 4
+DOWNLOAD_CANCEL_POLL_INTERVAL_S = 0.05
 
 
 class BulkDownloadStats(TypedDict):
@@ -122,11 +123,25 @@ class BulkLyricsDownloadWorker(QThread):
                     f"Searching LRCLIB ({worker_count} at a time)...",
                     self._elapsed(),
                 )
-                with ThreadPoolExecutor(max_workers=worker_count) as executor:
+                executor = ThreadPoolExecutor(max_workers=worker_count)
+                pending = {}
+                try:
                     pending = {executor.submit(self._fetch_job_match, job): job for job in jobs}
-                    while pending and not self.isInterruptionRequested():
-                        done, _ = wait(pending, return_when=FIRST_COMPLETED)
+                    while pending:
+                        if self.isInterruptionRequested():
+                            cancelled = True
+                            break
+                        done, _ = wait(
+                            pending,
+                            timeout=DOWNLOAD_CANCEL_POLL_INTERVAL_S,
+                            return_when=FIRST_COMPLETED,
+                        )
+                        if not done:
+                            continue
                         for future in done:
+                            if self.isInterruptionRequested():
+                                cancelled = True
+                                break
                             job = pending.pop(future)
                             completed += 1
                             try:
@@ -160,8 +175,14 @@ class BulkLyricsDownloadWorker(QThread):
 
                     if self.isInterruptionRequested():
                         cancelled = True
+                finally:
+                    if cancelled or self.isInterruptionRequested():
+                        cancelled = True
                         for pending_future in pending:
                             pending_future.cancel()
+                        executor.shutdown(wait=False, cancel_futures=True)
+                    else:
+                        executor.shutdown(wait=True)
         finally:
             if db is not None:
                 db.close()
@@ -183,6 +204,8 @@ class BulkLyricsDownloadWorker(QThread):
         api = LrcLibAPI(self.lrclib_instance)
 
         def _notify(status: str) -> None:
+            if self.isInterruptionRequested():
+                return
             self.progress.emit(-1, len(self.track_ids), job.label, status, self._elapsed())
 
         try:
