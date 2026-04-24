@@ -200,6 +200,13 @@ QComboBox#SpeedCombo {
     font-size: 11px;
 }
 
+QLabel#SpeedComboPrefix {
+    background: transparent;
+    color: {{color-text-muted}};
+    font-size: 11px;
+    font-weight: 700;
+}
+
 QSlider#VolumeSlider::groove:horizontal {
     height: 5px;
     background: {{color-bg-pressed}};

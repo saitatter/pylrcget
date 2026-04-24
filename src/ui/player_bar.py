@@ -327,18 +327,24 @@ class PlayerBar(QWidget):
         self.cmb_speed.setEditable(True)
         self.cmb_speed.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
         self._speed_items = [
-            ("Speed 1.0x", 1.0),
-            ("Speed 0.9x", 0.9),
-            ("Speed 0.8x", 0.8),
-            ("Speed 0.75x", 0.75),
-            ("Speed 0.5x", 0.5),
-            ("Speed 0.25x", 0.25),
+            ("1.0x", 1.0),
+            ("0.9x", 0.9),
+            ("0.8x", 0.8),
+            ("0.75x", 0.75),
+            ("0.5x", 0.5),
+            ("0.25x", 0.25),
         ]
         for label, speed in self._speed_items:
             self.cmb_speed.addItem(label, speed)
         self.cmb_speed.setCurrentIndex(0)
-        self.cmb_speed.lineEdit().setPlaceholderText("Speed custom")
+        self.cmb_speed.lineEdit().setPlaceholderText("custom")
+        self.cmb_speed.lineEdit().setTextMargins(42, 0, 0, 0)
         self.cmb_speed.lineEdit().installEventFilter(self)
+        self.cmb_speed.installEventFilter(self)
+        self.lbl_speed_prefix = QLabel("Speed", self.cmb_speed)
+        self.lbl_speed_prefix.setObjectName("SpeedComboPrefix")
+        self.lbl_speed_prefix.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        self.lbl_speed_prefix.setTextInteractionFlags(Qt.TextInteractionFlag.NoTextInteraction)
 
         self.btn_speed_up = QToolButton()
         self.btn_speed_up.setObjectName("SpeedAdjustButton")
@@ -401,6 +407,7 @@ class PlayerBar(QWidget):
         self._sync_speed_from_player()
         self._sync_volume_from_player()
         self.set_compact_mode(False)
+        QTimer.singleShot(0, self._position_speed_prefix)
 
     def attach_player(self, player) -> None:
         if player is None or self.player is player:
@@ -499,6 +506,7 @@ class PlayerBar(QWidget):
         self.center_panel.setMaximumWidth(16777215)
         self.setMinimumHeight(bar_height)
         self.setMaximumHeight(bar_height)
+        self._position_speed_prefix()
 
         now_playing = None
         if self.player:
@@ -512,7 +520,13 @@ class PlayerBar(QWidget):
         rendered = f"{float(speed):.2f}".rstrip("0").rstrip(".")
         if "." not in rendered:
             rendered += ".0"
-        return f"Speed {rendered}x"
+        return f"{rendered}x"
+
+    def _position_speed_prefix(self) -> None:
+        hint = self.lbl_speed_prefix.sizeHint()
+        y = max(0, (self.cmb_speed.height() - hint.height()) // 2)
+        self.lbl_speed_prefix.setGeometry(10, y, hint.width(), hint.height())
+        self.lbl_speed_prefix.raise_()
 
     def _normalize_speed(self, speed: float) -> float:
         return max(0.25, min(2.0, round(float(speed), 2)))
@@ -625,6 +639,8 @@ class PlayerBar(QWidget):
                 self._on_custom_speed_committed()
                 event.accept()
                 return True
+        if watched is self.cmb_speed and event.type() == QEvent.Type.Resize:
+            self._position_speed_prefix()
         return super().eventFilter(watched, event)
 
     def _on_slider_pressed(self):
