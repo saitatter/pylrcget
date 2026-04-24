@@ -10,13 +10,18 @@
 ] -%}
 {%- set known_types = ["feat", "feature", "features", "fix", "fixes", "bug fix", "bug fixes", "bugfix", "bugfixes", "perf", "performance", "refactor", "refactors", "refactoring", "build", "builds", "build system", "ci", "continuous integration", "chore", "chores", "doc", "docs", "documentation", "test", "tests", "testing"] -%}
 {%- set any_changes = namespace(value=false) -%}
+{%- set seen_commits = namespace(keys=[]) -%}
 
 {%- for heading, types in category_map %}
 {%- set bucket = namespace(items=[]) -%}
 {%- for type_name, commits in release["elements"] | dictsort %}
 {%- if type_name | lower in types %}
 {%- for commit in commits %}
+{%- set commit_key = ((commit.scope or "") ~ "|" ~ (commit.descriptions[0] or "")) | lower -%}
+{%- if commit_key not in seen_commits.keys %}
 {%- set _ = bucket.items.append(commit) -%}
+{%- set _ = seen_commits.keys.append(commit_key) -%}
+{%- endif %}
 {%- endfor %}
 {%- endif %}
 {%- endfor %}
@@ -37,7 +42,11 @@
 {%- for type_name, commits in release["elements"] | dictsort %}
 {%- if type_name | lower not in known_types and type_name | lower != "unknown" %}
 {%- for commit in commits %}
+{%- set commit_key = ((commit.scope or "") ~ "|" ~ (commit.descriptions[0] or "")) | lower -%}
+{%- if commit_key not in seen_commits.keys %}
 {%- set _ = other.items.append(commit) -%}
+{%- set _ = seen_commits.keys.append(commit_key) -%}
+{%- endif %}
 {%- endfor %}
 {%- endif %}
 {%- endfor %}
