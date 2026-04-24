@@ -15,6 +15,7 @@ from db.database import add_tracks, initialize_database
 from tests.test_support import make_fs_track, qt_app, touch_text
 from ui.controllers.lyrics_download_controller import LyricsDownloadController
 from ui.services.lyrics_match_retry import LyricsMatchCandidate
+from ui.widgets.download_progress_overlay import DownloadProgressOverlay
 
 
 class _FakeOverlay:
@@ -373,6 +374,20 @@ class LyricsDownloadControllerTests(unittest.TestCase):
                 self.assertEqual(_FakeMatchDialog.instances, [])
             finally:
                 db.close()
+
+    def test_overlay_status_only_progress_does_not_reset_bar(self):
+        overlay = DownloadProgressOverlay()
+        try:
+            overlay.start_batch("Prefer synced", 10)
+            overlay.update_progress(3, 10, "Artist - Song", "Candidate found.")
+            self.assertEqual(overlay.progress_bar.value(), 3)
+
+            overlay.update_progress(-1, 10, "Other Artist - Song", "Searching LRCLIB...")
+
+            self.assertEqual(overlay.progress_bar.value(), 3)
+            self.assertIn("Searching LRCLIB", overlay.status_label.text())
+        finally:
+            overlay.deleteLater()
 
 
 if __name__ == "__main__":

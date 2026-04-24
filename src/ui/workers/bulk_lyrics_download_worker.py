@@ -183,7 +183,7 @@ class BulkLyricsDownloadWorker(QThread):
         api = LrcLibAPI(self.lrclib_instance)
 
         def _notify(status: str) -> None:
-            self.progress.emit(0, len(self.track_ids), job.label, status, self._elapsed())
+            self.progress.emit(-1, len(self.track_ids), job.label, status, self._elapsed())
 
         try:
             match = find_best_lyrics_match(

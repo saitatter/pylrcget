@@ -206,7 +206,9 @@ class LyricsDownloadWorkerTests(unittest.TestCase):
                     download_mode="prefer_synced",
                 )
                 finished: list[tuple[bool, str, dict]] = []
+                progress: list[tuple[int, int, str, str]] = []
                 worker.finishedBatch.connect(lambda ok, msg, stats: finished.append((ok, msg, stats)))
+                worker.progress.connect(lambda current, total, label, status, elapsed: progress.append((current, total, label, status)))
 
                 fake_lyrics = SimpleNamespace(synced_lyrics=None, plain_lyrics="plain text")
                 with patch("ui.workers.bulk_lyrics_download_worker.LrcLibAPI") as api_cls, patch(
@@ -228,6 +230,10 @@ class LyricsDownloadWorkerTests(unittest.TestCase):
                 self.assertLessEqual(executor_cls.call_args.kwargs["max_workers"], MAX_PARALLEL_DOWNLOAD_WORKERS)
                 self.assertEqual(len(finished), 1)
                 self.assertEqual(finished[0][2]["ok"], len(track_ids))
+                completed_values = [current for current, *_ in progress if current >= 0]
+                self.assertEqual(completed_values, sorted(completed_values))
+                self.assertEqual(completed_values[-1], len(track_ids))
+                self.assertTrue(any(current == -1 for current, *_ in progress))
                 for track_id in track_ids:
                     refreshed = get_track_by_id(db, int(track_id))
                     self.assertIsNone(refreshed.txt_lyrics)
