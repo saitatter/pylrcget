@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
     QTableView,
     QVBoxLayout,
     QWidget,
+    QWidgetAction,
 )
 
 from db.database import get_directories, get_track_rows
@@ -328,37 +329,58 @@ class TrackListWidget(QWidget):
             return
 
         menu = QMenu(self)
+        menu.setObjectName("TrackContextMenu")
         current_track_id = self.model.track_id_at(idx.row())
         has_focused_track = current_track_id is not None
 
-        info = menu.addAction(f"{len(selected_ids)} track selected" if len(selected_ids) == 1 else f"{len(selected_ids)} tracks selected")
-        info.setEnabled(False)
+        def add_section(title: str, detail: str = ""):
+            action = QWidgetAction(menu)
+            header = QWidget(menu)
+            header.setObjectName("ContextMenuSection")
+            header_layout = QVBoxLayout(header)
+            set_layout_spacing(header_layout, margins=(10, 6, 10, 4), spacing=1)
+            title_label = QLabel(title.upper())
+            title_label.setObjectName("ContextMenuSectionTitle")
+            header_layout.addWidget(title_label)
+            if detail:
+                detail_label = QLabel(detail)
+                detail_label.setObjectName("ContextMenuSectionDetail")
+                header_layout.addWidget(detail_label)
+            action.setDefaultWidget(header)
+            menu.addAction(action)
+            return action
 
-        menu.addSeparator()
-        quick = menu.addAction("Quick Actions")
-        quick.setEnabled(False)
+        count = len(selected_ids)
+        count_text = f"{count} track selected" if count == 1 else f"{count} tracks selected"
+        add_section("Selection", count_text)
         act_play = menu.addAction("Play now")
         act_play.setEnabled(has_focused_track)
 
         menu.addSeparator()
-        bulk = menu.addAction("Selection Actions")
-        bulk.setEnabled(False)
-        act_refresh = menu.addAction("Refresh focused track from disk")
-        act_dl = menu.addAction("Download lyrics for focused track")
-        act_export = menu.addAction("Export lyrics files for focused track")
+        add_section("Focused Track")
+        act_refresh = menu.addAction("Refresh from disk")
+        act_dl = menu.addAction("Download lyrics")
+        act_export = menu.addAction("Export lyrics files")
         act_refresh.setEnabled(has_focused_track)
         act_dl.setEnabled(has_focused_track)
         act_export.setEnabled(has_focused_track)
+
         menu.addSeparator()
         count_suffix = f"({len(selected_ids)})"
-        act_dl_selected = menu.addAction(f"Download selection using current mode {count_suffix}")
-        act_dl_synced = menu.addAction(f"Download selection as synced only {count_suffix}")
-        act_dl_plain = menu.addAction(f"Download selection as plain only {count_suffix}")
-        act_instr = menu.addAction(f"Mark selection as instrumental {count_suffix}")
-        act_uninstr = menu.addAction(f"Unmark instrumental on selection {count_suffix}")
+        add_section("Download Selection")
+        act_dl_selected = menu.addAction(f"Use current mode {count_suffix}")
+        act_dl_synced = menu.addAction(f"Synced only {count_suffix}")
+        act_dl_plain = menu.addAction(f"Plain only {count_suffix}")
+
         menu.addSeparator()
-        act_pub_synced = menu.addAction(f"Publish selection synced {count_suffix}")
-        act_pub_plain = menu.addAction(f"Publish selection plain {count_suffix}")
+        add_section("Lyrics State")
+        act_instr = menu.addAction(f"Mark as instrumental {count_suffix}")
+        act_uninstr = menu.addAction(f"Unmark instrumental {count_suffix}")
+
+        menu.addSeparator()
+        add_section("Publish Selection")
+        act_pub_synced = menu.addAction(f"Publish synced {count_suffix}")
+        act_pub_plain = menu.addAction(f"Publish plain {count_suffix}")
 
         chosen = menu.exec(self.table.viewport().mapToGlobal(pos))
         if chosen == act_play:

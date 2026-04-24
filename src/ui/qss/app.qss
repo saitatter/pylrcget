@@ -241,6 +241,25 @@ QMenu::item:selected {
     background: {{color-menu-hover}};
 }
 
+QMenu QWidget#ContextMenuSection {
+    background: {{color-bg-control}};
+    border: 1px solid {{color-border}};
+    border-radius: {{radius-md}};
+    margin: 2px 0;
+}
+
+QMenu QLabel#ContextMenuSectionTitle {
+    color: {{color-accent}};
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+}
+
+QMenu QLabel#ContextMenuSectionDetail {
+    color: {{color-text-muted}};
+    font-size: {{font-size-sm}};
+}
+
 QScrollBar:vertical, QScrollBar:horizontal {
     background: {{color-scrollbar-track}};
     border: none;
