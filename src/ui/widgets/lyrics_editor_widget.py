@@ -162,13 +162,23 @@ class LyricsEditorWidget(QWidget):
         set_layout_spacing(root, margins=SPACE_3, spacing=SPACE_2)
 
         # --- header ---
-        header = QHBoxLayout()
+        header = QVBoxLayout()
         set_layout_spacing(header, spacing=SPACE_2)
+
+        title_row = QHBoxLayout()
+        set_layout_spacing(title_row, spacing=SPACE_2)
 
         self.title = QLabel("Lyrics")
         self.title.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
         self.title.setObjectName("LyricsTitle")
-        header.addWidget(self.title, 1)
+        title_row.addWidget(self.title, 1)
+        header.addLayout(title_row)
+
+        timing_row = QHBoxLayout()
+        set_layout_spacing(timing_row, spacing=SPACE_2)
+
+        actions_row = QHBoxLayout()
+        set_layout_spacing(actions_row, spacing=SPACE_2)
 
         self.btn_snap = QPushButton("Snap")
         self.btn_snap.setToolTip("Set the selected line's timestamp to the current playback position")
@@ -183,6 +193,7 @@ class LyricsEditorWidget(QWidget):
         self.shift_spin.setValue(0.10)
         self.shift_spin.setSuffix(" s")
         self.shift_spin.setToolTip("Custom shift amount in seconds")
+        self.shift_spin.setMinimumWidth(86)
         self.btn_shift_selected = QPushButton("Shift Selected")
         self.btn_shift_selected.setToolTip("Shift selected lines by the custom amount")
         self.btn_shift_all_from_first = QPushButton("Shift All from First")
@@ -217,16 +228,18 @@ class LyricsEditorWidget(QWidget):
         self.btn_save.clicked.connect(self._emit_save)
         self.btn_export_files.clicked.connect(self.exportFilesRequested.emit)
 
-        header.addWidget(self.btn_snap)
-        header.addWidget(self.btn_shift_minus)
-        header.addWidget(self.btn_shift_plus)
-        header.addWidget(self.shift_spin)
-        header.addWidget(self.btn_shift_selected)
-        header.addWidget(self.btn_shift_all_from_first)
-        header.addWidget(self.btn_add)
-        header.addWidget(self.btn_del)
-        header.addWidget(self.btn_save)
-        header.addWidget(self.btn_export_files)
+        timing_row.addWidget(self.btn_snap)
+        timing_row.addWidget(self.btn_shift_minus)
+        timing_row.addWidget(self.btn_shift_plus)
+        timing_row.addWidget(self.shift_spin)
+        timing_row.addWidget(self.btn_shift_selected)
+        timing_row.addWidget(self.btn_shift_all_from_first)
+        timing_row.addStretch(1)
+
+        actions_row.addWidget(self.btn_add)
+        actions_row.addWidget(self.btn_del)
+        actions_row.addWidget(self.btn_save)
+        actions_row.addWidget(self.btn_export_files)
 
         self.btn_publish_synced = QPushButton("Publish Synced")
         self.btn_publish_synced.setToolTip("Publish synced (LRC) lyrics to LRCLIB")
@@ -252,8 +265,12 @@ class LyricsEditorWidget(QWidget):
         ):
             button.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
 
-        header.addWidget(self.btn_publish_synced)
-        header.addWidget(self.btn_publish_plain)
+        actions_row.addWidget(self.btn_publish_synced)
+        actions_row.addWidget(self.btn_publish_plain)
+        actions_row.addStretch(1)
+
+        header.addLayout(timing_row)
+        header.addLayout(actions_row)
 
         root.addLayout(header)
 
