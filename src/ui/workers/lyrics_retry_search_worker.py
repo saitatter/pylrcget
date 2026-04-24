@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
+from dataclasses import dataclass
 import sqlite3
-import time
 
 from PySide6.QtCore import QObject, QThread, Signal
 
@@ -17,7 +17,16 @@ from ui.services.lyrics_match_retry import (
 
 
 RELAXED_RETRY_ACCEPT_SCORE = 90
-MAX_PARALLEL_QUERY_WORKERS = 3
+MAX_PARALLEL_RETRY_WORKERS = 4
+
+
+@dataclass(frozen=True)
+class _RetryTrack:
+    id: int
+    label: str
+    artist: str
+    title: str
+    album: str
 
 
 class LyricsRetrySearchWorker(QThread):
@@ -40,90 +49,64 @@ class LyricsRetrySearchWorker(QThread):
     def run(self) -> None:
         total = len(self.track_ids)
         candidates: list[LyricsMatchCandidate] = []
+        retry_tracks: list[_RetryTrack] = []
+        completed = 0
         db = None
         try:
             db = sqlite3.connect(self.db_path, timeout=15.0)
             db.row_factory = sqlite3.Row
 
-            for idx, track_id in enumerate(self.track_ids, start=1):
+            for track_id in self.track_ids:
                 if self.isInterruptionRequested():
                     break
 
                 try:
                     track = get_track_by_id(db, track_id)
                 except (sqlite3.Error, KeyError, TypeError):
-                    self.progress.emit(idx, total, f"Track {track_id}", "Track no longer exists; skipped.")
+                    completed += 1
+                    self.progress.emit(completed, total, "Retry search", "Track no longer exists; skipped.")
                     continue
                 if track is None:
-                    self.progress.emit(idx, total, f"Track {track_id}", "Track no longer exists; skipped.")
+                    completed += 1
+                    self.progress.emit(completed, total, "Retry search", "Track no longer exists; skipped.")
                     continue
                 title = (track.title or "").strip()
                 artist = (track.artist_name or "").strip()
                 album = (track.album_name or "").strip()
                 label = f"{artist} - {title}".strip(" -") or f"Track {track_id}"
-                best: LyricsMatchCandidate | None = None
+                retry_tracks.append(_RetryTrack(int(track_id), label, artist, title, album))
 
-                queries = build_retry_search_queries(artist=artist, title=title, album=album)
-                query_workers = min(MAX_PARALLEL_QUERY_WORKERS, max(1, len(queries)))
-                self.progress.emit(idx - 1, total, label, f"Trying relaxed search ({query_workers} at a time)...")
-                with ThreadPoolExecutor(max_workers=query_workers) as executor:
-                    pending = {}
-                    next_query_index = 0
+            if db is not None:
+                db.close()
+                db = None
 
-                    def submit_next_query() -> None:
-                        nonlocal next_query_index
-                        if next_query_index >= len(queries):
-                            return
-                        query = queries[next_query_index]
-                        next_query_index += 1
-                        pending[
-                            executor.submit(
-                                self._search_retry_query,
-                                track_id,
-                                label,
-                                artist,
-                                title,
-                                album,
-                                query,
+            worker_count = min(MAX_PARALLEL_RETRY_WORKERS, max(1, len(retry_tracks)))
+            self.progress.emit(completed, total, "Retry search", f"Searching failed tracks ({worker_count} at a time)...")
+            with ThreadPoolExecutor(max_workers=worker_count) as executor:
+                pending = {executor.submit(self._search_retry_track, track): track for track in retry_tracks}
+                while pending and not self.isInterruptionRequested():
+                    done, _ = wait(pending, return_when=FIRST_COMPLETED)
+                    for future in done:
+                        track = pending.pop(future)
+                        completed += 1
+                        try:
+                            candidate = future.result()
+                        except Exception as exc:
+                            self.progress.emit(
+                                completed,
+                                total,
+                                "Retry search",
+                                f"{track.label} failed: {type(exc).__name__}",
                             )
-                        ] = query
+                            continue
+                        if candidate is not None:
+                            candidates.append(candidate)
+                        status = f"{completed}/{total} failed tracks searched"
+                        self.progress.emit(completed, total, "Retry search", status)
 
-                    for _ in range(query_workers):
-                        submit_next_query()
-
-                    while pending and not self.isInterruptionRequested():
-                        done, _ = wait(pending, return_when=FIRST_COMPLETED)
-                        should_stop = False
-                        for future in done:
-                            query = pending.pop(future)
-                            try:
-                                candidate = future.result()
-                            except Exception as exc:
-                                self.progress.emit(
-                                    idx - 1,
-                                    total,
-                                    label,
-                                    f"{query.label} failed: {type(exc).__name__}",
-                                )
-                            else:
-                                if candidate is not None and (best is None or candidate.score > best.score):
-                                    best = candidate
-                                should_stop = best is not None and best.score >= RELAXED_RETRY_ACCEPT_SCORE
-
-                            if should_stop:
-                                for pending_future in pending:
-                                    pending_future.cancel()
-                                pending.clear()
-                                break
-                            submit_next_query()
-
-                if best is not None:
-                    candidates.append(best)
-                    self.progress.emit(idx, total, label, f"Best match: {best.score}%")
-                else:
-                    self.progress.emit(idx, total, label, "No relaxed match found.")
-                if idx < total:
-                    time.sleep(0.25)
+                if self.isInterruptionRequested():
+                    for pending_future in pending:
+                        pending_future.cancel()
 
             self.finishedSearch.emit(candidates, "")
         except Exception as exc:
@@ -132,13 +115,24 @@ class LyricsRetrySearchWorker(QThread):
             if db is not None:
                 db.close()
 
+    def _search_retry_track(self, track: _RetryTrack) -> LyricsMatchCandidate | None:
+        best: LyricsMatchCandidate | None = None
+        for query in build_retry_search_queries(artist=track.artist, title=track.title, album=track.album):
+            if self.isInterruptionRequested():
+                break
+            try:
+                candidate = self._search_retry_query(track, query)
+            except Exception:
+                continue
+            if candidate is not None and (best is None or candidate.score > best.score):
+                best = candidate
+            if best is not None and best.score >= RELAXED_RETRY_ACCEPT_SCORE:
+                break
+        return best
+
     def _search_retry_query(
         self,
-        track_id: int,
-        label: str,
-        artist: str,
-        title: str,
-        album: str,
+        track: _RetryTrack,
         query: RetrySearchQuery,
     ) -> LyricsMatchCandidate | None:
         api = LrcLibAPI(self.lrclib_instance)
@@ -149,11 +143,11 @@ class LyricsRetrySearchWorker(QThread):
             album_name=query.album or None,
         )
         return choose_best_candidate(
-            track_id=track_id,
-            track_label=label,
-            artist=artist,
-            title=title,
-            album=album,
+            track_id=track.id,
+            track_label=track.label,
+            artist=track.artist,
+            title=track.title,
+            album=track.album,
             query_label=query.label,
             results=results,
         )
