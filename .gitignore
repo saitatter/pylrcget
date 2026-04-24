@@ -52,6 +52,7 @@ desktop.ini
 # Packaging / installers
 *.spec
 !pylrcget.spec
+!pylrcget-portable.spec
 
 # PyInstaller
 *.manifest

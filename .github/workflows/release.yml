@@ -45,12 +45,15 @@ jobs:
           - os: windows-latest
             archive_name: pylrcget-windows.zip
             installer_name: pylrcget-windows-installer.exe
+            portable_name: pylrcget-windows-portable.exe
           - os: ubuntu-latest
             archive_name: pylrcget-linux.tar.gz
             installer_name: pylrcget-linux.deb
+            portable_name: pylrcget-linux-portable
           - os: macos-latest
             archive_name: pylrcget-macos.tar.gz
             installer_name: pylrcget-macos.pkg
+            portable_name: pylrcget-macos-portable
 
     steps:
       - uses: actions/checkout@v4
@@ -69,6 +72,18 @@ jobs:
 
       - name: Build executable
         run: pyinstaller --noconfirm pylrcget.spec
+
+      - name: Build portable executable
+        run: pyinstaller --noconfirm pylrcget-portable.spec
+
+      - name: Rename portable executable (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: Move-Item -LiteralPath dist/pylrcget-portable.exe -Destination ${{ matrix.portable_name }} -Force
+
+      - name: Rename portable executable (Unix)
+        if: runner.os != 'Windows'
+        run: mv dist/pylrcget-portable "${{ matrix.portable_name }}"
 
       - name: Package archive (Windows)
         if: runner.os == 'Windows'
@@ -159,6 +174,12 @@ jobs:
           name: ${{ matrix.installer_name }}
           path: ${{ matrix.installer_name }}
 
+      - name: Upload workflow artifact (portable)
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.portable_name }}
+          path: ${{ matrix.portable_name }}
+
       - name: Upload release asset (archive)
         env:
           GITHUB_TOKEN: ${{ secrets.RELEASE_PAT }}
@@ -168,3 +189,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.RELEASE_PAT }}
         run: gh release upload "${{ needs.release.outputs.tag }}" "${{ matrix.installer_name }}" --clobber
+
+      - name: Upload release asset (portable)
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_PAT }}
+        run: gh release upload "${{ needs.release.outputs.tag }}" "${{ matrix.portable_name }}" --clobber
