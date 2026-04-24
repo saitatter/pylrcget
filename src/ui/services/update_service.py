@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import hashlib
 import importlib.metadata
+import logging
 import os
 from pathlib import Path
 from contextlib import nullcontext
@@ -20,6 +21,8 @@ import zipfile
 import requests
 from packaging.version import InvalidVersion, Version
 
+
+logger = logging.getLogger(__name__)
 
 GITHUB_REPOSITORY = "saitatter/pylrcget"
 GITHUB_RELEASES_LATEST_URL = f"https://api.github.com/repos/{GITHUB_REPOSITORY}/releases/latest"
