@@ -11,7 +11,7 @@ from PySide6.QtGui import QColor, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QLabel, QStackedWidget,
     QTextEdit, QTableWidget, QTableWidgetItem,
-    QPushButton, QHBoxLayout, QDoubleSpinBox
+    QPushButton, QHBoxLayout, QDoubleSpinBox, QSizePolicy
 )
 
 from ui.spacing import SPACE_2, SPACE_3, set_layout_spacing
@@ -236,6 +236,21 @@ class LyricsEditorWidget(QWidget):
         self.btn_publish_plain.setEnabled(False)
         self.btn_publish_synced.clicked.connect(lambda: self.publishSyncedRequested.emit())
         self.btn_publish_plain.clicked.connect(lambda: self.publishPlainRequested.emit())
+
+        for button in (
+            self.btn_snap,
+            self.btn_shift_minus,
+            self.btn_shift_plus,
+            self.btn_shift_selected,
+            self.btn_shift_all_from_first,
+            self.btn_add,
+            self.btn_del,
+            self.btn_save,
+            self.btn_export_files,
+            self.btn_publish_synced,
+            self.btn_publish_plain,
+        ):
+            button.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
 
         header.addWidget(self.btn_publish_synced)
         header.addWidget(self.btn_publish_plain)
