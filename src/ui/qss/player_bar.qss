@@ -14,7 +14,7 @@ QWidget#PlayerBar[compact="true"] QWidget#PlayerShell {
 }
 
 QWidget#PlayerBar[compact="true"] QWidget#PlayerExtras {
-    min-width: 168px;
+    min-width: 205px;
 }
 
 QWidget#PlayerMeta,

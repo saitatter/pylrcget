@@ -29,8 +29,8 @@ logger = logging.getLogger(__name__)
 PLAYER_META_MIN_WIDTH = 220
 PLAYER_META_COMPACT_MIN_WIDTH = 170
 PLAYER_META_ARTWORK_WIDTH = 34
-PLAYER_EXTRAS_MIN_WIDTH = 170
-PLAYER_EXTRAS_COMPACT_MIN_WIDTH = 135
+PLAYER_EXTRAS_MIN_WIDTH = 230
+PLAYER_EXTRAS_COMPACT_MIN_WIDTH = 205
 PLAYER_CENTER_MIN_WIDTH = 340
 PLAYER_CENTER_COMPACT_MIN_WIDTH = 260
 PLAYER_COVER_SIZE = 52
@@ -310,7 +310,7 @@ class PlayerBar(QWidget):
         self.right_panel.setObjectName("PlayerExtras")
         self.right_panel.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred)
         right_layout = QVBoxLayout(self.right_panel)
-        set_layout_spacing(right_layout, margins=0, spacing=4)
+        set_layout_spacing(right_layout, margins=0, spacing=SPACE_2)
 
         self.lbl_speed = QLabel("Speed")
         self.lbl_speed.setObjectName("MetaLabel")
@@ -348,11 +348,12 @@ class PlayerBar(QWidget):
         self.btn_speed_up.setText("+")
         self.btn_speed_up.setToolTip("Increase playback speed by 0.05x")
 
+        speed_row.addWidget(self.lbl_speed)
+        speed_row.addStretch(1)
         speed_row.addWidget(self.btn_speed_down)
-        speed_row.addWidget(self.cmb_speed, 1)
+        speed_row.addWidget(self.cmb_speed)
         speed_row.addWidget(self.btn_speed_up)
 
-        right_layout.addWidget(self.lbl_speed)
         right_layout.addLayout(speed_row)
 
         volume_row = QHBoxLayout()
@@ -377,6 +378,7 @@ class PlayerBar(QWidget):
         volume_row.addWidget(self.slider_volume, 1)
         volume_row.addWidget(self.lbl_volume_value)
         right_layout.addLayout(volume_row)
+        right_layout.addStretch(1)
 
         shell_layout.addWidget(self.left_panel, 0, 0)
         shell_layout.addWidget(self.center_panel, 0, 1)
