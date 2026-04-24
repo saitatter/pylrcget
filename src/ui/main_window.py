@@ -189,7 +189,7 @@ class MainWindow(QMainWindow):
         splitter.setCollapsible(0, False)
         splitter.setCollapsible(1, False)
         self.track_list.setMinimumWidth(180)
-        self.lyrics_view.setMinimumWidth(640)
+        self.lyrics_view.setMinimumWidth(480)
 
         tracks_layout.addWidget(splitter)
 
@@ -212,7 +212,7 @@ class MainWindow(QMainWindow):
         self.albums_splitter.setCollapsible(0, False)
         self.albums_splitter.setCollapsible(1, False)
         self.albums_tab.setMinimumWidth(180)
-        self.albums_lyrics_view.setMinimumWidth(640)
+        self.albums_lyrics_view.setMinimumWidth(480)
         albums_layout.addWidget(self.albums_splitter)
 
         self.artists_tab = ArtistListWidget(self.app_state)
@@ -234,7 +234,7 @@ class MainWindow(QMainWindow):
         self.artists_splitter.setCollapsible(0, False)
         self.artists_splitter.setCollapsible(1, False)
         self.artists_tab.setMinimumWidth(180)
-        self.artists_lyrics_view.setMinimumWidth(640)
+        self.artists_lyrics_view.setMinimumWidth(480)
         artists_layout.addWidget(self.artists_splitter)
 
         self.mylrclib_tab = MyLrclibWidget(self.app_state)
