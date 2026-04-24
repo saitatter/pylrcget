@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 
 class FlowLayout(QLayout):
-    def __init__(self, parent=None, *, spacing: int = SPACE_2, justify_rows: bool = False):
+    def __init__(self, parent=None, *, spacing: int = SPACE_2, justify_rows: bool = True):
         super().__init__(parent)
         self._items = []
         self._justify_rows = bool(justify_rows)
