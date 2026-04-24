@@ -169,6 +169,7 @@ Uses **semantic-release** with Conventional Commits. On every push to `main`, CI
 - Use Conventional Commits: `feat: ...`, `fix: ...`, `chore: ...`
 - Breaking changes: use `!` or a `BREAKING CHANGE:` footer
 - Build artifacts for Windows, Linux, and macOS are attached to GitHub Releases
+- Portable single-file executables are published as `pylrcget-windows-portable.exe`, `pylrcget-linux-portable`, and `pylrcget-macos-portable`
 
 ### 🛡️ Windows note
 
@@ -183,6 +184,8 @@ The `About` dialog checks GitHub Releases for newer versions:
 | Windows | `pylrcget-windows-installer.exe` (Inno Setup) |
 | macOS | `.dmg`, `.pkg` |
 | Linux | `.AppImage`, `.deb`, `.rpm` |
+
+Portable single-file builds are also attached to releases for manual download. In-app automatic install continues to prefer platform installer assets when available.
 
 Local feed testing is supported via `PYLRCGET_UPDATE_LATEST_URL` and `PYLRCGET_UPDATE_DEBUG` environment overrides.
 

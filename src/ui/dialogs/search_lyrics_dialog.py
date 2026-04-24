@@ -105,6 +105,16 @@ class SearchLyricsDialog(QDialog):
         fields_row.addWidget(self.search_btn)
         layout.addLayout(fields_row)
 
+        refine_row = QHBoxLayout()
+        refine_row.addStretch(1)
+        self.artist_title_btn = QPushButton("Artist + title only")
+        self.clear_album_btn = QPushButton("Clear album")
+        self.free_text_btn = QPushButton("Use free-text query")
+        refine_row.addWidget(self.artist_title_btn)
+        refine_row.addWidget(self.clear_album_btn)
+        refine_row.addWidget(self.free_text_btn)
+        layout.addLayout(refine_row)
+
         self.status_label = QLabel("")
         layout.addWidget(self.status_label)
 
@@ -132,6 +142,9 @@ class SearchLyricsDialog(QDialog):
         layout.addLayout(btn_row)
 
         self.search_btn.clicked.connect(self._do_search)
+        self.artist_title_btn.clicked.connect(self._search_artist_title_only)
+        self.clear_album_btn.clicked.connect(self._clear_album_and_search)
+        self.free_text_btn.clicked.connect(self._search_free_text)
         self.query_edit.returnPressed.connect(self._do_search)
         self.artist_edit.returnPressed.connect(self._do_search)
         self.title_edit.returnPressed.connect(self._do_search)
@@ -143,6 +156,25 @@ class SearchLyricsDialog(QDialog):
 
         if initial_query.strip() or initial_artist.strip() or initial_title.strip():
             self._do_search()
+
+    def _search_artist_title_only(self):
+        self.query_edit.clear()
+        self.album_edit.clear()
+        self._do_search()
+
+    def _clear_album_and_search(self):
+        self.album_edit.clear()
+        self._do_search()
+
+    def _search_free_text(self):
+        artist = self.artist_edit.text().strip()
+        title = self.title_edit.text().strip()
+        query = " ".join(part for part in (artist, title) if part)
+        self.query_edit.setText(query)
+        self.artist_edit.clear()
+        self.title_edit.clear()
+        self.album_edit.clear()
+        self._do_search()
 
     def _do_search(self):
         query = self.query_edit.text().strip()

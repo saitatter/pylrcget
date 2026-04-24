@@ -21,6 +21,7 @@ from ui.theme_tokens import STYLE_TOKENS
 
 class DownloadProgressOverlay(QWidget):
     cancelRequested = Signal()
+    retryFailedRequested = Signal()
     dismissed = Signal()
     minimized = Signal()           # overlay hidden while operation still running
     activeChanged = Signal(bool)   # True = batch started, False = batch finished/cancelled
@@ -105,6 +106,11 @@ class DownloadProgressOverlay(QWidget):
         self.stop_btn = QPushButton("STOP")
         self.stop_btn.setObjectName("DownloadOverlayStop")
         self.stop_btn.clicked.connect(self._handle_cancel)
+        self.retry_failed_btn = QPushButton("RETRY FAILED")
+        self.retry_failed_btn.setObjectName("DownloadOverlayRetry")
+        self.retry_failed_btn.hide()
+        self.retry_failed_btn.clicked.connect(self.retryFailedRequested.emit)
+        actions_row.addWidget(self.retry_failed_btn)
         actions_row.addWidget(self.stop_btn)
         actions_row.addStretch(1)
         card_layout.addLayout(actions_row)
@@ -132,6 +138,8 @@ class DownloadProgressOverlay(QWidget):
         self.output.clear()
         self.stop_btn.setText("STOP")
         self.stop_btn.setEnabled(True)
+        self.retry_failed_btn.hide()
+        self.retry_failed_btn.setEnabled(False)
         self.close_btn.setEnabled(True)
         self._refresh_summary()
         self.sync_to_parent()
@@ -177,6 +185,17 @@ class DownloadProgressOverlay(QWidget):
         else:
             self.title_label.setText(f"{self._verb} Complete")
         self.activeChanged.emit(False)
+
+    def show_retry_failed(self, count: int) -> None:
+        count = max(0, int(count))
+        if count <= 0:
+            self.retry_failed_btn.hide()
+            self.retry_failed_btn.setEnabled(False)
+            return
+        label = "RETRY FAILED" if count == 1 else f"RETRY {count} FAILED"
+        self.retry_failed_btn.setText(label)
+        self.retry_failed_btn.setEnabled(True)
+        self.retry_failed_btn.show()
 
     def queue_auto_close(self, delay_ms: int) -> None:
         if self._active:
