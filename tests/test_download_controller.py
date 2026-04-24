@@ -22,6 +22,7 @@ class _FakeOverlay:
         self.progress: list[tuple[int, int, str, str]] = []
         self.results: list[tuple[str, str, bool]] = []
         self.finished: list[tuple[str, bool]] = []
+        self.retry_failed_counts: list[int] = []
 
     def start_batch(self, mode_label: str, total: int) -> None:
         self.started.append((mode_label, total))
@@ -34,6 +35,9 @@ class _FakeOverlay:
 
     def finish_batch(self, message: str, *, cancelled: bool = False) -> None:
         self.finished.append((message, cancelled))
+
+    def show_retry_failed(self, count: int) -> None:
+        self.retry_failed_counts.append(int(count))
 
 
 class _FakeWorker(QObject):
@@ -217,6 +221,35 @@ class LyricsDownloadControllerTests(unittest.TestCase):
                 self.assertIn("view", refreshed)
                 self.assertIn("history", refreshed)
                 self.assertEqual(statuses[-1], ("Finished lyrics download. Success: 1, Failed: 0.", 4000))
+            finally:
+                db.close()
+
+    def test_failed_batch_exposes_manual_retry_action(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db = initialize_database(tmp)
+            try:
+                app_state = SimpleNamespace(db=db, db_path=str(Path(tmp) / "pylrcget.db.sqlite3"))
+                overlay = _FakeOverlay()
+                controller, _, notifications, download_states, _ = self._make_controller(app_state, overlay)
+
+                with (
+                    patch("ui.controllers.lyrics_download_controller.BulkLyricsDownloadWorker", _FakeWorker),
+                    patch("ui.controllers.lyrics_download_controller.QTimer.singleShot"),
+                ):
+                    controller.start_downloads([41, 42], mode_override="prefer_synced")
+                    worker = _FakeWorker.instances[0]
+
+                    worker.itemFinished.emit(41, False, "Artist - Missing", "No lyrics found on LRCLIB for this track.")
+                    worker.itemFinished.emit(42, True, "Artist - Found", "Downloaded synced lyrics.")
+                    worker.finishedBatch.emit(
+                        True,
+                        "Finished lyrics download. Success: 1, Failed: 1.",
+                        {"ok": 1, "failed": 1, "cancelled": False},
+                    )
+
+                self.assertEqual(overlay.retry_failed_counts[-1], 1)
+                self.assertEqual(download_states[41], "error")
+                self.assertIn(("Finished lyrics download. Success: 1, Failed: 1.", "warning"), notifications)
             finally:
                 db.close()
 
