@@ -348,6 +348,10 @@ class LyricsDownloadController(QObject):
             )
             return
 
+        selected_ids = {int(candidate.track_id) for candidate in selected}
+        for candidate in candidates:
+            if int(candidate.track_id) not in selected_ids:
+                self._set_track_download_state(int(candidate.track_id), DownloadState.IDLE)
         applied_count = self._apply_download_candidates(selected, context=context)
 
         if not applied_count:

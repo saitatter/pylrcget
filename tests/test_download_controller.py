@@ -375,6 +375,79 @@ class LyricsDownloadControllerTests(unittest.TestCase):
             finally:
                 db.close()
 
+    def test_unselected_review_candidates_reset_to_idle_on_commit(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db = initialize_database(tmp)
+            try:
+                first_audio = Path(tmp) / "selected.mp3"
+                second_audio = Path(tmp) / "skipped.mp3"
+                touch_text(first_audio, "a")
+                touch_text(second_audio, "b")
+                add_tracks(
+                    db,
+                    [
+                        make_fs_track(first_audio, artist="Artist", album="Album", title="Selected"),
+                        make_fs_track(second_audio, artist="Artist", album="Album", title="Skipped"),
+                    ],
+                )
+                ids = [int(row["id"]) for row in db.execute("SELECT id FROM tracks ORDER BY id").fetchall()]
+                app_state = SimpleNamespace(db=db, db_path=str(Path(tmp) / "pylrcget.db.sqlite3"))
+                overlay = _FakeOverlay()
+                controller, _, _, download_states, _ = self._make_controller(app_state, overlay)
+                selected_candidate = LyricsMatchCandidate(
+                    track_id=ids[0],
+                    track_label="Artist - Selected",
+                    query_label="artist + title",
+                    score=94,
+                    artist_name="Artist",
+                    track_name="Selected",
+                    album_name="Album",
+                    duration=180,
+                    kind="Plain",
+                    plain_lyrics="selected plain",
+                    synced_lyrics="",
+                )
+                skipped_candidate = LyricsMatchCandidate(
+                    track_id=ids[1],
+                    track_label="Artist - Skipped",
+                    query_label="artist + title",
+                    score=92,
+                    artist_name="Artist",
+                    track_name="Skipped",
+                    album_name="Album",
+                    duration=180,
+                    kind="Plain",
+                    plain_lyrics="skipped plain",
+                    synced_lyrics="",
+                )
+                _FakeMatchDialog.selected = [selected_candidate]
+
+                with (
+                    patch("ui.controllers.lyrics_download_controller.BulkLyricsDownloadWorker", _FakeWorker),
+                    patch("ui.controllers.lyrics_download_controller.BatchLyricsMatchDialog", _FakeMatchDialog),
+                    patch("ui.controllers.lyrics_download_controller.QTimer.singleShot"),
+                ):
+                    controller.start_downloads(ids, mode_override="prefer_synced")
+                    worker = _FakeWorker.instances[0]
+                    for candidate in (selected_candidate, skipped_candidate):
+                        worker.itemFinished.emit(candidate.track_id, True, candidate.track_label, "Candidate found.")
+                    worker.finishedBatch.emit(
+                        True,
+                        "Finished lyrics search. Candidates: 2, Failed: 0.",
+                        {
+                            "total": 2,
+                            "ok": 2,
+                            "failed": 0,
+                            "cancelled": False,
+                            "candidates": [selected_candidate, skipped_candidate],
+                        },
+                    )
+
+                self.assertEqual(download_states[ids[0]], "success")
+                self.assertEqual(download_states[ids[1]], "idle")
+            finally:
+                db.close()
+
     def test_overlay_status_only_progress_does_not_reset_bar(self):
         overlay = DownloadProgressOverlay()
         try:

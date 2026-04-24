@@ -257,6 +257,47 @@ class LyricsDownloadWorkerTests(unittest.TestCase):
             finally:
                 db.close()
 
+    def test_perfect_alternative_match_stops_remaining_queries(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db = initialize_database(tmp)
+            try:
+                audio = Path(tmp) / "perfect_relaxed.mp3"
+                touch_text(audio, "a")
+                add_tracks(db, [make_fs_track(audio, artist="Artist", album="Album", title="Song")])
+                track = db.execute("SELECT id FROM tracks LIMIT 1").fetchone()
+                self.assertIsNotNone(track)
+
+                finished: list[tuple[bool, str, int]] = []
+                worker = LyricsDownloadWorker(
+                    db_path=str(Path(tmp) / "pylrcget.db.sqlite3"),
+                    track_id=int(track["id"]),
+                    download_mode="prefer_synced",
+                )
+                worker.finished.connect(lambda ok, msg, tid: finished.append((ok, msg, tid)))
+
+                perfect_result = SimpleNamespace(
+                    artist_name="Artist",
+                    track_name="Song",
+                    album_name="Album",
+                    duration=180,
+                    plain_lyrics="plain text",
+                    synced_lyrics="[00:01.00]plain text",
+                    instrumental=False,
+                )
+                with patch("ui.services.lyrics_download_service.LrcLibAPI") as api_cls:
+                    api_cls.return_value.get_lyrics.side_effect = NotFoundError(404, "Not Found")
+                    api_cls.return_value.search_lyrics.return_value = [perfect_result]
+                    worker.run()
+
+                self.assertEqual(len(finished), 1)
+                ok, msg, tid = finished[0]
+                self.assertTrue(ok)
+                self.assertIn("Match: 100%", msg)
+                self.assertEqual(tid, int(track["id"]))
+                self.assertEqual(api_cls.return_value.search_lyrics.call_count, 1)
+            finally:
+                db.close()
+
     def test_bulk_download_parallelizes_track_searches(self):
         with tempfile.TemporaryDirectory() as tmp:
             db = initialize_database(tmp)

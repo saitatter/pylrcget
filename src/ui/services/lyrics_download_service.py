@@ -178,6 +178,8 @@ def find_best_lyrics_match(
         )
         if candidate is not None and (best is None or candidate.score > best.score):
             best = candidate
+        if best is not None and best.score >= 100:
+            break
 
     if best is None:
         return None
