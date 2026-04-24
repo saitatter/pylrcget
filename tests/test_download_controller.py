@@ -224,18 +224,18 @@ class LyricsDownloadControllerTests(unittest.TestCase):
                     worker = _FakeWorker.instances[0]
 
                     worker.progress.emit(1, 2, "Artist - Song", "Querying LRCLIB...", 0.5)
-                    worker.itemFinished.emit(31, True, "Artist - Song", "Downloaded synced lyrics.")
-                    worker.finishedBatch.emit(True, "Finished lyrics download. Success: 1, Failed: 0.", {"ok": 1, "failed": 0, "cancelled": False})
+                    worker.itemFinished.emit(31, False, "Artist - Song", "No lyrics found on LRCLIB for this track.")
+                    worker.finishedBatch.emit(True, "Finished lyrics search. Candidates: 0, Failed: 1.", {"ok": 0, "failed": 1, "cancelled": False})
 
                 self.assertEqual(overlay.progress[-1], (1, 2, "Artist - Song", "Querying LRCLIB..."))
-                self.assertEqual(overlay.results[-1], ("Artist - Song", "Downloaded synced lyrics.", True))
-                self.assertEqual(overlay.finished[-1], ("Finished lyrics download. Success: 1, Failed: 0.", False))
-                self.assertEqual(download_states[31], "success")
+                self.assertEqual(overlay.results[-1], ("Artist - Song", "No lyrics found on LRCLIB for this track.", False))
+                self.assertEqual(overlay.finished[-1], ("Finished lyrics search. Candidates: 0, Failed: 1.", False))
+                self.assertEqual(download_states[31], "error")
                 self.assertEqual(download_states[32], "idle")
-                self.assertIn(("Lyrics downloaded successfully.", "success"), notifications)
+                self.assertIn(("Finished lyrics search. Candidates: 0, Failed: 1.", "error"), notifications)
                 self.assertIn("view", refreshed)
                 self.assertIn("history", refreshed)
-                self.assertEqual(statuses[-1], ("Finished lyrics download. Success: 1, Failed: 0.", 4000))
+                self.assertEqual(statuses[-1], ("Finished lyrics search. Candidates: 0, Failed: 1.", 4000))
             finally:
                 db.close()
 

@@ -64,7 +64,6 @@ class BulkLyricsDownloadWorker(QThread):
         self.lrclib_instance = lrclib_instance
         self.download_mode = normalize_download_mode(download_mode)
         self._started_at = 0.0
-        self._completed_count = 0
 
     def run(self) -> None:
         total = len(self.track_ids)
@@ -130,7 +129,6 @@ class BulkLyricsDownloadWorker(QThread):
                         for future in done:
                             job = pending.pop(future)
                             completed += 1
-                            self._completed_count = completed
                             try:
                                 result = future.result()
                             except Exception as exc:
@@ -185,7 +183,7 @@ class BulkLyricsDownloadWorker(QThread):
         api = LrcLibAPI(self.lrclib_instance)
 
         def _notify(status: str) -> None:
-            self.progress.emit(self._completed_count, len(self.track_ids), job.label, status, self._elapsed())
+            self.progress.emit(0, len(self.track_ids), job.label, status, self._elapsed())
 
         try:
             match = find_best_lyrics_match(

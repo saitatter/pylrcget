@@ -167,22 +167,23 @@ class LyricsDownloadController(QObject):
 
     def _on_download_item_finished(self, track_id: int, ok: bool, track_label: str, msg: str) -> None:
         self._active_track_ids.discard(int(track_id))
-        is_candidate = bool(ok) and "candidate found" in (msg or "").casefold()
-        state = DownloadState.LOADING if is_candidate else (DownloadState.SUCCESS if ok else DownloadState.ERROR)
+        # In batch mode a successful item means "candidate found"; no lyrics are written until
+        # the review dialog is committed explicitly by the user.
+        state = DownloadState.LOADING if ok else DownloadState.ERROR
         self._set_track_download_state(int(track_id), state)
         if not ok:
             failed_id = int(track_id)
             if failed_id not in self._failed_download_track_ids:
                 self._failed_download_track_ids.append(failed_id)
         self._overlay.append_result(track_label, msg, ok)
-        if not is_candidate:
+        if not ok:
             history_entry = self._build_download_history_entry(int(track_id), track_label, msg)
             if history_entry is not None:
                 self._pending_history_entries.append(history_entry)
 
         token = self._state_tokens.get(int(track_id), 0) + 1
         self._state_tokens[int(track_id)] = token
-        if not is_candidate:
+        if not ok:
             QTimer.singleShot(
                 1800,
                 self,
@@ -254,14 +255,9 @@ class LyricsDownloadController(QObject):
             )
             self._review_retry_candidates(candidates, context="download")
         else:
-            success_msg = (
-                "Lyrics downloaded successfully."
-                if int(stats_dict.get("ok", 0)) > 0
-                else "Lyrics search completed. No matches need applying."
-            )
             notify_user(
                 self._app_state,
-                success_msg,
+                "Lyrics search completed. No matches found.",
                 "success",
             )
             queue_auto_close = getattr(self._overlay, "queue_auto_close", None)
