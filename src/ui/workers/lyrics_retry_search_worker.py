@@ -44,7 +44,14 @@ class LyricsRetrySearchWorker(QThread):
                 if self.isInterruptionRequested():
                     break
 
-                track = get_track_by_id(db, track_id)
+                try:
+                    track = get_track_by_id(db, track_id)
+                except (sqlite3.Error, KeyError, TypeError):
+                    self.progress.emit(idx, total, f"Track {track_id}", "Track no longer exists; skipped.")
+                    continue
+                if track is None:
+                    self.progress.emit(idx, total, f"Track {track_id}", "Track no longer exists; skipped.")
+                    continue
                 title = (track.title or "").strip()
                 artist = (track.artist_name or "").strip()
                 album = (track.album_name or "").strip()
@@ -56,23 +63,27 @@ class LyricsRetrySearchWorker(QThread):
                     if self.isInterruptionRequested():
                         break
                     self.progress.emit(idx - 1, total, label, f"Trying {query.label}...")
-                    results = api.search_lyrics(
-                        query=query.query or None,
-                        track_name=query.title or None,
-                        artist_name=query.artist or None,
-                        album_name=query.album or None,
-                    )
-                    candidate = choose_best_candidate(
-                        track_id=track_id,
-                        track_label=label,
-                        artist=artist,
-                        title=title,
-                        album=album,
-                        query_label=query.label,
-                        results=results,
-                    )
-                    if candidate is not None and (best is None or candidate.score > best.score):
-                        best = candidate
+                    try:
+                        results = api.search_lyrics(
+                            query=query.query or None,
+                            track_name=query.title or None,
+                            artist_name=query.artist or None,
+                            album_name=query.album or None,
+                        )
+                        candidate = choose_best_candidate(
+                            track_id=track_id,
+                            track_label=label,
+                            artist=artist,
+                            title=title,
+                            album=album,
+                            query_label=query.label,
+                            results=results,
+                        )
+                        if candidate is not None and (best is None or candidate.score > best.score):
+                            best = candidate
+                    except Exception as exc:
+                        self.progress.emit(idx - 1, total, label, f"{query.label} failed: {type(exc).__name__}")
+                        continue
                     if query_idx < len(queries):
                         time.sleep(0.15)
 

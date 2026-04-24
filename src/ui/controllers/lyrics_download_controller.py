@@ -119,11 +119,10 @@ class LyricsDownloadController(QObject):
         self.start_downloads(track_ids, mode_override=mode)
 
     def cancel(self) -> None:
-        if self._download_worker is None or not self._download_worker.isRunning():
-            if self._retry_search_worker is not None and self._retry_search_worker.isRunning():
-                self._retry_search_worker.requestInterruption()
-            return
-        self._download_worker.requestInterruption()
+        if self._download_worker is not None and self._download_worker.isRunning():
+            self._download_worker.requestInterruption()
+        if self._retry_search_worker is not None and self._retry_search_worker.isRunning():
+            self._retry_search_worker.requestInterruption()
 
     def _resolve_download_mode(self, mode_override: str = "use_global") -> str:
         if mode_override and mode_override != "use_global":
