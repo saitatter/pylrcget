@@ -64,7 +64,7 @@ class LyricsDownloadController(QObject):
         self._get_track_download_state = get_track_download_state
 
         self._download_worker: BulkLyricsDownloadWorker | None = None
-        self._apply_worker: LyricsApplyCandidatesWorker | None = None
+        self._apply_workers: set[LyricsApplyCandidatesWorker] = set()
         self._active_request: LyricsDownloadRequest | None = None
         self._active_track_ids: set[int] = set()
         self._state_tokens: dict[int, int] = {}
@@ -120,8 +120,9 @@ class LyricsDownloadController(QObject):
     def cancel(self) -> None:
         if self._download_worker is not None and self._download_worker.isRunning():
             self._download_worker.requestInterruption()
-        if self._apply_worker is not None and self._apply_worker.isRunning():
-            self._apply_worker.requestInterruption()
+        for worker in list(self._apply_workers):
+            if worker.isRunning():
+                worker.requestInterruption()
         if self._retry_search_worker is not None and self._retry_search_worker.isRunning():
             self._retry_search_worker.requestInterruption()
 
@@ -358,25 +359,36 @@ class LyricsDownloadController(QObject):
         request = self._active_request
         mode = request.mode if request is not None else self._resolve_download_mode("use_global")
         lrclib_instance = request.lrclib_instance if request is not None else ""
-        self._apply_worker = LyricsApplyCandidatesWorker(
+        worker = LyricsApplyCandidatesWorker(
             self._app_state.db_path,
             candidates,
             download_mode=mode,
             lrclib_instance=lrclib_instance,
             parent=self,
         )
-        self._apply_worker.finishedApply.connect(
-            lambda applied_count, applied_ids, error, apply_context=context: self._on_apply_candidates_finished(
+        self._apply_workers.add(worker)
+        worker.finishedApply.connect(
+            lambda applied_count, applied_ids, error, apply_worker=worker, apply_context=context: self._on_apply_candidates_finished(
                 int(applied_count),
                 [int(track_id) for track_id in applied_ids],
                 str(error or ""),
+                worker=apply_worker,
                 context=apply_context,
             )
         )
-        self._apply_worker.start()
+        worker.start()
 
-    def _on_apply_candidates_finished(self, applied_count: int, applied_ids: list[int], error: str, *, context: str) -> None:
-        self._apply_worker = None
+    def _on_apply_candidates_finished(
+        self,
+        applied_count: int,
+        applied_ids: list[int],
+        error: str,
+        *,
+        worker: LyricsApplyCandidatesWorker,
+        context: str,
+    ) -> None:
+        self._apply_workers.discard(worker)
+        worker.deleteLater()
         for track_id in applied_ids:
             self._set_track_download_state(int(track_id), DownloadState.SUCCESS)
             if self._current_player_track_id() == int(track_id):

@@ -75,6 +75,41 @@ class _FakeWorker(QObject):
         cls.instances = []
 
 
+class _ControllableApplyWorker(QObject):
+    finishedApply = Signal(int, object, str)
+    instances: list["_ControllableApplyWorker"] = []
+
+    def __init__(self, db_path: str, candidates: list[LyricsMatchCandidate], *, download_mode: str, lrclib_instance: str, parent=None):
+        super().__init__(parent)
+        self.db_path = db_path
+        self.candidates = list(candidates)
+        self.download_mode = download_mode
+        self.lrclib_instance = lrclib_instance
+        self._running = False
+        self.interrupted = False
+        type(self).instances.append(self)
+
+    def start(self) -> None:
+        self._running = True
+
+    def isRunning(self) -> bool:
+        return self._running
+
+    def requestInterruption(self) -> None:
+        self.interrupted = True
+
+    def finish(self, applied_count: int = 0, applied_ids=None, error: str = "") -> None:
+        self._running = False
+        self.finishedApply.emit(applied_count, list(applied_ids or []), error)
+
+    def deleteLater(self) -> None:
+        pass
+
+    @classmethod
+    def reset(cls) -> None:
+        cls.instances = []
+
+
 class _FakeMatchDialog:
     selected: list[LyricsMatchCandidate] = []
     instances: list["_FakeMatchDialog"] = []
@@ -98,6 +133,7 @@ class LyricsDownloadControllerTests(unittest.TestCase):
 
     def setUp(self) -> None:
         _FakeWorker.reset()
+        _ControllableApplyWorker.reset()
         _FakeMatchDialog.selected = []
         _FakeMatchDialog.instances = []
 
@@ -125,11 +161,11 @@ class LyricsDownloadControllerTests(unittest.TestCase):
 
     def _wait_for_apply_worker(self, controller: LyricsDownloadController, timeout_s: float = 3.0) -> None:
         deadline = time.monotonic() + timeout_s
-        while getattr(controller, "_apply_worker", None) is not None and time.monotonic() < deadline:
+        while getattr(controller, "_apply_workers", set()) and time.monotonic() < deadline:
             self._app.processEvents()
             time.sleep(0.01)
         self._app.processEvents()
-        self.assertIsNone(getattr(controller, "_apply_worker", None))
+        self.assertFalse(getattr(controller, "_apply_workers", set()))
 
     def test_download_missing_uses_current_configured_mode(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -385,6 +421,49 @@ class LyricsDownloadControllerTests(unittest.TestCase):
                 self.assertEqual(_FakeMatchDialog.instances, [])
             finally:
                 db.close()
+
+    def test_multiple_apply_workers_are_tracked_independently(self):
+        app_state = SimpleNamespace(db=None, db_path="library.sqlite")
+        overlay = _FakeOverlay()
+        controller, *_ = self._make_controller(app_state, overlay)
+        first = LyricsMatchCandidate(
+            track_id=1,
+            track_label="Artist - Exact",
+            query_label="exact metadata",
+            score=100,
+            artist_name="Artist",
+            track_name="Exact",
+            album_name="Album",
+            duration=180,
+            kind="Plain",
+            plain_lyrics="one",
+            synced_lyrics="",
+        )
+        second = LyricsMatchCandidate(
+            track_id=2,
+            track_label="Artist - Reviewed",
+            query_label="artist + title",
+            score=94,
+            artist_name="Artist",
+            track_name="Reviewed",
+            album_name="Album",
+            duration=180,
+            kind="Plain",
+            plain_lyrics="two",
+            synced_lyrics="",
+        )
+
+        with patch("ui.controllers.lyrics_download_controller.LyricsApplyCandidatesWorker", _ControllableApplyWorker):
+            controller._active_request = SimpleNamespace(mode="prefer_synced", lrclib_instance="https://lrclib.net/api")
+            controller._start_apply_candidates([first], context="download")
+            controller._start_apply_candidates([second], context="download")
+
+        self.assertEqual(len(_ControllableApplyWorker.instances), 2)
+        self.assertEqual(len(controller._apply_workers), 2)
+        _ControllableApplyWorker.instances[0].finish(applied_count=1, applied_ids=[1])
+        self.assertEqual(len(controller._apply_workers), 1)
+        controller.cancel()
+        self.assertTrue(_ControllableApplyWorker.instances[1].interrupted)
 
     def test_unselected_review_candidates_reset_to_idle_on_commit(self):
         with tempfile.TemporaryDirectory() as tmp:
