@@ -223,6 +223,8 @@ class LyricsDownloadController(QObject):
             for candidate in (stats.get("candidates", []) if isinstance(stats, dict) else [])
             if isinstance(candidate, LyricsMatchCandidate)
         ]
+        exact_candidates = [candidate for candidate in candidates if int(candidate.score) >= 100]
+        review_candidates = [candidate for candidate in candidates if int(candidate.score) < 100]
         show_retry_failed = getattr(self._overlay, "show_retry_failed", None)
         if callable(show_retry_failed):
             retry_count = 0 if stats_dict.get("cancelled") else len(self._failed_download_track_ids)
@@ -233,6 +235,34 @@ class LyricsDownloadController(QObject):
                 "Lyrics download cancelled.",
                 "warning",
             )
+        elif candidates:
+            applied_exact = self._apply_download_candidates(exact_candidates, context="download") if exact_candidates else 0
+            if applied_exact and review_candidates:
+                self._flush_pending_download_history()
+                self._refresh_visible_library_view()
+                self._refresh_history()
+            if review_candidates:
+                exact_note = f"Applied {applied_exact} exact match(es). " if applied_exact else ""
+                failed_count = int(stats_dict.get("failed", 0))
+                failed_note = f" {failed_count} track(s) still failed." if failed_count else ""
+                notify_user(
+                    self._app_state,
+                    f"{exact_note}Review {len(review_candidates)} lower-confidence match candidate(s).{failed_note}",
+                    "info",
+                    show_status=self._show_status,
+                    status_timeout_ms=4000,
+                )
+                self._review_retry_candidates(review_candidates, context="download")
+            elif applied_exact:
+                self._after_candidates_applied(applied_exact, context="download")
+            else:
+                notify_user(
+                    self._app_state,
+                    "Lyrics matches could not be applied.",
+                    "warning",
+                    show_status=self._show_status,
+                    status_timeout_ms=3500,
+                )
         elif int(stats_dict.get("failed", 0)) > 0 and int(stats_dict.get("ok", 0)) > 0:
             notify_user(
                 self._app_state,
@@ -245,15 +275,6 @@ class LyricsDownloadController(QObject):
                 msg,
                 "error",
             )
-        elif candidates:
-            notify_user(
-                self._app_state,
-                f"Review {len(candidates)} lyrics match candidate(s) before applying.",
-                "info",
-                show_status=self._show_status,
-                status_timeout_ms=4000,
-            )
-            self._review_retry_candidates(candidates, context="download")
         else:
             notify_user(
                 self._app_state,
@@ -327,13 +348,20 @@ class LyricsDownloadController(QObject):
             )
             return
 
-        applied_count = 0
-        for candidate in selected:
-            if self._apply_retry_candidate(candidate):
-                applied_count += 1
+        applied_count = self._apply_download_candidates(selected, context=context)
 
         if not applied_count:
             return
+        self._after_candidates_applied(applied_count, context=context)
+
+    def _apply_download_candidates(self, candidates: list[LyricsMatchCandidate], *, context: str) -> int:
+        applied_count = 0
+        for candidate in candidates:
+            if self._apply_retry_candidate(candidate):
+                applied_count += 1
+        return applied_count
+
+    def _after_candidates_applied(self, applied_count: int, *, context: str) -> None:
         self._flush_pending_download_history()
         self._refresh_visible_library_view()
         self._refresh_history()

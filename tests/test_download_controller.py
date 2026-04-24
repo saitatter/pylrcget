@@ -75,10 +75,12 @@ class _FakeWorker(QObject):
 
 class _FakeMatchDialog:
     selected: list[LyricsMatchCandidate] = []
+    instances: list["_FakeMatchDialog"] = []
 
     def __init__(self, candidates, parent=None):
         del parent
         self.candidates = list(candidates)
+        type(self).instances.append(self)
 
     def exec(self):
         return True
@@ -94,6 +96,8 @@ class LyricsDownloadControllerTests(unittest.TestCase):
 
     def setUp(self) -> None:
         _FakeWorker.reset()
+        _FakeMatchDialog.selected = []
+        _FakeMatchDialog.instances = []
 
     def _make_controller(self, app_state, overlay: _FakeOverlay, *, current_track_id=None):
         statuses: list[tuple[str, int | None]] = []
@@ -268,7 +272,7 @@ class LyricsDownloadControllerTests(unittest.TestCase):
             finally:
                 db.close()
 
-    def test_batch_candidates_require_review_before_apply(self):
+    def test_lower_score_batch_candidates_require_review_before_apply(self):
         with tempfile.TemporaryDirectory() as tmp:
             db = initialize_database(tmp)
             try:
@@ -283,7 +287,7 @@ class LyricsDownloadControllerTests(unittest.TestCase):
                     track_id=track_id,
                     track_label="Air Supply - All Out Of Love",
                     query_label="exact metadata",
-                    score=100,
+                    score=93,
                     artist_name="Air Supply",
                     track_name="All Out of Love",
                     album_name="Lost in Love",
@@ -301,7 +305,7 @@ class LyricsDownloadControllerTests(unittest.TestCase):
                 ):
                     controller.start_downloads([track_id], mode_override="prefer_synced")
                     worker = _FakeWorker.instances[0]
-                    worker.itemFinished.emit(track_id, True, candidate.track_label, "Candidate found. Match: 100%.")
+                    worker.itemFinished.emit(track_id, True, candidate.track_label, "Candidate found. Match: 93%.")
 
                     before_apply = get_track_by_id(db, track_id)
                     self.assertIsNone(before_apply.lrc_lyrics)
@@ -320,6 +324,53 @@ class LyricsDownloadControllerTests(unittest.TestCase):
                 self.assertIn(("Applied lyrics to 1 downloaded track.", "success"), notifications)
                 self.assertIn("view", refreshed)
                 self.assertIn("history", refreshed)
+            finally:
+                db.close()
+
+    def test_exact_batch_candidates_apply_without_review(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db = initialize_database(tmp)
+            try:
+                audio = Path(tmp) / "exact.mp3"
+                touch_text(audio, "a")
+                add_tracks(db, [make_fs_track(audio, artist="Artist", album="Album", title="Song")])
+                track_id = int(db.execute("SELECT id FROM tracks LIMIT 1").fetchone()["id"])
+                app_state = SimpleNamespace(db=db, db_path=str(Path(tmp) / "pylrcget.db.sqlite3"))
+                overlay = _FakeOverlay()
+                controller, _, notifications, download_states, _ = self._make_controller(app_state, overlay)
+                candidate = LyricsMatchCandidate(
+                    track_id=track_id,
+                    track_label="Artist - Song",
+                    query_label="exact metadata",
+                    score=100,
+                    artist_name="Artist",
+                    track_name="Song",
+                    album_name="Album",
+                    duration=180,
+                    kind="Plain",
+                    plain_lyrics="plain text",
+                    synced_lyrics="",
+                )
+                with (
+                    patch("ui.controllers.lyrics_download_controller.BulkLyricsDownloadWorker", _FakeWorker),
+                    patch("ui.controllers.lyrics_download_controller.BatchLyricsMatchDialog", _FakeMatchDialog),
+                    patch("ui.controllers.lyrics_download_controller.QTimer.singleShot"),
+                ):
+                    controller.start_downloads([track_id], mode_override="prefer_synced")
+                    worker = _FakeWorker.instances[0]
+                    worker.itemFinished.emit(track_id, True, candidate.track_label, "Candidate found. Match: 100%.")
+                    worker.finishedBatch.emit(
+                        True,
+                        "Finished lyrics search. Candidates: 1, Failed: 0.",
+                        {"total": 1, "ok": 1, "failed": 0, "cancelled": False, "candidates": [candidate]},
+                    )
+
+                after_apply = get_track_by_id(db, track_id)
+                self.assertEqual(after_apply.txt_lyrics, "plain text")
+                self.assertIsNone(after_apply.lrc_lyrics)
+                self.assertEqual(download_states[track_id], "success")
+                self.assertIn(("Applied lyrics to 1 downloaded track.", "success"), notifications)
+                self.assertEqual(_FakeMatchDialog.instances, [])
             finally:
                 db.close()
 
