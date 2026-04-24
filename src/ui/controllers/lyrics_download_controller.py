@@ -19,6 +19,7 @@ from db.queries import (
     update_track_synced_lyrics,
 )
 from core.tracklist_models import DownloadState
+from ui.dialogs.batch_lyrics_match_dialog import BatchLyricsMatchDialog
 from ui.services.feedback import notify_user
 from ui.services.download_modes import download_mode_label, no_missing_tracks_message
 from ui.services.lyrics_match_retry import LyricsMatchCandidate
@@ -298,8 +299,6 @@ class LyricsDownloadController(QObject):
         self._review_retry_candidates([candidate for candidate in candidates if isinstance(candidate, LyricsMatchCandidate)])
 
     def _review_retry_candidates(self, candidates: list[LyricsMatchCandidate]) -> None:
-        from ui.dialogs.batch_lyrics_match_dialog import BatchLyricsMatchDialog
-
         dialog = BatchLyricsMatchDialog(candidates, parent=self.parent())
         if not dialog.exec():
             return

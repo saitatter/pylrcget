@@ -6,6 +6,10 @@ import re
 
 
 _WORD_RE = re.compile(r"[a-z0-9]+")
+TITLE_SCORE_WEIGHT = 0.58
+ARTIST_SCORE_WEIGHT = 0.34
+ALBUM_SCORE_WEIGHT = 0.08
+SYNCED_LYRICS_SCORE_BONUS = 3
 
 
 @dataclass(frozen=True)
@@ -82,7 +86,7 @@ def choose_best_candidate(
         if kind not in {"Synced", "Plain"}:
             continue
         if kind == "Synced":
-            score += 3
+            score += SYNCED_LYRICS_SCORE_BONUS
         candidate = LyricsMatchCandidate(
             track_id=int(track_id),
             track_label=track_label,
@@ -113,7 +117,11 @@ def _score_result(
     title_score = _text_similarity(title, result_title)
     artist_score = _text_similarity(artist, result_artist)
     album_score = _text_similarity(album, result_album) if album.strip() else 0.0
-    score = (title_score * 0.58) + (artist_score * 0.34) + (album_score * 0.08)
+    score = (
+        (title_score * TITLE_SCORE_WEIGHT)
+        + (artist_score * ARTIST_SCORE_WEIGHT)
+        + (album_score * ALBUM_SCORE_WEIGHT)
+    )
     return int(round(score * 100))
 
 
