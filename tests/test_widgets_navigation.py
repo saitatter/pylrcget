@@ -182,6 +182,7 @@ class TrackListWidgetTests(unittest.TestCase):
             self.assertEqual(widget.model.columnCount(), 4)
             self.assertEqual(widget.model.headerData(2, Qt.Orientation.Horizontal, Qt.ItemDataRole.DisplayRole), "Lyrics")
             self.assertFalse(widget.table.isColumnHidden(2))
+            self.assertGreaterEqual(widget.table.columnWidth(1), 90)
             self.assertEqual(widget.header.sectionResizeMode(2), QHeaderView.ResizeMode.Fixed)
             self.assertGreaterEqual(widget.table.columnWidth(2), 100)
         finally:

@@ -29,7 +29,7 @@ from ui.widgets.library_table_utils import should_load_more
 from ui.widgets.track_list_rows import build_track_list_rows
 from core.tracklist_models import DownloadState
 
-TRACK_DURATION_COLUMN_WIDTH = 78
+TRACK_DURATION_COLUMN_WIDTH = 92
 TRACK_LYRICS_COLUMN_WIDTH = 118
 TRACK_ACTIONS_COLUMN_WIDTH = 142
 
