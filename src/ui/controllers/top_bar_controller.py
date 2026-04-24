@@ -27,6 +27,7 @@ class TopBarController(QWidget):
         on_open_settings,
         on_open_about,
         on_toggle_logs,
+        on_toggle_hotkey_hints,
         on_schedule_search,
         on_filter_changed,
         parent=None,
@@ -158,6 +159,15 @@ class TopBarController(QWidget):
         self.btn_logs.setCheckable(True)
         self.btn_logs.clicked.connect(on_toggle_logs)
 
+        self.btn_hotkeys = QToolButton()
+        self.btn_hotkeys.setObjectName("TopBarAction")
+        self.btn_hotkeys.setText("Keys")
+        self.btn_hotkeys.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextOnly)
+        self.btn_hotkeys.setToolTip("Show keyboard shortcut hints")
+        self.btn_hotkeys.setAccessibleName("Show keyboard shortcut hints")
+        self.btn_hotkeys.setCheckable(True)
+        self.btn_hotkeys.clicked.connect(on_toggle_hotkey_hints)
+
         self.btn_bg_activity = QToolButton()
         self.btn_bg_activity.setObjectName("TopBarAction")
         self.btn_bg_activity.setIcon(load_svg_icon("download.svg", 18))
@@ -170,6 +180,7 @@ class TopBarController(QWidget):
         actions_row.addWidget(self.btn_config)
         actions_row.addWidget(self.btn_about)
         actions_row.addWidget(self.btn_logs)
+        actions_row.addWidget(self.btn_hotkeys)
         actions_row.addWidget(self.btn_bg_activity)
         actions_row.addStretch(1)
         actions_layout.addLayout(actions_row)

@@ -51,6 +51,16 @@ QToolButton#TopBarAction {
     min-height: 36px;
 }
 
+QLabel#HotkeyHintBadge {
+    background: {{color-accent}};
+    color: {{color-bg-app}};
+    border: 1px solid {{color-accent-alt}};
+    border-radius: {{radius-pill}};
+    padding: 1px 6px;
+    font-size: {{font-size-xs}};
+    font-weight: 800;
+}
+
 QToolButton#TopBarAction[actionState="loading"] {
     background: {{color-bg-pressed}};
     border-color: {{color-accent}};

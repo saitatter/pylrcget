@@ -61,6 +61,7 @@ from ui.widgets.log_panel import LogPanel, QtLogHandler
 from ui.widgets.my_lrclib_widget import MyLrclibWidget
 from ui.widgets.lrclib_browser_widget import LrclibBrowserWidget
 from ui.widgets.download_progress_overlay import DownloadProgressOverlay
+from ui.widgets.hotkey_hints import HotkeyHintManager
 
 logger = logging.getLogger(__name__)
 
@@ -94,6 +95,7 @@ class MainWindow(QMainWindow):
         self._pending_playback_speed: float | None = None
         self._pending_playback_volume: float | None = None
         self._recent_toast_messages: set[str] = set()
+        self.hotkey_hints = HotkeyHintManager(self)
         self.scanner = None
         self._playback_speed_save_timer = QTimer(self)
         self._playback_speed_save_timer.setSingleShot(True)
@@ -120,6 +122,7 @@ class MainWindow(QMainWindow):
         QShortcut(QKeySequence("Ctrl+Left"), self, activated=self.play_prev)
         QShortcut(QKeySequence.StandardKey.Save, self, activated=self._save_active_lyrics)
         QShortcut(QKeySequence.StandardKey.Find, self, activated=self._focus_search)
+        QShortcut(QKeySequence("Ctrl+/"), self, activated=self._toggle_hotkey_hints)
 
         self.central_widget = QWidget()
         self.setCentralWidget(self.central_widget)
@@ -141,6 +144,7 @@ class MainWindow(QMainWindow):
             on_open_settings=self.open_config_modal,
             on_open_about=self.open_about_modal,
             on_toggle_logs=self._toggle_logs_panel,
+            on_toggle_hotkey_hints=self._toggle_hotkey_hints,
             on_schedule_search=self._schedule_library_search,
             on_filter_changed=self._apply_track_filters,
             parent=self,
@@ -410,6 +414,7 @@ class MainWindow(QMainWindow):
 
         # --- Filters wiring ---
         self.top_bar.bind_tab_order(self, self.tabs)
+        self._register_hotkey_hints()
         self._sync_download_mode_ui()
 
         # --- Selection counter in status bar ---
@@ -1242,6 +1247,26 @@ class MainWindow(QMainWindow):
         """Ctrl+F: focus the search box."""
         self.top_bar.search_box.setFocus()
         self.top_bar.search_box.selectAll()
+
+    def _toggle_hotkey_hints(self) -> None:
+        visible = self.hotkey_hints.toggle()
+        if hasattr(self, "top_bar"):
+            self.top_bar.btn_hotkeys.setChecked(visible)
+        self._show_status_message(
+            "Keyboard shortcut hints shown." if visible else "Keyboard shortcut hints hidden.",
+            1800,
+        )
+
+    def _register_hotkey_hints(self) -> None:
+        self.hotkey_hints.register(self.top_bar.search_box, "Ctrl+F")
+        self.hotkey_hints.register(self.top_bar.btn_hotkeys, "Ctrl+/")
+        self.hotkey_hints.register(self.track_list.table, "Enter")
+        self.hotkey_hints.register(self.lyrics_view.btn_save, "Ctrl+S")
+        self.hotkey_hints.register(self.albums_lyrics_view.btn_save, "Ctrl+S")
+        self.hotkey_hints.register(self.artists_lyrics_view.btn_save, "Ctrl+S")
+        self.hotkey_hints.register(self.player_bar.btn_prev, "Ctrl+Left")
+        self.hotkey_hints.register(self.player_bar.btn_play, "Space")
+        self.hotkey_hints.register(self.player_bar.btn_next, "Ctrl+Right")
 
     def _all_lyrics_views(self) -> list[LyricsEditorWidget]:
         return [self.lyrics_view, self.albums_lyrics_view, self.artists_lyrics_view]
