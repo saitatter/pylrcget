@@ -61,13 +61,22 @@ def _strip_timestamps(lrc: str) -> str:
 
 
 def _should_retry_lrclib_error(exc: Exception) -> bool:
-    if isinstance(exc, NotFoundError):
+    if _is_lrclib_not_found(exc):
         return False
     if isinstance(exc, _RETRYABLE_API_ERRORS):
         return True
     if isinstance(exc, LrcLibError):
         return exc.status_code == 429 or exc.status_code >= 500
     return False
+
+
+def _is_lrclib_not_found(exc: Exception) -> bool:
+    if isinstance(exc, NotFoundError):
+        return True
+    if not isinstance(exc, LrcLibError):
+        return False
+    message = f"{exc.reason} {exc.message}".casefold()
+    return exc.status_code == 404 or "not found" in message or "notfound" in message
 
 
 def is_valid_lrclib_duration(duration_s: int | None) -> bool:
@@ -138,7 +147,9 @@ def find_best_lyrics_match(
         if _strip_empty(getattr(lyrics, "synced_lyrics", None)) or _strip_empty(getattr(lyrics, "plain_lyrics", None)):
             return LyricsDownloadMatch(lyrics, 100, "exact metadata")
         notify("Exact LRCLIB match has no usable lyrics; trying alternatives...")
-    except NotFoundError:
+    except Exception as exc:
+        if not _is_lrclib_not_found(exc):
+            raise
         notify("Exact LRCLIB match not found; trying alternatives...")
 
     best = None
