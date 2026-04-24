@@ -14,6 +14,8 @@ from ui.services.download_modes import normalize_download_mode
 from ui.services.lyrics_download_service import (
     LyricsDownloadMatch,
     find_best_lyrics_match,
+    invalid_lrclib_duration_message,
+    is_valid_lrclib_duration,
 )
 from ui.services.lyrics_match_retry import LyricsMatchCandidate
 
@@ -96,6 +98,14 @@ class BulkLyricsDownloadWorker(QThread):
                         self.itemFinished.emit(int(track_id), False, label, msg)
                         self.progress.emit(completed, total, label, msg, self._elapsed())
                         continue
+                    duration_s = int(round(track.duration or 0.0)) or None
+                    if duration_s is not None and not is_valid_lrclib_duration(duration_s):
+                        fail_count += 1
+                        completed += 1
+                        msg = invalid_lrclib_duration_message(duration_s)
+                        self.itemFinished.emit(int(track_id), False, label, msg)
+                        self.progress.emit(completed, total, label, msg, self._elapsed())
+                        continue
                     jobs.append(
                         _DownloadJob(
                             track_id=int(track_id),
@@ -103,7 +113,7 @@ class BulkLyricsDownloadWorker(QThread):
                             title=title,
                             artist=artist,
                             album=(track.album_name or "").strip(),
-                            duration_s=int(round(track.duration or 0.0)) or None,
+                            duration_s=duration_s,
                         )
                     )
                 except (sqlite3.Error, AttributeError, TypeError) as exc:

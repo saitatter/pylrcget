@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import tempfile
 import unittest
+from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -271,6 +272,76 @@ class LyricsDownloadWorkerTests(unittest.TestCase):
                 self.assertEqual(len(finished), 1)
                 self.assertFalse(finished[0][0])
                 self.assertTrue(finished[0][2]["cancelled"])
+            finally:
+                db.close()
+
+    def test_bulk_download_skips_invalid_duration_without_request(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db = initialize_database(tmp)
+            try:
+                audio = Path(tmp) / "too_long.mp3"
+                touch_text(audio, "a")
+                add_tracks(
+                    db,
+                    [
+                        replace(
+                            make_fs_track(audio, artist="Modern Talking", album="25 Years of Disco-Pop CD1", title="Medley"),
+                            duration=4000.0,
+                        )
+                    ],
+                )
+                track_ids = [int(row["id"]) for row in db.execute("SELECT id FROM tracks ORDER BY id").fetchall()]
+                worker = BulkLyricsDownloadWorker(
+                    db_path=str(Path(tmp) / "pylrcget.db.sqlite3"),
+                    track_ids=track_ids,
+                    lrclib_instance="https://lrclib.net/api",
+                    download_mode="prefer_synced",
+                )
+                results: list[tuple[int, bool, str, str]] = []
+                finished: list[tuple[bool, str, dict]] = []
+                worker.itemFinished.connect(lambda track_id, ok, label, msg: results.append((track_id, ok, label, msg)))
+                worker.finishedBatch.connect(lambda ok, msg, stats: finished.append((ok, msg, stats)))
+
+                with patch("ui.workers.bulk_lyrics_download_worker.LrcLibAPI") as api_cls, patch(
+                    "ui.workers.bulk_lyrics_download_worker.ThreadPoolExecutor"
+                ) as executor_cls:
+                    worker.run()
+
+                api_cls.assert_not_called()
+                executor_cls.assert_not_called()
+                self.assertEqual(len(results), 1)
+                self.assertFalse(results[0][1])
+                self.assertIn("Skipped without request", results[0][3])
+                self.assertEqual(finished[0][2]["failed"], 1)
+            finally:
+                db.close()
+
+    def test_single_download_skips_invalid_duration_without_request(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db = initialize_database(tmp)
+            try:
+                audio = Path(tmp) / "too_long_single.mp3"
+                touch_text(audio, "a")
+                add_tracks(
+                    db,
+                    [replace(make_fs_track(audio, artist="Artist", album="Album", title="Long Track"), duration=4000.0)],
+                )
+                track_id = int(db.execute("SELECT id FROM tracks LIMIT 1").fetchone()["id"])
+                worker = LyricsDownloadWorker(
+                    db_path=str(Path(tmp) / "pylrcget.db.sqlite3"),
+                    track_id=track_id,
+                    download_mode="prefer_synced",
+                )
+                finished: list[tuple[bool, str, int]] = []
+                worker.finished.connect(lambda ok, msg, tid: finished.append((ok, msg, tid)))
+
+                with patch("ui.services.lyrics_download_service.LrcLibAPI") as api_cls:
+                    worker.run()
+
+                api_cls.assert_not_called()
+                self.assertEqual(len(finished), 1)
+                self.assertFalse(finished[0][0])
+                self.assertIn("Skipped without request", finished[0][1])
             finally:
                 db.close()
 

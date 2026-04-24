@@ -25,6 +25,8 @@ _RETRYABLE_API_ERRORS = (RateLimitError, ServerError, requests_exceptions.Timeou
 _MAX_LRCLIB_RETRIES = 3
 _INITIAL_BACKOFF_S = 0.5
 _LRC_TIMESTAMP_RE = re.compile(r"\[(?:\d+:)?\d+:\d+(?:\.\d+)?\]")
+LRCLIB_MIN_DURATION_S = 1
+LRCLIB_MAX_DURATION_S = 3600
 
 
 @dataclass(frozen=True)
@@ -66,6 +68,19 @@ def _should_retry_lrclib_error(exc: Exception) -> bool:
     if isinstance(exc, LrcLibError):
         return exc.status_code == 429 or exc.status_code >= 500
     return False
+
+
+def is_valid_lrclib_duration(duration_s: int | None) -> bool:
+    if duration_s is None:
+        return True
+    return LRCLIB_MIN_DURATION_S <= int(duration_s) <= LRCLIB_MAX_DURATION_S
+
+
+def invalid_lrclib_duration_message(duration_s: int) -> str:
+    return (
+        f"Invalid duration for LRCLIB ({duration_s}s); "
+        f"must be between {LRCLIB_MIN_DURATION_S} and {LRCLIB_MAX_DURATION_S}. Skipped without request."
+    )
 
 
 def fetch_lyrics_with_retry(
@@ -287,6 +302,8 @@ def download_track_lyrics(
 
         if not title or not artist:
             return False, "Missing title/artist; cannot search lyrics.", track_id, title_for_ui
+        if duration_s and not is_valid_lrclib_duration(duration_s):
+            return False, invalid_lrclib_duration_message(duration_s), track_id, title_for_ui
 
         api_instance = api or LrcLibAPI(lrclib_instance)
         match = find_best_lyrics_match(
