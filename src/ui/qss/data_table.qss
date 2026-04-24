@@ -15,7 +15,7 @@ QTableView#{{table_name}}::item:hover {
 QHeaderView::section {
     background-color: {{color-table-header}};
     color: {{color-table-header-text}};
-    padding: 4px 24px 4px 6px;
+    padding: 4px 6px;
     border: none;
     border-bottom: 1px solid {{color-border-strong}};
     font-size: 11px;
