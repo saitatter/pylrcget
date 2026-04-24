@@ -171,13 +171,14 @@ class PlayerBar(QWidget):
 
         shell = QWidget()
         shell.setObjectName("PlayerShell")
+        shell.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         shell_layout = QGridLayout(shell)
         set_layout_spacing(shell_layout, margins=(SPACE_2, SPACE_2, SPACE_2, SPACE_2), spacing=SPACE_2)
-        root.addWidget(shell)
+        root.addWidget(shell, 1)
 
         left_panel = QWidget()
         left_panel.setObjectName("PlayerMeta")
-        left_panel.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Preferred)
+        left_panel.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         left_layout = QHBoxLayout(left_panel)
         set_layout_spacing(left_layout, margins=0, spacing=SPACE_2)
 
@@ -191,7 +192,8 @@ class PlayerBar(QWidget):
 
         self.lbl_title = QLabel("Nothing playing")
         self.lbl_title.setObjectName("NowPlaying")
-        self.lbl_title.setMinimumWidth(220)
+        self.lbl_title.setMinimumWidth(0)
+        self.lbl_title.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         self.lbl_title.setTextInteractionFlags(Qt.TextSelectableByMouse)
         self.lbl_title.setWordWrap(False)
 
@@ -200,6 +202,7 @@ class PlayerBar(QWidget):
         self.lbl_artist.setTextFormat(Qt.TextFormat.RichText)
         self.lbl_artist.setTextInteractionFlags(Qt.TextInteractionFlag.LinksAccessibleByMouse)
         self.lbl_artist.setOpenExternalLinks(False)
+        self.lbl_artist.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         self.lbl_artist.linkActivated.connect(self._on_artist_link_activated)
 
         self.lbl_album = QLabel("")
@@ -207,6 +210,7 @@ class PlayerBar(QWidget):
         self.lbl_album.setTextFormat(Qt.TextFormat.RichText)
         self.lbl_album.setTextInteractionFlags(Qt.TextInteractionFlag.LinksAccessibleByMouse)
         self.lbl_album.setOpenExternalLinks(False)
+        self.lbl_album.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         self.lbl_album.linkActivated.connect(self._on_album_link_activated)
 
         text_stack.addWidget(self.lbl_title)
@@ -219,7 +223,7 @@ class PlayerBar(QWidget):
 
         center_panel = QWidget()
         center_panel.setObjectName("PlayerCenter")
-        center_panel.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Preferred)
+        center_panel.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         center_layout = QVBoxLayout(center_panel)
         set_layout_spacing(center_layout, margins=(0, 1, 0, 1), spacing=2)
 
@@ -292,7 +296,7 @@ class PlayerBar(QWidget):
 
         right_panel = QWidget()
         right_panel.setObjectName("PlayerExtras")
-        right_panel.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Preferred)
+        right_panel.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred)
         right_layout = QVBoxLayout(right_panel)
         set_layout_spacing(right_layout, margins=0, spacing=4)
 
@@ -362,15 +366,12 @@ class PlayerBar(QWidget):
         volume_row.addWidget(self.lbl_volume_value)
         right_layout.addLayout(volume_row)
 
-        shell_layout.addWidget(left_panel, 0, 0, Qt.AlignLeft | Qt.AlignVCenter)
-        shell_layout.addWidget(center_panel, 0, 1, Qt.AlignCenter)
-        shell_layout.addWidget(right_panel, 0, 2, Qt.AlignRight | Qt.AlignVCenter)
-        shell_layout.setColumnStretch(0, 1)
-        shell_layout.setColumnStretch(1, 0)
-        shell_layout.setColumnStretch(2, 1)
-
-        center_panel.setMinimumWidth(500)
-        center_panel.setMaximumWidth(640)
+        shell_layout.addWidget(left_panel, 0, 0)
+        shell_layout.addWidget(center_panel, 0, 1)
+        shell_layout.addWidget(right_panel, 0, 2)
+        shell_layout.setColumnStretch(0, 3)
+        shell_layout.setColumnStretch(1, 5)
+        shell_layout.setColumnStretch(2, 2)
 
         self.slider.sliderPressed.connect(self._on_slider_pressed)
         self.slider.sliderReleased.connect(self._on_slider_released)
@@ -463,12 +464,12 @@ class PlayerBar(QWidget):
         self.lbl_album.setVisible(not compact)
         self.lbl_speed.setVisible(not compact)
         self.lbl_volume.setVisible(True)
-        self.lbl_title.setMinimumWidth(110 if compact else 150)
-        left_width = 200 if compact else 250
+        self.lbl_title.setMinimumWidth(0)
+        left_width = 170 if compact else 220
         if self._show_album_art:
-            left_width += 40
-        right_width = 150 if compact else 190
-        center_width = 420 if compact else 560
+            left_width += 34
+        right_width = 135 if compact else 170
+        center_width = 260 if compact else 340
         cover_size = 44 if compact else 52
         bar_height = 92 if compact else 104
 
@@ -480,9 +481,12 @@ class PlayerBar(QWidget):
 
         self.lbl_cover.setFixedSize(cover_size, cover_size)
         self.lbl_cover.setVisible(self._show_album_art)
-        self.findChild(QWidget, "PlayerMeta").setFixedWidth(left_width)
-        self.findChild(QWidget, "PlayerExtras").setFixedWidth(right_width)
-        self.findChild(QWidget, "PlayerCenter").setFixedWidth(center_width)
+        self.findChild(QWidget, "PlayerMeta").setMinimumWidth(left_width)
+        self.findChild(QWidget, "PlayerMeta").setMaximumWidth(16777215)
+        self.findChild(QWidget, "PlayerExtras").setMinimumWidth(right_width)
+        self.findChild(QWidget, "PlayerExtras").setMaximumWidth(16777215)
+        self.findChild(QWidget, "PlayerCenter").setMinimumWidth(center_width)
+        self.findChild(QWidget, "PlayerCenter").setMaximumWidth(16777215)
         self.setMinimumHeight(bar_height)
         self.setMaximumHeight(bar_height)
 

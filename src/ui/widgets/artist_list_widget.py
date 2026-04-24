@@ -4,7 +4,7 @@ from typing import Iterable
 
 from PySide6.QtCore import Qt, Signal, QModelIndex, QItemSelectionModel
 from PySide6.QtGui import QStandardItem, QStandardItemModel
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QTableView, QMenu, QStackedWidget
+from PySide6.QtWidgets import QHeaderView, QMenu, QStackedWidget, QTableView, QVBoxLayout, QWidget
 
 from db.database import get_directories
 from ui.style_loader import load_stylesheet
@@ -82,10 +82,10 @@ class ArtistListWidget(QWidget):
         self.table.setAlternatingRowColors(True)
         self.table.setObjectName("ArtistTable")
         self.table.verticalHeader().setDefaultSectionSize(30)
-        self.table.setColumnWidth(0, 520)
-        self.table.setColumnWidth(1, 90)
-        self.table.setColumnWidth(2, 90)
-        self.header.setStretchLastSection(True)
+        self.header.setStretchLastSection(False)
+        self.header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        self.header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
+        self.header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
         self.table.setSortingEnabled(False)
         self.header.setSortIndicator(0, Qt.SortOrder.AscendingOrder)
         self.header.sortIndicatorChanged.connect(self._on_sort_changed)

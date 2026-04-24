@@ -5,7 +5,17 @@ from dataclasses import replace
 from typing import Sequence
 
 from PySide6.QtCore import Signal, Qt, QItemSelectionModel
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QTableView, QMenu, QStackedWidget, QLabel, QPushButton, QHBoxLayout
+from PySide6.QtWidgets import (
+    QHeaderView,
+    QHBoxLayout,
+    QLabel,
+    QMenu,
+    QPushButton,
+    QStackedWidget,
+    QTableView,
+    QVBoxLayout,
+    QWidget,
+)
 
 from db.database import get_directories, get_track_rows
 from ui.library_routes import LibraryRoute, tracks_album, tracks_artist
@@ -99,11 +109,11 @@ class TrackListWidget(QWidget):
         self.header.sortIndicatorChanged.connect(self._on_sort_changed)
         self.table.verticalScrollBar().valueChanged.connect(self._maybe_load_more)
 
-        self.table.setColumnWidth(0, 520)
-        self.table.setColumnWidth(1, 90)
-        self.table.setColumnWidth(2, 110)
-        self.table.setColumnWidth(3, 180)
-        self.header.setStretchLastSection(True)
+        self.header.setStretchLastSection(False)
+        self.header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        self.header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
+        self.header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
+        self.header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
         self.table.setObjectName("TrackTable")
 
         self.table.verticalHeader().setDefaultSectionSize(44)
@@ -145,7 +155,6 @@ class TrackListWidget(QWidget):
     def set_ui_scale(self, scale: float) -> None:
         self._ui_scale = max(0.85, min(1.5, float(scale or 1.0)))
         self.table.verticalHeader().setDefaultSectionSize(int(round(44 * self._ui_scale)))
-        self.table.setColumnWidth(0, int(round(520 * self._ui_scale)))
         self.table.setColumnWidth(1, int(round(90 * self._ui_scale)))
         self.table.setColumnWidth(2, int(round(110 * self._ui_scale)))
         self.table.setColumnWidth(3, int(round(180 * self._ui_scale)))
