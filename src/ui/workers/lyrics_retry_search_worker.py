@@ -14,6 +14,9 @@ from ui.services.lyrics_match_retry import (
 )
 
 
+RELAXED_RETRY_ACCEPT_SCORE = 90
+
+
 class LyricsRetrySearchWorker(QThread):
     progress = Signal(int, int, str, str)  # current, total, track label, status
     finishedSearch = Signal(list, str)  # list[LyricsMatchCandidate], error
@@ -81,6 +84,8 @@ class LyricsRetrySearchWorker(QThread):
                         )
                         if candidate is not None and (best is None or candidate.score > best.score):
                             best = candidate
+                        if best is not None and best.score >= RELAXED_RETRY_ACCEPT_SCORE:
+                            break
                     except Exception as exc:
                         self.progress.emit(idx - 1, total, label, f"{query.label} failed: {type(exc).__name__}")
                         continue
