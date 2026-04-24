@@ -150,7 +150,9 @@ class DownloadProgressOverlay(QWidget):
     def update_progress(self, current: int, total: int, track_label: str, status: str) -> None:
         self._total = max(0, int(total))
         self.progress_bar.setRange(0, max(1, self._total))
-        self.progress_bar.setValue(min(int(current), int(total)))
+        # Negative current values are status-only updates from parallel workers.
+        if int(current) >= 0:
+            self.progress_bar.setValue(min(int(current), int(total)))
         label = (track_label or "").strip()
         if label:
             self.status_label.setText(f"{label}  •  {status}")
@@ -210,7 +212,7 @@ class DownloadProgressOverlay(QWidget):
     def _handle_cancel(self) -> None:
         if self._active:
             self.stop_btn.setEnabled(False)
-            self.status_label.setText("Cancelling after the current track…")
+            self.status_label.setText("Cancelling now...")
             self.cancelRequested.emit()
             return
         self.hide()

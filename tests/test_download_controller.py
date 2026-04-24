@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import tempfile
+import time
 import unittest
 from dataclasses import replace
 from pathlib import Path
@@ -10,10 +11,12 @@ from unittest.mock import patch
 from PySide6.QtCore import QObject, Signal
 
 from tests import test_support as _test_support  # noqa: F401
-from db.queries import get_config, set_config
-from db.database import initialize_database
-from tests.test_support import qt_app
+from db.queries import get_config, get_track_by_id, set_config
+from db.database import add_tracks, initialize_database
+from tests.test_support import make_fs_track, qt_app, touch_text
 from ui.controllers.lyrics_download_controller import LyricsDownloadController
+from ui.services.lyrics_match_retry import LyricsMatchCandidate
+from ui.widgets.download_progress_overlay import DownloadProgressOverlay
 
 
 class _FakeOverlay:
@@ -72,6 +75,57 @@ class _FakeWorker(QObject):
         cls.instances = []
 
 
+class _ControllableApplyWorker(QObject):
+    finishedApply = Signal(int, object, str)
+    instances: list["_ControllableApplyWorker"] = []
+
+    def __init__(self, db_path: str, candidates: list[LyricsMatchCandidate], *, download_mode: str, lrclib_instance: str, parent=None):
+        super().__init__(parent)
+        self.db_path = db_path
+        self.candidates = list(candidates)
+        self.download_mode = download_mode
+        self.lrclib_instance = lrclib_instance
+        self._running = False
+        self.interrupted = False
+        type(self).instances.append(self)
+
+    def start(self) -> None:
+        self._running = True
+
+    def isRunning(self) -> bool:
+        return self._running
+
+    def requestInterruption(self) -> None:
+        self.interrupted = True
+
+    def finish(self, applied_count: int = 0, applied_ids=None, error: str = "") -> None:
+        self._running = False
+        self.finishedApply.emit(applied_count, list(applied_ids or []), error)
+
+    def deleteLater(self) -> None:
+        pass
+
+    @classmethod
+    def reset(cls) -> None:
+        cls.instances = []
+
+
+class _FakeMatchDialog:
+    selected: list[LyricsMatchCandidate] = []
+    instances: list["_FakeMatchDialog"] = []
+
+    def __init__(self, candidates, parent=None):
+        del parent
+        self.candidates = list(candidates)
+        type(self).instances.append(self)
+
+    def exec(self):
+        return True
+
+    def selected_candidates(self):
+        return list(self.selected)
+
+
 class LyricsDownloadControllerTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -79,6 +133,9 @@ class LyricsDownloadControllerTests(unittest.TestCase):
 
     def setUp(self) -> None:
         _FakeWorker.reset()
+        _ControllableApplyWorker.reset()
+        _FakeMatchDialog.selected = []
+        _FakeMatchDialog.instances = []
 
     def _make_controller(self, app_state, overlay: _FakeOverlay, *, current_track_id=None):
         statuses: list[tuple[str, int | None]] = []
@@ -101,6 +158,14 @@ class LyricsDownloadControllerTests(unittest.TestCase):
             get_track_download_state=lambda track_id: download_states.get(int(track_id), "idle"),
         )
         return controller, statuses, notifications, download_states, refreshed
+
+    def _wait_for_apply_worker(self, controller: LyricsDownloadController, timeout_s: float = 3.0) -> None:
+        deadline = time.monotonic() + timeout_s
+        while getattr(controller, "_apply_workers", set()) and time.monotonic() < deadline:
+            self._app.processEvents()
+            time.sleep(0.01)
+        self._app.processEvents()
+        self.assertFalse(getattr(controller, "_apply_workers", set()))
 
     def test_download_missing_uses_current_configured_mode(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -209,18 +274,18 @@ class LyricsDownloadControllerTests(unittest.TestCase):
                     worker = _FakeWorker.instances[0]
 
                     worker.progress.emit(1, 2, "Artist - Song", "Querying LRCLIB...", 0.5)
-                    worker.itemFinished.emit(31, True, "Artist - Song", "Downloaded synced lyrics.")
-                    worker.finishedBatch.emit(True, "Finished lyrics download. Success: 1, Failed: 0.", {"ok": 1, "failed": 0, "cancelled": False})
+                    worker.itemFinished.emit(31, False, "Artist - Song", "No lyrics found on LRCLIB for this track.")
+                    worker.finishedBatch.emit(True, "Finished lyrics search. Candidates: 0, Failed: 1.", {"ok": 0, "failed": 1, "cancelled": False})
 
                 self.assertEqual(overlay.progress[-1], (1, 2, "Artist - Song", "Querying LRCLIB..."))
-                self.assertEqual(overlay.results[-1], ("Artist - Song", "Downloaded synced lyrics.", True))
-                self.assertEqual(overlay.finished[-1], ("Finished lyrics download. Success: 1, Failed: 0.", False))
-                self.assertEqual(download_states[31], "success")
+                self.assertEqual(overlay.results[-1], ("Artist - Song", "No lyrics found on LRCLIB for this track.", False))
+                self.assertEqual(overlay.finished[-1], ("Finished lyrics search. Candidates: 0, Failed: 1.", False))
+                self.assertEqual(download_states[31], "error")
                 self.assertEqual(download_states[32], "idle")
-                self.assertIn(("Lyrics downloaded successfully.", "success"), notifications)
+                self.assertIn(("Finished lyrics search. Candidates: 0, Failed: 1.", "error"), notifications)
                 self.assertIn("view", refreshed)
                 self.assertIn("history", refreshed)
-                self.assertEqual(statuses[-1], ("Finished lyrics download. Success: 1, Failed: 0.", 4000))
+                self.assertEqual(statuses[-1], ("Finished lyrics search. Candidates: 0, Failed: 1.", 4000))
             finally:
                 db.close()
 
@@ -252,6 +317,241 @@ class LyricsDownloadControllerTests(unittest.TestCase):
                 self.assertIn(("Finished lyrics download. Success: 1, Failed: 1.", "warning"), notifications)
             finally:
                 db.close()
+
+    def test_lower_score_batch_candidates_require_review_before_apply(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db = initialize_database(tmp)
+            try:
+                audio = Path(tmp) / "candidate.mp3"
+                touch_text(audio, "a")
+                add_tracks(db, [make_fs_track(audio, artist="Air Supply", album="Greatest Hits", title="All Out Of Love")])
+                track_id = int(db.execute("SELECT id FROM tracks LIMIT 1").fetchone()["id"])
+                app_state = SimpleNamespace(db=db, db_path=str(Path(tmp) / "pylrcget.db.sqlite3"))
+                overlay = _FakeOverlay()
+                controller, _, notifications, download_states, refreshed = self._make_controller(app_state, overlay)
+                candidate = LyricsMatchCandidate(
+                    track_id=track_id,
+                    track_label="Air Supply - All Out Of Love",
+                    query_label="exact metadata",
+                    score=93,
+                    artist_name="Air Supply",
+                    track_name="All Out of Love",
+                    album_name="Lost in Love",
+                    duration=240,
+                    kind="Synced",
+                    plain_lyrics="plain text",
+                    synced_lyrics="[00:01.00]plain text",
+                )
+                _FakeMatchDialog.selected = [candidate]
+
+                with (
+                    patch("ui.controllers.lyrics_download_controller.BulkLyricsDownloadWorker", _FakeWorker),
+                    patch("ui.controllers.lyrics_download_controller.BatchLyricsMatchDialog", _FakeMatchDialog),
+                    patch("ui.controllers.lyrics_download_controller.QTimer.singleShot"),
+                ):
+                    controller.start_downloads([track_id], mode_override="prefer_synced")
+                    worker = _FakeWorker.instances[0]
+                    worker.itemFinished.emit(track_id, True, candidate.track_label, "Candidate found. Match: 93%.")
+
+                    before_apply = get_track_by_id(db, track_id)
+                    self.assertIsNone(before_apply.lrc_lyrics)
+                    self.assertIsNone(before_apply.txt_lyrics)
+
+                    worker.finishedBatch.emit(
+                        True,
+                        "Finished lyrics search. Candidates: 1, Failed: 0.",
+                        {"total": 1, "ok": 1, "failed": 0, "cancelled": False, "candidates": [candidate]},
+                    )
+                    self._wait_for_apply_worker(controller)
+
+                after_apply = get_track_by_id(db, track_id)
+                self.assertEqual(after_apply.lrc_lyrics, "[00:01.00]plain text")
+                self.assertEqual(after_apply.txt_lyrics, "plain text")
+                self.assertEqual(download_states[track_id], "success")
+                self.assertIn(("Applied lyrics to 1 downloaded track.", "success"), notifications)
+                self.assertIn("view", refreshed)
+                self.assertIn("history", refreshed)
+            finally:
+                db.close()
+
+    def test_exact_batch_candidates_apply_without_review(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db = initialize_database(tmp)
+            try:
+                audio = Path(tmp) / "exact.mp3"
+                touch_text(audio, "a")
+                add_tracks(db, [make_fs_track(audio, artist="Artist", album="Album", title="Song")])
+                track_id = int(db.execute("SELECT id FROM tracks LIMIT 1").fetchone()["id"])
+                app_state = SimpleNamespace(db=db, db_path=str(Path(tmp) / "pylrcget.db.sqlite3"))
+                overlay = _FakeOverlay()
+                controller, _, notifications, download_states, _ = self._make_controller(app_state, overlay)
+                candidate = LyricsMatchCandidate(
+                    track_id=track_id,
+                    track_label="Artist - Song",
+                    query_label="exact metadata",
+                    score=100,
+                    artist_name="Artist",
+                    track_name="Song",
+                    album_name="Album",
+                    duration=180,
+                    kind="Plain",
+                    plain_lyrics="plain text",
+                    synced_lyrics="",
+                )
+                with (
+                    patch("ui.controllers.lyrics_download_controller.BulkLyricsDownloadWorker", _FakeWorker),
+                    patch("ui.controllers.lyrics_download_controller.BatchLyricsMatchDialog", _FakeMatchDialog),
+                    patch("ui.controllers.lyrics_download_controller.QTimer.singleShot"),
+                ):
+                    controller.start_downloads([track_id], mode_override="prefer_synced")
+                    worker = _FakeWorker.instances[0]
+                    worker.itemFinished.emit(track_id, True, candidate.track_label, "Candidate found. Match: 100%.")
+                    worker.finishedBatch.emit(
+                        True,
+                        "Finished lyrics search. Candidates: 1, Failed: 0.",
+                        {"total": 1, "ok": 1, "failed": 0, "cancelled": False, "candidates": [candidate]},
+                    )
+                    self._wait_for_apply_worker(controller)
+
+                after_apply = get_track_by_id(db, track_id)
+                self.assertEqual(after_apply.txt_lyrics, "plain text")
+                self.assertIsNone(after_apply.lrc_lyrics)
+                self.assertEqual(download_states[track_id], "success")
+                self.assertIn(("Applied lyrics to 1 downloaded track.", "success"), notifications)
+                self.assertEqual(_FakeMatchDialog.instances, [])
+            finally:
+                db.close()
+
+    def test_multiple_apply_workers_are_tracked_independently(self):
+        app_state = SimpleNamespace(db=None, db_path="library.sqlite")
+        overlay = _FakeOverlay()
+        controller, *_ = self._make_controller(app_state, overlay)
+        first = LyricsMatchCandidate(
+            track_id=1,
+            track_label="Artist - Exact",
+            query_label="exact metadata",
+            score=100,
+            artist_name="Artist",
+            track_name="Exact",
+            album_name="Album",
+            duration=180,
+            kind="Plain",
+            plain_lyrics="one",
+            synced_lyrics="",
+        )
+        second = LyricsMatchCandidate(
+            track_id=2,
+            track_label="Artist - Reviewed",
+            query_label="artist + title",
+            score=94,
+            artist_name="Artist",
+            track_name="Reviewed",
+            album_name="Album",
+            duration=180,
+            kind="Plain",
+            plain_lyrics="two",
+            synced_lyrics="",
+        )
+
+        with patch("ui.controllers.lyrics_download_controller.LyricsApplyCandidatesWorker", _ControllableApplyWorker):
+            controller._active_request = SimpleNamespace(mode="prefer_synced", lrclib_instance="https://lrclib.net/api")
+            controller._start_apply_candidates([first], context="download")
+            controller._start_apply_candidates([second], context="download")
+
+        self.assertEqual(len(_ControllableApplyWorker.instances), 2)
+        self.assertEqual(len(controller._apply_workers), 2)
+        _ControllableApplyWorker.instances[0].finish(applied_count=1, applied_ids=[1])
+        self.assertEqual(len(controller._apply_workers), 1)
+        controller.cancel()
+        self.assertTrue(_ControllableApplyWorker.instances[1].interrupted)
+
+    def test_unselected_review_candidates_reset_to_idle_on_commit(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db = initialize_database(tmp)
+            try:
+                first_audio = Path(tmp) / "selected.mp3"
+                second_audio = Path(tmp) / "skipped.mp3"
+                touch_text(first_audio, "a")
+                touch_text(second_audio, "b")
+                add_tracks(
+                    db,
+                    [
+                        make_fs_track(first_audio, artist="Artist", album="Album", title="Selected"),
+                        make_fs_track(second_audio, artist="Artist", album="Album", title="Skipped"),
+                    ],
+                )
+                ids = [int(row["id"]) for row in db.execute("SELECT id FROM tracks ORDER BY id").fetchall()]
+                app_state = SimpleNamespace(db=db, db_path=str(Path(tmp) / "pylrcget.db.sqlite3"))
+                overlay = _FakeOverlay()
+                controller, _, _, download_states, _ = self._make_controller(app_state, overlay)
+                selected_candidate = LyricsMatchCandidate(
+                    track_id=ids[0],
+                    track_label="Artist - Selected",
+                    query_label="artist + title",
+                    score=94,
+                    artist_name="Artist",
+                    track_name="Selected",
+                    album_name="Album",
+                    duration=180,
+                    kind="Plain",
+                    plain_lyrics="selected plain",
+                    synced_lyrics="",
+                )
+                skipped_candidate = LyricsMatchCandidate(
+                    track_id=ids[1],
+                    track_label="Artist - Skipped",
+                    query_label="artist + title",
+                    score=92,
+                    artist_name="Artist",
+                    track_name="Skipped",
+                    album_name="Album",
+                    duration=180,
+                    kind="Plain",
+                    plain_lyrics="skipped plain",
+                    synced_lyrics="",
+                )
+                _FakeMatchDialog.selected = [selected_candidate]
+
+                with (
+                    patch("ui.controllers.lyrics_download_controller.BulkLyricsDownloadWorker", _FakeWorker),
+                    patch("ui.controllers.lyrics_download_controller.BatchLyricsMatchDialog", _FakeMatchDialog),
+                    patch("ui.controllers.lyrics_download_controller.QTimer.singleShot"),
+                ):
+                    controller.start_downloads(ids, mode_override="prefer_synced")
+                    worker = _FakeWorker.instances[0]
+                    for candidate in (selected_candidate, skipped_candidate):
+                        worker.itemFinished.emit(candidate.track_id, True, candidate.track_label, "Candidate found.")
+                    worker.finishedBatch.emit(
+                        True,
+                        "Finished lyrics search. Candidates: 2, Failed: 0.",
+                        {
+                            "total": 2,
+                            "ok": 2,
+                            "failed": 0,
+                            "cancelled": False,
+                            "candidates": [selected_candidate, skipped_candidate],
+                        },
+                    )
+                    self._wait_for_apply_worker(controller)
+
+                self.assertEqual(download_states[ids[0]], "success")
+                self.assertEqual(download_states[ids[1]], "idle")
+            finally:
+                db.close()
+
+    def test_overlay_status_only_progress_does_not_reset_bar(self):
+        overlay = DownloadProgressOverlay()
+        try:
+            overlay.start_batch("Prefer synced", 10)
+            overlay.update_progress(3, 10, "Artist - Song", "Candidate found.")
+            self.assertEqual(overlay.progress_bar.value(), 3)
+
+            overlay.update_progress(-1, 10, "Other Artist - Song", "Searching LRCLIB...")
+
+            self.assertEqual(overlay.progress_bar.value(), 3)
+            self.assertIn("Searching LRCLIB", overlay.status_label.text())
+        finally:
+            overlay.deleteLater()
 
 
 if __name__ == "__main__":

@@ -12,8 +12,10 @@ from ui.services import update_service
 
 
 class _FakeResponse:
-    def __init__(self, payload: dict):
+    def __init__(self, payload: dict, *, content: bytes = b""):
         self._payload = payload
+        self._content = content
+        self.headers = {"Content-Length": str(len(content))} if content else {}
 
     def raise_for_status(self) -> None:
         return None
@@ -21,17 +23,35 @@ class _FakeResponse:
     def json(self) -> dict:
         return self._payload
 
+    def iter_content(self, chunk_size: int):
+        del chunk_size
+        if self._content:
+            yield self._content
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        return False
+
 
 class _FakeSession:
-    def __init__(self, payload: dict):
+    def __init__(self, payload: dict, *, content: bytes = b""):
         self.payload = payload
+        self.content = content
         self.calls: list[dict] = []
 
     def get(self, *args, **kwargs):
         call = dict(kwargs)
         call["url"] = args[0] if args else ""
         self.calls.append(call)
-        return _FakeResponse(self.payload)
+        return _FakeResponse(self.payload, content=self.content)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        return False
 
 
 class UpdateServiceTests(unittest.TestCase):
@@ -186,6 +206,20 @@ class UpdateServiceTests(unittest.TestCase):
         self.assertEqual(selected.parent, download_dir)
         self.assertNotEqual(selected.name, "pylrcget-windows-installer.exe")
         self.assertEqual(selected.suffix, ".exe")
+
+    def test_download_release_asset_logs_hash_without_name_error(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            destination = Path(tmp) / "pylrcget-windows-installer.exe"
+            asset = update_service.ReleaseAssetInfo(
+                name=destination.name,
+                download_url="https://example.com/installer.exe",
+                size=7,
+                content_type="application/octet-stream",
+            )
+
+            path = update_service.download_release_asset(asset, destination, session=_FakeSession({}, content=b"payload"))
+            self.assertEqual(path, destination)
+            self.assertEqual(destination.read_bytes(), b"payload")
 
     def test_stage_self_update_creates_windows_updater_script(self):
         with tempfile.TemporaryDirectory() as tmp:

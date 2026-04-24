@@ -6,9 +6,11 @@ import re
 from bisect import bisect_right
 from typing import List, Optional, Tuple
 
-from PySide6.QtCore import Qt, Signal, QTimer
+from PySide6.QtCore import QRect, QSize, Qt, Signal, QTimer
 from PySide6.QtGui import QColor, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
+    QLayout,
+    QSizePolicy,
     QWidget, QVBoxLayout, QLabel, QStackedWidget,
     QTextEdit, QTableWidget, QTableWidgetItem,
     QPushButton, QHBoxLayout, QDoubleSpinBox
@@ -21,7 +23,103 @@ from ui.widgets.empty_state_widget import EmptyStateWidget
 _TS_RE = re.compile(r"\[(\d+):(\d+)(?:\.(\d+))?\]")
 TIMESTAMP_MS_ROLE = Qt.ItemDataRole.UserRole
 TIMESTAMP_VALID_ROLE = Qt.ItemDataRole.UserRole + 1
+SHIFT_SPIN_MIN_WIDTH = 96
 logger = logging.getLogger(__name__)
+
+
+class FlowLayout(QLayout):
+    def __init__(self, parent=None, *, spacing: int = SPACE_2, justify_rows: bool = True):
+        super().__init__(parent)
+        self._items = []
+        self._justify_rows = bool(justify_rows)
+        self.setContentsMargins(0, 0, 0, 0)
+        self.setSpacing(spacing)
+
+    def addItem(self, item):
+        self._items.append(item)
+
+    def count(self) -> int:
+        return len(self._items)
+
+    def itemAt(self, index: int):
+        if 0 <= index < len(self._items):
+            return self._items[index]
+        return None
+
+    def takeAt(self, index: int):
+        if 0 <= index < len(self._items):
+            return self._items.pop(index)
+        return None
+
+    def expandingDirections(self):
+        return Qt.Orientation(0)
+
+    def hasHeightForWidth(self) -> bool:
+        return True
+
+    def heightForWidth(self, width: int) -> int:
+        return self._do_layout(QRect(0, 0, width, 0), test_only=True)
+
+    def setGeometry(self, rect: QRect) -> None:
+        super().setGeometry(rect)
+        self._do_layout(rect, test_only=False)
+
+    def sizeHint(self) -> QSize:
+        return self.minimumSize()
+
+    def minimumSize(self) -> QSize:
+        size = QSize()
+        for item in self._items:
+            size = size.expandedTo(item.minimumSize())
+        margins = self.contentsMargins()
+        size += QSize(margins.left() + margins.right(), margins.top() + margins.bottom())
+        return size
+
+    def _do_layout(self, rect: QRect, *, test_only: bool) -> int:
+        margins = self.contentsMargins()
+        effective = rect.adjusted(margins.left(), margins.top(), -margins.right(), -margins.bottom())
+        y = effective.y()
+        spacing = self.spacing()
+        rows = []
+        row = []
+        row_width = 0
+        row_height = 0
+
+        for item in self._items:
+            widget = item.widget()
+            if widget is not None and not widget.isVisible():
+                continue
+            item_size = item.sizeHint()
+            next_width = row_width + (spacing if row else 0) + item_size.width()
+            if row and next_width > effective.width():
+                rows.append((row, row_width, row_height))
+                row = []
+                row_width = 0
+                row_height = 0
+                next_width = item_size.width()
+            row.append((item, item_size))
+            row_width = next_width
+            row_height = max(row_height, item_size.height())
+
+        if row:
+            rows.append((row, row_width, row_height))
+
+        for row_items, row_width, row_height in rows:
+            x = effective.x()
+            extra = max(0, effective.width() - row_width)
+            extra_each = extra // len(row_items) if self._justify_rows and row_items and not test_only else 0
+            extra_remainder = extra % len(row_items) if self._justify_rows and row_items and not test_only else 0
+            for index, (item, item_size) in enumerate(row_items):
+                item_width = item_size.width() + extra_each + (1 if index < extra_remainder else 0)
+                item_height = item_size.height()
+                if not test_only:
+                    item.setGeometry(QRect(x, y, item_width, item_height))
+                x += item_width + spacing
+            y += row_height + spacing
+
+        if rows:
+            y -= spacing
+        return y - rect.y() + margins.bottom()
 
 
 def _ts_to_ms(mm: str, ss: str, frac: str | None) -> int:
@@ -162,13 +260,19 @@ class LyricsEditorWidget(QWidget):
         set_layout_spacing(root, margins=SPACE_3, spacing=SPACE_2)
 
         # --- header ---
-        header = QHBoxLayout()
+        header = QVBoxLayout()
         set_layout_spacing(header, spacing=SPACE_2)
+
+        title_row = QHBoxLayout()
+        set_layout_spacing(title_row, spacing=SPACE_2)
 
         self.title = QLabel("Lyrics")
         self.title.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
         self.title.setObjectName("LyricsTitle")
-        header.addWidget(self.title, 1)
+        title_row.addWidget(self.title, 1)
+        header.addLayout(title_row)
+
+        toolbar = FlowLayout(spacing=SPACE_2)
 
         self.btn_snap = QPushButton("Snap")
         self.btn_snap.setToolTip("Set the selected line's timestamp to the current playback position")
@@ -183,6 +287,9 @@ class LyricsEditorWidget(QWidget):
         self.shift_spin.setValue(0.10)
         self.shift_spin.setSuffix(" s")
         self.shift_spin.setToolTip("Custom shift amount in seconds")
+        self.shift_spin.setObjectName("LyricsShiftSpin")
+        self.shift_spin.setButtonSymbols(QDoubleSpinBox.ButtonSymbols.NoButtons)
+        self.shift_spin.setMinimumWidth(SHIFT_SPIN_MIN_WIDTH)
         self.btn_shift_selected = QPushButton("Shift Selected")
         self.btn_shift_selected.setToolTip("Shift selected lines by the custom amount")
         self.btn_shift_all_from_first = QPushButton("Shift All from First")
@@ -217,16 +324,16 @@ class LyricsEditorWidget(QWidget):
         self.btn_save.clicked.connect(self._emit_save)
         self.btn_export_files.clicked.connect(self.exportFilesRequested.emit)
 
-        header.addWidget(self.btn_snap)
-        header.addWidget(self.btn_shift_minus)
-        header.addWidget(self.btn_shift_plus)
-        header.addWidget(self.shift_spin)
-        header.addWidget(self.btn_shift_selected)
-        header.addWidget(self.btn_shift_all_from_first)
-        header.addWidget(self.btn_add)
-        header.addWidget(self.btn_del)
-        header.addWidget(self.btn_save)
-        header.addWidget(self.btn_export_files)
+        toolbar.addWidget(self.btn_snap)
+        toolbar.addWidget(self.btn_shift_minus)
+        toolbar.addWidget(self.btn_shift_plus)
+        toolbar.addWidget(self.shift_spin)
+        toolbar.addWidget(self.btn_shift_selected)
+        toolbar.addWidget(self.btn_shift_all_from_first)
+        toolbar.addWidget(self.btn_add)
+        toolbar.addWidget(self.btn_del)
+        toolbar.addWidget(self.btn_save)
+        toolbar.addWidget(self.btn_export_files)
 
         self.btn_publish_synced = QPushButton("Publish Synced")
         self.btn_publish_synced.setToolTip("Publish synced (LRC) lyrics to LRCLIB")
@@ -237,8 +344,25 @@ class LyricsEditorWidget(QWidget):
         self.btn_publish_synced.clicked.connect(lambda: self.publishSyncedRequested.emit())
         self.btn_publish_plain.clicked.connect(lambda: self.publishPlainRequested.emit())
 
-        header.addWidget(self.btn_publish_synced)
-        header.addWidget(self.btn_publish_plain)
+        for button in (
+            self.btn_snap,
+            self.btn_shift_minus,
+            self.btn_shift_plus,
+            self.btn_shift_selected,
+            self.btn_shift_all_from_first,
+            self.btn_add,
+            self.btn_del,
+            self.btn_save,
+            self.btn_export_files,
+            self.btn_publish_synced,
+            self.btn_publish_plain,
+        ):
+            button.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
+
+        toolbar.addWidget(self.btn_publish_synced)
+        toolbar.addWidget(self.btn_publish_plain)
+
+        header.addLayout(toolbar)
 
         root.addLayout(header)
 

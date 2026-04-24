@@ -61,6 +61,8 @@ class TrackTableModel(QAbstractTableModel):
                 "Lyrics status: None / Plain / Synced / Instrumental",
                 "Actions",
             ][section]
+        if role == Qt.TextAlignmentRole and section in {1, 2, 3}:
+            return int(Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignVCenter)
         return None
 
     def data(self, index: QModelIndex, role: int = int(Qt.ItemDataRole.DisplayRole)) -> object:

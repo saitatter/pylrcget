@@ -5,7 +5,18 @@ from dataclasses import replace
 from typing import Sequence
 
 from PySide6.QtCore import Signal, Qt, QItemSelectionModel
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QTableView, QMenu, QStackedWidget, QLabel, QPushButton, QHBoxLayout
+from PySide6.QtWidgets import (
+    QHeaderView,
+    QHBoxLayout,
+    QLabel,
+    QMenu,
+    QPushButton,
+    QStackedWidget,
+    QTableView,
+    QVBoxLayout,
+    QWidget,
+    QWidgetAction,
+)
 
 from db.database import get_directories, get_track_rows
 from ui.library_routes import LibraryRoute, tracks_album, tracks_artist
@@ -13,11 +24,16 @@ from ui.widgets.empty_state_widget import EmptyStateWidget
 from ui.models.track_table_model import TrackTableModel
 from ui.delegates.actions_delegate import ActionsDelegate
 from ui.delegates.track_info_delegate import TrackInfoDelegate
+from ui.spacing import set_layout_spacing
 from ui.style_loader import load_stylesheet
 from ui.widgets.sortable_header_view import SortableHeaderView
 from ui.widgets.library_table_utils import should_load_more
 from ui.widgets.track_list_rows import build_track_list_rows
 from core.tracklist_models import DownloadState
+
+TRACK_DURATION_COLUMN_WIDTH = 92
+TRACK_LYRICS_COLUMN_WIDTH = 118
+TRACK_ACTIONS_COLUMN_WIDTH = 142
 
 
 class TrackListWidget(QWidget):
@@ -99,12 +115,13 @@ class TrackListWidget(QWidget):
         self.header.sortIndicatorChanged.connect(self._on_sort_changed)
         self.table.verticalScrollBar().valueChanged.connect(self._maybe_load_more)
 
-        self.table.setColumnWidth(0, 520)
-        self.table.setColumnWidth(1, 90)
-        self.table.setColumnWidth(2, 110)
-        self.table.setColumnWidth(3, 180)
-        self.header.setStretchLastSection(True)
+        self.header.setStretchLastSection(False)
+        self.header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        self.header.setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
+        self.header.setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
+        self.header.setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)
         self.table.setObjectName("TrackTable")
+        self._apply_column_widths()
 
         self.table.verticalHeader().setDefaultSectionSize(44)
 
@@ -145,12 +162,14 @@ class TrackListWidget(QWidget):
     def set_ui_scale(self, scale: float) -> None:
         self._ui_scale = max(0.85, min(1.5, float(scale or 1.0)))
         self.table.verticalHeader().setDefaultSectionSize(int(round(44 * self._ui_scale)))
-        self.table.setColumnWidth(0, int(round(520 * self._ui_scale)))
-        self.table.setColumnWidth(1, int(round(90 * self._ui_scale)))
-        self.table.setColumnWidth(2, int(round(110 * self._ui_scale)))
-        self.table.setColumnWidth(3, int(round(180 * self._ui_scale)))
+        self._apply_column_widths()
         if hasattr(self.actions, "set_ui_scale"):
             self.actions.set_ui_scale(self._ui_scale)
+
+    def _apply_column_widths(self) -> None:
+        self.table.setColumnWidth(1, int(round(TRACK_DURATION_COLUMN_WIDTH * self._ui_scale)))
+        self.table.setColumnWidth(2, int(round(TRACK_LYRICS_COLUMN_WIDTH * self._ui_scale)))
+        self.table.setColumnWidth(3, int(round(TRACK_ACTIONS_COLUMN_WIDTH * self._ui_scale)))
 
     # -------------------------
     # External API
@@ -311,37 +330,58 @@ class TrackListWidget(QWidget):
             return
 
         menu = QMenu(self)
+        menu.setObjectName("TrackContextMenu")
         current_track_id = self.model.track_id_at(idx.row())
         has_focused_track = current_track_id is not None
 
-        info = menu.addAction(f"{len(selected_ids)} track selected" if len(selected_ids) == 1 else f"{len(selected_ids)} tracks selected")
-        info.setEnabled(False)
+        def add_section(title: str, detail: str = ""):
+            action = QWidgetAction(menu)
+            header = QWidget(menu)
+            header.setObjectName("ContextMenuSection")
+            header_layout = QVBoxLayout(header)
+            set_layout_spacing(header_layout, margins=(10, 6, 10, 4), spacing=1)
+            title_label = QLabel(title.upper())
+            title_label.setObjectName("ContextMenuSectionTitle")
+            header_layout.addWidget(title_label)
+            if detail:
+                detail_label = QLabel(detail)
+                detail_label.setObjectName("ContextMenuSectionDetail")
+                header_layout.addWidget(detail_label)
+            action.setDefaultWidget(header)
+            menu.addAction(action)
+            return action
 
-        menu.addSeparator()
-        quick = menu.addAction("Quick Actions")
-        quick.setEnabled(False)
+        count = len(selected_ids)
+        count_text = f"{count} track selected" if count == 1 else f"{count} tracks selected"
+        add_section("Selection", count_text)
         act_play = menu.addAction("Play now")
         act_play.setEnabled(has_focused_track)
 
         menu.addSeparator()
-        bulk = menu.addAction("Selection Actions")
-        bulk.setEnabled(False)
-        act_refresh = menu.addAction("Refresh focused track from disk")
-        act_dl = menu.addAction("Download lyrics for focused track")
-        act_export = menu.addAction("Export lyrics files for focused track")
+        add_section("Focused Track")
+        act_refresh = menu.addAction("Refresh from disk")
+        act_dl = menu.addAction("Download lyrics")
+        act_export = menu.addAction("Export lyrics files")
         act_refresh.setEnabled(has_focused_track)
         act_dl.setEnabled(has_focused_track)
         act_export.setEnabled(has_focused_track)
+
         menu.addSeparator()
         count_suffix = f"({len(selected_ids)})"
-        act_dl_selected = menu.addAction(f"Download selection using current mode {count_suffix}")
-        act_dl_synced = menu.addAction(f"Download selection as synced only {count_suffix}")
-        act_dl_plain = menu.addAction(f"Download selection as plain only {count_suffix}")
-        act_instr = menu.addAction(f"Mark selection as instrumental {count_suffix}")
-        act_uninstr = menu.addAction(f"Unmark instrumental on selection {count_suffix}")
+        add_section("Download Selection")
+        act_dl_selected = menu.addAction(f"Use current mode {count_suffix}")
+        act_dl_synced = menu.addAction(f"Synced only {count_suffix}")
+        act_dl_plain = menu.addAction(f"Plain only {count_suffix}")
+
         menu.addSeparator()
-        act_pub_synced = menu.addAction(f"Publish selection synced {count_suffix}")
-        act_pub_plain = menu.addAction(f"Publish selection plain {count_suffix}")
+        add_section("Lyrics State")
+        act_instr = menu.addAction(f"Mark as instrumental {count_suffix}")
+        act_uninstr = menu.addAction(f"Unmark instrumental {count_suffix}")
+
+        menu.addSeparator()
+        add_section("Publish Selection")
+        act_pub_synced = menu.addAction(f"Publish synced {count_suffix}")
+        act_pub_plain = menu.addAction(f"Publish plain {count_suffix}")
 
         chosen = menu.exec(self.table.viewport().mapToGlobal(pos))
         if chosen == act_play:

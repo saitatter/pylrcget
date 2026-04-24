@@ -8,23 +8,20 @@ from typing import Callable
 
 from PySide6.QtCore import QObject, QTimer
 
-from core.utils import plain_text_from_lrc
 from db.models import Track
 from db.queries import (
     get_config,
     get_track_by_id,
     get_track_ids_for_download_mode,
     record_download_history_batch,
-    update_track_plain_lyrics,
-    update_track_synced_lyrics,
 )
 from core.tracklist_models import DownloadState
 from ui.dialogs.batch_lyrics_match_dialog import BatchLyricsMatchDialog
 from ui.services.feedback import notify_user
 from ui.services.download_modes import download_mode_label, no_missing_tracks_message
 from ui.services.lyrics_match_retry import LyricsMatchCandidate
-from ui.services.lyrics_download_service import sync_track_outputs_with_result
 from ui.widgets.download_progress_overlay import DownloadProgressOverlay
+from ui.workers.lyrics_apply_worker import LyricsApplyCandidatesWorker
 from ui.workers.bulk_lyrics_download_worker import BulkDownloadStats, BulkLyricsDownloadWorker
 from ui.workers.lyrics_retry_search_worker import LyricsRetrySearchWorker
 
@@ -67,6 +64,7 @@ class LyricsDownloadController(QObject):
         self._get_track_download_state = get_track_download_state
 
         self._download_worker: BulkLyricsDownloadWorker | None = None
+        self._apply_workers: set[LyricsApplyCandidatesWorker] = set()
         self._active_request: LyricsDownloadRequest | None = None
         self._active_track_ids: set[int] = set()
         self._state_tokens: dict[int, int] = {}
@@ -122,6 +120,9 @@ class LyricsDownloadController(QObject):
     def cancel(self) -> None:
         if self._download_worker is not None and self._download_worker.isRunning():
             self._download_worker.requestInterruption()
+        for worker in list(self._apply_workers):
+            if worker.isRunning():
+                worker.requestInterruption()
         if self._retry_search_worker is not None and self._retry_search_worker.isRunning():
             self._retry_search_worker.requestInterruption()
 
@@ -166,37 +167,33 @@ class LyricsDownloadController(QObject):
         self._show_status(status, None)
 
     def _on_download_item_finished(self, track_id: int, ok: bool, track_label: str, msg: str) -> None:
-        try:
-            current_track_id = self._current_player_track_id()
-            if current_track_id is not None and current_track_id == int(track_id):
-                track = get_track_by_id(self._app_state.db, int(track_id))
-                self._set_track_lyrics_views(track)
-        except (sqlite3.Error, AttributeError, TypeError) as exc:
-            logger.warning("Failed to update track after lyrics download for %s: %s", track_id, exc)
-
         self._active_track_ids.discard(int(track_id))
-        state = DownloadState.SUCCESS if ok else DownloadState.ERROR
+        # In batch mode a successful item means "candidate found"; no lyrics are written until
+        # the review dialog is committed explicitly by the user.
+        state = DownloadState.LOADING if ok else DownloadState.ERROR
         self._set_track_download_state(int(track_id), state)
         if not ok:
             failed_id = int(track_id)
             if failed_id not in self._failed_download_track_ids:
                 self._failed_download_track_ids.append(failed_id)
         self._overlay.append_result(track_label, msg, ok)
-        history_entry = self._build_download_history_entry(int(track_id), track_label, msg)
-        if history_entry is not None:
-            self._pending_history_entries.append(history_entry)
+        if not ok:
+            history_entry = self._build_download_history_entry(int(track_id), track_label, msg)
+            if history_entry is not None:
+                self._pending_history_entries.append(history_entry)
 
         token = self._state_tokens.get(int(track_id), 0) + 1
         self._state_tokens[int(track_id)] = token
-        QTimer.singleShot(
-            1800,
-            self,
-            lambda tid=track_id, expected=token, expected_state=state: self._reset_track_download_state_if_unchanged(
-                tid,
-                expected,
-                expected_state,
-            ),
-        )
+        if not ok:
+            QTimer.singleShot(
+                1800,
+                self,
+                lambda tid=track_id, expected=token, expected_state=state: self._reset_track_download_state_if_unchanged(
+                    tid,
+                    expected,
+                    expected_state,
+                ),
+            )
 
     def _on_download_batch_finished(self, ok: bool, msg: str, stats: dict) -> None:
         del ok
@@ -222,6 +219,13 @@ class LyricsDownloadController(QObject):
             "cancelled": bool(stats.get("cancelled")) if isinstance(stats, dict) else False,
         }
         self._overlay.finish_batch(msg, cancelled=bool(stats_dict.get("cancelled")))
+        candidates = [
+            candidate
+            for candidate in (stats.get("candidates", []) if isinstance(stats, dict) else [])
+            if isinstance(candidate, LyricsMatchCandidate)
+        ]
+        exact_candidates = [candidate for candidate in candidates if int(candidate.score) >= 100]
+        review_candidates = [candidate for candidate in candidates if int(candidate.score) < 100]
         show_retry_failed = getattr(self._overlay, "show_retry_failed", None)
         if callable(show_retry_failed):
             retry_count = 0 if stats_dict.get("cancelled") else len(self._failed_download_track_ids)
@@ -232,6 +236,32 @@ class LyricsDownloadController(QObject):
                 "Lyrics download cancelled.",
                 "warning",
             )
+        elif candidates:
+            applying_exact = bool(exact_candidates)
+            if review_candidates:
+                exact_note = f"Applying {len(exact_candidates)} exact match(es). " if applying_exact else ""
+                failed_count = int(stats_dict.get("failed", 0))
+                failed_note = f" {failed_count} track(s) still failed." if failed_count else ""
+                notify_user(
+                    self._app_state,
+                    f"{exact_note}Review {len(review_candidates)} lower-confidence match candidate(s).{failed_note}",
+                    "info",
+                    show_status=self._show_status,
+                    status_timeout_ms=4000,
+                )
+                if exact_candidates:
+                    self._start_apply_candidates(exact_candidates, context="download")
+                self._review_retry_candidates(review_candidates, context="download")
+            elif exact_candidates:
+                self._start_apply_candidates(exact_candidates, context="download")
+            else:
+                notify_user(
+                    self._app_state,
+                    "Lyrics matches could not be applied.",
+                    "warning",
+                    show_status=self._show_status,
+                    status_timeout_ms=3500,
+                )
         elif int(stats_dict.get("failed", 0)) > 0 and int(stats_dict.get("ok", 0)) > 0:
             notify_user(
                 self._app_state,
@@ -247,7 +277,7 @@ class LyricsDownloadController(QObject):
         else:
             notify_user(
                 self._app_state,
-                "Lyrics downloaded successfully.",
+                "Lyrics search completed. No matches found.",
                 "success",
             )
             queue_auto_close = getattr(self._overlay, "queue_auto_close", None)
@@ -298,79 +328,99 @@ class LyricsDownloadController(QObject):
         self._overlay.finish_batch(f"Relaxed lyrics search found {len(candidates)} candidate match(es).")
         self._review_retry_candidates([candidate for candidate in candidates if isinstance(candidate, LyricsMatchCandidate)])
 
-    def _review_retry_candidates(self, candidates: list[LyricsMatchCandidate]) -> None:
+    def _review_retry_candidates(self, candidates: list[LyricsMatchCandidate], *, context: str = "retry") -> None:
         dialog = BatchLyricsMatchDialog(candidates, parent=self.parent())
         if not dialog.exec():
+            for candidate in candidates:
+                self._set_track_download_state(int(candidate.track_id), DownloadState.IDLE)
             return
         selected = dialog.selected_candidates()
         if not selected:
+            for candidate in candidates:
+                self._set_track_download_state(int(candidate.track_id), DownloadState.IDLE)
             notify_user(
                 self._app_state,
-                "No retry matches were selected.",
+                "No lyrics matches were selected.",
                 "info",
                 show_status=self._show_status,
                 status_timeout_ms=3000,
             )
             return
 
-        applied_count = 0
-        for candidate in selected:
-            if self._apply_retry_candidate(candidate):
-                applied_count += 1
+        selected_ids = {int(candidate.track_id) for candidate in selected}
+        for candidate in candidates:
+            if int(candidate.track_id) not in selected_ids:
+                self._set_track_download_state(int(candidate.track_id), DownloadState.IDLE)
+        self._start_apply_candidates(selected, context=context)
 
+    def _start_apply_candidates(self, candidates: list[LyricsMatchCandidate], *, context: str) -> None:
+        if not candidates:
+            return
+        request = self._active_request
+        mode = request.mode if request is not None else self._resolve_download_mode("use_global")
+        lrclib_instance = request.lrclib_instance if request is not None else ""
+        worker = LyricsApplyCandidatesWorker(
+            self._app_state.db_path,
+            candidates,
+            download_mode=mode,
+            lrclib_instance=lrclib_instance,
+            parent=self,
+        )
+        self._apply_workers.add(worker)
+        worker.finishedApply.connect(
+            lambda applied_count, applied_ids, error, apply_worker=worker, apply_context=context: self._on_apply_candidates_finished(
+                int(applied_count),
+                [int(track_id) for track_id in applied_ids],
+                str(error or ""),
+                worker=apply_worker,
+                context=apply_context,
+            )
+        )
+        worker.start()
+
+    def _on_apply_candidates_finished(
+        self,
+        applied_count: int,
+        applied_ids: list[int],
+        error: str,
+        *,
+        worker: LyricsApplyCandidatesWorker,
+        context: str,
+    ) -> None:
+        self._apply_workers.discard(worker)
+        worker.deleteLater()
+        for track_id in applied_ids:
+            self._set_track_download_state(int(track_id), DownloadState.SUCCESS)
+            if self._current_player_track_id() == int(track_id):
+                try:
+                    updated = get_track_by_id(self._app_state.db, int(track_id))
+                    self._set_track_lyrics_views(updated)
+                except (sqlite3.Error, AttributeError, TypeError) as exc:
+                    logger.warning("Failed to refresh applied lyrics for track %s: %s", track_id, exc)
+        if error:
+            notify_user(
+                self._app_state,
+                f"Lyrics matches could not be fully applied: {error}",
+                "error",
+                show_status=self._show_status,
+                status_timeout_ms=4500,
+            )
         if not applied_count:
             return
+        self._after_candidates_applied(applied_count, context=context)
+
+    def _after_candidates_applied(self, applied_count: int, *, context: str) -> None:
         self._flush_pending_download_history()
         self._refresh_visible_library_view()
         self._refresh_history()
+        label = "downloaded" if context == "download" else "failed"
         notify_user(
             self._app_state,
-            f"Applied lyrics to {applied_count} failed track{'s' if applied_count != 1 else ''}.",
+            f"Applied lyrics to {applied_count} {label} track{'s' if applied_count != 1 else ''}.",
             "success",
             show_status=self._show_status,
             status_timeout_ms=3500,
         )
-
-    def _apply_retry_candidate(self, candidate: LyricsMatchCandidate) -> bool:
-        try:
-            track = get_track_by_id(self._app_state.db, int(candidate.track_id))
-        except (sqlite3.Error, AttributeError, TypeError) as exc:
-            logger.warning("Failed to load track for lyrics retry candidate %s: %s", candidate.track_id, exc)
-            return False
-
-        updated = self._apply_selected_lyrics(candidate.track_id, candidate.plain_lyrics, candidate.synced_lyrics)
-        if updated is None:
-            return False
-
-        message = "Downloaded synced lyrics via relaxed search." if updated.lrc_lyrics else "Downloaded plain lyrics via relaxed search."
-        history_entry = self._build_download_history_entry(
-            int(candidate.track_id),
-            f"{track.artist_name or ''} - {track.title or ''}".strip(" -"),
-            message,
-        )
-        if history_entry is not None:
-            self._pending_history_entries.append(history_entry)
-
-        self._set_track_download_state(int(candidate.track_id), DownloadState.SUCCESS)
-        if self._current_player_track_id() == int(candidate.track_id):
-            self._set_track_lyrics_views(updated)
-        return True
-
-    def _apply_selected_lyrics(self, track_id: int, plain: str, synced: str) -> Track | None:
-        synced_text = (synced or "").strip()
-        plain_text = (plain or "").strip()
-        if synced_text:
-            if not plain_text:
-                plain_text = plain_text_from_lrc(synced_text)
-            track = update_track_synced_lyrics(self._app_state.db, int(track_id), synced_text, plain_text)
-        elif plain_text:
-            track = update_track_plain_lyrics(self._app_state.db, int(track_id), plain_text)
-        else:
-            return None
-
-        config = get_config(self._app_state.db)
-        sync_track_outputs_with_result(track, config)
-        return track
 
     def _reset_track_download_state_if_unchanged(
         self,

@@ -3,6 +3,8 @@ from __future__ import annotations
 import unittest
 from unittest.mock import patch
 
+from PySide6.QtWidgets import QHeaderView
+
 from ui.library_routes import tracks_album, tracks_artist
 from tests.test_support import (
     HAS_QT,
@@ -169,6 +171,24 @@ class TrackListWidgetTests(unittest.TestCase):
             self.assertEqual(widget._album_id, 11)
             self.assertIsNone(widget._artist_id)
             self.assertEqual(widget._scope_label, "Album: Kid A")
+        finally:
+            widget.deleteLater()
+            app_state.db.close()
+
+    def test_track_table_keeps_lyrics_status_column_visible(self):
+        app_state = simple_app_state()
+        widget = TrackListWidget(app_state)
+        try:
+            self.assertEqual(widget.model.columnCount(), 4)
+            self.assertEqual(widget.model.headerData(2, Qt.Orientation.Horizontal, Qt.ItemDataRole.DisplayRole), "Lyrics")
+            self.assertEqual(
+                widget.model.headerData(2, Qt.Orientation.Horizontal, Qt.ItemDataRole.TextAlignmentRole),
+                int(Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignVCenter),
+            )
+            self.assertFalse(widget.table.isColumnHidden(2))
+            self.assertGreaterEqual(widget.table.columnWidth(1), 90)
+            self.assertEqual(widget.header.sectionResizeMode(2), QHeaderView.ResizeMode.Fixed)
+            self.assertGreaterEqual(widget.table.columnWidth(2), 100)
         finally:
             widget.deleteLater()
             app_state.db.close()

@@ -26,6 +26,18 @@ from ui.theme_tokens import STYLE_TOKENS
 
 logger = logging.getLogger(__name__)
 
+PLAYER_META_MIN_WIDTH = 220
+PLAYER_META_COMPACT_MIN_WIDTH = 170
+PLAYER_META_ARTWORK_WIDTH = 34
+PLAYER_EXTRAS_MIN_WIDTH = 230
+PLAYER_EXTRAS_COMPACT_MIN_WIDTH = 205
+PLAYER_CENTER_MIN_WIDTH = 340
+PLAYER_CENTER_COMPACT_MIN_WIDTH = 260
+PLAYER_COVER_SIZE = 52
+PLAYER_COVER_COMPACT_SIZE = 44
+PLAYER_BAR_HEIGHT = 104
+PLAYER_BAR_COMPACT_HEIGHT = 92
+
 
 def _fmt(ms: int) -> str:
     ms = max(0, int(ms))
@@ -171,14 +183,15 @@ class PlayerBar(QWidget):
 
         shell = QWidget()
         shell.setObjectName("PlayerShell")
+        shell.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         shell_layout = QGridLayout(shell)
         set_layout_spacing(shell_layout, margins=(SPACE_2, SPACE_2, SPACE_2, SPACE_2), spacing=SPACE_2)
-        root.addWidget(shell)
+        root.addWidget(shell, 1)
 
-        left_panel = QWidget()
-        left_panel.setObjectName("PlayerMeta")
-        left_panel.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Preferred)
-        left_layout = QHBoxLayout(left_panel)
+        self.left_panel = QWidget()
+        self.left_panel.setObjectName("PlayerMeta")
+        self.left_panel.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+        left_layout = QHBoxLayout(self.left_panel)
         set_layout_spacing(left_layout, margins=0, spacing=SPACE_2)
 
         self.lbl_cover = QLabel()
@@ -191,7 +204,8 @@ class PlayerBar(QWidget):
 
         self.lbl_title = QLabel("Nothing playing")
         self.lbl_title.setObjectName("NowPlaying")
-        self.lbl_title.setMinimumWidth(220)
+        self.lbl_title.setMinimumWidth(0)
+        self.lbl_title.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         self.lbl_title.setTextInteractionFlags(Qt.TextSelectableByMouse)
         self.lbl_title.setWordWrap(False)
 
@@ -200,6 +214,7 @@ class PlayerBar(QWidget):
         self.lbl_artist.setTextFormat(Qt.TextFormat.RichText)
         self.lbl_artist.setTextInteractionFlags(Qt.TextInteractionFlag.LinksAccessibleByMouse)
         self.lbl_artist.setOpenExternalLinks(False)
+        self.lbl_artist.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         self.lbl_artist.linkActivated.connect(self._on_artist_link_activated)
 
         self.lbl_album = QLabel("")
@@ -207,6 +222,7 @@ class PlayerBar(QWidget):
         self.lbl_album.setTextFormat(Qt.TextFormat.RichText)
         self.lbl_album.setTextInteractionFlags(Qt.TextInteractionFlag.LinksAccessibleByMouse)
         self.lbl_album.setOpenExternalLinks(False)
+        self.lbl_album.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
         self.lbl_album.linkActivated.connect(self._on_album_link_activated)
 
         text_stack.addWidget(self.lbl_title)
@@ -217,10 +233,10 @@ class PlayerBar(QWidget):
         left_layout.addWidget(self.lbl_cover, 0, Qt.AlignVCenter)
         left_layout.addLayout(text_stack, 1)
 
-        center_panel = QWidget()
-        center_panel.setObjectName("PlayerCenter")
-        center_panel.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Preferred)
-        center_layout = QVBoxLayout(center_panel)
+        self.center_panel = QWidget()
+        self.center_panel.setObjectName("PlayerCenter")
+        self.center_panel.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+        center_layout = QVBoxLayout(self.center_panel)
         set_layout_spacing(center_layout, margins=(0, 1, 0, 1), spacing=2)
 
         controls_row = QHBoxLayout()
@@ -290,14 +306,11 @@ class PlayerBar(QWidget):
         progress_row.addWidget(self.lbl_dur)
         center_layout.addLayout(progress_row)
 
-        right_panel = QWidget()
-        right_panel.setObjectName("PlayerExtras")
-        right_panel.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Preferred)
-        right_layout = QVBoxLayout(right_panel)
-        set_layout_spacing(right_layout, margins=0, spacing=4)
-
-        self.lbl_speed = QLabel("Speed")
-        self.lbl_speed.setObjectName("MetaLabel")
+        self.right_panel = QWidget()
+        self.right_panel.setObjectName("PlayerExtras")
+        self.right_panel.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred)
+        right_layout = QVBoxLayout(self.right_panel)
+        set_layout_spacing(right_layout, margins=0, spacing=SPACE_2)
 
         speed_row = QHBoxLayout()
         set_layout_spacing(speed_row, margins=0, spacing=SPACE_2)
@@ -324,19 +337,25 @@ class PlayerBar(QWidget):
         for label, speed in self._speed_items:
             self.cmb_speed.addItem(label, speed)
         self.cmb_speed.setCurrentIndex(0)
-        self.cmb_speed.lineEdit().setPlaceholderText("Custom")
+        self.cmb_speed.lineEdit().setPlaceholderText("custom")
+        self.cmb_speed.lineEdit().setTextMargins(42, 0, 0, 0)
         self.cmb_speed.lineEdit().installEventFilter(self)
+        self.cmb_speed.installEventFilter(self)
+        self.lbl_speed_prefix = QLabel("Speed", self.cmb_speed)
+        self.lbl_speed_prefix.setObjectName("SpeedComboPrefix")
+        self.lbl_speed_prefix.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        self.lbl_speed_prefix.setTextInteractionFlags(Qt.TextInteractionFlag.NoTextInteraction)
 
         self.btn_speed_up = QToolButton()
         self.btn_speed_up.setObjectName("SpeedAdjustButton")
         self.btn_speed_up.setText("+")
         self.btn_speed_up.setToolTip("Increase playback speed by 0.05x")
 
+        speed_row.addStretch(1)
         speed_row.addWidget(self.btn_speed_down)
-        speed_row.addWidget(self.cmb_speed, 1)
+        speed_row.addWidget(self.cmb_speed)
         speed_row.addWidget(self.btn_speed_up)
 
-        right_layout.addWidget(self.lbl_speed)
         right_layout.addLayout(speed_row)
 
         volume_row = QHBoxLayout()
@@ -351,26 +370,26 @@ class PlayerBar(QWidget):
         self.slider_volume.setSingleStep(5)
         self.slider_volume.setPageStep(10)
         self.slider_volume.setMinimumHeight(16)
+        self.slider_volume.setMaximumWidth(150)
 
         self.lbl_volume_value = QLabel("70%")
         self.lbl_volume_value.setObjectName("TimeLabel")
         self.lbl_volume_value.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         self.lbl_volume_value.setMinimumWidth(34)
 
+        volume_row.addStretch(1)
         volume_row.addWidget(self.lbl_volume)
-        volume_row.addWidget(self.slider_volume, 1)
+        volume_row.addWidget(self.slider_volume)
         volume_row.addWidget(self.lbl_volume_value)
         right_layout.addLayout(volume_row)
+        right_layout.addStretch(1)
 
-        shell_layout.addWidget(left_panel, 0, 0, Qt.AlignLeft | Qt.AlignVCenter)
-        shell_layout.addWidget(center_panel, 0, 1, Qt.AlignCenter)
-        shell_layout.addWidget(right_panel, 0, 2, Qt.AlignRight | Qt.AlignVCenter)
-        shell_layout.setColumnStretch(0, 1)
-        shell_layout.setColumnStretch(1, 0)
-        shell_layout.setColumnStretch(2, 1)
-
-        center_panel.setMinimumWidth(500)
-        center_panel.setMaximumWidth(640)
+        shell_layout.addWidget(self.left_panel, 0, 0)
+        shell_layout.addWidget(self.center_panel, 0, 1)
+        shell_layout.addWidget(self.right_panel, 0, 2)
+        shell_layout.setColumnStretch(0, 3)
+        shell_layout.setColumnStretch(1, 5)
+        shell_layout.setColumnStretch(2, 2)
 
         self.slider.sliderPressed.connect(self._on_slider_pressed)
         self.slider.sliderReleased.connect(self._on_slider_released)
@@ -389,6 +408,7 @@ class PlayerBar(QWidget):
         self._sync_speed_from_player()
         self._sync_volume_from_player()
         self.set_compact_mode(False)
+        QTimer.singleShot(0, self._position_speed_prefix)
 
     def attach_player(self, player) -> None:
         if player is None or self.player is player:
@@ -461,16 +481,15 @@ class PlayerBar(QWidget):
         self.update()
 
         self.lbl_album.setVisible(not compact)
-        self.lbl_speed.setVisible(not compact)
         self.lbl_volume.setVisible(True)
-        self.lbl_title.setMinimumWidth(110 if compact else 150)
-        left_width = 200 if compact else 250
+        self.lbl_title.setMinimumWidth(0)
+        left_width = PLAYER_META_COMPACT_MIN_WIDTH if compact else PLAYER_META_MIN_WIDTH
         if self._show_album_art:
-            left_width += 40
-        right_width = 150 if compact else 190
-        center_width = 420 if compact else 560
-        cover_size = 44 if compact else 52
-        bar_height = 92 if compact else 104
+            left_width += PLAYER_META_ARTWORK_WIDTH
+        right_width = PLAYER_EXTRAS_COMPACT_MIN_WIDTH if compact else PLAYER_EXTRAS_MIN_WIDTH
+        center_width = PLAYER_CENTER_COMPACT_MIN_WIDTH if compact else PLAYER_CENTER_MIN_WIDTH
+        cover_size = PLAYER_COVER_COMPACT_SIZE if compact else PLAYER_COVER_SIZE
+        bar_height = PLAYER_BAR_COMPACT_HEIGHT if compact else PLAYER_BAR_HEIGHT
 
         left_width = int(round(left_width * self._ui_scale))
         right_width = int(round(right_width * self._ui_scale))
@@ -480,11 +499,15 @@ class PlayerBar(QWidget):
 
         self.lbl_cover.setFixedSize(cover_size, cover_size)
         self.lbl_cover.setVisible(self._show_album_art)
-        self.findChild(QWidget, "PlayerMeta").setFixedWidth(left_width)
-        self.findChild(QWidget, "PlayerExtras").setFixedWidth(right_width)
-        self.findChild(QWidget, "PlayerCenter").setFixedWidth(center_width)
+        self.left_panel.setMinimumWidth(left_width)
+        self.left_panel.setMaximumWidth(16777215)
+        self.right_panel.setMinimumWidth(right_width)
+        self.right_panel.setMaximumWidth(16777215)
+        self.center_panel.setMinimumWidth(center_width)
+        self.center_panel.setMaximumWidth(16777215)
         self.setMinimumHeight(bar_height)
         self.setMaximumHeight(bar_height)
+        self._position_speed_prefix()
 
         now_playing = None
         if self.player:
@@ -499,6 +522,12 @@ class PlayerBar(QWidget):
         if "." not in rendered:
             rendered += ".0"
         return f"{rendered}x"
+
+    def _position_speed_prefix(self) -> None:
+        hint = self.lbl_speed_prefix.sizeHint()
+        y = max(0, (self.cmb_speed.height() - hint.height()) // 2)
+        self.lbl_speed_prefix.setGeometry(10, y, hint.width(), hint.height())
+        self.lbl_speed_prefix.raise_()
 
     def _normalize_speed(self, speed: float) -> float:
         return max(0.25, min(2.0, round(float(speed), 2)))
@@ -542,7 +571,7 @@ class PlayerBar(QWidget):
         self._apply_speed(float(speed))
 
     def _on_custom_speed_committed(self):
-        raw = (self.cmb_speed.currentText() or "").strip().lower().replace("x", "")
+        raw = (self.cmb_speed.currentText() or "").strip().lower().replace("speed", "").replace("x", "").strip()
         if not raw:
             self._sync_speed_from_player()
             return
@@ -611,6 +640,8 @@ class PlayerBar(QWidget):
                 self._on_custom_speed_committed()
                 event.accept()
                 return True
+        if watched is self.cmb_speed and event.type() == QEvent.Type.Resize:
+            self._position_speed_prefix()
         return super().eventFilter(watched, event)
 
     def _on_slider_pressed(self):

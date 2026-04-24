@@ -7,6 +7,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QSizePolicy,
     QToolButton,
     QVBoxLayout,
     QWidget,
@@ -26,12 +27,14 @@ class TopBarController(QWidget):
         on_open_settings,
         on_open_about,
         on_toggle_logs,
+        on_toggle_hotkey_hints,
         on_schedule_search,
         on_filter_changed,
         parent=None,
     ) -> None:
         super().__init__(parent)
         self.setObjectName("TopBar")
+        self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
 
         root = QHBoxLayout(self)
         self.root_layout = root
@@ -39,6 +42,7 @@ class TopBarController(QWidget):
 
         self.search_group = QWidget()
         self.search_group.setObjectName("TopBarGroup")
+        self.search_group.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
         search_layout = QVBoxLayout(self.search_group)
         set_layout_spacing(search_layout, margins=SPACE_2, spacing=SPACE_1)
         search_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
@@ -57,6 +61,7 @@ class TopBarController(QWidget):
 
         self.filters_group = QWidget()
         self.filters_group.setObjectName("TopBarGroup")
+        self.filters_group.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
         filters_layout = QVBoxLayout(self.filters_group)
         set_layout_spacing(filters_layout, margins=SPACE_2, spacing=SPACE_1)
         filters_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
@@ -109,6 +114,7 @@ class TopBarController(QWidget):
 
         self.actions_group = QWidget()
         self.actions_group.setObjectName("TopBarGroup")
+        self.actions_group.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
         actions_layout = QVBoxLayout(self.actions_group)
         set_layout_spacing(actions_layout, margins=SPACE_2, spacing=SPACE_1)
         actions_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
@@ -153,6 +159,15 @@ class TopBarController(QWidget):
         self.btn_logs.setCheckable(True)
         self.btn_logs.clicked.connect(on_toggle_logs)
 
+        self.btn_hotkeys = QToolButton()
+        self.btn_hotkeys.setObjectName("TopBarAction")
+        self.btn_hotkeys.setText("Keys")
+        self.btn_hotkeys.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextOnly)
+        self.btn_hotkeys.setToolTip("Show keyboard shortcut hints")
+        self.btn_hotkeys.setAccessibleName("Show keyboard shortcut hints")
+        self.btn_hotkeys.setCheckable(True)
+        self.btn_hotkeys.clicked.connect(on_toggle_hotkey_hints)
+
         self.btn_bg_activity = QToolButton()
         self.btn_bg_activity.setObjectName("TopBarAction")
         self.btn_bg_activity.setIcon(load_svg_icon("download.svg", 18))
@@ -165,6 +180,7 @@ class TopBarController(QWidget):
         actions_row.addWidget(self.btn_config)
         actions_row.addWidget(self.btn_about)
         actions_row.addWidget(self.btn_logs)
+        actions_row.addWidget(self.btn_hotkeys)
         actions_row.addWidget(self.btn_bg_activity)
         actions_row.addStretch(1)
         actions_layout.addLayout(actions_row)
@@ -235,8 +251,15 @@ class TopBarController(QWidget):
     def update_responsive_layout(self, width: int) -> None:
         if width < 1120:
             self.root_layout.setDirection(QBoxLayout.TopToBottom)
+            self.root_layout.setStretch(0, 0)
+            self.root_layout.setStretch(1, 0)
+            self.root_layout.setStretch(2, 0)
         else:
             self.root_layout.setDirection(QBoxLayout.LeftToRight)
+            self.root_layout.setStretch(0, 3)
+            self.root_layout.setStretch(1, 2)
+            self.root_layout.setStretch(2, 1)
+        self.updateGeometry()
 
     def bind_tab_order(self, window, tabs_widget) -> None:
         window.setTabOrder(self.search_box, self.btn_refresh)
