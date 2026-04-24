@@ -377,8 +377,9 @@ class PlayerBar(QWidget):
         self.lbl_volume_value.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         self.lbl_volume_value.setMinimumWidth(34)
 
+        volume_row.addStretch(1)
         volume_row.addWidget(self.lbl_volume)
-        volume_row.addWidget(self.slider_volume, 1)
+        volume_row.addWidget(self.slider_volume)
         volume_row.addWidget(self.lbl_volume_value)
         right_layout.addLayout(volume_row)
         right_layout.addStretch(1)
