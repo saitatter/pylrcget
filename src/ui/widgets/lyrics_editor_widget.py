@@ -28,9 +28,10 @@ logger = logging.getLogger(__name__)
 
 
 class FlowLayout(QLayout):
-    def __init__(self, parent=None, *, spacing: int = SPACE_2):
+    def __init__(self, parent=None, *, spacing: int = SPACE_2, justify_rows: bool = False):
         super().__init__(parent)
         self._items = []
+        self._justify_rows = bool(justify_rows)
         self.setContentsMargins(0, 0, 0, 0)
         self.setSpacing(spacing)
 
@@ -106,8 +107,8 @@ class FlowLayout(QLayout):
         for row_items, row_width, row_height in rows:
             x = effective.x()
             extra = max(0, effective.width() - row_width)
-            extra_each = extra // len(row_items) if row_items and not test_only else 0
-            extra_remainder = extra % len(row_items) if row_items and not test_only else 0
+            extra_each = extra // len(row_items) if self._justify_rows and row_items and not test_only else 0
+            extra_remainder = extra % len(row_items) if self._justify_rows and row_items and not test_only else 0
             for index, (item, item_size) in enumerate(row_items):
                 item_width = item_size.width() + extra_each + (1 if index < extra_remainder else 0)
                 item_height = item_size.height()

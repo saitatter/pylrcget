@@ -3,6 +3,7 @@ from __future__ import annotations
 from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from dataclasses import dataclass
 import sqlite3
+import threading
 
 from PySide6.QtCore import QObject, QThread, Signal
 
@@ -46,6 +47,7 @@ class LyricsRetrySearchWorker(QThread):
         self.db_path = db_path
         self.track_ids = [int(track_id) for track_id in track_ids]
         self.lrclib_instance = lrclib_instance
+        self._thread_local = threading.local()
 
     def run(self) -> None:
         total = len(self.track_ids)
@@ -139,7 +141,7 @@ class LyricsRetrySearchWorker(QThread):
 
     def _search_retry_track(self, track: _RetryTrack) -> LyricsMatchCandidate | None:
         best: LyricsMatchCandidate | None = None
-        api = LrcLibAPI(self.lrclib_instance)
+        api = self._api_for_current_thread()
         for query in build_retry_search_queries(artist=track.artist, title=track.title, album=track.album):
             if self.isInterruptionRequested():
                 break
@@ -174,3 +176,10 @@ class LyricsRetrySearchWorker(QThread):
             query_label=query.label,
             results=results,
         )
+
+    def _api_for_current_thread(self) -> LrcLibAPI:
+        api = getattr(self._thread_local, "api", None)
+        if api is None:
+            api = LrcLibAPI(self.lrclib_instance)
+            self._thread_local.api = api
+        return api

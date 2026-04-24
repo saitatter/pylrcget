@@ -3,6 +3,7 @@ from __future__ import annotations
 from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from dataclasses import dataclass
 import sqlite3
+import threading
 import time
 from typing import TypedDict
 
@@ -67,6 +68,7 @@ class BulkLyricsDownloadWorker(QThread):
         self.lrclib_instance = lrclib_instance
         self.download_mode = normalize_download_mode(download_mode)
         self._started_at = 0.0
+        self._thread_local = threading.local()
 
     def run(self) -> None:
         total = len(self.track_ids)
@@ -211,7 +213,7 @@ class BulkLyricsDownloadWorker(QThread):
             self.finishedBatch.emit(True, f"Finished lyrics download. Success: {ok_count}, Failed: {fail_count}.", stats)
 
     def _fetch_job_match(self, job: _DownloadJob) -> _DownloadFetchResult:
-        api = LrcLibAPI(self.lrclib_instance)
+        api = self._api_for_current_thread()
 
         def _notify(status: str) -> None:
             if self.isInterruptionRequested():
@@ -232,6 +234,13 @@ class BulkLyricsDownloadWorker(QThread):
             return _DownloadFetchResult(job=job, match=match)
         except Exception as exc:
             return _DownloadFetchResult(job=job, error=str(exc))
+
+    def _api_for_current_thread(self) -> LrcLibAPI:
+        api = getattr(self._thread_local, "api", None)
+        if api is None:
+            api = LrcLibAPI(self.lrclib_instance)
+            self._thread_local.api = api
+        return api
 
     def _elapsed(self) -> float:
         if not self._started_at:

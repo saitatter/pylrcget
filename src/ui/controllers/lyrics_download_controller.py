@@ -8,23 +8,20 @@ from typing import Callable
 
 from PySide6.QtCore import QObject, QTimer
 
-from core.utils import plain_text_from_lrc
 from db.models import Track
 from db.queries import (
     get_config,
     get_track_by_id,
     get_track_ids_for_download_mode,
     record_download_history_batch,
-    update_track_plain_lyrics,
-    update_track_synced_lyrics,
 )
 from core.tracklist_models import DownloadState
 from ui.dialogs.batch_lyrics_match_dialog import BatchLyricsMatchDialog
 from ui.services.feedback import notify_user
 from ui.services.download_modes import download_mode_label, no_missing_tracks_message
 from ui.services.lyrics_match_retry import LyricsMatchCandidate
-from ui.services.lyrics_download_service import sync_track_outputs_with_result
 from ui.widgets.download_progress_overlay import DownloadProgressOverlay
+from ui.workers.lyrics_apply_worker import LyricsApplyCandidatesWorker
 from ui.workers.bulk_lyrics_download_worker import BulkDownloadStats, BulkLyricsDownloadWorker
 from ui.workers.lyrics_retry_search_worker import LyricsRetrySearchWorker
 
@@ -67,6 +64,7 @@ class LyricsDownloadController(QObject):
         self._get_track_download_state = get_track_download_state
 
         self._download_worker: BulkLyricsDownloadWorker | None = None
+        self._apply_worker: LyricsApplyCandidatesWorker | None = None
         self._active_request: LyricsDownloadRequest | None = None
         self._active_track_ids: set[int] = set()
         self._state_tokens: dict[int, int] = {}
@@ -122,6 +120,8 @@ class LyricsDownloadController(QObject):
     def cancel(self) -> None:
         if self._download_worker is not None and self._download_worker.isRunning():
             self._download_worker.requestInterruption()
+        if self._apply_worker is not None and self._apply_worker.isRunning():
+            self._apply_worker.requestInterruption()
         if self._retry_search_worker is not None and self._retry_search_worker.isRunning():
             self._retry_search_worker.requestInterruption()
 
@@ -236,13 +236,9 @@ class LyricsDownloadController(QObject):
                 "warning",
             )
         elif candidates:
-            applied_exact = self._apply_download_candidates(exact_candidates, context="download") if exact_candidates else 0
-            if applied_exact and review_candidates:
-                self._flush_pending_download_history()
-                self._refresh_visible_library_view()
-                self._refresh_history()
+            applying_exact = bool(exact_candidates)
             if review_candidates:
-                exact_note = f"Applied {applied_exact} exact match(es). " if applied_exact else ""
+                exact_note = f"Applying {len(exact_candidates)} exact match(es). " if applying_exact else ""
                 failed_count = int(stats_dict.get("failed", 0))
                 failed_note = f" {failed_count} track(s) still failed." if failed_count else ""
                 notify_user(
@@ -252,9 +248,11 @@ class LyricsDownloadController(QObject):
                     show_status=self._show_status,
                     status_timeout_ms=4000,
                 )
+                if exact_candidates:
+                    self._start_apply_candidates(exact_candidates, context="download")
                 self._review_retry_candidates(review_candidates, context="download")
-            elif applied_exact:
-                self._after_candidates_applied(applied_exact, context="download")
+            elif exact_candidates:
+                self._start_apply_candidates(exact_candidates, context="download")
             else:
                 notify_user(
                     self._app_state,
@@ -352,18 +350,52 @@ class LyricsDownloadController(QObject):
         for candidate in candidates:
             if int(candidate.track_id) not in selected_ids:
                 self._set_track_download_state(int(candidate.track_id), DownloadState.IDLE)
-        applied_count = self._apply_download_candidates(selected, context=context)
+        self._start_apply_candidates(selected, context=context)
 
+    def _start_apply_candidates(self, candidates: list[LyricsMatchCandidate], *, context: str) -> None:
+        if not candidates:
+            return
+        request = self._active_request
+        mode = request.mode if request is not None else self._resolve_download_mode("use_global")
+        lrclib_instance = request.lrclib_instance if request is not None else ""
+        self._apply_worker = LyricsApplyCandidatesWorker(
+            self._app_state.db_path,
+            candidates,
+            download_mode=mode,
+            lrclib_instance=lrclib_instance,
+            parent=self,
+        )
+        self._apply_worker.finishedApply.connect(
+            lambda applied_count, applied_ids, error, apply_context=context: self._on_apply_candidates_finished(
+                int(applied_count),
+                [int(track_id) for track_id in applied_ids],
+                str(error or ""),
+                context=apply_context,
+            )
+        )
+        self._apply_worker.start()
+
+    def _on_apply_candidates_finished(self, applied_count: int, applied_ids: list[int], error: str, *, context: str) -> None:
+        self._apply_worker = None
+        for track_id in applied_ids:
+            self._set_track_download_state(int(track_id), DownloadState.SUCCESS)
+            if self._current_player_track_id() == int(track_id):
+                try:
+                    updated = get_track_by_id(self._app_state.db, int(track_id))
+                    self._set_track_lyrics_views(updated)
+                except (sqlite3.Error, AttributeError, TypeError) as exc:
+                    logger.warning("Failed to refresh applied lyrics for track %s: %s", track_id, exc)
+        if error:
+            notify_user(
+                self._app_state,
+                f"Lyrics matches could not be fully applied: {error}",
+                "error",
+                show_status=self._show_status,
+                status_timeout_ms=4500,
+            )
         if not applied_count:
             return
         self._after_candidates_applied(applied_count, context=context)
-
-    def _apply_download_candidates(self, candidates: list[LyricsMatchCandidate], *, context: str) -> int:
-        applied_count = 0
-        for candidate in candidates:
-            if self._apply_retry_candidate(candidate):
-                applied_count += 1
-        return applied_count
 
     def _after_candidates_applied(self, applied_count: int, *, context: str) -> None:
         self._flush_pending_download_history()
@@ -377,52 +409,6 @@ class LyricsDownloadController(QObject):
             show_status=self._show_status,
             status_timeout_ms=3500,
         )
-
-    def _apply_retry_candidate(self, candidate: LyricsMatchCandidate) -> bool:
-        try:
-            track = get_track_by_id(self._app_state.db, int(candidate.track_id))
-        except (sqlite3.Error, AttributeError, TypeError) as exc:
-            logger.warning("Failed to load track for lyrics retry candidate %s: %s", candidate.track_id, exc)
-            return False
-
-        updated = self._apply_selected_lyrics(candidate.track_id, candidate.plain_lyrics, candidate.synced_lyrics)
-        if updated is None:
-            return False
-
-        score_note = f" Match: {int(candidate.score)}%."
-        message = (
-            f"Downloaded synced lyrics via reviewed match.{score_note}"
-            if updated.lrc_lyrics
-            else f"Downloaded plain lyrics via reviewed match.{score_note}"
-        )
-        history_entry = self._build_download_history_entry(
-            int(candidate.track_id),
-            f"{track.artist_name or ''} - {track.title or ''}".strip(" -"),
-            message,
-        )
-        if history_entry is not None:
-            self._pending_history_entries.append(history_entry)
-
-        self._set_track_download_state(int(candidate.track_id), DownloadState.SUCCESS)
-        if self._current_player_track_id() == int(candidate.track_id):
-            self._set_track_lyrics_views(updated)
-        return True
-
-    def _apply_selected_lyrics(self, track_id: int, plain: str, synced: str) -> Track | None:
-        synced_text = (synced or "").strip()
-        plain_text = (plain or "").strip()
-        if synced_text:
-            if not plain_text:
-                plain_text = plain_text_from_lrc(synced_text)
-            track = update_track_synced_lyrics(self._app_state.db, int(track_id), synced_text, plain_text)
-        elif plain_text:
-            track = update_track_plain_lyrics(self._app_state.db, int(track_id), plain_text)
-        else:
-            return None
-
-        config = get_config(self._app_state.db)
-        sync_track_outputs_with_result(track, config)
-        return track
 
     def _reset_track_download_state_if_unchanged(
         self,

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import tempfile
+import time
 import unittest
 from dataclasses import replace
 from pathlib import Path
@@ -121,6 +122,14 @@ class LyricsDownloadControllerTests(unittest.TestCase):
             get_track_download_state=lambda track_id: download_states.get(int(track_id), "idle"),
         )
         return controller, statuses, notifications, download_states, refreshed
+
+    def _wait_for_apply_worker(self, controller: LyricsDownloadController, timeout_s: float = 3.0) -> None:
+        deadline = time.monotonic() + timeout_s
+        while getattr(controller, "_apply_worker", None) is not None and time.monotonic() < deadline:
+            self._app.processEvents()
+            time.sleep(0.01)
+        self._app.processEvents()
+        self.assertIsNone(getattr(controller, "_apply_worker", None))
 
     def test_download_missing_uses_current_configured_mode(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -317,6 +326,7 @@ class LyricsDownloadControllerTests(unittest.TestCase):
                         "Finished lyrics search. Candidates: 1, Failed: 0.",
                         {"total": 1, "ok": 1, "failed": 0, "cancelled": False, "candidates": [candidate]},
                     )
+                    self._wait_for_apply_worker(controller)
 
                 after_apply = get_track_by_id(db, track_id)
                 self.assertEqual(after_apply.lrc_lyrics, "[00:01.00]plain text")
@@ -365,6 +375,7 @@ class LyricsDownloadControllerTests(unittest.TestCase):
                         "Finished lyrics search. Candidates: 1, Failed: 0.",
                         {"total": 1, "ok": 1, "failed": 0, "cancelled": False, "candidates": [candidate]},
                     )
+                    self._wait_for_apply_worker(controller)
 
                 after_apply = get_track_by_id(db, track_id)
                 self.assertEqual(after_apply.txt_lyrics, "plain text")
@@ -442,6 +453,7 @@ class LyricsDownloadControllerTests(unittest.TestCase):
                             "candidates": [selected_candidate, skipped_candidate],
                         },
                     )
+                    self._wait_for_apply_worker(controller)
 
                 self.assertEqual(download_states[ids[0]], "success")
                 self.assertEqual(download_states[ids[1]], "idle")
