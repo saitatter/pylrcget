@@ -3,6 +3,33 @@ QLabel#LyricsTitle {
     font-size: {{font-size-lg}};
 }
 
+QDoubleSpinBox#LyricsShiftSpin {
+    min-height: 38px;
+    padding: {{space-2}} {{space-3}};
+    border: 1px solid {{color-border}};
+    border-radius: {{radius-md}};
+    background: {{color-bg-control}};
+    color: {{color-text}};
+    selection-background-color: {{color-accent}};
+    selection-color: {{color-bg-app}};
+}
+
+QDoubleSpinBox#LyricsShiftSpin:hover {
+    border-color: {{color-accent}};
+    background: {{color-bg-elevated}};
+}
+
+QDoubleSpinBox#LyricsShiftSpin:focus {
+    border-color: {{color-accent}};
+    outline: none;
+}
+
+QDoubleSpinBox#LyricsShiftSpin:disabled {
+    color: {{color-disabled-text}};
+    border-color: {{color-disabled-border}};
+    background: {{color-disabled-bg}};
+}
+
 QLabel#LyricsMessage {
     color: {{color-empty-body}};
 }
