@@ -29,6 +29,10 @@ from ui.widgets.library_table_utils import should_load_more
 from ui.widgets.track_list_rows import build_track_list_rows
 from core.tracklist_models import DownloadState
 
+TRACK_DURATION_COLUMN_WIDTH = 78
+TRACK_LYRICS_COLUMN_WIDTH = 118
+TRACK_ACTIONS_COLUMN_WIDTH = 142
+
 
 class TrackListWidget(QWidget):
     playTrack = Signal(int)       # track_id
@@ -111,10 +115,11 @@ class TrackListWidget(QWidget):
 
         self.header.setStretchLastSection(False)
         self.header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
-        self.header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
-        self.header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
-        self.header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
+        self.header.setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
+        self.header.setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
+        self.header.setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)
         self.table.setObjectName("TrackTable")
+        self._apply_column_widths()
 
         self.table.verticalHeader().setDefaultSectionSize(44)
 
@@ -155,11 +160,14 @@ class TrackListWidget(QWidget):
     def set_ui_scale(self, scale: float) -> None:
         self._ui_scale = max(0.85, min(1.5, float(scale or 1.0)))
         self.table.verticalHeader().setDefaultSectionSize(int(round(44 * self._ui_scale)))
-        self.table.setColumnWidth(1, int(round(90 * self._ui_scale)))
-        self.table.setColumnWidth(2, int(round(110 * self._ui_scale)))
-        self.table.setColumnWidth(3, int(round(180 * self._ui_scale)))
+        self._apply_column_widths()
         if hasattr(self.actions, "set_ui_scale"):
             self.actions.set_ui_scale(self._ui_scale)
+
+    def _apply_column_widths(self) -> None:
+        self.table.setColumnWidth(1, int(round(TRACK_DURATION_COLUMN_WIDTH * self._ui_scale)))
+        self.table.setColumnWidth(2, int(round(TRACK_LYRICS_COLUMN_WIDTH * self._ui_scale)))
+        self.table.setColumnWidth(3, int(round(TRACK_ACTIONS_COLUMN_WIDTH * self._ui_scale)))
 
     # -------------------------
     # External API
