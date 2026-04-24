@@ -312,9 +312,6 @@ class PlayerBar(QWidget):
         right_layout = QVBoxLayout(self.right_panel)
         set_layout_spacing(right_layout, margins=0, spacing=SPACE_2)
 
-        self.lbl_speed = QLabel("Speed")
-        self.lbl_speed.setObjectName("MetaLabel")
-
         speed_row = QHBoxLayout()
         set_layout_spacing(speed_row, margins=0, spacing=SPACE_2)
 
@@ -330,17 +327,17 @@ class PlayerBar(QWidget):
         self.cmb_speed.setEditable(True)
         self.cmb_speed.setInsertPolicy(QComboBox.InsertPolicy.NoInsert)
         self._speed_items = [
-            ("1.0x", 1.0),
-            ("0.9x", 0.9),
-            ("0.8x", 0.8),
-            ("0.75x", 0.75),
-            ("0.5x", 0.5),
-            ("0.25x", 0.25),
+            ("Speed 1.0x", 1.0),
+            ("Speed 0.9x", 0.9),
+            ("Speed 0.8x", 0.8),
+            ("Speed 0.75x", 0.75),
+            ("Speed 0.5x", 0.5),
+            ("Speed 0.25x", 0.25),
         ]
         for label, speed in self._speed_items:
             self.cmb_speed.addItem(label, speed)
         self.cmb_speed.setCurrentIndex(0)
-        self.cmb_speed.lineEdit().setPlaceholderText("Custom")
+        self.cmb_speed.lineEdit().setPlaceholderText("Speed custom")
         self.cmb_speed.lineEdit().installEventFilter(self)
 
         self.btn_speed_up = QToolButton()
@@ -348,7 +345,6 @@ class PlayerBar(QWidget):
         self.btn_speed_up.setText("+")
         self.btn_speed_up.setToolTip("Increase playback speed by 0.05x")
 
-        speed_row.addWidget(self.lbl_speed)
         speed_row.addStretch(1)
         speed_row.addWidget(self.btn_speed_down)
         speed_row.addWidget(self.cmb_speed)
@@ -368,6 +364,7 @@ class PlayerBar(QWidget):
         self.slider_volume.setSingleStep(5)
         self.slider_volume.setPageStep(10)
         self.slider_volume.setMinimumHeight(16)
+        self.slider_volume.setMaximumWidth(150)
 
         self.lbl_volume_value = QLabel("70%")
         self.lbl_volume_value.setObjectName("TimeLabel")
@@ -476,7 +473,6 @@ class PlayerBar(QWidget):
         self.update()
 
         self.lbl_album.setVisible(not compact)
-        self.lbl_speed.setVisible(not compact)
         self.lbl_volume.setVisible(True)
         self.lbl_title.setMinimumWidth(0)
         left_width = PLAYER_META_COMPACT_MIN_WIDTH if compact else PLAYER_META_MIN_WIDTH
@@ -516,7 +512,7 @@ class PlayerBar(QWidget):
         rendered = f"{float(speed):.2f}".rstrip("0").rstrip(".")
         if "." not in rendered:
             rendered += ".0"
-        return f"{rendered}x"
+        return f"Speed {rendered}x"
 
     def _normalize_speed(self, speed: float) -> float:
         return max(0.25, min(2.0, round(float(speed), 2)))
@@ -560,7 +556,7 @@ class PlayerBar(QWidget):
         self._apply_speed(float(speed))
 
     def _on_custom_speed_committed(self):
-        raw = (self.cmb_speed.currentText() or "").strip().lower().replace("x", "")
+        raw = (self.cmb_speed.currentText() or "").strip().lower().replace("speed", "").replace("x", "").strip()
         if not raw:
             self._sync_speed_from_player()
             return
