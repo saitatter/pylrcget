@@ -26,6 +26,18 @@ from ui.theme_tokens import STYLE_TOKENS
 
 logger = logging.getLogger(__name__)
 
+PLAYER_META_MIN_WIDTH = 220
+PLAYER_META_COMPACT_MIN_WIDTH = 170
+PLAYER_META_ARTWORK_WIDTH = 34
+PLAYER_EXTRAS_MIN_WIDTH = 170
+PLAYER_EXTRAS_COMPACT_MIN_WIDTH = 135
+PLAYER_CENTER_MIN_WIDTH = 340
+PLAYER_CENTER_COMPACT_MIN_WIDTH = 260
+PLAYER_COVER_SIZE = 52
+PLAYER_COVER_COMPACT_SIZE = 44
+PLAYER_BAR_HEIGHT = 104
+PLAYER_BAR_COMPACT_HEIGHT = 92
+
 
 def _fmt(ms: int) -> str:
     ms = max(0, int(ms))
@@ -465,13 +477,13 @@ class PlayerBar(QWidget):
         self.lbl_speed.setVisible(not compact)
         self.lbl_volume.setVisible(True)
         self.lbl_title.setMinimumWidth(0)
-        left_width = 170 if compact else 220
+        left_width = PLAYER_META_COMPACT_MIN_WIDTH if compact else PLAYER_META_MIN_WIDTH
         if self._show_album_art:
-            left_width += 34
-        right_width = 135 if compact else 170
-        center_width = 260 if compact else 340
-        cover_size = 44 if compact else 52
-        bar_height = 92 if compact else 104
+            left_width += PLAYER_META_ARTWORK_WIDTH
+        right_width = PLAYER_EXTRAS_COMPACT_MIN_WIDTH if compact else PLAYER_EXTRAS_MIN_WIDTH
+        center_width = PLAYER_CENTER_COMPACT_MIN_WIDTH if compact else PLAYER_CENTER_MIN_WIDTH
+        cover_size = PLAYER_COVER_COMPACT_SIZE if compact else PLAYER_COVER_SIZE
+        bar_height = PLAYER_BAR_COMPACT_HEIGHT if compact else PLAYER_BAR_HEIGHT
 
         left_width = int(round(left_width * self._ui_scale))
         right_width = int(round(right_width * self._ui_scale))

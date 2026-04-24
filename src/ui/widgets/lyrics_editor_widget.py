@@ -23,6 +23,7 @@ from ui.widgets.empty_state_widget import EmptyStateWidget
 _TS_RE = re.compile(r"\[(\d+):(\d+)(?:\.(\d+))?\]")
 TIMESTAMP_MS_ROLE = Qt.ItemDataRole.UserRole
 TIMESTAMP_VALID_ROLE = Qt.ItemDataRole.UserRole + 1
+SHIFT_SPIN_MIN_WIDTH = 96
 logger = logging.getLogger(__name__)
 
 
@@ -287,7 +288,7 @@ class LyricsEditorWidget(QWidget):
         self.shift_spin.setToolTip("Custom shift amount in seconds")
         self.shift_spin.setObjectName("LyricsShiftSpin")
         self.shift_spin.setButtonSymbols(QDoubleSpinBox.ButtonSymbols.NoButtons)
-        self.shift_spin.setMinimumWidth(96)
+        self.shift_spin.setMinimumWidth(SHIFT_SPIN_MIN_WIDTH)
         self.btn_shift_selected = QPushButton("Shift Selected")
         self.btn_shift_selected.setToolTip("Shift selected lines by the custom amount")
         self.btn_shift_all_from_first = QPushButton("Shift All from First")

@@ -65,6 +65,9 @@ from ui.widgets.hotkey_hints import HotkeyHintManager
 
 logger = logging.getLogger(__name__)
 
+LIBRARY_PANE_MIN_WIDTH = 180
+LYRICS_PANE_MIN_WIDTH = 480
+
 
 class MainWindow(QMainWindow):
     @staticmethod
@@ -192,8 +195,8 @@ class MainWindow(QMainWindow):
         splitter.setStretchFactor(1, 2)
         splitter.setCollapsible(0, False)
         splitter.setCollapsible(1, False)
-        self.track_list.setMinimumWidth(180)
-        self.lyrics_view.setMinimumWidth(480)
+        self.track_list.setMinimumWidth(LIBRARY_PANE_MIN_WIDTH)
+        self.lyrics_view.setMinimumWidth(LYRICS_PANE_MIN_WIDTH)
 
         tracks_layout.addWidget(splitter)
 
@@ -215,8 +218,8 @@ class MainWindow(QMainWindow):
         self.albums_splitter.setStretchFactor(1, 2)
         self.albums_splitter.setCollapsible(0, False)
         self.albums_splitter.setCollapsible(1, False)
-        self.albums_tab.setMinimumWidth(180)
-        self.albums_lyrics_view.setMinimumWidth(480)
+        self.albums_tab.setMinimumWidth(LIBRARY_PANE_MIN_WIDTH)
+        self.albums_lyrics_view.setMinimumWidth(LYRICS_PANE_MIN_WIDTH)
         albums_layout.addWidget(self.albums_splitter)
 
         self.artists_tab = ArtistListWidget(self.app_state)
@@ -237,8 +240,8 @@ class MainWindow(QMainWindow):
         self.artists_splitter.setStretchFactor(1, 2)
         self.artists_splitter.setCollapsible(0, False)
         self.artists_splitter.setCollapsible(1, False)
-        self.artists_tab.setMinimumWidth(180)
-        self.artists_lyrics_view.setMinimumWidth(480)
+        self.artists_tab.setMinimumWidth(LIBRARY_PANE_MIN_WIDTH)
+        self.artists_lyrics_view.setMinimumWidth(LYRICS_PANE_MIN_WIDTH)
         artists_layout.addWidget(self.artists_splitter)
 
         self.mylrclib_tab = MyLrclibWidget(self.app_state)
