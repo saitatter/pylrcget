@@ -9,13 +9,13 @@ from typing import TypedDict
 from PySide6.QtCore import QObject, QThread, Signal
 from core.lrclib_client import LrcLibAPI
 
-from db.queries import get_config, get_track_by_id
+from db.queries import get_track_by_id
 from ui.services.download_modes import normalize_download_mode
 from ui.services.lyrics_download_service import (
     LyricsDownloadMatch,
-    apply_lyrics_match_to_track,
     find_best_lyrics_match,
 )
+from ui.services.lyrics_match_retry import LyricsMatchCandidate
 
 MAX_PARALLEL_DOWNLOAD_WORKERS = 4
 
@@ -74,11 +74,11 @@ class BulkLyricsDownloadWorker(QThread):
         cancelled = False
         completed = 0
         jobs: list[_DownloadJob] = []
+        candidates: list[LyricsMatchCandidate] = []
         db = None
         try:
             db = sqlite3.connect(self.db_path, timeout=15.0)
             db.row_factory = sqlite3.Row
-            config = get_config(db)
 
             for track_id in self.track_ids:
                 if self.isInterruptionRequested():
@@ -149,19 +149,15 @@ class BulkLyricsDownloadWorker(QThread):
                                 self.progress.emit(completed, total, job.label, msg, self._elapsed())
                                 continue
 
-                            ok, msg, _updated = apply_lyrics_match_to_track(
-                                db,
-                                track_id=job.track_id,
-                                match=result.match,
-                                download_mode=self.download_mode,
-                                notify=lambda _status: None,
-                                config=config,
-                            )
-                            if ok:
+                            candidate = self._candidate_from_match(job, result.match)
+                            if candidate is not None:
+                                candidates.append(candidate)
                                 ok_count += 1
+                                msg = f"Candidate found. Match: {candidate.score}%."
                             else:
                                 fail_count += 1
-                            self.itemFinished.emit(job.track_id, bool(ok), job.label, msg)
+                                msg = "No usable lyrics found on LRCLIB for this track."
+                            self.itemFinished.emit(job.track_id, candidate is not None, job.label, msg)
                             self.progress.emit(completed, total, job.label, msg, self._elapsed())
 
                     if self.isInterruptionRequested():
@@ -177,6 +173,8 @@ class BulkLyricsDownloadWorker(QThread):
             "ok": ok_count,
             "failed": fail_count,
             "cancelled": cancelled,
+            "candidates": candidates,
+            "requires_review": bool(candidates) and not cancelled,
         }
         if cancelled:
             self.finishedBatch.emit(False, "Lyrics download cancelled.", stats)
@@ -208,3 +206,23 @@ class BulkLyricsDownloadWorker(QThread):
         if not self._started_at:
             return 0.0
         return time.perf_counter() - self._started_at
+
+    def _candidate_from_match(self, job: _DownloadJob, match: LyricsDownloadMatch) -> LyricsMatchCandidate | None:
+        result = match.result
+        synced = str(getattr(result, "synced_lyrics", "") or "")
+        plain = str(getattr(result, "plain_lyrics", "") or "")
+        if not synced and not plain:
+            return None
+        return LyricsMatchCandidate(
+            track_id=job.track_id,
+            track_label=job.label,
+            query_label=match.query_label,
+            score=int(match.score),
+            artist_name=str(getattr(result, "artist_name", "") or job.artist),
+            track_name=str(getattr(result, "track_name", "") or job.title),
+            album_name=str(getattr(result, "album_name", "") or job.album),
+            duration=int(getattr(result, "duration", 0) or job.duration_s or 0),
+            kind="Synced" if synced else "Plain",
+            plain_lyrics=plain,
+            synced_lyrics=synced,
+        )

@@ -10,10 +10,11 @@ from unittest.mock import patch
 from PySide6.QtCore import QObject, Signal
 
 from tests import test_support as _test_support  # noqa: F401
-from db.queries import get_config, set_config
-from db.database import initialize_database
-from tests.test_support import qt_app
+from db.queries import get_config, get_track_by_id, set_config
+from db.database import add_tracks, initialize_database
+from tests.test_support import make_fs_track, qt_app, touch_text
 from ui.controllers.lyrics_download_controller import LyricsDownloadController
+from ui.services.lyrics_match_retry import LyricsMatchCandidate
 
 
 class _FakeOverlay:
@@ -70,6 +71,20 @@ class _FakeWorker(QObject):
     @classmethod
     def reset(cls) -> None:
         cls.instances = []
+
+
+class _FakeMatchDialog:
+    selected: list[LyricsMatchCandidate] = []
+
+    def __init__(self, candidates, parent=None):
+        del parent
+        self.candidates = list(candidates)
+
+    def exec(self):
+        return True
+
+    def selected_candidates(self):
+        return list(self.selected)
 
 
 class LyricsDownloadControllerTests(unittest.TestCase):
@@ -250,6 +265,61 @@ class LyricsDownloadControllerTests(unittest.TestCase):
                 self.assertEqual(overlay.retry_failed_counts[-1], 1)
                 self.assertEqual(download_states[41], "error")
                 self.assertIn(("Finished lyrics download. Success: 1, Failed: 1.", "warning"), notifications)
+            finally:
+                db.close()
+
+    def test_batch_candidates_require_review_before_apply(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db = initialize_database(tmp)
+            try:
+                audio = Path(tmp) / "candidate.mp3"
+                touch_text(audio, "a")
+                add_tracks(db, [make_fs_track(audio, artist="Air Supply", album="Greatest Hits", title="All Out Of Love")])
+                track_id = int(db.execute("SELECT id FROM tracks LIMIT 1").fetchone()["id"])
+                app_state = SimpleNamespace(db=db, db_path=str(Path(tmp) / "pylrcget.db.sqlite3"))
+                overlay = _FakeOverlay()
+                controller, _, notifications, download_states, refreshed = self._make_controller(app_state, overlay)
+                candidate = LyricsMatchCandidate(
+                    track_id=track_id,
+                    track_label="Air Supply - All Out Of Love",
+                    query_label="exact metadata",
+                    score=100,
+                    artist_name="Air Supply",
+                    track_name="All Out of Love",
+                    album_name="Lost in Love",
+                    duration=240,
+                    kind="Synced",
+                    plain_lyrics="plain text",
+                    synced_lyrics="[00:01.00]plain text",
+                )
+                _FakeMatchDialog.selected = [candidate]
+
+                with (
+                    patch("ui.controllers.lyrics_download_controller.BulkLyricsDownloadWorker", _FakeWorker),
+                    patch("ui.controllers.lyrics_download_controller.BatchLyricsMatchDialog", _FakeMatchDialog),
+                    patch("ui.controllers.lyrics_download_controller.QTimer.singleShot"),
+                ):
+                    controller.start_downloads([track_id], mode_override="prefer_synced")
+                    worker = _FakeWorker.instances[0]
+                    worker.itemFinished.emit(track_id, True, candidate.track_label, "Candidate found. Match: 100%.")
+
+                    before_apply = get_track_by_id(db, track_id)
+                    self.assertIsNone(before_apply.lrc_lyrics)
+                    self.assertIsNone(before_apply.txt_lyrics)
+
+                    worker.finishedBatch.emit(
+                        True,
+                        "Finished lyrics search. Candidates: 1, Failed: 0.",
+                        {"total": 1, "ok": 1, "failed": 0, "cancelled": False, "candidates": [candidate]},
+                    )
+
+                after_apply = get_track_by_id(db, track_id)
+                self.assertEqual(after_apply.lrc_lyrics, "[00:01.00]plain text")
+                self.assertEqual(after_apply.txt_lyrics, "plain text")
+                self.assertEqual(download_states[track_id], "success")
+                self.assertIn(("Applied lyrics to 1 downloaded track.", "success"), notifications)
+                self.assertIn("view", refreshed)
+                self.assertIn("history", refreshed)
             finally:
                 db.close()
 

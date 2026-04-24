@@ -166,37 +166,32 @@ class LyricsDownloadController(QObject):
         self._show_status(status, None)
 
     def _on_download_item_finished(self, track_id: int, ok: bool, track_label: str, msg: str) -> None:
-        try:
-            current_track_id = self._current_player_track_id()
-            if current_track_id is not None and current_track_id == int(track_id):
-                track = get_track_by_id(self._app_state.db, int(track_id))
-                self._set_track_lyrics_views(track)
-        except (sqlite3.Error, AttributeError, TypeError) as exc:
-            logger.warning("Failed to update track after lyrics download for %s: %s", track_id, exc)
-
         self._active_track_ids.discard(int(track_id))
-        state = DownloadState.SUCCESS if ok else DownloadState.ERROR
+        is_candidate = bool(ok) and "candidate found" in (msg or "").casefold()
+        state = DownloadState.LOADING if is_candidate else (DownloadState.SUCCESS if ok else DownloadState.ERROR)
         self._set_track_download_state(int(track_id), state)
         if not ok:
             failed_id = int(track_id)
             if failed_id not in self._failed_download_track_ids:
                 self._failed_download_track_ids.append(failed_id)
         self._overlay.append_result(track_label, msg, ok)
-        history_entry = self._build_download_history_entry(int(track_id), track_label, msg)
-        if history_entry is not None:
-            self._pending_history_entries.append(history_entry)
+        if not is_candidate:
+            history_entry = self._build_download_history_entry(int(track_id), track_label, msg)
+            if history_entry is not None:
+                self._pending_history_entries.append(history_entry)
 
         token = self._state_tokens.get(int(track_id), 0) + 1
         self._state_tokens[int(track_id)] = token
-        QTimer.singleShot(
-            1800,
-            self,
-            lambda tid=track_id, expected=token, expected_state=state: self._reset_track_download_state_if_unchanged(
-                tid,
-                expected,
-                expected_state,
-            ),
-        )
+        if not is_candidate:
+            QTimer.singleShot(
+                1800,
+                self,
+                lambda tid=track_id, expected=token, expected_state=state: self._reset_track_download_state_if_unchanged(
+                    tid,
+                    expected,
+                    expected_state,
+                ),
+            )
 
     def _on_download_batch_finished(self, ok: bool, msg: str, stats: dict) -> None:
         del ok
@@ -222,6 +217,11 @@ class LyricsDownloadController(QObject):
             "cancelled": bool(stats.get("cancelled")) if isinstance(stats, dict) else False,
         }
         self._overlay.finish_batch(msg, cancelled=bool(stats_dict.get("cancelled")))
+        candidates = [
+            candidate
+            for candidate in (stats.get("candidates", []) if isinstance(stats, dict) else [])
+            if isinstance(candidate, LyricsMatchCandidate)
+        ]
         show_retry_failed = getattr(self._overlay, "show_retry_failed", None)
         if callable(show_retry_failed):
             retry_count = 0 if stats_dict.get("cancelled") else len(self._failed_download_track_ids)
@@ -244,10 +244,24 @@ class LyricsDownloadController(QObject):
                 msg,
                 "error",
             )
-        else:
+        elif candidates:
             notify_user(
                 self._app_state,
-                "Lyrics downloaded successfully.",
+                f"Review {len(candidates)} lyrics match candidate(s) before applying.",
+                "info",
+                show_status=self._show_status,
+                status_timeout_ms=4000,
+            )
+            self._review_retry_candidates(candidates, context="download")
+        else:
+            success_msg = (
+                "Lyrics downloaded successfully."
+                if int(stats_dict.get("ok", 0)) > 0
+                else "Lyrics search completed. No matches need applying."
+            )
+            notify_user(
+                self._app_state,
+                success_msg,
                 "success",
             )
             queue_auto_close = getattr(self._overlay, "queue_auto_close", None)
@@ -298,15 +312,19 @@ class LyricsDownloadController(QObject):
         self._overlay.finish_batch(f"Relaxed lyrics search found {len(candidates)} candidate match(es).")
         self._review_retry_candidates([candidate for candidate in candidates if isinstance(candidate, LyricsMatchCandidate)])
 
-    def _review_retry_candidates(self, candidates: list[LyricsMatchCandidate]) -> None:
+    def _review_retry_candidates(self, candidates: list[LyricsMatchCandidate], *, context: str = "retry") -> None:
         dialog = BatchLyricsMatchDialog(candidates, parent=self.parent())
         if not dialog.exec():
+            for candidate in candidates:
+                self._set_track_download_state(int(candidate.track_id), DownloadState.IDLE)
             return
         selected = dialog.selected_candidates()
         if not selected:
+            for candidate in candidates:
+                self._set_track_download_state(int(candidate.track_id), DownloadState.IDLE)
             notify_user(
                 self._app_state,
-                "No retry matches were selected.",
+                "No lyrics matches were selected.",
                 "info",
                 show_status=self._show_status,
                 status_timeout_ms=3000,
@@ -323,9 +341,10 @@ class LyricsDownloadController(QObject):
         self._flush_pending_download_history()
         self._refresh_visible_library_view()
         self._refresh_history()
+        label = "downloaded" if context == "download" else "failed"
         notify_user(
             self._app_state,
-            f"Applied lyrics to {applied_count} failed track{'s' if applied_count != 1 else ''}.",
+            f"Applied lyrics to {applied_count} {label} track{'s' if applied_count != 1 else ''}.",
             "success",
             show_status=self._show_status,
             status_timeout_ms=3500,
@@ -342,7 +361,12 @@ class LyricsDownloadController(QObject):
         if updated is None:
             return False
 
-        message = "Downloaded synced lyrics via relaxed search." if updated.lrc_lyrics else "Downloaded plain lyrics via relaxed search."
+        score_note = f" Match: {int(candidate.score)}%."
+        message = (
+            f"Downloaded synced lyrics via reviewed match.{score_note}"
+            if updated.lrc_lyrics
+            else f"Downloaded plain lyrics via reviewed match.{score_note}"
+        )
         history_entry = self._build_download_history_entry(
             int(candidate.track_id),
             f"{track.artist_name or ''} - {track.title or ''}".strip(" -"),

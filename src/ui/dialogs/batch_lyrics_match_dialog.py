@@ -25,7 +25,9 @@ class BatchLyricsMatchDialog(QDialog):
         self._candidates = list(candidates)
 
         layout = QVBoxLayout(self)
-        self.summary_label = QLabel(f"Review {len(self._candidates)} best match(es) found for failed downloads.")
+        self.summary_label = QLabel(
+            f"Review {len(self._candidates)} LRCLIB match candidate(s). Checked rows will be written to your library."
+        )
         self.summary_label.setWordWrap(True)
         layout.addWidget(self.summary_label)
 
@@ -46,7 +48,7 @@ class BatchLyricsMatchDialog(QDialog):
         layout.addWidget(self.table, 1)
 
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
-        buttons.button(QDialogButtonBox.StandardButton.Ok).setText("Apply Checked")
+        buttons.button(QDialogButtonBox.StandardButton.Ok).setText("Commit Checked")
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)

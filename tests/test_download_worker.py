@@ -228,6 +228,10 @@ class LyricsDownloadWorkerTests(unittest.TestCase):
                 self.assertLessEqual(executor_cls.call_args.kwargs["max_workers"], MAX_PARALLEL_DOWNLOAD_WORKERS)
                 self.assertEqual(len(finished), 1)
                 self.assertEqual(finished[0][2]["ok"], len(track_ids))
+                for track_id in track_ids:
+                    refreshed = get_track_by_id(db, int(track_id))
+                    self.assertIsNone(refreshed.txt_lyrics)
+                    self.assertIsNone(refreshed.lrc_lyrics)
             finally:
                 db.close()
 
