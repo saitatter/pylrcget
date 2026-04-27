@@ -196,6 +196,9 @@ class AiSyncWorker(QThread):
 
             self.progress.emit("Separating vocals with Demucs...")
             vocals_path = self._separate_vocals(device)
+            if self.isInterruptionRequested():
+                self.finished.emit(False, "Cancelled.", "")
+                return
 
             audio_input = vocals_path or self.audio_path
 
@@ -204,6 +207,9 @@ class AiSyncWorker(QThread):
                 self.whisper_model,
                 device=device,
             )
+            if self.isInterruptionRequested():
+                self.finished.emit(False, "Cancelled.", "")
+                return
 
             self.progress.emit("Transcribing audio...")
             audio_np = self._load_audio_as_numpy(audio_input)

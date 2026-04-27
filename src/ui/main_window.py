@@ -27,6 +27,7 @@ from db.queries import (
     get_artist_by_id,
     get_config,
     get_directories,
+    get_existing_file_paths,
     refresh_track_from_file,
     get_track_by_id,
     mark_tracks_instrumental,
@@ -670,16 +671,7 @@ class MainWindow(QMainWindow):
         skipped = 0
 
         # Batch-check existing paths to avoid per-file SELECT
-        existing_paths: set[str] = set()
-        chunk_size = 500
-        for i in range(0, len(dropped_files), chunk_size):
-            chunk = dropped_files[i : i + chunk_size]
-            placeholders = ",".join("?" for _ in chunk)
-            rows = self.app_state.db.execute(
-                f"SELECT file_path FROM tracks WHERE file_path IN ({placeholders})",
-                chunk,
-            ).fetchall()
-            existing_paths.update(row[0] for row in rows)
+        existing_paths = get_existing_file_paths(self.app_state.db, dropped_files)
 
         fs_tracks: list = []
         for file_path in dropped_files:

@@ -435,6 +435,21 @@ def add_track(db: sqlite3.Connection, track: FsTrack, *, commit: bool = True) ->
         db.commit()
 
 
+def get_existing_file_paths(db: sqlite3.Connection, paths: list[str]) -> set[str]:
+    """Return the subset of *paths* that already exist in the tracks table."""
+    result: set[str] = set()
+    chunk_size = 500
+    for i in range(0, len(paths), chunk_size):
+        chunk = paths[i : i + chunk_size]
+        placeholders = ",".join("?" for _ in chunk)
+        rows = db.execute(
+            f"SELECT file_path FROM tracks WHERE file_path IN ({placeholders})",
+            chunk,
+        ).fetchall()
+        result.update(row["file_path"] for row in rows)
+    return result
+
+
 def add_tracks(db: sqlite3.Connection, tracks: list[FsTrack], *, commit: bool = True) -> None:
     if not tracks:
         return
