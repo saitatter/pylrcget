@@ -43,6 +43,26 @@ QPushButton#LyricsSwitchMode:hover {
     color: {{color-text}};
 }
 
+QPushButton#LyricsAutoSync {
+    background: transparent;
+    color: {{color-accent}};
+    border: 1px solid {{color-accent}};
+    border-radius: {{radius-pill}};
+    padding: 3px 8px;
+    font-size: {{font-size-xs}};
+    font-weight: 600;
+}
+
+QPushButton#LyricsAutoSync:hover {
+    background: {{color-accent}};
+    color: {{color-bg-app}};
+}
+
+QPushButton#LyricsAutoSync:disabled {
+    color: {{color-disabled-text}};
+    border-color: {{color-disabled-border}};
+}
+
 QDoubleSpinBox#LyricsShiftSpin {
     min-height: 38px;
     padding: {{space-2}} {{space-3}};

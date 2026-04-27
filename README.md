@@ -29,6 +29,7 @@ PyLrcGet goes beyond bulk lyric downloads and turns the app into a full desktop 
 
 - Synced lyrics (`.lrc`) and plain lyrics support
 - Toggle between synced and plain editing modes on any track
+- AI-powered auto-sync: generate synced lyrics from audio using Whisper + Demucs (see [AI Auto-Sync](#-ai-auto-sync))
 - Configurable download modes: `Prefer synced`, `Synced only`, `Plain only`
 - Bulk `Download missing lyrics` action based on the active download mode
 - Per-selection download overrides from the track context menu
@@ -133,6 +134,37 @@ The global `Download missing lyrics` action can also upgrade plain-only tracks t
 
 ---
 
+## 🤖 AI Auto-Sync
+
+PyLrcGet can generate synced lyrics locally using **OpenAI Whisper** for transcription and **Demucs** for vocal separation. Everything runs on your machine — no API keys or internet connection required (after initial model download).
+
+### How it works
+
+1. **Demucs** isolates the vocal track from the audio (optional — falls back to full mix if it fails)
+2. **Whisper** transcribes the vocals with word-level timestamps
+3. If plain lyrics are already present, they are aligned to the detected timestamps; otherwise Whisper's transcription is used directly
+4. The result is placed in the synced lyrics editor as an unsaved draft
+
+### Install AI dependencies
+
+AI sync dependencies are **not** included in the base install. Install them separately:
+
+```bash
+pip install torch torchaudio openai-whisper demucs soundfile
+```
+
+Or, if installing from `pyproject.toml`:
+
+```bash
+pip install pylrcget[ai]
+```
+
+> **Note:** AI dependencies add ~2 GB to the install (mostly PyTorch). The `base` Whisper model (~140 MB) is downloaded automatically on first use. GPU acceleration (CUDA) is used when available, otherwise CPU.
+
+> **Note:** AI dependencies are **not** bundled in binary releases. Users of standalone executables must install Python and the AI packages separately.
+
+---
+
 ## ⚡ Performance
 
 - Incremental library refreshes using stored file signatures
@@ -151,6 +183,12 @@ The global `Download missing lyrics` action can also upgrade plain-only tracks t
 ```bash
 python -m pip install -r requirements.txt
 python main.py
+```
+
+To enable AI auto-sync (optional):
+
+```bash
+python -m pip install torch torchaudio openai-whisper demucs soundfile
 ```
 
 ### Build standalone executable

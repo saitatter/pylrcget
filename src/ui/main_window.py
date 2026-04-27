@@ -123,6 +123,7 @@ class MainWindow(QMainWindow):
         self._refresh_default_label = "Global Actions"
         self._pending_playback_speed: float | None = None
         self._pending_playback_volume: float | None = None
+        self._ai_sync_worker = None
         self._recent_toast_messages: set[str] = set()
         self.hotkey_hints = HotkeyHintManager(self)
         self.scanner = None
@@ -221,6 +222,7 @@ class MainWindow(QMainWindow):
         self.lyrics_view.saveRequested.connect(self._on_lyrics_save_requested)
         self.lyrics_view.dirtyDraftChanged.connect(self._on_dirty_lyrics_changed)
         self.lyrics_view.discardDraftRequested.connect(self._on_discard_draft_requested)
+        self.lyrics_view.autoSyncRequested.connect(self._on_auto_sync_requested)
 
         splitter.addWidget(self.lyrics_view)
         self.lyrics_view.seekRequested.connect(self._seek_player)
@@ -246,6 +248,7 @@ class MainWindow(QMainWindow):
         self.albums_lyrics_view.saveRequested.connect(self._on_lyrics_save_requested)
         self.albums_lyrics_view.dirtyDraftChanged.connect(self._on_dirty_lyrics_changed)
         self.albums_lyrics_view.discardDraftRequested.connect(self._on_discard_draft_requested)
+        self.albums_lyrics_view.autoSyncRequested.connect(self._on_auto_sync_requested)
         self.albums_lyrics_view.seekRequested.connect(self._seek_player)
         self.albums_lyrics_view.downloadRequested.connect(self._download_current_track_lyrics)
         self.albums_lyrics_view.searchRequested.connect(self._search_current_track_lyrics)
@@ -270,6 +273,7 @@ class MainWindow(QMainWindow):
         self.artists_lyrics_view.saveRequested.connect(self._on_lyrics_save_requested)
         self.artists_lyrics_view.dirtyDraftChanged.connect(self._on_dirty_lyrics_changed)
         self.artists_lyrics_view.discardDraftRequested.connect(self._on_discard_draft_requested)
+        self.artists_lyrics_view.autoSyncRequested.connect(self._on_auto_sync_requested)
         self.artists_lyrics_view.seekRequested.connect(self._seek_player)
         self.artists_lyrics_view.downloadRequested.connect(self._download_current_track_lyrics)
         self.artists_lyrics_view.searchRequested.connect(self._search_current_track_lyrics)
@@ -1321,6 +1325,118 @@ class MainWindow(QMainWindow):
             self._show_status_message("Draft discarded.", 2500)
         except sqlite3.Error as exc:
             logger.warning("Failed to discard dirty lyrics draft for track %s: %s", track_id, exc)
+
+    def _on_auto_sync_requested(self) -> None:
+        from ui.workers.ai_sync_worker import _check_ai_sync_available, AiSyncWorker
+
+        track_id = self._editing_track_id
+        if track_id is None:
+            notify_user(
+                self.app_state,
+                "Select a track before auto-syncing.",
+                "warning",
+                show_status=self._show_status_message,
+                status_timeout_ms=3000,
+            )
+            return
+
+        if self._ai_sync_worker is not None and self._ai_sync_worker.isRunning():
+            notify_user(
+                self.app_state,
+                "AI sync is already running. Please wait.",
+                "warning",
+                show_status=self._show_status_message,
+                status_timeout_ms=3000,
+            )
+            return
+
+        ok, msg = _check_ai_sync_available()
+        if not ok:
+            notify_user(
+                self.app_state,
+                msg,
+                "error",
+                show_status=self._show_status_message,
+                status_timeout_ms=6000,
+            )
+            return
+
+        track = get_track_by_id(self.app_state.db, int(track_id))
+        audio_path = self._track_playback_path(track)
+        if not os.path.isfile(audio_path):
+            notify_user(
+                self.app_state,
+                "Audio file not found on disk.",
+                "error",
+                show_status=self._show_status_message,
+                status_timeout_ms=3000,
+            )
+            return
+
+        # Get plain lyrics if available (for alignment)
+        plain_lyrics = ""
+        if track.txt_lyrics:
+            plain_lyrics = track.txt_lyrics
+        elif track.dirty_txt_lyrics:
+            plain_lyrics = track.dirty_txt_lyrics
+
+        for view in self._all_lyrics_views():
+            view.btn_auto_sync.setEnabled(False)
+            view.btn_auto_sync.setText("Syncing...")
+
+        self._show_status_message("AI sync starting...")
+        sync_track_id = int(track_id)
+
+        worker = AiSyncWorker(audio_path, plain_lyrics)
+        worker.progress.connect(lambda msg: self._show_status_message(msg))
+        worker.finished.connect(lambda ok, msg, lrc: self._on_auto_sync_finished(ok, msg, lrc, sync_track_id))
+        self._ai_sync_worker = worker
+        worker.start()
+
+    def _on_auto_sync_finished(self, ok: bool, msg: str, lrc: str, track_id: int) -> None:
+        for view in self._all_lyrics_views():
+            view.btn_auto_sync.setEnabled(True)
+            view.btn_auto_sync.setText("Auto Sync")
+
+        if not ok:
+            notify_user(
+                self.app_state,
+                msg,
+                "error",
+                show_status=self._show_status_message,
+                status_timeout_ms=5000,
+            )
+            return
+
+        try:
+            from core.utils import plain_text_from_lrc
+            plain = plain_text_from_lrc(lrc)
+            update_track_synced_lyrics(self.app_state.db, track_id, lrc.strip(), plain.strip())
+            track = get_track_by_id(self.app_state.db, int(track_id))
+            self._sync_track_lyrics_outputs(track)
+            if self._editing_track_id == track_id:
+                self._set_track_lyrics_views(track)
+            self.track_list.set_dirty_lyrics_state(int(track_id), False)
+            self.albums_tab.set_dirty_lyrics_state(int(track_id), False)
+            self.artists_tab.set_dirty_lyrics_state(int(track_id), False)
+            self._refresh_visible_library_view_after_downloads()
+            notify_user(
+                self.app_state,
+                msg,
+                "success",
+                show_status=self._show_status_message,
+                status_timeout_ms=4000,
+            )
+        except (sqlite3.Error, OSError, ValueError) as exc:
+            log_and_notify(
+                self.app_state,
+                logger,
+                logging.ERROR,
+                exception_message("Failed to save AI-synced lyrics", exc),
+                "error",
+                show_status=self._show_status_message,
+                status_timeout_ms=4000,
+            )
 
     # ------------------ helpers ------------------
     def _normalize_lrclib_base(self, url: str) -> str:

@@ -237,6 +237,7 @@ class LyricsEditorWidget(QWidget):
     saveRequested = Signal(str, str)     # lrc_text, plain_text
     dirtyDraftChanged = Signal(str, str)  # lrc_text, plain_text
     discardDraftRequested = Signal()
+    autoSyncRequested = Signal()
     downloadRequested = Signal()
     searchRequested = Signal()
     exportFilesRequested = Signal()
@@ -292,6 +293,13 @@ class LyricsEditorWidget(QWidget):
         self.btn_switch_mode.hide()
         self.btn_switch_mode.clicked.connect(self._toggle_editor_mode)
         title_row.addWidget(self.btn_switch_mode)
+
+        self.btn_auto_sync = QPushButton("Auto Sync")
+        self.btn_auto_sync.setObjectName("LyricsAutoSync")
+        self.btn_auto_sync.setToolTip("Automatically synchronize lyrics using AI (requires torch, demucs, whisperx)")
+        self.btn_auto_sync.hide()
+        self.btn_auto_sync.clicked.connect(self.autoSyncRequested.emit)
+        title_row.addWidget(self.btn_auto_sync)
 
         header.addLayout(title_row)
 
@@ -587,6 +595,7 @@ class LyricsEditorWidget(QWidget):
         self.btn_save.setEnabled(False)
         self.btn_export_files.setEnabled(False)
         self.btn_switch_mode.hide()
+        self.btn_auto_sync.hide()
 
     def _set_dirty_badge(self, visible: bool) -> None:
         self._has_dirty_draft = bool(visible)
@@ -614,6 +623,7 @@ class LyricsEditorWidget(QWidget):
         self.btn_export_files.setEnabled(True)
         self.btn_switch_mode.setText("Switch to Synced")
         self.btn_switch_mode.setVisible(True)
+        self.btn_auto_sync.setVisible(True)
 
     def _start_writing_lyrics(self):
         """Switch to an empty plain editor so the user can write lyrics from scratch."""
@@ -751,6 +761,7 @@ class LyricsEditorWidget(QWidget):
         self.btn_export_files.setEnabled(True)
         self.btn_switch_mode.setText("Switch to Plain")
         self.btn_switch_mode.setVisible(True)
+        self.btn_auto_sync.setVisible(True)
 
     def _rebuild_times_cache(self):
         times: List[int] = []
