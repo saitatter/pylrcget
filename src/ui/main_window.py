@@ -1088,7 +1088,7 @@ class MainWindow(QMainWindow):
                     show_status=self._show_status_message,
                     status_timeout_ms=4000,
                 )
-                return
+                continue
 
             if refreshed is None:
                 removed_ids.add(int(track_id))
