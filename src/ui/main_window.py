@@ -126,6 +126,7 @@ class MainWindow(QMainWindow):
         self._queue_ids: list[int] = []
         self._queue_index: int = -1
         self._editing_track_id: int | None = None
+        self._editing_saved_lyrics: tuple[str, str] = ("", "")
         self._loading_lyrics_views = False
         self._refresh_default_label = "Global Actions"
         self._pending_playback_speed: float | None = None
@@ -1037,6 +1038,7 @@ class MainWindow(QMainWindow):
         except (sqlite3.Error, KeyError):
             return
         self._editing_track_id = int(track_id)
+        self._editing_saved_lyrics = _canonical_lyrics_pair(track.lrc_lyrics, track.txt_lyrics)
         self._set_track_lyrics_views(track)
 
     def _normalize_dirty_lyrics_state(self, track):
@@ -1315,6 +1317,7 @@ class MainWindow(QMainWindow):
                 update_track_null_lyrics(self.app_state.db, track_id)
 
             track = get_track_by_id(self.app_state.db, track_id)
+            self._editing_saved_lyrics = _canonical_lyrics_pair(track.lrc_lyrics, track.txt_lyrics)
             self._sync_track_lyrics_outputs(track)
             self._set_track_lyrics_views(track)
             self.track_list.set_dirty_lyrics_state(int(track_id), False)
@@ -1354,9 +1357,8 @@ class MainWindow(QMainWindow):
         lrc = self._pending_dirty_lrc
         txt = self._pending_dirty_txt
         try:
-            track = get_track_by_id(self.app_state.db, int(track_id))
             draft_lrc, draft_txt = _canonical_lyrics_pair(lrc, txt)
-            saved_lrc, saved_txt = _canonical_lyrics_pair(track.lrc_lyrics, track.txt_lyrics)
+            saved_lrc, saved_txt = self._editing_saved_lyrics
             has_dirty = (draft_lrc, draft_txt) != (saved_lrc, saved_txt)
             if has_dirty:
                 update_track_dirty_lyrics(self.app_state.db, int(track_id), draft_lrc, draft_txt)
