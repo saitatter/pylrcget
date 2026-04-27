@@ -156,13 +156,15 @@ def _find_nonce(
     prefix: str,
     target: bytes,
     result: list[int | None],
+    found: threading.Event,
     start: int,
     step: int,
 ) -> None:
     nonce = start
-    while result[0] is None:
+    while not found.is_set():
         if _is_nonce_valid(prefix, nonce, target):
             result[0] = nonce
+            found.set()
             return
         nonce += step
 
@@ -171,14 +173,14 @@ def solve_challenge(prefix: str, target_hex: str) -> str:
     target = bytes.fromhex(target_hex)
     num_threads = os.cpu_count() or 1
     result: list[int | None] = [None]
+    found = threading.Event()
     threads = [
-        threading.Thread(target=_find_nonce, args=(prefix, target, result, i, num_threads), daemon=True)
+        threading.Thread(target=_find_nonce, args=(prefix, target, result, found, i, num_threads), daemon=True)
         for i in range(num_threads)
     ]
     for t in threads:
         t.start()
-    for t in threads:
-        t.join()
+    found.wait()
     return str(result[0])
 
 
