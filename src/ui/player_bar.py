@@ -278,8 +278,6 @@ class PlayerBar(QWidget):
         self.btn_prev.setIcon(self._icons["prev"])
         self.btn_next.setIcon(self._icons["next"])
         self.btn_play.setIcon(self._icons["play"])
-        self.lbl_volume.setIcon(self._icons["volume"])
-        self.lbl_volume.setIconSize(QSize(16, 16))
         self.btn_prev.setIconSize(QSize(12, 12))
         self.btn_next.setIconSize(QSize(12, 12))
         self.btn_play.setIconSize(QSize(18, 18))
@@ -372,6 +370,8 @@ class PlayerBar(QWidget):
         self.lbl_volume.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
         self.lbl_volume.setAutoRaise(True)
         self.lbl_volume.setFixedSize(22, 22)
+        self.lbl_volume.setIcon(self._icons["volume"])
+        self.lbl_volume.setIconSize(QSize(16, 16))
         self._muted = False
         self._pre_mute_volume = 70
 
