@@ -68,11 +68,17 @@ from ui.widgets.my_lrclib_widget import MyLrclibWidget
 from ui.widgets.lrclib_browser_widget import LrclibBrowserWidget
 from ui.widgets.download_progress_overlay import DownloadProgressOverlay
 from ui.widgets.hotkey_hints import HotkeyHintManager
+from ui.constants import (
+    DIRTY_LYRICS_FLUSH_MS,
+    FEEDBACK_RESET_MS,
+    LIBRARY_PANE_MIN_WIDTH,
+    LYRICS_PANE_MIN_WIDTH,
+    PLAYBACK_SPEED_SAVE_MS,
+    PLAYBACK_VOLUME_SAVE_MS,
+    SEARCH_DEBOUNCE_MS,
+)
 
 logger = logging.getLogger(__name__)
-
-LIBRARY_PANE_MIN_WIDTH = 180
-LYRICS_PANE_MIN_WIDTH = 480
 
 
 def _canonical_lyrics_pair(lrc: str | None, txt: str | None) -> tuple[str, str]:
@@ -127,7 +133,7 @@ class MainWindow(QMainWindow):
         self._ai_sync_worker = None
         self._dirty_lyrics_timer = QTimer(self)
         self._dirty_lyrics_timer.setSingleShot(True)
-        self._dirty_lyrics_timer.setInterval(500)
+        self._dirty_lyrics_timer.setInterval(DIRTY_LYRICS_FLUSH_MS)
         self._dirty_lyrics_timer.timeout.connect(self._flush_dirty_lyrics)
         self._pending_dirty_lrc: str = ""
         self._pending_dirty_txt: str = ""
@@ -136,15 +142,15 @@ class MainWindow(QMainWindow):
         self.scanner = None
         self._playback_speed_save_timer = QTimer(self)
         self._playback_speed_save_timer.setSingleShot(True)
-        self._playback_speed_save_timer.setInterval(350)
+        self._playback_speed_save_timer.setInterval(PLAYBACK_SPEED_SAVE_MS)
         self._playback_speed_save_timer.timeout.connect(self._flush_playback_speed)
         self._playback_volume_save_timer = QTimer(self)
         self._playback_volume_save_timer.setSingleShot(True)
-        self._playback_volume_save_timer.setInterval(250)
+        self._playback_volume_save_timer.setInterval(PLAYBACK_VOLUME_SAVE_MS)
         self._playback_volume_save_timer.timeout.connect(self._flush_playback_volume)
         self._search_apply_timer = QTimer(self)
         self._search_apply_timer.setSingleShot(True)
-        self._search_apply_timer.setInterval(180)
+        self._search_apply_timer.setInterval(SEARCH_DEBOUNCE_MS)
         self._search_apply_timer.timeout.connect(self._apply_library_search)
         # --- Player signals ---
         if self.app_state.player:
@@ -851,7 +857,7 @@ class MainWindow(QMainWindow):
                 status_timeout_ms=3000,
             )
             self.top_bar.set_button_feedback(self.top_bar.btn_refresh, "error")
-            QTimer.singleShot(1800, self._reset_refresh_feedback)
+            QTimer.singleShot(FEEDBACK_RESET_MS, self._reset_refresh_feedback)
             return
 
         logger.info("Starting library scan across %d folder(s).", len(directories))
@@ -976,7 +982,7 @@ class MainWindow(QMainWindow):
                 self.top_bar.set_button_feedback(self.top_bar.btn_refresh, "error")
 
         self.top_bar.btn_refresh.setEnabled(True)
-        QTimer.singleShot(1800, self._reset_refresh_feedback)
+        QTimer.singleShot(FEEDBACK_RESET_MS, self._reset_refresh_feedback)
         self.scanner = None
 
     def _cancel_scan(self):
@@ -1753,7 +1759,7 @@ class MainWindow(QMainWindow):
             self.top_bar.btn_hotkeys.setChecked(visible)
         self._show_status_message(
             "Keyboard shortcut hints shown." if visible else "Keyboard shortcut hints hidden.",
-            1800,
+            FEEDBACK_RESET_MS,
         )
 
     def _register_hotkey_hints(self) -> None:
