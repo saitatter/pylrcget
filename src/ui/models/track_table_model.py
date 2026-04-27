@@ -73,7 +73,8 @@ class TrackTableModel(QAbstractTableModel):
 
         if role == Qt.DisplayRole:
             if col == 0:
-                return f"{row.artist} — {row.title}" if row.artist else row.title
+                text = f"{row.artist} — {row.title}" if row.artist else row.title
+                return f"⊜ {text}" if row.is_duplicate else text
             if col == 1:
                 return fmt_duration(row.duration_s)
             if col == 2:
@@ -103,6 +104,8 @@ class TrackTableModel(QAbstractTableModel):
             return font
         if role == Qt.TextAlignmentRole and col in {1, 2, 3}:
             return int(Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignVCenter)
+        if role == Qt.ToolTipRole and col == 0 and row.is_duplicate:
+            return "Possible duplicate: another track shares the same title, artist, and duration."
         if role == Qt.UserRole:
             return row
         return None

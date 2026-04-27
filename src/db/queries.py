@@ -955,6 +955,25 @@ def prune_library(db: sqlite3.Connection) -> None:
     db.commit()
 
 
+def get_duplicate_track_ids(db: sqlite3.Connection) -> set[int]:
+    """Return track IDs that share the same title + artist + rounded duration."""
+    rows = db.execute("""
+        SELECT t.id
+        FROM tracks t
+        JOIN artists a ON t.artist_id = a.id
+        WHERE EXISTS (
+            SELECT 1
+            FROM tracks t2
+            JOIN artists a2 ON t2.artist_id = a2.id
+            WHERE t2.title_lower = t.title_lower
+              AND a2.name_lower = a.name_lower
+              AND ROUND(t2.duration) = ROUND(t.duration)
+              AND t2.id != t.id
+        )
+    """).fetchall()
+    return {int(r["id"]) for r in rows}
+
+
 # -------------------------------
 # GET TRACKS BY ALBUM / ARTIST
 # -------------------------------

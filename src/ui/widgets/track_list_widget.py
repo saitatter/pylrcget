@@ -21,7 +21,7 @@ from PySide6.QtWidgets import (
     QWidgetAction,
 )
 
-from db.database import get_directories, get_track_by_id, get_track_rows
+from db.database import get_directories, get_duplicate_track_ids, get_track_by_id, get_track_rows
 from ui.library_routes import LibraryRoute, tracks_album, tracks_artist
 from ui.widgets.empty_state_widget import EmptyStateWidget
 from ui.models.track_table_model import TrackTableModel
@@ -82,6 +82,7 @@ class TrackListWidget(QWidget):
         self._sort_order = Qt.SortOrder.AscendingOrder
         self._has_more_rows = False
         self._loading_more = False
+        self._duplicate_ids: set[int] = set()
         self._ui_scale = 1.0
 
         self.scope_bar = QWidget()
@@ -287,7 +288,10 @@ class TrackListWidget(QWidget):
         self._has_more_rows = len(rows) > self._page_size
         visible_rows = rows[: self._page_size]
 
-        ui_rows = build_track_list_rows(visible_rows, self._download_states)
+        if reset:
+            self._duplicate_ids = get_duplicate_track_ids(db)
+
+        ui_rows = build_track_list_rows(visible_rows, self._download_states, self._duplicate_ids)
 
         if reset:
             self.model.set_rows(ui_rows)

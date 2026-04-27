@@ -3,7 +3,11 @@ from __future__ import annotations
 from core.tracklist_models import DownloadState, LyricsState, TrackListRow
 
 
-def build_track_list_rows(rows, download_states: dict[int, DownloadState]) -> list[TrackListRow]:
+def build_track_list_rows(
+    rows,
+    download_states: dict[int, DownloadState],
+    duplicate_ids: set[int] | None = None,
+) -> list[TrackListRow]:
     ui_rows: list[TrackListRow] = []
     for row in rows:
         instrumental = bool(row["instrumental"])
@@ -36,6 +40,7 @@ def build_track_list_rows(rows, download_states: dict[int, DownloadState]) -> li
                 lyrics_state=state,
                 has_dirty_lyrics=has_dirty_lyrics,
                 download_state=download_states.get(track_id, DownloadState.IDLE),
+                is_duplicate=bool(duplicate_ids and track_id in duplicate_ids),
             )
         )
 

@@ -29,3 +29,4 @@ class TrackListRow:
     lyrics_state: LyricsState
     has_dirty_lyrics: bool = False
     download_state: DownloadState = DownloadState.IDLE
+    is_duplicate: bool = False
