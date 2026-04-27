@@ -166,6 +166,8 @@ class LyricsEditorWidget(QWidget):
         self._has_dirty_draft = False
         self._reaction_delay_ms: int = 0
         self._current_position_provider = None
+        self._saved_lrc: str = ""
+        self._saved_txt: str = ""
 
         # Snapshot-based undo/redo for the synced table editor
         self._undo_stack: list[list[tuple[int, str]]] = []
@@ -196,6 +198,13 @@ class LyricsEditorWidget(QWidget):
         self.btn_discard_draft.hide()
         self.btn_discard_draft.clicked.connect(self.discardDraftRequested.emit)
         title_row.addWidget(self.btn_discard_draft)
+
+        self.btn_show_diff = QPushButton("Diff")
+        self.btn_show_diff.setObjectName("LyricsShowDiff")
+        self.btn_show_diff.setToolTip("Show differences between saved and draft lyrics")
+        self.btn_show_diff.hide()
+        self.btn_show_diff.clicked.connect(self._show_diff)
+        title_row.addWidget(self.btn_show_diff)
 
         self.btn_switch_mode = QPushButton("Switch to Synced")
         self.btn_switch_mode.setObjectName("LyricsSwitchMode")
@@ -417,6 +426,8 @@ class LyricsEditorWidget(QWidget):
         dirty_lyrics_present: bool = False,
     ):
         self._loading_track = True
+        self._saved_lrc = (lrc_lyrics or "").strip()
+        self._saved_txt = (txt_lyrics or "").strip()
         self.title.setText(title or "Lyrics")
         has_dirty_draft = bool(
             dirty_lyrics_present
@@ -512,6 +523,17 @@ class LyricsEditorWidget(QWidget):
         self.dirty_badge.setText("Unsaved draft" if visible else "")
         self.dirty_badge.setVisible(bool(visible))
         self.btn_discard_draft.setVisible(bool(visible))
+        self.btn_show_diff.setVisible(bool(visible))
+
+    def _show_diff(self) -> None:
+        from ui.dialogs.lyrics_diff_dialog import LyricsDiffDialog
+
+        saved = self._saved_lrc or self._saved_txt or ""
+        _draft_lrc, draft_txt = self._current_lyrics_text()
+        draft = _draft_lrc or draft_txt or ""
+
+        dlg = LyricsDiffDialog(saved, draft, title="Lyrics Diff — Saved vs Draft", parent=self.window())
+        dlg.exec()
 
     def _set_plain(self, txt: str):
         self._reset_state()
