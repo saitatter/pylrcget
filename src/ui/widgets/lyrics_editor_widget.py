@@ -236,6 +236,7 @@ class LyricsEditorWidget(QWidget):
     publishPlainRequested = Signal()
     saveRequested = Signal(str, str)     # lrc_text, plain_text
     dirtyDraftChanged = Signal(str, str)  # lrc_text, plain_text
+    discardDraftRequested = Signal()
     downloadRequested = Signal()
     searchRequested = Signal()
     exportFilesRequested = Signal()
@@ -277,6 +278,14 @@ class LyricsEditorWidget(QWidget):
         self.dirty_badge.setObjectName("LyricsDirtyBadge")
         self.dirty_badge.hide()
         title_row.addWidget(self.dirty_badge)
+
+        self.btn_discard_draft = QPushButton("Discard")
+        self.btn_discard_draft.setObjectName("LyricsDiscardDraft")
+        self.btn_discard_draft.setToolTip("Discard draft and revert to saved lyrics")
+        self.btn_discard_draft.hide()
+        self.btn_discard_draft.clicked.connect(self.discardDraftRequested.emit)
+        title_row.addWidget(self.btn_discard_draft)
+
         header.addLayout(title_row)
 
         toolbar = FlowLayout(spacing=SPACE_2)
@@ -575,6 +584,7 @@ class LyricsEditorWidget(QWidget):
         self._has_dirty_draft = bool(visible)
         self.dirty_badge.setText("Unsaved draft" if visible else "")
         self.dirty_badge.setVisible(bool(visible))
+        self.btn_discard_draft.setVisible(bool(visible))
 
     def _set_plain(self, txt: str):
         self._reset_state()
@@ -719,6 +729,7 @@ class LyricsEditorWidget(QWidget):
         current_row = self._current_index if self.stack.currentWidget() is self.table else -1
         selected_row = self.table.currentRow()
 
+        self.table.blockSignals(True)
         for row in range(self.table.rowCount()):
             is_current = row == current_row
             is_selected = row == selected_row
@@ -748,6 +759,7 @@ class LyricsEditorWidget(QWidget):
                 else:
                     item.setBackground(bg)
                 item.setForeground(fg)
+        self.table.blockSignals(False)
 
     def _update_save_enabled(self):
         if self.stack.currentWidget() is self.table:

@@ -108,6 +108,16 @@ class TopBarController(QWidget):
         self.chk_none.setMinimumHeight(36)
         self.chk_none.toggled.connect(on_filter_changed)
         filters_row.addWidget(self.chk_none)
+
+        self.chk_unsaved = QCheckBox("Unsaved")
+        self.chk_unsaved.setObjectName("TopBarFilterCheck")
+        self.chk_unsaved.setChecked(False)
+        self.chk_unsaved.setAccessibleName("Filter tracks with unsaved draft")
+        self.chk_unsaved.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.chk_unsaved.setMinimumHeight(36)
+        self.chk_unsaved.toggled.connect(on_filter_changed)
+        filters_row.addWidget(self.chk_unsaved)
+
         filters_row.addStretch(1)
         filters_layout.addLayout(filters_row)
         root.addWidget(self.filters_group, stretch=2)
@@ -204,6 +214,7 @@ class TopBarController(QWidget):
             "plain": self.chk_plain.isChecked(),
             "instrumental": self.chk_instr.isChecked(),
             "none": self.chk_none.isChecked(),
+            "unsaved": self.chk_unsaved.isChecked(),
         }
 
     def reset_track_filters(self) -> None:
@@ -215,6 +226,7 @@ class TopBarController(QWidget):
             (self.chk_plain, True),
             (self.chk_instr, False),
             (self.chk_none, True),
+            (self.chk_unsaved, False),
         ):
             checkbox.blockSignals(True)
             checkbox.setChecked(checked)

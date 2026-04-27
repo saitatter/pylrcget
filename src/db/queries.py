@@ -475,6 +475,7 @@ def get_track_rows(
     plain_lyrics_tracks: bool,
     instrumental_tracks: bool,
     no_lyrics_tracks: bool,
+    unsaved_draft_only: bool = False,
     limit: int | None = None,
     offset: int = 0,
     artist_id: int | None = None,
@@ -495,14 +496,17 @@ def get_track_rows(
         like = f"%{q}%"
         params.extend([like, like, like, like])
 
-    if not synced_lyrics_tracks:
-        conditions.append("(tracks.lrc_lyrics IS NULL OR tracks.lrc_lyrics = '[au: instrumental]')")
-    if not plain_lyrics_tracks:
-        conditions.append("(tracks.txt_lyrics IS NULL OR tracks.lrc_lyrics IS NOT NULL)")
-    if not instrumental_tracks:
-        conditions.append("tracks.instrumental = 0")
-    if not no_lyrics_tracks:
-        conditions.append("(tracks.txt_lyrics IS NOT NULL OR tracks.lrc_lyrics IS NOT NULL OR tracks.instrumental = 1)")
+    if unsaved_draft_only:
+        conditions.append("tracks.dirty_lyrics_present = 1")
+    else:
+        if not synced_lyrics_tracks:
+            conditions.append("(tracks.lrc_lyrics IS NULL OR tracks.lrc_lyrics = '[au: instrumental]')")
+        if not plain_lyrics_tracks:
+            conditions.append("(tracks.txt_lyrics IS NULL OR tracks.lrc_lyrics IS NOT NULL)")
+        if not instrumental_tracks:
+            conditions.append("tracks.instrumental = 0")
+        if not no_lyrics_tracks:
+            conditions.append("(tracks.txt_lyrics IS NOT NULL OR tracks.lrc_lyrics IS NOT NULL OR tracks.instrumental = 1)")
 
     if artist_ids:
         placeholders = ", ".join("?" for _ in artist_ids)

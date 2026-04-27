@@ -13,6 +13,20 @@ QLabel#LyricsDirtyBadge {
     font-weight: 800;
 }
 
+QPushButton#LyricsDiscardDraft {
+    background: transparent;
+    color: {{color-warning-text}};
+    border: 1px solid {{color-warning-border}};
+    border-radius: {{radius-pill}};
+    padding: 3px 8px;
+    font-size: {{font-size-xs}};
+    font-weight: 600;
+}
+
+QPushButton#LyricsDiscardDraft:hover {
+    background: {{color-warning-bg}};
+}
+
 QDoubleSpinBox#LyricsShiftSpin {
     min-height: 38px;
     padding: {{space-2}} {{space-3}};

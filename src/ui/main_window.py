@@ -218,6 +218,7 @@ class MainWindow(QMainWindow):
         self.lyrics_view.show_none("Select a track to see lyrics")
         self.lyrics_view.saveRequested.connect(self._on_lyrics_save_requested)
         self.lyrics_view.dirtyDraftChanged.connect(self._on_dirty_lyrics_changed)
+        self.lyrics_view.discardDraftRequested.connect(self._on_discard_draft_requested)
 
         splitter.addWidget(self.lyrics_view)
         self.lyrics_view.seekRequested.connect(self._seek_player)
@@ -242,6 +243,7 @@ class MainWindow(QMainWindow):
         self.albums_lyrics_view.show_none("Select a track to see lyrics")
         self.albums_lyrics_view.saveRequested.connect(self._on_lyrics_save_requested)
         self.albums_lyrics_view.dirtyDraftChanged.connect(self._on_dirty_lyrics_changed)
+        self.albums_lyrics_view.discardDraftRequested.connect(self._on_discard_draft_requested)
         self.albums_lyrics_view.seekRequested.connect(self._seek_player)
         self.albums_lyrics_view.downloadRequested.connect(self._download_current_track_lyrics)
         self.albums_lyrics_view.searchRequested.connect(self._search_current_track_lyrics)
@@ -265,6 +267,7 @@ class MainWindow(QMainWindow):
         self.artists_lyrics_view.show_none("Select a track to see lyrics")
         self.artists_lyrics_view.saveRequested.connect(self._on_lyrics_save_requested)
         self.artists_lyrics_view.dirtyDraftChanged.connect(self._on_dirty_lyrics_changed)
+        self.artists_lyrics_view.discardDraftRequested.connect(self._on_discard_draft_requested)
         self.artists_lyrics_view.seekRequested.connect(self._seek_player)
         self.artists_lyrics_view.downloadRequested.connect(self._download_current_track_lyrics)
         self.artists_lyrics_view.searchRequested.connect(self._search_current_track_lyrics)
@@ -685,6 +688,7 @@ class MainWindow(QMainWindow):
             plain=filters["plain"],
             instrumental=filters["instrumental"],
             none_=filters["none"],
+            unsaved=filters.get("unsaved", False),
         )
         if self.app_state.player and self.app_state.player.track:
             self.track_list.set_now_playing(self.app_state.player.track.track_id)
@@ -1227,8 +1231,25 @@ class MainWindow(QMainWindow):
             self.track_list.set_dirty_lyrics_state(int(track_id), has_dirty)
             self.albums_tab.set_dirty_lyrics_state(int(track_id), has_dirty)
             self.artists_tab.set_dirty_lyrics_state(int(track_id), has_dirty)
+            for view in self._all_lyrics_views():
+                view._set_dirty_badge(has_dirty)
         except sqlite3.Error as exc:
             logger.warning("Failed to save dirty lyrics draft for track %s: %s", track_id, exc)
+
+    def _on_discard_draft_requested(self) -> None:
+        track_id = self._editing_track_id
+        if track_id is None:
+            return
+        try:
+            clear_track_dirty_lyrics(self.app_state.db, int(track_id))
+            track = get_track_by_id(self.app_state.db, int(track_id))
+            self._set_track_lyrics_views(track)
+            self.track_list.set_dirty_lyrics_state(int(track_id), False)
+            self.albums_tab.set_dirty_lyrics_state(int(track_id), False)
+            self.artists_tab.set_dirty_lyrics_state(int(track_id), False)
+            self._show_status_message("Draft discarded.", 2500)
+        except sqlite3.Error as exc:
+            logger.warning("Failed to discard dirty lyrics draft for track %s: %s", track_id, exc)
 
     # ------------------ helpers ------------------
     def _normalize_lrclib_base(self, url: str) -> str:

@@ -69,6 +69,7 @@ class TrackListWidget(QWidget):
             plain=True,
             instrumental=False,
             none=True,
+            unsaved=False,
         )
         self._artist_id: int | None = None
         self._album_id: int | None = None
@@ -202,8 +203,8 @@ class TrackListWidget(QWidget):
         if self._active:
             self.refresh()
 
-    def setFilters(self, synced: bool, plain: bool, instrumental: bool, none_: bool):
-        self._filters = dict(synced=synced, plain=plain, instrumental=instrumental, none=none_)
+    def setFilters(self, synced: bool, plain: bool, instrumental: bool, none_: bool, unsaved: bool = False):
+        self._filters = dict(synced=synced, plain=plain, instrumental=instrumental, none=none_, unsaved=unsaved)
         if self._active:
             self.refresh()
 
@@ -273,6 +274,7 @@ class TrackListWidget(QWidget):
             plain_lyrics_tracks=self._filters["plain"],
             instrumental_tracks=self._filters["instrumental"],
             no_lyrics_tracks=self._filters["none"],
+            unsaved_draft_only=self._filters.get("unsaved", False),
             limit=self._page_size + 1,
             offset=0 if reset else self.model.rowCount(),
             artist_id=self._artist_id,
