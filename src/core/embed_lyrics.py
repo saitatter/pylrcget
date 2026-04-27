@@ -103,16 +103,19 @@ def embed_lyrics_in_file(path: str, plain: Optional[str], synced: Optional[str])
         return
 
     # Fallback: try a simple text-only lyrics field if mutagen supports it.
-    audio = MutagenFile(path, easy=True)
-    if audio is None:
-        return
+    try:
+        audio = MutagenFile(path, easy=True)
+        if audio is None:
+            return
 
-    if plain:
-        audio["lyrics"] = [plain]
-    elif "lyrics" in audio:
-        del audio["lyrics"]
+        if plain:
+            audio["lyrics"] = [plain]
+        elif "lyrics" in audio:
+            del audio["lyrics"]
 
-    audio.save()
+        audio.save()
+    except Exception:
+        pass
 
 
 def _embed_vorbis_comment(audio_cls, path: str, plain: Optional[str], synced: Optional[str]) -> None:
