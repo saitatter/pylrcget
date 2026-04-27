@@ -11,6 +11,12 @@ from core.utils import prepare_input
 from db.models import Album, Artist, Config, Track
 from library import scan_library
 
+
+def _escape_like(value: str) -> str:
+    """Escape SQL LIKE metacharacters so they match literally."""
+    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
 # -------------------------------
 # DIRECTORIES
 # -------------------------------
@@ -190,8 +196,8 @@ def get_artist_rows(
     params: list[object] = []
 
     if search_query:
-        q += " AND ar.name LIKE ?"
-        params.append(f"%{search_query}%")
+        q += " AND ar.name LIKE ? ESCAPE '\\'"
+        params.append(f"%{_escape_like(search_query)}%")
 
     order = "DESC" if str(sort_order).lower() == "desc" else "ASC"
     order_map = {
@@ -296,8 +302,8 @@ def get_album_rows(
     params: list[object] = []
 
     if search_query:
-        q += " AND (a.name LIKE ? OR COALESCE(NULLIF(a.album_artist_name, ''), ar.name, '') LIKE ? OR a.album_artist_name LIKE ?)"
-        like = f"%{search_query}%"
+        q += " AND (a.name LIKE ? ESCAPE '\\' OR COALESCE(NULLIF(a.album_artist_name, ''), ar.name, '') LIKE ? ESCAPE '\\' OR a.album_artist_name LIKE ? ESCAPE '\\')"
+        like = f"%{_escape_like(search_query)}%"
         params += [like, like, like]
 
     if artist_ids:
@@ -491,9 +497,9 @@ def get_track_rows(
     q = prepare_input(search_query or "")
     if q:
         conditions.append(
-            "(tracks.title_lower LIKE ? OR artists.name_lower LIKE ? OR albums.name_lower LIKE ? OR albums.album_artist_name_lower LIKE ?)"
+            "(tracks.title_lower LIKE ? ESCAPE '\\' OR artists.name_lower LIKE ? ESCAPE '\\' OR albums.name_lower LIKE ? ESCAPE '\\' OR albums.album_artist_name_lower LIKE ? ESCAPE '\\')"
         )
-        like = f"%{q}%"
+        like = f"%{_escape_like(q)}%"
         params.extend([like, like, like, like])
 
     if unsaved_draft_only:
