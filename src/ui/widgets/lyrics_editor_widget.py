@@ -772,8 +772,19 @@ class LyricsEditorWidget(QWidget):
         self._times = times
 
     def _refresh_row_styles(self):
+        from ui.theme_tokens import STYLE_TOKENS
         current_row = self._current_index if self.stack.currentWidget() is self.table else -1
         selected_row = self.table.currentRow()
+
+        default_fg = QColor(STYLE_TOKENS.get("color-text", "#e5e7eb"))
+        invalid_bg = QColor(STYLE_TOKENS.get("color-error-bg", "#3f1418"))
+        invalid_fg = QColor(STYLE_TOKENS.get("color-error-text", "#fecaca"))
+        current_selected_bg = QColor(STYLE_TOKENS.get("color-selection-bg", "#0b2942"))
+        current_selected_fg = QColor(STYLE_TOKENS.get("color-selection-text", "#e0f2fe"))
+        current_bg = QColor(STYLE_TOKENS.get("color-table-row-hover", "#0f2235"))
+        current_fg = QColor(STYLE_TOKENS.get("color-accent-alt", "#bae6fd"))
+        selected_bg = QColor(STYLE_TOKENS.get("color-bg-control", "#172554"))
+        selected_fg = QColor(STYLE_TOKENS.get("color-text-strong", "#dbeafe"))
 
         self.table.blockSignals(True)
         for row in range(self.table.rowCount()):
@@ -782,19 +793,19 @@ class LyricsEditorWidget(QWidget):
             is_invalid = row in self._invalid_rows
 
             bg = None
-            fg = QColor("#e5e7eb")
+            fg = default_fg
             if is_invalid:
-                bg = QColor("#3f1418")
-                fg = QColor("#fecaca")
+                bg = invalid_bg
+                fg = invalid_fg
             elif is_current and is_selected:
-                bg = QColor("#0b2942")
-                fg = QColor("#e0f2fe")
+                bg = current_selected_bg
+                fg = current_selected_fg
             elif is_current:
-                bg = QColor("#0f2235")
-                fg = QColor("#bae6fd")
+                bg = current_bg
+                fg = current_fg
             elif is_selected:
-                bg = QColor("#172554")
-                fg = QColor("#dbeafe")
+                bg = selected_bg
+                fg = selected_fg
 
             for col in range(self.table.columnCount()):
                 item = self.table.item(row, col)
