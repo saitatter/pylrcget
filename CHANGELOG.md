@@ -1,4 +1,144 @@
 # Changelog
+## v1.3.0 (2026-04-27)
+
+### ✨ Features
+* Lyrics draft management, editor mode toggle, and drag-and-drop file import ([fbb94b7](https://github.com/saitatter/pylrcget/commit/fbb94b7e8bc2ec0177cc6b529405f2bfba188e73))
+  * Add open containing folder action
+  * Move selection actions to toolbar
+  * Add dirty lyrics drafts and track preview
+* Add discard draft button and unsaved filter ([fbb94b7](https://github.com/saitatter/pylrcget/commit/fbb94b7e8bc2ec0177cc6b529405f2bfba188e73))
+  - Fix false 'Unsaved draft' badge by blocking table signals during row style refresh
+- Feed back correct dirty state from main window handler to editor badge
+- Add 'Discard' button next to the unsaved draft badge to revert to saved lyrics
+- Add 'Unsaved' filter checkbox in top bar to show only tracks with dirty drafts
+- When 'Unsaved' filter is active, lyrics type filters are bypassed
+* Add synced/plain editor mode toggle ([fbb94b7](https://github.com/saitatter/pylrcget/commit/fbb94b7e8bc2ec0177cc6b529405f2bfba188e73))
+  - Add 'Switch to Synced' / 'Switch to Plain' button in lyrics editor title bar
+- Plain to Synced: converts text lines into timestamped rows at [00:00.00]
+- Synced to Plain: extracts text from table, discarding timestamps
+- Button hidden on empty state / instrumental tracks
+* Support drag-and-drop of individual audio files ([fbb94b7](https://github.com/saitatter/pylrcget/commit/fbb94b7e8bc2ec0177cc6b529405f2bfba188e73))
+  - Extend drag-and-drop to accept audio files in addition to folders
+- Import dropped files directly into library with metadata extraction
+- Skip files already present in the database
+- Support all audio formats: mp3, m4a, flac, ogg, opus, wav, wma, etc.
+* Add ai auto-sync with whisper + demucs ([fbb94b7](https://github.com/saitatter/pylrcget/commit/fbb94b7e8bc2ec0177cc6b529405f2bfba188e73))
+  - Add AiSyncWorker using openai-whisper for transcription with word timestamps
+- Add Demucs vocal separation for improved accuracy
+- Use soundfile for audio I/O (no ffmpeg dependency)
+- Align existing plain lyrics to detected timestamps when available
+- Add Auto Sync button to lyrics editor (hidden when AI deps missing)
+- Add optional [ai] extras group in pyproject.toml
+- Update README with AI Auto-Sync section and install instructions
+* Load ai sync result as dirty draft instead of saving directly ([fbb94b7](https://github.com/saitatter/pylrcget/commit/fbb94b7e8bc2ec0177cc6b529405f2bfba188e73))
+  AI-synced lyrics are now stored as dirty draft (update_track_dirty_lyrics) so the user can review and manually save. Shows '(loaded as draft)' message.
+* Escape key clears search box and returns focus ([fbb94b7](https://github.com/saitatter/pylrcget/commit/fbb94b7e8bc2ec0177cc6b529405f2bfba188e73))
+  When the search box is focused, pressing Escape clears its text and returns focus to the main content area.
+* Show toast notification when lyrics are saved ([fbb94b7](https://github.com/saitatter/pylrcget/commit/fbb94b7e8bc2ec0177cc6b529405f2bfba188e73))
+  Adds a success toast on Ctrl+S save in addition to the existing status bar message for better visibility.
+* Add mute toggle button to player bar ([fbb94b7](https://github.com/saitatter/pylrcget/commit/fbb94b7e8bc2ec0177cc6b529405f2bfba188e73))
+  Replace the Volume text label with a clickable speaker icon that toggles mute/unmute. Remembers the previous volume level when unmuting. Icon changes to show muted state.
+  * Translate all Romanian comments and docstrings to English
+  * Fix WHERE 1 anti-pattern in set_init and set_config queries
+  * Extract magic numbers to ui/constants.py
+  * Fix player EOF race condition with threading lock
+  * Reject zero/negative duration tracks before LRCLIB request
+  * Add logging to mutagen embed operations
+  * Add duplicate track detection with visual indicator
+  * Add LRCLIB search history with recent queries in search dialog
+  * Add lyrics diff viewer dialog for saved vs. draft comparison
+  * Fix PlayerBar crash: move lbl_volume icon assignment after widget creation
+  * Fix on_refresh_tracks: continue on error instead of aborting batch
+  * Skip test_lrclib_client under unittest discover when pytest is missing
+  * Address Gemini review: log fallback embed errors, fix tooltip, add MPS support, preserve timestamps in editor toggle
+  * Fix dirty badge comparison, restore smart apostrophe regex, fix config cache race
+  * Fix QApplication import in toggle_play_pause, make Config frozen
+  * Add title_lower index to migration, batch dropped file imports via add_tracks
+  * Use QAbstractSpinBox in focus check, add soundfile/torchaudio to AI sync dep check
+  * Cache saved lyrics baseline to avoid DB query on every dirty flush
+  * Move file-path query to queries.py, add AI sync cancellation checks
+
+### 🐛 Fixes
+* Address code review feedback ([fbb94b7](https://github.com/saitatter/pylrcget/commit/fbb94b7e8bc2ec0177cc6b529405f2bfba188e73))
+  - Batch commit dropped files instead of per-file commits
+- Debounce dirty lyrics DB writes with 500ms QTimer
+- Flush pending draft on track switch and app close
+- Use CURRENT_DB_VERSION constant in migrations instead of hardcoded value
+* Escape sql like wildcards in search queries ([fbb94b7](https://github.com/saitatter/pylrcget/commit/fbb94b7e8bc2ec0177cc6b529405f2bfba188e73))
+  Add _escape_like helper to prevent % and _ in user search input from acting as SQL LIKE metacharacters. Applied to get_artist_rows, get_album_rows, and get_track_rows.
+* Prevent path traversal in lyrics sidecar export ([fbb94b7](https://github.com/saitatter/pylrcget/commit/fbb94b7e8bc2ec0177cc6b529405f2bfba188e73))
+  - Reject '..' as a safe component in _safe_component
+- Add is_relative_to check in _resolve_output_base to prevent
+  traversal outside configured output directory
+* Add unique constraint on tracks.file_path and index on dirty_lyrics_present ([fbb94b7](https://github.com/saitatter/pylrcget/commit/fbb94b7e8bc2ec0177cc6b529405f2bfba188e73))
+  - Add UNIQUE on tracks.file_path to prevent duplicate track entries
+- Add index on dirty_lyrics_present for unsaved draft filter queries
+- Migration v2->v3: deduplicates existing rows, upgrades index
+- Refactor migration to use sequential version checks instead of if/return
+* Skip space play/pause shortcut when text input has focus ([fbb94b7](https://github.com/saitatter/pylrcget/commit/fbb94b7e8bc2ec0177cc6b529405f2bfba188e73))
+  Check if focus is on QLineEdit, QTextEdit, QPlainTextEdit, QSpinBox, or QComboBox before triggering play/pause toggle.
+* Use theme tokens for lyrics editor row colors ([fbb94b7](https://github.com/saitatter/pylrcget/commit/fbb94b7e8bc2ec0177cc6b529405f2bfba188e73))
+  Replace hardcoded hex colors in _refresh_row_styles with STYLE_TOKENS lookups so colors adapt to the active theme.
+* Notify user when player backend fails to initialize ([fbb94b7](https://github.com/saitatter/pylrcget/commit/fbb94b7e8bc2ec0177cc6b529405f2bfba188e73))
+  Log warning and show user notification when mpv backend is unavailable.
+* Add threading lock to _config_cache ([fbb94b7](https://github.com/saitatter/pylrcget/commit/fbb94b7e8bc2ec0177cc6b529405f2bfba188e73))
+  Protect global _config_cache with threading.Lock to prevent race conditions when accessed from multiple threads (UI, download workers, player).
+* Cancel all workers on application close ([fbb94b7](https://github.com/saitatter/pylrcget/commit/fbb94b7e8bc2ec0177cc6b529405f2bfba188e73))
+  Cancel download controller workers and library scanner in closeEvent, not just the AI sync worker. Request interruption before waiting.
+* Validate sort_column against whitelist in query functions ([fbb94b7](https://github.com/saitatter/pylrcget/commit/fbb94b7e8bc2ec0177cc6b529405f2bfba188e73))
+  Replace dict.get fallback with explicit whitelist check to ensure sort_column is always a known valid key before SQL interpolation.
+* Clean up temp file if sf.write fails in _separate_vocals ([fbb94b7](https://github.com/saitatter/pylrcget/commit/fbb94b7e8bc2ec0177cc6b529405f2bfba188e73))
+  If writing the vocals WAV fails after temp file creation, the file would leak. Now caught and unlinked before re-raising.
+* Wrap embed_lyrics fallback in try/except ([fbb94b7](https://github.com/saitatter/pylrcget/commit/fbb94b7e8bc2ec0177cc6b529405f2bfba188e73))
+  The generic mutagen fallback could raise for unsupported formats. Silently ignore errors since this is a best-effort path.
+* Surface sidecar/embed errors via notify callback ([fbb94b7](https://github.com/saitatter/pylrcget/commit/fbb94b7e8bc2ec0177cc6b529405f2bfba188e73))
+  sync_track_outputs now reports sidecar and embed failures through the progress callback so the user sees warnings in the UI.
+* Reject timestamps with seconds >= 60 in parse_ts_str ([fbb94b7](https://github.com/saitatter/pylrcget/commit/fbb94b7e8bc2ec0177cc6b529405f2bfba188e73))
+  Previously '01:75.00' was accepted as valid. Now returns None for out-of-range seconds values.
+
+### ♻️ Refactors
+* Move lrc parsing functions to core/utils ([fbb94b7](https://github.com/saitatter/pylrcget/commit/fbb94b7e8bc2ec0177cc6b529405f2bfba188e73))
+  Move parse_lrc, ms_to_ts, parse_ts_str, and _ts_to_ms from lyrics_editor_widget to core/utils for reuse across modules.
+* Extract _read_vorbis_lyrics helper in scan_library ([fbb94b7](https://github.com/saitatter/pylrcget/commit/fbb94b7e8bc2ec0177cc6b529405f2bfba188e73))
+  Deduplicate FLAC/OGG/OPUS lyrics reading into a single helper.
+* Extract _wire_lyrics_view helper for signal wiring ([fbb94b7](https://github.com/saitatter/pylrcget/commit/fbb94b7e8bc2ec0177cc6b529405f2bfba188e73))
+  Deduplicate repeated signal.connect calls for all 3 lyrics editor views into a single _wire_lyrics_view method.
+* Use threading.event for coordinated nonce search shutdown ([fbb94b7](https://github.com/saitatter/pylrcget/commit/fbb94b7e8bc2ec0177cc6b529405f2bfba188e73))
+  Replace polling on result[0] with Event.is_set() for immediate thread exit once a nonce is found. Avoids busy-wait teardown.
+* Remove unused get_artists, get_albums, clean_library ([fbb94b7](https://github.com/saitatter/pylrcget/commit/fbb94b7e8bc2ec0177cc6b529405f2bfba188e73))
+  These functions were defined but never imported or called anywhere. Also removes the now-unused Album and Artist imports.
+* Remove unused trackrow and trackfilters dataclasses ([fbb94b7](https://github.com/saitatter/pylrcget/commit/fbb94b7e8bc2ec0177cc6b529405f2bfba188e73))
+  These classes in core/models.py were never imported or used.
+* Replace typing.optional/list/tuple with native syntax ([fbb94b7](https://github.com/saitatter/pylrcget/commit/fbb94b7e8bc2ec0177cc6b529405f2bfba188e73))
+  All files already use 'from __future__ import annotations', so Optional[X] -> X | None, List[X] -> list[X], Tuple[X] -> tuple[X]. Remove unnecessary typing imports from 11 files.
+* Deduplicate lrc timestamp regex ([fbb94b7](https://github.com/saitatter/pylrcget/commit/fbb94b7e8bc2ec0177cc6b529405f2bfba188e73))
+  Export LRC_TS_RE from core/utils.py and reuse it in lyrics_editor_widget.py instead of defining an identical regex.
+
+### 📚 Docs
+* Update readme with new features ([fbb94b7](https://github.com/saitatter/pylrcget/commit/fbb94b7e8bc2ec0177cc6b529405f2bfba188e73))
+  - Add synced/plain editor toggle, draft management, unsaved filter
+- Add drag-and-drop audio files support
+
+### 🧪 Tests
+* Add tests for lrclib_client, scan exclusions, lrc parsing, ai sync ([fbb94b7](https://github.com/saitatter/pylrcget/commit/fbb94b7e8bc2ec0177cc6b529405f2bfba188e73))
+  - test_lrclib_client: _raise_for_status, model helpers, challenge solver, API methods
+- test_scan_exclusions: path/pattern exclusion helpers
+- test_lrc_parsing: parse_lrc, ms_to_ts, parse_ts_str, _ts_to_ms
+- test_ai_sync_worker: _format_ts, _build_lrc_from_segments
+* Add path traversal tests for lyrics sidecar export ([fbb94b7](https://github.com/saitatter/pylrcget/commit/fbb94b7e8bc2ec0177cc6b529405f2bfba188e73))
+  Verify that patterns containing '../' and malicious track metadata cannot write files outside the configured output directory.
+
+### 🔧 Other Changes
+* Cache artist/album lookups in add_tracks ([fbb94b7](https://github.com/saitatter/pylrcget/commit/fbb94b7e8bc2ec0177cc6b529405f2bfba188e73))
+  Pre-load artist and album ID caches before bulk insert loop, eliminating per-track find_artist/find_album database queries. New entries are added to the cache as they're created.
+* Cache get_config result at module level ([fbb94b7](https://github.com/saitatter/pylrcget/commit/fbb94b7e8bc2ec0177cc6b529405f2bfba188e73))
+  Cache Config object after first DB read. Invalidate cache at the start of set_config so subsequent get_config calls re-read.
+* Single-row update instead of full view refresh after lyrics save ([fbb94b7](https://github.com/saitatter/pylrcget/commit/fbb94b7e8bc2ec0177cc6b529405f2bfba188e73))
+  Replace _refresh_visible_library_view_after_downloads with targeted update_track_lyrics_state for single-track save and AI sync operations. Full refresh still used for bulk operations (batch download, rescan).
+* Remove redundant get_track_by_id from update_track_* functions ([fbb94b7](https://github.com/saitatter/pylrcget/commit/fbb94b7e8bc2ec0177cc6b529405f2bfba188e73))
+  All update/clear functions now return None. Callers that need the updated Track explicitly call get_track_by_id, eliminating the double-SELECT that occurred on every lyrics save.
+
+
 ## v1.2.0 (2026-04-24)
 
 ### ✨ Features
