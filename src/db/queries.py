@@ -42,7 +42,7 @@ def get_init(db: sqlite3.Connection) -> bool:
 
 
 def set_init(db: sqlite3.Connection, init: bool) -> None:
-    db.execute("UPDATE library_data SET init = ? WHERE 1", (init,))
+    db.execute("UPDATE library_data SET init = ? WHERE id = 1", (init,))
     db.commit()
 
 
@@ -139,7 +139,7 @@ def set_config(db: sqlite3.Connection, config: Config) -> None:
             playback_speed = ?,
             playback_volume = ?,
             last_library_route = ?
-        WHERE 1
+        WHERE id = 1
     """, (
         config.skip_tracks_with_synced_lyrics,
         config.skip_tracks_with_plain_lyrics,
