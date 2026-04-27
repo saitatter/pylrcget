@@ -768,7 +768,7 @@ class MainWindow(QMainWindow):
         self._apply_saved_playback_volume()
 
     def _toggle_play_pause(self) -> None:
-        from PySide6.QtWidgets import QLineEdit, QTextEdit, QPlainTextEdit, QSpinBox, QComboBox
+        from PySide6.QtWidgets import QApplication, QLineEdit, QTextEdit, QPlainTextEdit, QSpinBox, QComboBox
         focus = QApplication.focusWidget()
         if isinstance(focus, (QLineEdit, QTextEdit, QPlainTextEdit, QSpinBox, QComboBox)):
             return

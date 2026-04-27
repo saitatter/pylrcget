@@ -98,7 +98,7 @@ class Artist:
         )
 
 
-@dataclass
+@dataclass(frozen=True)
 class Config:
     skip_tracks_with_synced_lyrics: bool
     skip_tracks_with_plain_lyrics: bool
