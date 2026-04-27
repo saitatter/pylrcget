@@ -9,7 +9,7 @@ from typing import List, Sequence
 
 from core.models import FsTrack
 from core.utils import prepare_input
-from db.models import Album, Artist, Config, Track
+from db.models import Config, Track
 from library import scan_library
 
 
@@ -250,18 +250,6 @@ def get_artist_by_id(db: sqlite3.Connection, artist_id: int) -> dict:
     return dict(zip(cols, row))
 
 
-def get_artists(db: sqlite3.Connection) -> List[Artist]:
-    query = """
-        SELECT artists.id, artists.name, COUNT(tracks.id) AS tracks_count
-        FROM artists
-        JOIN tracks ON tracks.artist_id = artists.id
-        GROUP BY artists.id, artists.name
-        ORDER BY artists.name_lower ASC
-    """
-    rows = db.execute(query).fetchall()
-    return [Artist.from_row(row) for row in rows]
-
-
 # -------------------------------
 # ALBUMS
 # -------------------------------
@@ -347,19 +335,6 @@ def get_album_rows(
     cur = db.execute(q, params)
     cols = [c[0] for c in cur.description]
     return [dict(zip(cols, row)) for row in cur.fetchall()]
-
-
-def get_albums(db: sqlite3.Connection) -> List[Album]:
-    query = """
-        SELECT albums.id, albums.name, albums.album_artist_name,
-               COUNT(tracks.id) AS tracks_count
-        FROM albums
-        JOIN tracks ON tracks.album_id = albums.id
-        GROUP BY albums.id, albums.name, albums.album_artist_name
-        ORDER BY albums.name_lower ASC
-    """
-    rows = db.execute(query).fetchall()
-    return [Album.from_row(row) for row in rows]
 
 
 def get_album_by_id(db: sqlite3.Connection, album_id: int) -> dict:
@@ -921,16 +896,6 @@ def get_track_ids_for_download_mode(db: sqlite3.Connection, download_mode: str) 
         f"SELECT id FROM tracks WHERE {where_clause} ORDER BY title_lower ASC"
     ).fetchall()
     return [int(r["id"]) for r in rows]
-
-
-# -------------------------------
-# CLEAN LIBRARY
-# -------------------------------
-def clean_library(db: sqlite3.Connection) -> None:
-    db.execute("DELETE FROM tracks")
-    db.execute("DELETE FROM albums")
-    db.execute("DELETE FROM artists")
-    db.commit()
 
 
 def get_library_file_index(db: sqlite3.Connection) -> dict[str, tuple[float | None, int | None]]:
