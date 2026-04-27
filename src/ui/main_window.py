@@ -754,6 +754,14 @@ class MainWindow(QMainWindow):
         try:
             player = Player()
         except (RuntimeError, OSError) as exc:
+            logger.warning("Player backend unavailable: %s", exc)
+            notify_user(
+                self.app_state,
+                f"Player unavailable: {exc}",
+                "warning",
+                show_status=self._show_status_message,
+                status_timeout_ms=5000,
+            )
             self.show_queued_notifications()
             return
 
