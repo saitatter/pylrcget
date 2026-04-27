@@ -56,7 +56,7 @@ CREATE TABLE albums (
 
 CREATE TABLE tracks (
     id INTEGER PRIMARY KEY,
-    file_path TEXT,
+    file_path TEXT UNIQUE,
     file_name TEXT,
     title TEXT,
     title_lower TEXT,
@@ -109,7 +109,8 @@ CREATE INDEX idx_albums_name_lower ON albums(name_lower);
 CREATE INDEX idx_artists_name_lower ON artists(name_lower);
 CREATE INDEX idx_albums_album_artist_name_lower ON albums(album_artist_name_lower);
 CREATE INDEX idx_tracks_track_number ON tracks(track_number);
-CREATE INDEX idx_tracks_file_path ON tracks(file_path);
+CREATE UNIQUE INDEX idx_tracks_file_path ON tracks(file_path);
+CREATE INDEX idx_tracks_dirty ON tracks(dirty_lyrics_present);
 CREATE INDEX idx_tracks_artist_id ON tracks(artist_id);
 CREATE INDEX idx_tracks_album_id ON tracks(album_id);
 CREATE INDEX idx_tracks_artist_album ON tracks(artist_id, album_id);

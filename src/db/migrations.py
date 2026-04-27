@@ -44,12 +44,28 @@ def upgrade_database_if_needed(db: sqlite3.Connection, existing_version: int) ->
         db.commit()
         return
 
-    if existing_version == 1:
-        logger.info("Upgrade database version 1 -> %d...", CURRENT_DB_VERSION)
+    if existing_version < 2:
+        logger.info("Upgrade database version %d -> 2...", existing_version)
         db.execute("ALTER TABLE tracks ADD COLUMN dirty_lrc_lyrics TEXT")
         db.execute("ALTER TABLE tracks ADD COLUMN dirty_txt_lyrics TEXT")
         db.execute("ALTER TABLE tracks ADD COLUMN dirty_lyrics_present BOOLEAN DEFAULT 0")
-        db.execute(f"PRAGMA user_version={CURRENT_DB_VERSION}")
+        db.execute("PRAGMA user_version=2")
+        db.commit()
+        existing_version = 2
+
+    if existing_version < 3:
+        logger.info("Upgrade database version %d -> 3...", existing_version)
+        # Deduplicate any existing rows before adding unique index
+        db.execute("""
+            DELETE FROM tracks WHERE id NOT IN (
+                SELECT MIN(id) FROM tracks GROUP BY file_path
+            )
+        """)
+        # Replace non-unique index with unique index
+        db.execute("DROP INDEX IF EXISTS idx_tracks_file_path")
+        db.execute("CREATE UNIQUE INDEX idx_tracks_file_path ON tracks(file_path)")
+        db.execute("CREATE INDEX IF NOT EXISTS idx_tracks_dirty ON tracks(dirty_lyrics_present)")
+        db.execute("PRAGMA user_version=3")
         db.commit()
         return
 
