@@ -80,8 +80,8 @@ def _is_lrclib_not_found(exc: Exception) -> bool:
 
 
 def is_valid_lrclib_duration(duration_s: int | None) -> bool:
-    if duration_s is None:
-        return True
+    if duration_s is None or duration_s <= 0:
+        return False
     return LRCLIB_MIN_DURATION_S <= int(duration_s) <= LRCLIB_MAX_DURATION_S
 
 
@@ -325,7 +325,7 @@ def download_track_lyrics(
 
         if not title or not artist:
             return False, "Missing title/artist; cannot search lyrics.", track_id, title_for_ui
-        if duration_s and not is_valid_lrclib_duration(duration_s):
+        if not is_valid_lrclib_duration(duration_s):
             return False, invalid_lrclib_duration_message(duration_s), track_id, title_for_ui
 
         api_instance = api or LrcLibAPI(lrclib_instance)
