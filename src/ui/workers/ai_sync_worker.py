@@ -292,11 +292,19 @@ class AiSyncWorker(QThread):
 
             # Save to temp file
             tmp = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
+            tmp_name = tmp.name
             tmp.close()
-            sf.write(tmp.name, vocals.numpy().T, model.samplerate)
+            try:
+                sf.write(tmp_name, vocals.numpy().T, model.samplerate)
+            except Exception:
+                try:
+                    os.unlink(tmp_name)
+                except OSError:
+                    pass
+                raise
 
             self.progress.emit("Vocal separation complete.")
-            return tmp.name
+            return tmp_name
 
         except Exception as exc:
             logger.warning("Demucs vocal separation failed, proceeding with full mix: %s", exc)
