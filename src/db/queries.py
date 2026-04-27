@@ -448,8 +448,45 @@ def add_tracks(db: sqlite3.Connection, tracks: List[FsTrack], *, commit: bool = 
         return
 
     def _do_add() -> None:
+        # Pre-load artist and album caches to avoid per-track lookups
+        artist_cache: dict[str, int] = {
+            row[1]: row[0]
+            for row in db.execute("SELECT id, name_lower FROM artists").fetchall()
+        }
+        album_cache: dict[tuple[str, str], int] = {
+            (row[1], row[2]): row[0]
+            for row in db.execute("SELECT id, name_lower, album_artist_name_lower FROM albums").fetchall()
+        }
         for t in tracks:
-            add_track(db, t, commit=False)
+            # Resolve artist
+            artist_key = prepare_input(t.artist)
+            artist_id = artist_cache.get(artist_key)
+            if artist_id is None:
+                artist_id = add_artist(db, t.artist, commit=False)
+                artist_cache[artist_key] = artist_id
+
+            # Resolve album
+            album_key = (prepare_input(t.album), prepare_input(t.album_artist))
+            album_id = album_cache.get(album_key)
+            if album_id is None:
+                album_id = add_album(db, t.album, t.album_artist, commit=False)
+                album_cache[album_key] = album_id
+
+            is_instrumental = t.instrumental or bool(
+                t.lrc_lyrics and re.search(r"\[au:\s*instrumental\]", t.lrc_lyrics)
+            )
+            db.execute("""
+                INSERT OR IGNORE INTO tracks (
+                    file_path, file_name, title, title_lower,
+                    album_id, artist_id, duration, track_number,
+                    txt_lyrics, lrc_lyrics, instrumental, modified_time, file_size
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                t.file_path, t.file_name, t.title, prepare_input(t.title),
+                album_id, artist_id, t.duration, t.track_number,
+                t.txt_lyrics, t.lrc_lyrics, is_instrumental,
+                t.modified_time, t.file_size,
+            ))
 
     if commit:
         with db:
