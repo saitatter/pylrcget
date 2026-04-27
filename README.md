@@ -28,6 +28,7 @@ PyLrcGet goes beyond bulk lyric downloads and turns the app into a full desktop 
 ### 📝 Lyrics Workflow
 
 - Synced lyrics (`.lrc`) and plain lyrics support
+- Toggle between synced and plain editing modes on any track
 - Configurable download modes: `Prefer synced`, `Synced only`, `Plain only`
 - Bulk `Download missing lyrics` action based on the active download mode
 - Per-selection download overrides from the track context menu
@@ -36,12 +37,15 @@ PyLrcGet goes beyond bulk lyric downloads and turns the app into a full desktop 
 - Shift selected lines by preset or custom time offsets
 - Shift the entire lyric sheet from the first line based on the current playback position
 - Live lyric highlighting during playback
+- Unsaved draft tracking with badge indicator and discard action
+- Filter tracks by unsaved draft state
 - Explicit `Export Files` action for generating sidecar lyrics from local / embedded lyrics
 - Publish synced or plain lyrics to LRCLIB
 
 ### 📚 Library
 
 - Recursive library scan into a local SQLite database
+- Drag-and-drop audio files or folders into the window to import them
 - Incremental refresh using per-file signature checks (`mtime` + `size`)
 - Scan exclusion rules by path and regex
 - Automatic re-scan after changing library folders in Settings
