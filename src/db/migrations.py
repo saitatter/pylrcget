@@ -67,6 +67,22 @@ def upgrade_database_if_needed(db: sqlite3.Connection, existing_version: int) ->
         db.execute("CREATE INDEX IF NOT EXISTS idx_tracks_dirty ON tracks(dirty_lyrics_present)")
         db.execute("PRAGMA user_version=3")
         db.commit()
+        existing_version = 3
+
+    if existing_version < 4:
+        logger.info("Upgrade database version %d -> 4...", existing_version)
+        db.execute("""
+            CREATE TABLE IF NOT EXISTS search_history (
+                id INTEGER PRIMARY KEY,
+                artist TEXT NOT NULL,
+                title TEXT NOT NULL,
+                album TEXT NOT NULL DEFAULT '',
+                searched_at TEXT NOT NULL
+            )
+        """)
+        db.execute("CREATE INDEX IF NOT EXISTS idx_search_history_searched_at ON search_history(searched_at DESC)")
+        db.execute("PRAGMA user_version=4")
+        db.commit()
         return
 
     raise RuntimeError(

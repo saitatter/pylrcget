@@ -1194,3 +1194,45 @@ def get_download_history_rows(
         {limit_clause}
     """
     return db.execute(query).fetchall()
+
+
+# -------------------------------
+# SEARCH HISTORY
+# -------------------------------
+def record_search_history(
+    db: sqlite3.Connection,
+    *,
+    artist: str,
+    title: str,
+    album: str = "",
+) -> None:
+    searched_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+    db.execute(
+        "INSERT INTO search_history (artist, title, album, searched_at) VALUES (?, ?, ?, ?)",
+        (
+            (artist or "").strip(),
+            (title or "").strip(),
+            (album or "").strip(),
+            searched_at,
+        ),
+    )
+    db.commit()
+
+
+def get_recent_search_queries(
+    db: sqlite3.Connection,
+    *,
+    limit: int = 50,
+) -> list[dict]:
+    """Return recent unique artist/title/album combinations, newest first."""
+    rows = db.execute(
+        """
+        SELECT artist, title, album, MAX(searched_at) AS last_searched
+        FROM search_history
+        GROUP BY artist, title, album
+        ORDER BY last_searched DESC
+        LIMIT ?
+        """,
+        (int(limit),),
+    ).fetchall()
+    return [{"artist": r["artist"], "title": r["title"], "album": r["album"]} for r in rows]

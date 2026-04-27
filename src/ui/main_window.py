@@ -1630,6 +1630,7 @@ class MainWindow(QMainWindow):
 
         dlg = SearchLyricsDialog(
             lrclib_url,
+            db=self.app_state.db,
             initial_artist=artist,
             initial_title=title,
             initial_album=album,

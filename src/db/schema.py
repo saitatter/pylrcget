@@ -101,6 +101,14 @@ CREATE TABLE download_history (
     downloaded_at TEXT NOT NULL
 );
 
+CREATE TABLE search_history (
+    id INTEGER PRIMARY KEY,
+    artist TEXT NOT NULL,
+    title TEXT NOT NULL,
+    album TEXT NOT NULL DEFAULT '',
+    searched_at TEXT NOT NULL
+);
+
 CREATE INDEX idx_tracks_title ON tracks(title);
 CREATE INDEX idx_albums_name ON albums(name);
 CREATE INDEX idx_artists_name ON artists(name);
@@ -119,6 +127,7 @@ CREATE INDEX idx_publish_history_published_at ON publish_history(published_at DE
 CREATE INDEX idx_publish_history_track_id ON publish_history(track_id);
 CREATE INDEX idx_download_history_downloaded_at ON download_history(downloaded_at DESC, id DESC);
 CREATE INDEX idx_download_history_track_id ON download_history(track_id);
+CREATE INDEX idx_search_history_searched_at ON search_history(searched_at DESC);
 
 INSERT INTO library_data (init) VALUES (0);
 INSERT INTO config_data (
