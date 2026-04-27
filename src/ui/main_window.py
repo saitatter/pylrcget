@@ -1465,18 +1465,16 @@ class MainWindow(QMainWindow):
         try:
             from core.utils import plain_text_from_lrc
             plain = plain_text_from_lrc(lrc)
-            update_track_synced_lyrics(self.app_state.db, track_id, lrc.strip(), plain.strip())
-            track = get_track_by_id(self.app_state.db, int(track_id))
-            self._sync_track_lyrics_outputs(track)
+            update_track_dirty_lyrics(self.app_state.db, int(track_id), lrc.strip(), plain.strip())
             if self._editing_track_id == track_id:
+                track = get_track_by_id(self.app_state.db, int(track_id))
                 self._set_track_lyrics_views(track)
-            self.track_list.set_dirty_lyrics_state(int(track_id), False)
-            self.albums_tab.set_dirty_lyrics_state(int(track_id), False)
-            self.artists_tab.set_dirty_lyrics_state(int(track_id), False)
-            self._update_single_track_lyrics_state(track)
+            self.track_list.set_dirty_lyrics_state(int(track_id), True)
+            self.albums_tab.set_dirty_lyrics_state(int(track_id), True)
+            self.artists_tab.set_dirty_lyrics_state(int(track_id), True)
             notify_user(
                 self.app_state,
-                msg,
+                msg + " (loaded as draft — save to apply)",
                 "success",
                 show_status=self._show_status_message,
                 status_timeout_ms=4000,
@@ -1486,7 +1484,7 @@ class MainWindow(QMainWindow):
                 self.app_state,
                 logger,
                 logging.ERROR,
-                exception_message("Failed to save AI-synced lyrics", exc),
+                exception_message("Failed to load AI-synced lyrics as draft", exc),
                 "error",
                 show_status=self._show_status_message,
                 status_timeout_ms=4000,
