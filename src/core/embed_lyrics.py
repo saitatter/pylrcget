@@ -1,6 +1,7 @@
 # core/embed_lyrics.py
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 from mutagen import File as MutagenFile
@@ -28,6 +29,8 @@ MP4_PLAIN_KEY = "\xa9lyr"
 MP4_SYNCED_KEY = "----:com.lrclib:LYRICS"  # custom atom name; keep stable across app versions
 ASF_PLAIN_KEY = "WM/Lyrics"
 ASF_SYNCED_KEY = "LRCLIB_LRC"
+
+logger = logging.getLogger(__name__)
 
 
 def _strip_timestamps(lrc: str) -> str:
@@ -98,7 +101,11 @@ def embed_lyrics_in_file(path: str, plain: str | None, synced: str | None) -> No
     ext = Path(path).suffix.lower()
     embedder = EMBEDDER_MAP.get(ext)
     if embedder:
-        embedder(path, plain, synced)
+        try:
+            embedder(path, plain, synced)
+        except Exception as exc:
+            logger.warning("Failed to embed lyrics in %s: %s", path, exc)
+            raise
         return
 
     # Fallback: try a simple text-only lyrics field if mutagen supports it.
