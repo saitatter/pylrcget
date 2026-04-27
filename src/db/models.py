@@ -121,6 +121,3 @@ class Config:
     playback_speed: float
     playback_volume: float
     last_library_route: str
-
-
-# Keep FsTrack here too if you already have it in this file.

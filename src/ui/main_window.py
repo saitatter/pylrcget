@@ -292,7 +292,7 @@ class MainWindow(QMainWindow):
 
         self.layout.addWidget(self.tabs)
 
-        # --- PlayerBar (fără Now Playing label separat) ---
+        # --- PlayerBar ---
         self.player_bar = PlayerBar(self.app_state.player, self)
         self.layout.addWidget(self.player_bar)
         self.player_bar.set_prev_next_handlers(self.play_prev, self.play_next)
@@ -1168,7 +1168,7 @@ class MainWindow(QMainWindow):
             self.artists_tab.album_browser.track_list.set_now_playing(now_playing.track_id if now_playing else None)
 
     def _on_player_status_changed(self, status):
-        # momentan nu mai afișăm nimic text-based aici
+        # No text-based status display currently needed
         pass
 
     # ------------------ lyrics download & save ------------------
