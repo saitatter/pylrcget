@@ -194,7 +194,11 @@ def sync_track_outputs(
     config: Config | None = None,
 ) -> None:
     config = config or get_config(db)
-    sync_track_outputs_with_result(track, config, notify=notify)
+    result = sync_track_outputs_with_result(track, config, notify=notify)
+    if result.sidecar_error:
+        notify(f"Warning: sidecar export failed: {result.sidecar_error}")
+    if result.embed_error:
+        notify(f"Warning: lyrics embedding failed: {result.embed_error}")
 
 
 def sync_track_outputs_with_result(
