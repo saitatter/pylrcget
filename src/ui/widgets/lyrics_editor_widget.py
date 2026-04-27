@@ -286,6 +286,13 @@ class LyricsEditorWidget(QWidget):
         self.btn_discard_draft.clicked.connect(self.discardDraftRequested.emit)
         title_row.addWidget(self.btn_discard_draft)
 
+        self.btn_switch_mode = QPushButton("Switch to Synced")
+        self.btn_switch_mode.setObjectName("LyricsSwitchMode")
+        self.btn_switch_mode.setToolTip("Toggle between synced (timestamped) and plain text editing")
+        self.btn_switch_mode.hide()
+        self.btn_switch_mode.clicked.connect(self._toggle_editor_mode)
+        title_row.addWidget(self.btn_switch_mode)
+
         header.addLayout(title_row)
 
         toolbar = FlowLayout(spacing=SPACE_2)
@@ -579,6 +586,7 @@ class LyricsEditorWidget(QWidget):
         self.btn_del.setEnabled(False)
         self.btn_save.setEnabled(False)
         self.btn_export_files.setEnabled(False)
+        self.btn_switch_mode.hide()
 
     def _set_dirty_badge(self, visible: bool) -> None:
         self._has_dirty_draft = bool(visible)
@@ -604,11 +612,36 @@ class LyricsEditorWidget(QWidget):
         self.btn_shift_selected.setEnabled(False)
         self.btn_shift_all_from_first.setEnabled(False)
         self.btn_export_files.setEnabled(True)
+        self.btn_switch_mode.setText("Switch to Synced")
+        self.btn_switch_mode.setVisible(True)
 
     def _start_writing_lyrics(self):
         """Switch to an empty plain editor so the user can write lyrics from scratch."""
         self._set_plain("")
         self.plain.setFocus()
+
+    def _toggle_editor_mode(self):
+        """Switch between synced (table) and plain text editing modes."""
+        if self.stack.currentWidget() is self.table:
+            # Synced → Plain: extract text lines from table
+            lines: list[str] = []
+            for r in range(self.table.rowCount()):
+                it_text = self.table.item(r, 1)
+                lines.append(it_text.text().rstrip() if it_text else "")
+            txt = "\n".join(lines).rstrip()
+            self._set_plain(txt)
+            self._emit_dirty_draft_changed()
+        elif self.stack.currentWidget() is self.plain:
+            # Plain → Synced: create timestamped lines (all at 00:00.00)
+            txt = (self.plain.toPlainText() or "").strip()
+            if not txt:
+                return
+            lines = txt.splitlines()
+            pairs: list[tuple[int, str]] = []
+            for line in lines:
+                pairs.append((0, line.rstrip()))
+            self._set_synced(pairs)
+            self._emit_dirty_draft_changed()
 
     # --- Undo / Redo (snapshot-based for synced table) ---
     def _take_snapshot(self) -> list[tuple[int, str]]:
@@ -716,6 +749,8 @@ class LyricsEditorWidget(QWidget):
         self.btn_shift_selected.setEnabled(has_selection)
         self.btn_save.setEnabled(not self._invalid_rows)
         self.btn_export_files.setEnabled(True)
+        self.btn_switch_mode.setText("Switch to Plain")
+        self.btn_switch_mode.setVisible(True)
 
     def _rebuild_times_cache(self):
         times: List[int] = []
