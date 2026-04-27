@@ -1313,6 +1313,7 @@ class MainWindow(QMainWindow):
             self.artists_tab.set_dirty_lyrics_state(int(track_id), False)
             self._update_single_track_lyrics_state(track)
             self._show_status_message("Lyrics saved.", 2500)
+            self.toasts.show("Lyrics saved.", "success")
             for view in self._all_lyrics_views():
                 view.set_save_feedback("success", "Saved")
         except (sqlite3.Error, OSError, ValueError) as exc:
