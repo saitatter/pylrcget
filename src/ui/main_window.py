@@ -22,7 +22,7 @@ from dataclasses import replace
 from core.state import Notify
 from core.tracklist_models import LyricsState
 from db.queries import (
-    add_track,
+    add_tracks,
     get_album_by_id,
     get_artist_by_id,
     get_config,
@@ -680,25 +680,28 @@ class MainWindow(QMainWindow):
             ).fetchall()
             existing_paths.update(row[0] for row in rows)
 
-        with self.app_state.db:
-            for file_path in dropped_files:
-                if file_path in existing_paths:
-                    skipped += 1
-                    continue
+        fs_tracks: list = []
+        for file_path in dropped_files:
+            if file_path in existing_paths:
+                skipped += 1
+                continue
 
-                fs_track = new_fs_track_from_path(
-                    file_path,
-                    lyrics_lookup_subdir=config.lyrics_lookup_subdir,
-                )
-                if fs_track is None:
-                    skipped += 1
-                    continue
-                try:
-                    add_track(self.app_state.db, fs_track, commit=False)
-                    added += 1
-                except sqlite3.Error as exc:
-                    logger.warning("Failed to import dropped file %s: %s", file_path, exc)
-                    skipped += 1
+            fs_track = new_fs_track_from_path(
+                file_path,
+                lyrics_lookup_subdir=config.lyrics_lookup_subdir,
+            )
+            if fs_track is None:
+                skipped += 1
+                continue
+            fs_tracks.append(fs_track)
+
+        if fs_tracks:
+            try:
+                add_tracks(self.app_state.db, fs_tracks)
+                added = len(fs_tracks)
+            except sqlite3.Error as exc:
+                logger.warning("Failed to import dropped files: %s", exc)
+                skipped += len(fs_tracks)
 
         if added:
             self._refresh_visible_library_view_after_downloads()

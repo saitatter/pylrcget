@@ -59,6 +59,7 @@ def upgrade_database_if_needed(db: sqlite3.Connection, existing_version: int) ->
         db.execute("DROP INDEX IF EXISTS idx_tracks_file_path")
         db.execute("CREATE UNIQUE INDEX idx_tracks_file_path ON tracks(file_path)")
         db.execute("CREATE INDEX IF NOT EXISTS idx_tracks_dirty ON tracks(dirty_lyrics_present)")
+        db.execute("CREATE INDEX IF NOT EXISTS idx_tracks_title_lower ON tracks(title_lower)")
         # Search history table
         db.execute("""
             CREATE TABLE IF NOT EXISTS search_history (
