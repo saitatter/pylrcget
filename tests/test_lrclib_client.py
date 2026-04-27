@@ -2,9 +2,13 @@
 from __future__ import annotations
 
 import json
+import unittest
 from unittest.mock import MagicMock, patch
 
-import pytest
+try:
+    import pytest
+except ImportError:
+    raise unittest.SkipTest("pytest not installed")
 
 from tests import test_support as _test_support  # noqa: F401
 
