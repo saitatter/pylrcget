@@ -178,6 +178,7 @@ class AiSyncWorker(QThread):
         return "cuda" if torch.cuda.is_available() else "cpu"
 
     def run(self):
+        vocals_path = None
         try:
             ok, msg = _check_ai_sync_available()
             if not ok:
@@ -208,13 +209,6 @@ class AiSyncWorker(QThread):
             )
             segments = result.get("segments", [])
 
-            # Clean up temporary vocals file
-            if vocals_path and os.path.isfile(vocals_path):
-                try:
-                    os.unlink(vocals_path)
-                except OSError:
-                    pass
-
             self.progress.emit("Building LRC output...")
 
             plain_lines = [l for l in self.plain_lyrics.splitlines() if l.strip()] if self.plain_lyrics else []
@@ -233,6 +227,12 @@ class AiSyncWorker(QThread):
         except Exception as exc:
             logger.error("AI sync failed: %s", exc, exc_info=True)
             self.finished.emit(False, f"AI sync failed: {exc}", "")
+        finally:
+            if vocals_path and os.path.isfile(vocals_path):
+                try:
+                    os.unlink(vocals_path)
+                except OSError:
+                    pass
 
     @staticmethod
     def _load_audio_as_numpy(path: str):

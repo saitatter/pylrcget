@@ -19,31 +19,17 @@ class AppDataMigrationTests(unittest.TestCase):
 
             self.assertFalse(old_nested.exists())
 
-    def test_removes_non_empty_old_nested_directory_without_warning(self):
+    def test_keeps_non_empty_old_nested_directory(self):
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp)
             old_nested = base / "PyLrcGet"
             old_nested.mkdir()
+            # "logs" exists in both locations — can't migrate, stays behind
             (base / "logs").mkdir()
             (old_nested / "logs").mkdir()
 
-            records: list[logging.LogRecord] = []
+            _migrate_old_nested_app_data(str(base))
 
-            class CaptureHandler(logging.Handler):
-                def emit(self, record: logging.LogRecord) -> None:
-                    records.append(record)
-
-            handler = CaptureHandler()
-            root = logging.getLogger()
-            previous_level = root.level
-            root.addHandler(handler)
-            root.setLevel(logging.INFO)
-            try:
-                _migrate_old_nested_app_data(str(base))
-            finally:
-                root.removeHandler(handler)
-                root.setLevel(previous_level)
-
-            self.assertFalse(old_nested.exists())
-            warnings = [record for record in records if record.levelno >= logging.WARNING]
-            self.assertEqual(warnings, [])
+            # Old dir kept because it still contains un-migrated items
+            self.assertTrue(old_nested.exists())
+            self.assertTrue((old_nested / "logs").exists())

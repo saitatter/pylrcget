@@ -1,7 +1,6 @@
 import os
 import sys
 import logging
-import shutil
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
@@ -49,9 +48,9 @@ def _migrate_old_nested_app_data(base: str) -> None:
                 logging.warning("Failed to migrate app data from %s to %s: %s", src, dst, exc)
 
     try:
-        shutil.rmtree(old_nested_path)
+        os.rmdir(old_nested_path)
     except OSError:
-        logging.warning("Failed to remove old app data directory %s", old_nested, exc_info=True)
+        logging.info("Old app data directory not empty after migration, keeping: %s", old_nested)
 
 def get_app_data_dir() -> str:
     app = QApplication.instance()

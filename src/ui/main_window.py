@@ -124,6 +124,12 @@ class MainWindow(QMainWindow):
         self._pending_playback_speed: float | None = None
         self._pending_playback_volume: float | None = None
         self._ai_sync_worker = None
+        self._dirty_lyrics_timer = QTimer(self)
+        self._dirty_lyrics_timer.setSingleShot(True)
+        self._dirty_lyrics_timer.setInterval(500)
+        self._dirty_lyrics_timer.timeout.connect(self._flush_dirty_lyrics)
+        self._pending_dirty_lrc: str = ""
+        self._pending_dirty_txt: str = ""
         self._recent_toast_messages: set[str] = set()
         self.hotkey_hints = HotkeyHintManager(self)
         self.scanner = None
@@ -674,29 +680,38 @@ class MainWindow(QMainWindow):
         config = get_config(self.app_state.db)
         added = 0
         skipped = 0
-        for file_path in dropped_files:
-            # Check if track already exists in DB
-            existing = self.app_state.db.execute(
-                "SELECT id FROM tracks WHERE file_path = ? LIMIT 1",
-                (file_path,),
-            ).fetchone()
-            if existing:
-                skipped += 1
-                continue
 
-            fs_track = new_fs_track_from_path(
-                file_path,
-                lyrics_lookup_subdir=config.lyrics_lookup_subdir,
-            )
-            if fs_track is None:
-                skipped += 1
-                continue
-            try:
-                add_track(self.app_state.db, fs_track)
-                added += 1
-            except sqlite3.Error as exc:
-                logger.warning("Failed to import dropped file %s: %s", file_path, exc)
-                skipped += 1
+        # Batch-check existing paths to avoid per-file SELECT
+        existing_paths: set[str] = set()
+        chunk_size = 500
+        for i in range(0, len(dropped_files), chunk_size):
+            chunk = dropped_files[i : i + chunk_size]
+            placeholders = ",".join("?" for _ in chunk)
+            rows = self.app_state.db.execute(
+                f"SELECT file_path FROM tracks WHERE file_path IN ({placeholders})",
+                chunk,
+            ).fetchall()
+            existing_paths.update(row[0] for row in rows)
+
+        with self.app_state.db:
+            for file_path in dropped_files:
+                if file_path in existing_paths:
+                    skipped += 1
+                    continue
+
+                fs_track = new_fs_track_from_path(
+                    file_path,
+                    lyrics_lookup_subdir=config.lyrics_lookup_subdir,
+                )
+                if fs_track is None:
+                    skipped += 1
+                    continue
+                try:
+                    add_track(self.app_state.db, fs_track, commit=False)
+                    added += 1
+                except sqlite3.Error as exc:
+                    logger.warning("Failed to import dropped file %s: %s", file_path, exc)
+                    skipped += 1
 
         if added:
             self._refresh_visible_library_view_after_downloads()
@@ -720,6 +735,11 @@ class MainWindow(QMainWindow):
             )
 
     def closeEvent(self, event: QCloseEvent) -> None:
+        if self._dirty_lyrics_timer.isActive():
+            self._dirty_lyrics_timer.stop()
+            self._flush_dirty_lyrics()
+        if self._ai_sync_worker is not None and self._ai_sync_worker.isRunning():
+            self._ai_sync_worker.wait(5000)
         self._save_window_state()
         self._flush_playback_speed()
         self._flush_playback_volume()
@@ -1001,6 +1021,9 @@ class MainWindow(QMainWindow):
         self._set_track_lyrics_views(track)
 
     def _preview_track(self, track_id: int) -> None:
+        if self._dirty_lyrics_timer.isActive():
+            self._dirty_lyrics_timer.stop()
+            self._flush_dirty_lyrics()
         try:
             track = get_track_by_id(self.app_state.db, int(track_id))
         except (sqlite3.Error, KeyError):
@@ -1291,9 +1314,18 @@ class MainWindow(QMainWindow):
     def _on_dirty_lyrics_changed(self, lrc: str, txt: str) -> None:
         if self._loading_lyrics_views:
             return
+        if self._editing_track_id is None:
+            return
+        self._pending_dirty_lrc = lrc
+        self._pending_dirty_txt = txt
+        self._dirty_lyrics_timer.start()
+
+    def _flush_dirty_lyrics(self) -> None:
         track_id = self._editing_track_id
         if track_id is None:
             return
+        lrc = self._pending_dirty_lrc
+        txt = self._pending_dirty_txt
         try:
             track = get_track_by_id(self.app_state.db, int(track_id))
             draft_lrc, draft_txt = _canonical_lyrics_pair(lrc, txt)
@@ -1373,12 +1405,12 @@ class MainWindow(QMainWindow):
             )
             return
 
-        # Get plain lyrics if available (for alignment)
+        # Get plain lyrics if available (prefer dirty draft for alignment)
         plain_lyrics = ""
-        if track.txt_lyrics:
-            plain_lyrics = track.txt_lyrics
-        elif track.dirty_txt_lyrics:
+        if track.dirty_lyrics_present and track.dirty_txt_lyrics:
             plain_lyrics = track.dirty_txt_lyrics
+        elif track.txt_lyrics:
+            plain_lyrics = track.txt_lyrics
 
         for view in self._all_lyrics_views():
             view.btn_auto_sync.setEnabled(False)

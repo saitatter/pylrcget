@@ -856,9 +856,9 @@ class LyricsEditorWidget(QWidget):
         self.seekRequested.emit(int(ms))
 
     def _on_table_item_changed(self, item: QTableWidgetItem):
-        self._emit_dirty_draft_changed()
         # If user edited the Time cell, validate and update ms
         if item.column() != 0:
+            self._emit_dirty_draft_changed()
             return
 
         row = item.row()
@@ -873,6 +873,7 @@ class LyricsEditorWidget(QWidget):
             )
             self._update_save_enabled()
             self._refresh_row_styles()
+            self._emit_dirty_draft_changed()
             return
 
         item.setData(TIMESTAMP_MS_ROLE, int(new_ms))
@@ -891,6 +892,7 @@ class LyricsEditorWidget(QWidget):
         self._rebuild_times_cache()
         self._update_save_enabled()
         self._refresh_row_styles()
+        self._emit_dirty_draft_changed()
 
     def _current_lyrics_text(self) -> tuple[str, str]:
         if self.stack.currentWidget() is self.table:
