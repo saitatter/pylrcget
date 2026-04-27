@@ -2,9 +2,11 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from pathlib import Path
 from typing import Sequence
 
-from PySide6.QtCore import Signal, Qt, QItemSelectionModel
+from PySide6.QtCore import Signal, Qt, QItemSelectionModel, QUrl
+from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QHeaderView,
     QHBoxLayout,
@@ -18,7 +20,7 @@ from PySide6.QtWidgets import (
     QWidgetAction,
 )
 
-from db.database import get_directories, get_track_rows
+from db.database import get_directories, get_track_by_id, get_track_rows
 from ui.library_routes import LibraryRoute, tracks_album, tracks_artist
 from ui.widgets.empty_state_widget import EmptyStateWidget
 from ui.models.track_table_model import TrackTableModel
@@ -360,9 +362,11 @@ class TrackListWidget(QWidget):
         menu.addSeparator()
         add_section("Focused Track")
         act_refresh = menu.addAction("Refresh from disk")
+        act_open_folder = menu.addAction("Open containing folder")
         act_dl = menu.addAction("Download lyrics")
         act_export = menu.addAction("Export lyrics files")
         act_refresh.setEnabled(has_focused_track)
+        act_open_folder.setEnabled(has_focused_track)
         act_dl.setEnabled(has_focused_track)
         act_export.setEnabled(has_focused_track)
 
@@ -390,6 +394,9 @@ class TrackListWidget(QWidget):
         elif chosen == act_refresh:
             if current_track_id is not None:
                 self.refreshTrack.emit(int(current_track_id))
+        elif chosen == act_open_folder:
+            if current_track_id is not None:
+                self._open_track_folder(int(current_track_id))
         elif chosen == act_dl:
             if current_track_id is not None:
                 self.downloadLyrics.emit(int(current_track_id))
@@ -410,6 +417,16 @@ class TrackListWidget(QWidget):
             self.bulkPublishRequested.emit(selected_ids, True)
         elif chosen == act_pub_plain:
             self.bulkPublishRequested.emit(selected_ids, False)
+
+    def _open_track_folder(self, track_id: int) -> bool:
+        track = get_track_by_id(self.app_state.db, int(track_id))
+        file_path = str(track.file_path or "").strip()
+        if not file_path:
+            return False
+        folder = Path(file_path).expanduser().parent
+        if not str(folder) or not folder.exists():
+            return False
+        return QDesktopServices.openUrl(QUrl.fromLocalFile(str(folder)))
 
     def _emit_artist_navigation(self, artist_id: int) -> None:
         self.openArtist.emit(int(artist_id))
