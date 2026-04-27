@@ -21,6 +21,7 @@ from dataclasses import replace
 
 from core.state import Notify
 from db.queries import (
+    add_track,
     get_album_by_id,
     get_artist_by_id,
     get_config,
@@ -37,6 +38,7 @@ from db.queries import (
     update_track_plain_lyrics,
     update_track_synced_lyrics,
 )
+from library.scan_library import AUDIO_EXTS, new_fs_track_from_path
 from ui.workers.library_scanner import LibraryScanner
 from ui.controllers.lyrics_download_controller import LyricsDownloadController
 from ui.controllers.navigation_controller import NavigationController
@@ -602,22 +604,42 @@ class MainWindow(QMainWindow):
 
     def dragEnterEvent(self, event):
         if event.mimeData().hasUrls():
-            # Accept if at least one URL is a directory
             for url in event.mimeData().urls():
-                if url.isLocalFile() and os.path.isdir(url.toLocalFile()):
+                if not url.isLocalFile():
+                    continue
+                path = url.toLocalFile()
+                if os.path.isdir(path):
+                    event.acceptProposedAction()
+                    return
+                ext = os.path.splitext(path)[1].lower()
+                if ext in AUDIO_EXTS:
                     event.acceptProposedAction()
                     return
 
     def dropEvent(self, event):
-        dropped_dirs = []
+        dropped_dirs: list[str] = []
+        dropped_files: list[str] = []
         for url in event.mimeData().urls():
+            if not url.isLocalFile():
+                continue
             path = url.toLocalFile()
             if os.path.isdir(path):
                 dropped_dirs.append(os.path.normpath(path))
-        if not dropped_dirs:
+            else:
+                ext = os.path.splitext(path)[1].lower()
+                if ext in AUDIO_EXTS:
+                    dropped_files.append(os.path.normpath(path))
+
+        if not dropped_dirs and not dropped_files:
             return
         event.acceptProposedAction()
 
+        if dropped_dirs:
+            self._handle_dropped_directories(dropped_dirs)
+        if dropped_files:
+            self._handle_dropped_files(dropped_files)
+
+    def _handle_dropped_directories(self, dropped_dirs: list[str]) -> None:
         existing = get_directories(self.app_state.db)
         existing_set = {os.path.normcase(os.path.normpath(d)) for d in existing}
         new_dirs = [d for d in dropped_dirs if os.path.normcase(os.path.normpath(d)) not in existing_set]
@@ -643,6 +665,55 @@ class MainWindow(QMainWindow):
             status_timeout_ms=4000,
         )
         self.refresh_library()
+
+    def _handle_dropped_files(self, dropped_files: list[str]) -> None:
+        config = get_config(self.app_state.db)
+        added = 0
+        skipped = 0
+        for file_path in dropped_files:
+            # Check if track already exists in DB
+            existing = self.app_state.db.execute(
+                "SELECT id FROM tracks WHERE file_path = ? LIMIT 1",
+                (file_path,),
+            ).fetchone()
+            if existing:
+                skipped += 1
+                continue
+
+            fs_track = new_fs_track_from_path(
+                file_path,
+                lyrics_lookup_subdir=config.lyrics_lookup_subdir,
+            )
+            if fs_track is None:
+                skipped += 1
+                continue
+            try:
+                add_track(self.app_state.db, fs_track)
+                added += 1
+            except sqlite3.Error as exc:
+                logger.warning("Failed to import dropped file %s: %s", file_path, exc)
+                skipped += 1
+
+        if added:
+            self._refresh_visible_library_view_after_downloads()
+            msg = f"Imported {added} track(s)."
+            if skipped:
+                msg += f" {skipped} skipped (already in library or unreadable)."
+            notify_user(
+                self.app_state,
+                msg,
+                "success",
+                show_status=self._show_status_message,
+                status_timeout_ms=4000,
+            )
+        elif skipped:
+            notify_user(
+                self.app_state,
+                "All dropped files are already in the library or could not be read.",
+                "info",
+                show_status=self._show_status_message,
+                status_timeout_ms=3000,
+            )
 
     def closeEvent(self, event: QCloseEvent) -> None:
         self._save_window_state()
