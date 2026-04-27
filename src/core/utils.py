@@ -37,7 +37,8 @@ def prepare_input(input_str: str) -> str:
     return prepared_input
 
 
-_LRC_TS_RE = re.compile(r"\[(\d+):(\d+)(?:\.(\d+))?\]")
+LRC_TS_RE = re.compile(r"\[(\d+):(\d+)(?:\.(\d+))?\]")
+_LRC_TS_RE = LRC_TS_RE  # internal alias for backward compat
 _LRC_META_PREFIXES = ("[ar:", "[ti:", "[al:", "[by:", "[offset:", "[au:")
 
 

@@ -19,13 +19,13 @@ from ui.spacing import SPACE_2, SPACE_3, set_layout_spacing
 from ui.style_loader import load_stylesheet
 from ui.widgets.empty_state_widget import EmptyStateWidget
 from core.utils import (
+    LRC_TS_RE as _TS_RE,
     _ts_to_ms,
     ms_to_ts as _ms_to_ts,
     parse_ts_str as _parse_ts_str,
     parse_lrc,
 )
 
-_TS_RE = re.compile(r"\[(\d+):(\d+)(?:\.(\d+))?\]")
 TIMESTAMP_MS_ROLE = Qt.ItemDataRole.UserRole
 TIMESTAMP_VALID_ROLE = Qt.ItemDataRole.UserRole + 1
 SHIFT_SPIN_MIN_WIDTH = 96
