@@ -19,8 +19,8 @@ def prepare_input(input_str: str) -> str:
     # Replace special characters with space
     prepared_input = re.sub(r"[`~!@#$%^&*()_|+\-=?;:\",.<>{}\[\]\\\/]", " ", prepared_input)
 
-    # Remove apostrophes
-    prepared_input = re.sub(r"['']", "", prepared_input)
+    # Remove apostrophes (plain, left-single, right-single)
+    prepared_input = re.sub(r"['‘’]", "", prepared_input)
 
     # Convert to lowercase
     prepared_input = prepared_input.lower()

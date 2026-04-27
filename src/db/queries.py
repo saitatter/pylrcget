@@ -114,8 +114,6 @@ def get_config(db: sqlite3.Connection) -> Config:
 
 def set_config(db: sqlite3.Connection, config: Config) -> None:
     global _config_cache
-    with _config_cache_lock:
-        _config_cache = None
     db.execute("""
         UPDATE config_data
         SET skip_tracks_with_synced_lyrics = ?,
@@ -164,6 +162,8 @@ def set_config(db: sqlite3.Connection, config: Config) -> None:
         config.last_library_route,
     ))
     db.commit()
+    with _config_cache_lock:
+        _config_cache = None
 
 
 # -------------------------------

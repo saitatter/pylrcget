@@ -869,7 +869,8 @@ class LyricsEditorWidget(QWidget):
         if self.stack.currentWidget() not in {self.table, self.plain}:
             return
         lrc, txt = self._current_lyrics_text()
-        self._set_dirty_badge(bool(lrc.strip() or txt.strip()))
+        has_changes = (lrc.strip() != self._saved_lrc) or (txt.strip() != self._saved_txt)
+        self._set_dirty_badge(has_changes)
         self.dirtyDraftChanged.emit(lrc, txt)
 
     def _add_line_after_selection(self):
