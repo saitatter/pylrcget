@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, patch
 try:
     import pytest
 except ImportError:
-    raise unittest.SkipTest("pytest not installed")
+    pytest = None  # type: ignore[assignment]
 
 from tests import test_support as _test_support  # noqa: F401
 
@@ -24,6 +24,13 @@ from core.lrclib_client import (
     solve_challenge,
     _is_nonce_valid,
 )
+
+
+# When pytest is not installed (e.g. CI running ``unittest discover``),
+# expose an empty suite so the runner does not choke on bare functions.
+if pytest is None:
+    def load_tests(loader, tests, pattern):
+        return unittest.TestSuite()
 
 
 # ---------------------------------------------------------------------------

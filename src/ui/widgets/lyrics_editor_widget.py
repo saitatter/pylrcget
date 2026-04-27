@@ -215,7 +215,7 @@ class LyricsEditorWidget(QWidget):
 
         self.btn_auto_sync = QPushButton("Auto Sync")
         self.btn_auto_sync.setObjectName("LyricsAutoSync")
-        self.btn_auto_sync.setToolTip("Automatically synchronize lyrics using AI (requires torch, demucs, whisperx)")
+        self.btn_auto_sync.setToolTip("Automatically synchronize lyrics using AI (requires torch, demucs, openai-whisper)")
         self.btn_auto_sync.hide()
         self.btn_auto_sync.clicked.connect(self.autoSyncRequested.emit)
         title_row.addWidget(self.btn_auto_sync)
@@ -565,7 +565,8 @@ class LyricsEditorWidget(QWidget):
     def _toggle_editor_mode(self):
         """Switch between synced (table) and plain text editing modes."""
         if self.stack.currentWidget() is self.table:
-            # Synced → Plain: extract text lines from table
+            # Synced → Plain: cache synced pairs so we can restore timestamps
+            self._cached_synced_pairs = self._take_snapshot()
             lines: list[str] = []
             for r in range(self.table.rowCount()):
                 it_text = self.table.item(r, 1)
@@ -574,14 +575,17 @@ class LyricsEditorWidget(QWidget):
             self._set_plain(txt)
             self._emit_dirty_draft_changed()
         elif self.stack.currentWidget() is self.plain:
-            # Plain → Synced: create timestamped lines (all at 00:00.00)
+            # Plain → Synced: restore cached timestamps when line count matches
             txt = (self.plain.toPlainText() or "").strip()
             if not txt:
                 return
             lines = txt.splitlines()
-            pairs: list[tuple[int, str]] = []
-            for line in lines:
-                pairs.append((0, line.rstrip()))
+            cached = getattr(self, "_cached_synced_pairs", None)
+            if cached and len(cached) == len(lines):
+                pairs = [(ms, line.rstrip()) for (ms, _), line in zip(cached, lines)]
+            else:
+                pairs = [(0, line.rstrip()) for line in lines]
+            self._cached_synced_pairs = None
             self._set_synced(pairs)
             self._emit_dirty_draft_changed()
 

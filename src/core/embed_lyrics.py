@@ -120,8 +120,8 @@ def embed_lyrics_in_file(path: str, plain: str | None, synced: str | None) -> No
             del audio["lyrics"]
 
         audio.save()
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.warning("Failed to embed lyrics in %s (fallback): %s", path, exc)
 
 
 def _embed_vorbis_comment(audio_cls, path: str, plain: str | None, synced: str | None) -> None:

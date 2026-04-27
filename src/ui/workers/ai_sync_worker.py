@@ -175,7 +175,11 @@ class AiSyncWorker(QThread):
         import torch
         if self._device and self._device != "auto":
             return self._device
-        return "cuda" if torch.cuda.is_available() else "cpu"
+        if torch.cuda.is_available():
+            return "cuda"
+        if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+            return "mps"
+        return "cpu"
 
     def run(self):
         vocals_path = None
