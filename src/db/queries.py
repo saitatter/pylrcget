@@ -220,9 +220,10 @@ def get_artist_rows(
         1: f"album_count {order}, ar.name COLLATE NOCASE {order}",
         2: f"track_count {order}, ar.name COLLATE NOCASE {order}",
     }
+    col = int(sort_column) if int(sort_column) in order_map else 0
     q += f"""
     GROUP BY ar.id, ar.name
-    ORDER BY {order_map.get(int(sort_column), order_map[0])}
+    ORDER BY {order_map[col]}
     """
     if limit:
         q += f" LIMIT {int(limit)} OFFSET {max(0, int(offset))}"
@@ -335,9 +336,10 @@ def get_album_rows(
         1: f"COALESCE(NULLIF(a.album_artist_name, ''), ar.name, '') COLLATE NOCASE {order}, a.name COLLATE NOCASE {order}",
         2: f"track_count {order}, a.name COLLATE NOCASE {order}",
     }
+    col = int(sort_column) if int(sort_column) in order_map else 0
     q += f"""
     GROUP BY a.id, a.name, a.album_artist_name, ar.name
-    ORDER BY {order_map.get(int(sort_column), order_map[0])}
+    ORDER BY {order_map[col]}
     """
     if limit:
         q += f" LIMIT {int(limit)} OFFSET {max(0, int(offset))}"
@@ -597,7 +599,8 @@ def get_track_rows(
         ),
         3: f"tracks.title_lower {order}, tracks.id {order}",
     }
-    order_clause = order_map.get(int(sort_column), order_map[0])
+    col = int(sort_column) if int(sort_column) in order_map else 0
+    order_clause = order_map[col]
     limit_clause = f"LIMIT {int(limit)} OFFSET {max(0, int(offset))}" if limit else ""
 
     query = f"""
