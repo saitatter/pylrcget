@@ -37,6 +37,14 @@ APE_PLAIN_KEYS = ("UNSYNCEDLYRICS", "lyrics")
 APE_SYNCED_KEYS = ("LYRICS", "LRCLIB_LRC")
 
 
+def _read_vorbis_lyrics(audio) -> tuple[str | None, str | None]:
+    plain_list = audio.get(VORBIS_PLAIN_KEY)
+    synced_list = audio.get(VORBIS_SYNCED_KEY)
+    plain = (plain_list[0] if isinstance(plain_list, (list, tuple)) and plain_list else None)
+    synced = (synced_list[0] if isinstance(synced_list, (list, tuple)) and synced_list else None)
+    return plain, synced
+
+
 def _split_lines(block: str | None) -> list[str]:
     return [line.strip() for line in (block or "").splitlines() if line.strip()]
 
@@ -347,24 +355,14 @@ def read_embedded_lyrics(path: str) -> Tuple[Optional[str], Optional[str]]:
 
         elif ext in {".flac"}:
             audio = FLAC(path)
-            # Vorbis comments are lists
-            plain_list = audio.get(VORBIS_PLAIN_KEY)
-            synced_list = audio.get(VORBIS_SYNCED_KEY)
-            plain = plain_list[0] if plain_list else None
-            synced = synced_list[0] if synced_list else None
+            plain, synced = _read_vorbis_lyrics(audio)
         elif ext in {".ogg", ".oga"}:
             audio = OggVorbis(path)
-            plain_list = audio.get(VORBIS_PLAIN_KEY)
-            synced_list = audio.get(VORBIS_SYNCED_KEY)
-            plain = (plain_list[0] if isinstance(plain_list, (list, tuple)) and plain_list else None)
-            synced = (synced_list[0] if isinstance(synced_list, (list, tuple)) and synced_list else None)
+            plain, synced = _read_vorbis_lyrics(audio)
 
         elif ext == ".opus":
             audio = OggOpus(path)
-            plain_list = audio.get(VORBIS_PLAIN_KEY)
-            synced_list = audio.get(VORBIS_SYNCED_KEY)
-            plain = (plain_list[0] if isinstance(plain_list, (list, tuple)) and plain_list else None)
-            synced = (synced_list[0] if isinstance(synced_list, (list, tuple)) and synced_list else None)
+            plain, synced = _read_vorbis_lyrics(audio)
 
         elif ext in {".m4a", ".mp4"}:
             audio = MP4(path)
