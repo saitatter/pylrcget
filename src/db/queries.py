@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import re
 import sqlite3
+import threading
 from datetime import datetime, timezone
 from typing import List, Sequence
 
@@ -49,12 +50,14 @@ def set_init(db: sqlite3.Connection, init: bool) -> None:
 # CONFIG
 # -------------------------------
 _config_cache: Config | None = None
+_config_cache_lock = threading.Lock()
 
 
 def get_config(db: sqlite3.Connection) -> Config:
     global _config_cache
-    if _config_cache is not None:
-        return _config_cache
+    with _config_cache_lock:
+        if _config_cache is not None:
+            return _config_cache
     row = db.execute("""
         SELECT skip_tracks_with_synced_lyrics,
                skip_tracks_with_plain_lyrics,
@@ -104,13 +107,15 @@ def get_config(db: sqlite3.Connection) -> Config:
         playback_volume=float(row["playback_volume"] if row["playback_volume"] is not None else 0.7),
         last_library_route=row["last_library_route"] or "",
     )
-    _config_cache = config
+    with _config_cache_lock:
+        _config_cache = config
     return config
 
 
 def set_config(db: sqlite3.Connection, config: Config) -> None:
     global _config_cache
-    _config_cache = None
+    with _config_cache_lock:
+        _config_cache = None
     db.execute("""
         UPDATE config_data
         SET skip_tracks_with_synced_lyrics = ?,
