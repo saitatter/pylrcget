@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional
 
 from PySide6.QtCore import Qt, QTimer, QEasingCurve, QPoint, QPropertyAnimation
 from PySide6.QtWidgets import (
@@ -92,8 +91,8 @@ class ToastWidget(QFrame):
         self._opacity.setOpacity(0.0)
         self.setGraphicsEffect(self._opacity)
 
-        self._anim_opacity: Optional[QPropertyAnimation] = None
-        self._anim_pos: Optional[QPropertyAnimation] = None
+        self._anim_opacity: QPropertyAnimation | None = None
+        self._anim_pos: QPropertyAnimation | None = None
 
     def close_requested(self):
         # Let the manager handle the removal animation.

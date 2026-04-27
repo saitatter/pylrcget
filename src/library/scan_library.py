@@ -5,7 +5,6 @@ import os
 import logging
 import re
 from pathlib import Path
-from typing import Optional, Tuple
 
 from mutagen import File as MutagenFile
 from mutagen.asf import ASF
@@ -291,7 +290,7 @@ def _read_sidecar(path: str, lyrics_lookup_subdir: str | None = None) -> tuple[s
     lrc = lrc.strip() if lrc else None
     return txt, lrc
 
-def read_embedded_lyrics(path: str) -> Tuple[Optional[str], Optional[str]]:
+def read_embedded_lyrics(path: str) -> tuple[str | None, str | None]:
     """
     Read embedded plain lyrics and synced LRC (if present) from an audio file.
     Returns (plain_lyrics_or_None, synced_lrc_or_None).
@@ -306,8 +305,8 @@ def read_embedded_lyrics(path: str) -> Tuple[Optional[str], Optional[str]]:
     """
     p = Path(path)
     ext = p.suffix.lower()
-    plain: Optional[str] = None
-    synced: Optional[str] = None
+    plain: str | None = None
+    synced: str | None = None
 
     try:
         if ext == ".mp3":
@@ -390,7 +389,7 @@ def read_embedded_lyrics(path: str) -> Tuple[Optional[str], Optional[str]]:
         elif ext in {".wma", ".asf"}:
             audio = ASF(path)
 
-            def _first_asf_text(keys: tuple[str, ...]) -> Optional[str]:
+            def _first_asf_text(keys: tuple[str, ...]) -> str | None:
                 for key in keys:
                     values = audio.get(key)
                     if not values:
@@ -411,7 +410,7 @@ def read_embedded_lyrics(path: str) -> Tuple[Optional[str], Optional[str]]:
             audio = Musepack(path)
             tags = getattr(audio, "tags", None)
 
-            def _first_ape_text(keys: tuple[str, ...]) -> Optional[str]:
+            def _first_ape_text(keys: tuple[str, ...]) -> str | None:
                 if not tags:
                     return None
                 for key in keys:
@@ -451,7 +450,7 @@ def read_embedded_lyrics(path: str) -> Tuple[Optional[str], Optional[str]]:
         logger.exception("Failed to read embedded lyrics from %s: %s", path, e)
         # return whatever we have (likely None, None)
     # Normalize blank -> None and strip
-    def _norm(s: Optional[str]) -> Optional[str]:
+    def _norm(s: str | None) -> str | None:
         if s is None:
             return None
         s2 = str(s).strip()

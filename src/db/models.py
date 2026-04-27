@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional
 import sqlite3
 
 
@@ -12,18 +11,18 @@ class Track:
     file_name: str
     title: str
     album_name: str
-    album_artist_name: Optional[str]
+    album_artist_name: str | None
     album_id: int
     artist_name: str
     artist_id: int
-    image_path: Optional[str]
-    track_number: Optional[int]
-    txt_lyrics: Optional[str]
-    lrc_lyrics: Optional[str]
+    image_path: str | None
+    track_number: int | None
+    txt_lyrics: str | None
+    lrc_lyrics: str | None
     duration: float
     instrumental: bool
-    dirty_txt_lyrics: Optional[str] = None
-    dirty_lrc_lyrics: Optional[str] = None
+    dirty_txt_lyrics: str | None = None
+    dirty_lrc_lyrics: str | None = None
     dirty_lyrics_present: bool = False
 
     @staticmethod
@@ -59,9 +58,9 @@ class Track:
 class Album:
     id: int
     name: str
-    image_path: Optional[str]
+    image_path: str | None
     artist_name: str
-    album_artist_name: Optional[str]
+    album_artist_name: str | None
     tracks_count: int
 
     @staticmethod

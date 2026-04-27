@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-from typing import Optional
 
 from PySide6.QtCore import Qt, QThread, Signal
 from PySide6.QtGui import QColor
@@ -68,7 +67,7 @@ class SearchLyricsDialog(QDialog):
         self.resize(750, 500)
         self.lrclib_instance = lrclib_instance
         self._results: list = []
-        self._worker: Optional[_SearchWorker] = None
+        self._worker: _SearchWorker | None = None
 
         layout = QVBoxLayout(self)
 

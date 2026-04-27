@@ -4,7 +4,6 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 from enum import Enum, auto
-from typing import Optional
 
 from PySide6.QtCore import QObject, Signal, QTimer
 from PySide6.QtMultimedia import QMediaPlayer, QAudioOutput
@@ -41,7 +40,7 @@ class Player(QObject):
 
         # --- Backend selection ---
         self._use_mpv: bool = False
-        self._mpv: Optional[MpvIpcBackend] = None
+        self._mpv: MpvIpcBackend | None = None
 
         # Qt fallback backend
         self.audio = QAudioOutput()

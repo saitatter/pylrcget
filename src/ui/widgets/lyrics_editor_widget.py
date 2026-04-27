@@ -4,7 +4,6 @@ from __future__ import annotations
 import logging
 import re
 from bisect import bisect_right
-from typing import List, Optional, Tuple
 
 from PySide6.QtCore import QRect, QSize, Qt, Signal, QTimer
 from PySide6.QtGui import QColor, QKeySequence, QShortcut
@@ -157,7 +156,7 @@ class LyricsEditorWidget(QWidget):
         super().__init__(parent)
 
         self._current_pos_ms: int = 0
-        self._times: List[int] = []
+        self._times: list[int] = []
         self._current_index: int = -1
         self._invalid_rows: set[int] = set()
         self._default_button_text: dict[QPushButton, str] = {}
@@ -410,11 +409,11 @@ class LyricsEditorWidget(QWidget):
     def set_track_lyrics(
         self,
         title: str,
-        txt_lyrics: Optional[str],
-        lrc_lyrics: Optional[str],
+        txt_lyrics: str | None,
+        lrc_lyrics: str | None,
         instrumental: bool,
-        dirty_txt_lyrics: Optional[str] = None,
-        dirty_lrc_lyrics: Optional[str] = None,
+        dirty_txt_lyrics: str | None = None,
+        dirty_lrc_lyrics: str | None = None,
         dirty_lyrics_present: bool = False,
     ):
         self._loading_track = True
@@ -633,7 +632,7 @@ class LyricsEditorWidget(QWidget):
         self._restore_snapshot(snapshot)
         self._set_validation_message("Redo", state="success")
 
-    def _set_synced(self, pairs: List[Tuple[int, str]]):
+    def _set_synced(self, pairs: list[tuple[int, str]]):
         self._reset_state()
         self.stack.setCurrentWidget(self.table)
 
@@ -675,7 +674,7 @@ class LyricsEditorWidget(QWidget):
         self.btn_auto_sync.setVisible(True)
 
     def _rebuild_times_cache(self):
-        times: List[int] = []
+        times: list[int] = []
         for r in range(self.table.rowCount()):
             it_time = self.table.item(r, 0)
             ms = int(it_time.data(TIMESTAMP_MS_ROLE) or 0) if it_time else 0
@@ -818,7 +817,7 @@ class LyricsEditorWidget(QWidget):
 
     def _current_lyrics_text(self) -> tuple[str, str]:
         if self.stack.currentWidget() is self.table:
-            pairs: List[Tuple[int, str]] = []
+            pairs: list[tuple[int, str]] = []
             for r in range(self.table.rowCount()):
                 it_time = self.table.item(r, 0)
                 it_text = self.table.item(r, 1)

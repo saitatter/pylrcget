@@ -1,7 +1,6 @@
 # core/embed_lyrics.py
 from __future__ import annotations
 
-from typing import Optional
 from pathlib import Path
 
 from mutagen import File as MutagenFile
@@ -45,7 +44,7 @@ def _strip_timestamps(lrc: str) -> str:
     return "\n".join(out_lines).strip()
 
 
-def _norm(s: Optional[str]) -> Optional[str]:
+def _norm(s: str | None) -> str | None:
     """Normalize optional strings (strip + convert empty to None)."""
     if not s:
         return None
@@ -72,7 +71,7 @@ def embed_lyrics_for_track(track: TrackWithLyrics) -> None:
     embed_lyrics_in_file(path, plain, synced)
 
 
-def embed_lyrics_in_file(path: str, plain: Optional[str], synced: Optional[str]) -> None:
+def embed_lyrics_in_file(path: str, plain: str | None, synced: str | None) -> None:
     """
     Embed lyrics depending on file extension:
       - .mp3            -> ID3: USLT for plain + TXXX for synced (LYRICS)
@@ -118,7 +117,7 @@ def embed_lyrics_in_file(path: str, plain: Optional[str], synced: Optional[str])
         pass
 
 
-def _embed_vorbis_comment(audio_cls, path: str, plain: Optional[str], synced: Optional[str]) -> None:
+def _embed_vorbis_comment(audio_cls, path: str, plain: str | None, synced: str | None) -> None:
     """Helper for formats that use Vorbis comments (FLAC/Vorbis/Opus)."""
     audio = audio_cls(path)
 
@@ -135,19 +134,19 @@ def _embed_vorbis_comment(audio_cls, path: str, plain: Optional[str], synced: Op
     audio.save()
 
 
-def _embed_flac(path: str, plain: Optional[str], synced: Optional[str]) -> None:
+def _embed_flac(path: str, plain: str | None, synced: str | None) -> None:
     _embed_vorbis_comment(FLAC, path, plain, synced)
 
 
-def _embed_ogg_vorbis(path: str, plain: Optional[str], synced: Optional[str]) -> None:
+def _embed_ogg_vorbis(path: str, plain: str | None, synced: str | None) -> None:
     _embed_vorbis_comment(OggVorbis, path, plain, synced)
 
 
-def _embed_ogg_opus(path: str, plain: Optional[str], synced: Optional[str]) -> None:
+def _embed_ogg_opus(path: str, plain: str | None, synced: str | None) -> None:
     _embed_vorbis_comment(OggOpus, path, plain, synced)
 
 
-def _embed_mp3(path: str, plain: Optional[str], synced: Optional[str]) -> None:
+def _embed_mp3(path: str, plain: str | None, synced: str | None) -> None:
     try:
         tags = ID3(path)
     except ID3NoHeaderError:
@@ -192,7 +191,7 @@ def _embed_mp3(path: str, plain: Optional[str], synced: Optional[str]) -> None:
     tags.save(path)
 
 
-def _write_id3_lyrics(tags: ID3, plain: Optional[str], synced: Optional[str]) -> None:
+def _write_id3_lyrics(tags: ID3, plain: str | None, synced: str | None) -> None:
     tags.delall("USLT")
     tags.delall(f"TXXX:{ID3_SYNCED_DESC}")
     tags.delall(f"TXXX:{ID3_PLAIN_DESC}")
@@ -224,7 +223,7 @@ def _write_id3_lyrics(tags: ID3, plain: Optional[str], synced: Optional[str]) ->
         )
 
 
-def _embed_mp4(path: str, plain: Optional[str], synced: Optional[str]) -> None:
+def _embed_mp4(path: str, plain: str | None, synced: str | None) -> None:
     audio = MP4(path)
 
     # Plain lyrics: standard Apple tag ©lyr.
@@ -242,7 +241,7 @@ def _embed_mp4(path: str, plain: Optional[str], synced: Optional[str]) -> None:
     audio.save()
 
 
-def _embed_asf(path: str, plain: Optional[str], synced: Optional[str]) -> None:
+def _embed_asf(path: str, plain: str | None, synced: str | None) -> None:
     audio = ASF(path)
 
     if ASF_PLAIN_KEY in audio:
@@ -258,7 +257,7 @@ def _embed_asf(path: str, plain: Optional[str], synced: Optional[str]) -> None:
     audio.save()
 
 
-def _embed_musepack(path: str, plain: Optional[str], synced: Optional[str]) -> None:
+def _embed_musepack(path: str, plain: str | None, synced: str | None) -> None:
     audio = Musepack(path)
     if getattr(audio, "tags", None) is None:
         audio.add_tags()
@@ -276,7 +275,7 @@ def _embed_musepack(path: str, plain: Optional[str], synced: Optional[str]) -> N
     audio.save()
 
 
-def _embed_dsf(path: str, plain: Optional[str], synced: Optional[str]) -> None:
+def _embed_dsf(path: str, plain: str | None, synced: str | None) -> None:
     audio = DSF(path)
     if getattr(audio, "tags", None) is None:
         audio.add_tags()
@@ -284,7 +283,7 @@ def _embed_dsf(path: str, plain: Optional[str], synced: Optional[str]) -> None:
     audio.save()
 
 
-def _embed_dsdiff(path: str, plain: Optional[str], synced: Optional[str]) -> None:
+def _embed_dsdiff(path: str, plain: str | None, synced: str | None) -> None:
     audio = DSDIFF(path)
     if getattr(audio, "tags", None) is None:
         audio.add_tags()

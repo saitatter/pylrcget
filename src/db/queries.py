@@ -5,7 +5,7 @@ import re
 import sqlite3
 import threading
 from datetime import datetime, timezone
-from typing import List, Sequence
+from typing import Sequence
 
 from core.models import FsTrack
 from core.utils import prepare_input
@@ -21,12 +21,12 @@ def _escape_like(value: str) -> str:
 # -------------------------------
 # DIRECTORIES
 # -------------------------------
-def get_directories(db: sqlite3.Connection) -> List[str]:
+def get_directories(db: sqlite3.Connection) -> list[str]:
     cursor = db.execute("SELECT path FROM directories")
     return [row["path"] for row in cursor.fetchall()]
 
 
-def set_directories(db: sqlite3.Connection, directories: List[str]) -> None:
+def set_directories(db: sqlite3.Connection, directories: list[str]) -> None:
     db.execute("DELETE FROM directories")
     for path in directories:
         db.execute("INSERT INTO directories (path) VALUES (?)", (path,))
@@ -435,7 +435,7 @@ def add_track(db: sqlite3.Connection, track: FsTrack, *, commit: bool = True) ->
         db.commit()
 
 
-def add_tracks(db: sqlite3.Connection, tracks: List[FsTrack], *, commit: bool = True) -> None:
+def add_tracks(db: sqlite3.Connection, tracks: list[FsTrack], *, commit: bool = True) -> None:
     if not tracks:
         return
 
@@ -487,7 +487,7 @@ def add_tracks(db: sqlite3.Connection, tracks: List[FsTrack], *, commit: bool = 
         _do_add()
 
 
-def get_tracks(db: sqlite3.Connection) -> List[Track]:
+def get_tracks(db: sqlite3.Connection) -> list[Track]:
     cursor = db.execute("""
         SELECT
             tracks.id, file_path, file_name, title,
@@ -821,7 +821,7 @@ def get_track_ids(
     plain_lyrics: bool,
     instrumental: bool,
     no_lyrics: bool,
-) -> List[int]:
+) -> list[int]:
     conditions: list[str] = []
 
     if not synced_lyrics:
@@ -843,7 +843,7 @@ def get_album_track_ids(
     album_id: int,
     without_plain_lyrics: bool,
     without_synced_lyrics: bool,
-) -> List[int]:
+) -> list[int]:
     conditions: list[str] = []
     if without_plain_lyrics:
         conditions.append("txt_lyrics IS NULL")
@@ -862,7 +862,7 @@ def get_artist_track_ids(
     artist_id: int,
     without_plain_lyrics: bool,
     without_synced_lyrics: bool,
-) -> List[int]:
+) -> list[int]:
     conditions: list[str] = []
     if without_plain_lyrics:
         conditions.append("txt_lyrics IS NULL")
@@ -958,7 +958,7 @@ def prune_library(db: sqlite3.Connection) -> None:
 # -------------------------------
 # GET TRACKS BY ALBUM / ARTIST
 # -------------------------------
-def get_album_tracks(db: sqlite3.Connection, album_id: int) -> List[Track]:
+def get_album_tracks(db: sqlite3.Connection, album_id: int) -> list[Track]:
     query = """
         SELECT
             tracks.id, file_path, file_name, title,
@@ -976,7 +976,7 @@ def get_album_tracks(db: sqlite3.Connection, album_id: int) -> List[Track]:
     return [Track.from_row(row) for row in rows]
 
 
-def get_artist_tracks(db: sqlite3.Connection, artist_id: int) -> List[Track]:
+def get_artist_tracks(db: sqlite3.Connection, artist_id: int) -> list[Track]:
     query = """
         SELECT
             tracks.id, file_path, file_name, title,
