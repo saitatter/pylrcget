@@ -718,8 +718,14 @@ class MainWindow(QMainWindow):
         if self._dirty_lyrics_timer.isActive():
             self._dirty_lyrics_timer.stop()
             self._flush_dirty_lyrics()
+        # Cancel running workers before shutdown
         if self._ai_sync_worker is not None and self._ai_sync_worker.isRunning():
+            self._ai_sync_worker.requestInterruption()
             self._ai_sync_worker.wait(5000)
+        self.downloads.cancel()
+        if self.scanner is not None and self.scanner.isRunning():
+            self.scanner.requestInterruption()
+            self.scanner.wait(2000)
         self._save_window_state()
         self._flush_playback_speed()
         self._flush_playback_volume()
