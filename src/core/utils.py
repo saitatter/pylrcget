@@ -99,6 +99,8 @@ def parse_ts_str(ts: str) -> int | None:
     m = re.match(r"^(\d+):(\d{1,2})(?:\.(\d{1,3}))?$", t)
     if not m:
         return None
+    if int(m.group(2)) >= 60:
+        return None
     try:
         return _ts_to_ms(m.group(1), m.group(2), m.group(3))
     except (ValueError, TypeError):
