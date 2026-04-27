@@ -106,6 +106,45 @@ class LyricsSidecarExportTests(unittest.TestCase):
 
             self.assertEqual({str(expected_lrc), str(expected_txt)}, set(written))
 
+    def test_path_traversal_in_pattern_falls_back_to_safe_name(self):
+        """A pattern that resolves outside the output dir must be rejected."""
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            audio = tmp_path / "music" / "song.mp3"
+            audio.parent.mkdir(parents=True, exist_ok=True)
+            audio.write_text("audio")
+            out_dir = tmp_path / "lyrics"
+            config = _make_config(str(out_dir), "../../etc/{filename}")
+            track = _make_track(audio)
+
+            written = export_lyrics_sidecars(track, config)
+            for path in written:
+                self.assertTrue(
+                    Path(path).resolve().is_relative_to(out_dir.resolve()),
+                    f"Sidecar escaped output dir: {path}",
+                )
+
+    def test_dotdot_in_artist_name_sanitised(self):
+        """Track metadata containing '..' must not cause path traversal."""
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            audio = tmp_path / "music" / "song.mp3"
+            audio.parent.mkdir(parents=True, exist_ok=True)
+            audio.write_text("audio")
+            out_dir = tmp_path / "lyrics"
+            config = _make_config(str(out_dir), "{artist}/{title}")
+            track = _make_track(audio)
+            track = Track(
+                **{**track.__dict__, "artist_name": "../../../etc", "title": "passwd"},
+            )
+
+            written = export_lyrics_sidecars(track, config)
+            for path in written:
+                self.assertTrue(
+                    Path(path).resolve().is_relative_to(out_dir.resolve()),
+                    f"Sidecar escaped output dir: {path}",
+                )
+
 
 if __name__ == "__main__":
     unittest.main()
