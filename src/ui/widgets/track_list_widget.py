@@ -32,7 +32,7 @@ from ui.style_loader import load_stylesheet
 from ui.widgets.sortable_header_view import SortableHeaderView
 from ui.widgets.library_table_utils import should_load_more
 from ui.widgets.track_list_rows import build_track_list_rows
-from core.tracklist_models import DownloadState
+from core.tracklist_models import DownloadState, LyricsState
 
 
 TRACK_DURATION_COLUMN_WIDTH = 92
@@ -634,6 +634,15 @@ class TrackListWidget(QWidget):
             return
         current = self.model._rows[row]
         self.model._rows[row] = replace(current, has_dirty_lyrics=bool(has_dirty_lyrics))
+        idx = self.model.index(row, 2)
+        self.model.dataChanged.emit(idx, idx, [Qt.DisplayRole, Qt.ForegroundRole, Qt.FontRole, Qt.UserRole])
+
+    def update_track_lyrics_state(self, track_id: int, lyrics_state: LyricsState) -> None:
+        row = self.model.row_for_track_id(int(track_id))
+        if row < 0:
+            return
+        current = self.model._rows[row]
+        self.model._rows[row] = replace(current, lyrics_state=lyrics_state, has_dirty_lyrics=False)
         idx = self.model.index(row, 2)
         self.model.dataChanged.emit(idx, idx, [Qt.DisplayRole, Qt.ForegroundRole, Qt.FontRole, Qt.UserRole])
 

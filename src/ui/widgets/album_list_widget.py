@@ -207,6 +207,9 @@ class AlbumListWidget(QWidget):
     def set_dirty_lyrics_state(self, track_id: int, has_dirty_lyrics: bool) -> None:
         self.track_list.set_dirty_lyrics_state(track_id, has_dirty_lyrics)
 
+    def update_track_lyrics_state(self, track_id: int, lyrics_state) -> None:
+        self.track_list.update_track_lyrics_state(track_id, lyrics_state)
+
     def get_download_state(self, track_id: int) -> str:
         return self.track_list.get_download_state(track_id)
 

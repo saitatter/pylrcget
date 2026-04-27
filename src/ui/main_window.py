@@ -20,6 +20,7 @@ import sqlite3
 from dataclasses import replace
 
 from core.state import Notify
+from core.tracklist_models import LyricsState
 from db.queries import (
     add_track,
     get_album_by_id,
@@ -1263,6 +1264,23 @@ class MainWindow(QMainWindow):
             route = self.navigation.current_route
             self.artists_tab.apply_route(route if route.tab == "artists" else LibraryRoute(tab="artists", mode="root"))
 
+    @staticmethod
+    def _lyrics_state_from_track(track) -> LyricsState:
+        if track.instrumental or track.lrc_lyrics == "[au: instrumental]":
+            return LyricsState.INSTRUMENTAL
+        if track.lrc_lyrics:
+            return LyricsState.SYNCED
+        if track.txt_lyrics:
+            return LyricsState.PLAIN
+        return LyricsState.NONE
+
+    def _update_single_track_lyrics_state(self, track) -> None:
+        state = self._lyrics_state_from_track(track)
+        tid = int(track.id)
+        self.track_list.update_track_lyrics_state(tid, state)
+        self.albums_tab.update_track_lyrics_state(tid, state)
+        self.artists_tab.update_track_lyrics_state(tid, state)
+
 
     def _on_lyrics_save_requested(self, lrc: str, txt: str):
         track_id = self._editing_track_id
@@ -1294,7 +1312,7 @@ class MainWindow(QMainWindow):
             self.track_list.set_dirty_lyrics_state(int(track_id), False)
             self.albums_tab.set_dirty_lyrics_state(int(track_id), False)
             self.artists_tab.set_dirty_lyrics_state(int(track_id), False)
-            self._refresh_visible_library_view_after_downloads()
+            self._update_single_track_lyrics_state(track)
             self._show_status_message("Lyrics saved.", 2500)
             for view in self._all_lyrics_views():
                 view.set_save_feedback("success", "Saved")
@@ -1451,7 +1469,7 @@ class MainWindow(QMainWindow):
             self.track_list.set_dirty_lyrics_state(int(track_id), False)
             self.albums_tab.set_dirty_lyrics_state(int(track_id), False)
             self.artists_tab.set_dirty_lyrics_state(int(track_id), False)
-            self._refresh_visible_library_view_after_downloads()
+            self._update_single_track_lyrics_state(track)
             notify_user(
                 self.app_state,
                 msg,
