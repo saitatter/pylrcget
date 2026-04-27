@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import threading
 from dataclasses import dataclass
 from enum import Enum, auto
 
@@ -69,6 +70,7 @@ class Player(QObject):
 
         # mpv end detection
         self._mpv_last_eof: bool = False
+        self._mpv_eof_lock = threading.Lock()
 
         # Try to start mpv backend; if it fails, we keep Qt fallback
         self._try_init_mpv()
@@ -138,9 +140,11 @@ class Player(QObject):
         This callback may run on our message-processing thread; we only cache state here.
         """
         try:
-            self._mpv_last_eof = bool(value)
+            with self._mpv_eof_lock:
+                self._mpv_last_eof = bool(value)
         except (TypeError, ValueError):
-            self._mpv_last_eof = False
+            with self._mpv_eof_lock:
+                self._mpv_last_eof = False
 
     # ----------------------------
     # Shared helpers
@@ -203,8 +207,11 @@ class Player(QObject):
 
         # Ended event
         # eof-reached tends to briefly flip true at the end; emit once when it transitions false->true.
-        if self._mpv_last_eof:
-            self._mpv_last_eof = False
+        with self._mpv_eof_lock:
+            eof = self._mpv_last_eof
+            if eof:
+                self._mpv_last_eof = False
+        if eof:
             self._set_status(PlayerStatus.STOPPED)
             self.ended.emit()
 
