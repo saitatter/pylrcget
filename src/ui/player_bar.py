@@ -272,6 +272,8 @@ class PlayerBar(QWidget):
             "next": load_svg_icon("skip-forward.svg", 20, "#e5e7eb"),
             "play": load_svg_icon("play.svg", 28, "#e5e7eb"),
             "pause": load_svg_icon("pause.svg", 28, "#e5e7eb"),
+            "volume": load_svg_icon("volume-2.svg", 16, "#e5e7eb"),
+            "volume_muted": load_svg_icon("volume-x.svg", 16, "#e5e7eb"),
         }
         self.btn_prev.setIcon(self._icons["prev"])
         self.btn_next.setIcon(self._icons["next"])
@@ -361,8 +363,17 @@ class PlayerBar(QWidget):
         volume_row = QHBoxLayout()
         set_layout_spacing(volume_row, margins=0, spacing=SPACE_2)
 
-        self.lbl_volume = QLabel("Volume")
-        self.lbl_volume.setObjectName("MetaLabel")
+        self.lbl_volume = QToolButton()
+        self.lbl_volume.setObjectName("BtnMute")
+        self.lbl_volume.setToolTip("Mute / Unmute")
+        self.lbl_volume.setAccessibleName("Mute toggle")
+        self.lbl_volume.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
+        self.lbl_volume.setAutoRaise(True)
+        self.lbl_volume.setFixedSize(22, 22)
+        self.lbl_volume.setIcon(self._icons["volume"])
+        self.lbl_volume.setIconSize(QSize(16, 16))
+        self._muted = False
+        self._pre_mute_volume = 70
 
         self.slider_volume = SeekSlider(Qt.Orientation.Horizontal)
         self.slider_volume.setObjectName("VolumeSlider")
@@ -400,6 +411,7 @@ class PlayerBar(QWidget):
         self.btn_speed_down.clicked.connect(lambda: self._step_speed(-self._speed_step))
         self.btn_speed_up.clicked.connect(lambda: self._step_speed(self._speed_step))
         self.slider_volume.valueChanged.connect(self._on_volume_changed)
+        self.lbl_volume.clicked.connect(self._toggle_mute)
 
         if self.player:
             self._connect_player_signals(self.player)
@@ -555,6 +567,12 @@ class PlayerBar(QWidget):
     def _on_volume_changed(self, value: int) -> None:
         normalized = max(0.0, min(1.0, float(value) / 100.0))
         self.lbl_volume_value.setText(f"{int(round(normalized * 100))}%")
+        if value > 0:
+            self._muted = False
+            self.lbl_volume.setIcon(self._icons["volume"])
+        else:
+            self._muted = True
+            self.lbl_volume.setIcon(self._icons["volume_muted"])
         if self.player and hasattr(self.player, "set_volume"):
             try:
                 self.player.set_volume(normalized)
@@ -563,6 +581,13 @@ class PlayerBar(QWidget):
                 self._sync_volume_from_player()
                 return
         self.volumeChanged.emit(normalized)
+
+    def _toggle_mute(self) -> None:
+        if self._muted:
+            self.slider_volume.setValue(self._pre_mute_volume)
+        else:
+            self._pre_mute_volume = max(self.slider_volume.value(), 5)
+            self.slider_volume.setValue(0)
 
     def _on_speed_preset_selected(self, index: int):
         speed = self.cmb_speed.itemData(index)

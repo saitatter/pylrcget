@@ -80,8 +80,8 @@ def _is_lrclib_not_found(exc: Exception) -> bool:
 
 
 def is_valid_lrclib_duration(duration_s: int | None) -> bool:
-    if duration_s is None:
-        return True
+    if duration_s is None or duration_s <= 0:
+        return False
     return LRCLIB_MIN_DURATION_S <= int(duration_s) <= LRCLIB_MAX_DURATION_S
 
 
@@ -194,7 +194,11 @@ def sync_track_outputs(
     config: Config | None = None,
 ) -> None:
     config = config or get_config(db)
-    sync_track_outputs_with_result(track, config, notify=notify)
+    result = sync_track_outputs_with_result(track, config, notify=notify)
+    if result.sidecar_error:
+        notify(f"Warning: sidecar export failed: {result.sidecar_error}")
+    if result.embed_error:
+        notify(f"Warning: lyrics embedding failed: {result.embed_error}")
 
 
 def sync_track_outputs_with_result(
@@ -253,14 +257,16 @@ def apply_lyrics_match_to_track(
     if mode == "plain_only":
         if plain:
             notify("Saving plain lyrics...")
-            track = update_track_plain_lyrics(db, track_id, plain)
+            update_track_plain_lyrics(db, track_id, plain)
+            track = get_track_by_id(db, track_id)
             sync_track_outputs(db, track, notify, config=config)
             return True, f"Downloaded plain lyrics.{score_note}", track
         if synced:
             derived_plain = _strip_empty(_strip_timestamps(synced))
             if derived_plain:
                 notify("Saving plain lyrics derived from synced lyrics...")
-                track = update_track_plain_lyrics(db, track_id, derived_plain)
+                update_track_plain_lyrics(db, track_id, derived_plain)
+                track = get_track_by_id(db, track_id)
                 sync_track_outputs(db, track, notify, config=config)
                 return True, f"Downloaded plain lyrics.{score_note}", track
         return False, f"No plain lyrics found on LRCLIB for this track.{score_note}", None
@@ -269,7 +275,8 @@ def apply_lyrics_match_to_track(
         if not plain:
             plain = _strip_empty(_strip_timestamps(synced))
         notify("Saving synced + plain lyrics...")
-        track = update_track_synced_lyrics(db, track_id, synced, plain or "")
+        update_track_synced_lyrics(db, track_id, synced, plain or "")
+        track = get_track_by_id(db, track_id)
         sync_track_outputs(db, track, notify, config=config)
         return True, f"Downloaded synced lyrics.{score_note}", track
 
@@ -277,7 +284,8 @@ def apply_lyrics_match_to_track(
         if mode == "synced_only":
             return False, f"Only plain lyrics were found; synced-only mode is enabled.{score_note}", None
         notify("Saving plain lyrics...")
-        track = update_track_plain_lyrics(db, track_id, plain)
+        update_track_plain_lyrics(db, track_id, plain)
+        track = get_track_by_id(db, track_id)
         sync_track_outputs(db, track, notify, config=config)
         return True, f"Downloaded plain lyrics.{score_note}", track
 
@@ -317,7 +325,7 @@ def download_track_lyrics(
 
         if not title or not artist:
             return False, "Missing title/artist; cannot search lyrics.", track_id, title_for_ui
-        if duration_s and not is_valid_lrclib_duration(duration_s):
+        if not is_valid_lrclib_duration(duration_s):
             return False, invalid_lrclib_duration_message(duration_s), track_id, title_for_ui
 
         api_instance = api or LrcLibAPI(lrclib_instance)

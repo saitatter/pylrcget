@@ -10,7 +10,7 @@ import subprocess
 import threading
 import time
 from dataclasses import dataclass
-from typing import Any, Callable, Optional
+from typing import Any, Callable
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +48,7 @@ def _remove_unix_socket_if_exists(path: str) -> None:
         pass
 
 
-def _find_mpv_binary(preferred_path: Optional[str] = None) -> Optional[str]:
+def _find_mpv_binary(preferred_path: str | None = None) -> str | None:
     """
     Locate mpv binary. Priority:
       1) preferred_path if exists
@@ -121,7 +121,7 @@ class _MpvJsonIpcTransport:
         self.endpoint = endpoint
         self._stop = threading.Event()
 
-        self._rx_thread: Optional[threading.Thread] = None
+        self._rx_thread: threading.Thread | None = None
         self._rx_queue: "queue.Queue[dict[str, Any]]" = queue.Queue()
 
         self._tx_lock = threading.Lock()
@@ -130,7 +130,7 @@ class _MpvJsonIpcTransport:
         self._pipe_fh = None
 
         # Unix socket
-        self._sock: Optional[socket.socket] = None
+        self._sock: socket.socket | None = None
 
     def connect(self, timeout_s: float = 3.0) -> None:
         deadline = time.time() + timeout_s
@@ -139,7 +139,7 @@ class _MpvJsonIpcTransport:
             # Wait for pipe to appear, then open it as a file.
             # mpv pipe path looks like: \\.\pipe\name
             # Python open() can open this path directly in binary mode.
-            last_err: Optional[Exception] = None
+            last_err: Exception | None = None
             while time.time() < deadline and not self._stop.is_set():
                 try:
                     self._pipe_fh = open(self.endpoint, "r+b", buffering=0)
@@ -151,7 +151,7 @@ class _MpvJsonIpcTransport:
             if self._pipe_fh is None:
                 raise OSError(f"Failed to open mpv named pipe: {self.endpoint}. Last error: {last_err!r}")
         else:
-            last_err: Optional[Exception] = None
+            last_err: Exception | None = None
             while time.time() < deadline and not self._stop.is_set():
                 try:
                     s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
@@ -207,7 +207,7 @@ class _MpvJsonIpcTransport:
                     raise RuntimeError("mpv socket not connected")
                 self._sock.sendall(line)
 
-    def recv_nowait(self) -> Optional[dict[str, Any]]:
+    def recv_nowait(self) -> dict[str, Any] | None:
         try:
             return self._rx_queue.get_nowait()
         except queue.Empty:
@@ -264,8 +264,8 @@ class _MpvJsonIpcTransport:
 
 @dataclass
 class MpvBackendConfig:
-    mpv_path: Optional[str] = None
-    ipc_endpoint: Optional[str] = None
+    mpv_path: str | None = None
+    ipc_endpoint: str | None = None
     start_paused: bool = False
 
     # mpv tuning
@@ -273,7 +273,7 @@ class MpvBackendConfig:
     keep_open: bool = False
 
     # If you bundle mpv, you might want to force a working directory for relative assets.
-    cwd: Optional[str] = None
+    cwd: str | None = None
 
 
 class MpvIpcBackend:
@@ -285,7 +285,7 @@ class MpvIpcBackend:
       - using callbacks to emit signals
     """
 
-    def __init__(self, config: Optional[MpvBackendConfig] = None):
+    def __init__(self, config: MpvBackendConfig | None = None):
         self.config = config or MpvBackendConfig()
 
         self._mpv_bin = _find_mpv_binary(self.config.mpv_path)
@@ -295,7 +295,7 @@ class MpvIpcBackend:
         self.ipc = self.config.ipc_endpoint or _default_ipc_endpoint()
 
         # Process handle
-        self._proc: Optional[subprocess.Popen] = None
+        self._proc: subprocess.Popen | None = None
 
         # JSON request/response correlation
         self._req_id = 0

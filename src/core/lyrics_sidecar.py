@@ -46,7 +46,11 @@ def _resolve_output_base(track: Track, config: Config) -> Path:
             filename = _render_pattern(pattern, track)
         else:
             filename = _default_output_name(track)
-        return Path(output_dir) / filename
+        result = Path(output_dir) / filename
+        # Prevent path traversal outside the configured output directory
+        if not result.resolve().is_relative_to(Path(output_dir).resolve()):
+            result = Path(output_dir) / _default_output_name(track)
+        return result
 
     return Path(track.file_path).with_suffix("")
 
@@ -87,4 +91,7 @@ def _safe_component(value: str) -> str:
     cleaned = _INVALID_FILENAME_CHARS.sub("_", (value or "").strip())
     cleaned = re.sub(r"\s+", " ", cleaned)
     cleaned = cleaned.strip(" .")
+    # Reject path traversal components
+    if cleaned in ("", ".", ".."):
+        return ""
     return cleaned

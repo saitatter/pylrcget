@@ -24,8 +24,10 @@ from ui.widgets.track_list_widget import TrackListWidget
 
 
 class AlbumListWidget(QWidget):
+    previewTrack = Signal(int)
     playTrack = Signal(int)
     refreshTrack = Signal(int)
+    bulkRefreshRequested = Signal(list)
     downloadLyrics = Signal(int)
     exportLyricsFiles = Signal(int)
     bulkDownloadRequested = Signal(list, str)
@@ -120,7 +122,9 @@ class AlbumListWidget(QWidget):
         self.track_list = TrackListWidget(self.app_state)
         self.track_list.setScopeBannerEnabled(False)
         self.track_list.playTrack.connect(self.playTrack.emit)
+        self.track_list.previewTrack.connect(self.previewTrack.emit)
         self.track_list.refreshTrack.connect(self.refreshTrack.emit)
+        self.track_list.bulkRefreshRequested.connect(self.bulkRefreshRequested.emit)
         self.track_list.downloadLyrics.connect(self.downloadLyrics.emit)
         self.track_list.exportLyricsFiles.connect(self.exportLyricsFiles.emit)
         self.track_list.bulkDownloadRequested.connect(self.bulkDownloadRequested.emit)
@@ -199,6 +203,12 @@ class AlbumListWidget(QWidget):
 
     def set_download_state(self, track_id: int, state: str) -> None:
         self.track_list.set_download_state(track_id, state)
+
+    def set_dirty_lyrics_state(self, track_id: int, has_dirty_lyrics: bool) -> None:
+        self.track_list.set_dirty_lyrics_state(track_id, has_dirty_lyrics)
+
+    def update_track_lyrics_state(self, track_id: int, lyrics_state) -> None:
+        self.track_list.update_track_lyrics_state(track_id, lyrics_state)
 
     def get_download_state(self, track_id: int) -> str:
         return self.track_list.get_download_state(track_id)

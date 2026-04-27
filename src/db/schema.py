@@ -56,7 +56,7 @@ CREATE TABLE albums (
 
 CREATE TABLE tracks (
     id INTEGER PRIMARY KEY,
-    file_path TEXT,
+    file_path TEXT UNIQUE,
     file_name TEXT,
     title TEXT,
     title_lower TEXT,
@@ -65,6 +65,9 @@ CREATE TABLE tracks (
     duration FLOAT,
     lrc_lyrics TEXT,
     txt_lyrics TEXT,
+    dirty_lrc_lyrics TEXT,
+    dirty_txt_lyrics TEXT,
+    dirty_lyrics_present BOOLEAN DEFAULT 0,
     instrumental BOOLEAN DEFAULT 0,
     track_number INTEGER,
     modified_time REAL,
@@ -98,6 +101,14 @@ CREATE TABLE download_history (
     downloaded_at TEXT NOT NULL
 );
 
+CREATE TABLE search_history (
+    id INTEGER PRIMARY KEY,
+    artist TEXT NOT NULL,
+    title TEXT NOT NULL,
+    album TEXT NOT NULL DEFAULT '',
+    searched_at TEXT NOT NULL
+);
+
 CREATE INDEX idx_tracks_title ON tracks(title);
 CREATE INDEX idx_albums_name ON albums(name);
 CREATE INDEX idx_artists_name ON artists(name);
@@ -106,7 +117,8 @@ CREATE INDEX idx_albums_name_lower ON albums(name_lower);
 CREATE INDEX idx_artists_name_lower ON artists(name_lower);
 CREATE INDEX idx_albums_album_artist_name_lower ON albums(album_artist_name_lower);
 CREATE INDEX idx_tracks_track_number ON tracks(track_number);
-CREATE INDEX idx_tracks_file_path ON tracks(file_path);
+CREATE UNIQUE INDEX idx_tracks_file_path ON tracks(file_path);
+CREATE INDEX idx_tracks_dirty ON tracks(dirty_lyrics_present);
 CREATE INDEX idx_tracks_artist_id ON tracks(artist_id);
 CREATE INDEX idx_tracks_album_id ON tracks(album_id);
 CREATE INDEX idx_tracks_artist_album ON tracks(artist_id, album_id);
@@ -115,6 +127,7 @@ CREATE INDEX idx_publish_history_published_at ON publish_history(published_at DE
 CREATE INDEX idx_publish_history_track_id ON publish_history(track_id);
 CREATE INDEX idx_download_history_downloaded_at ON download_history(downloaded_at DESC, id DESC);
 CREATE INDEX idx_download_history_track_id ON download_history(track_id);
+CREATE INDEX idx_search_history_searched_at ON search_history(searched_at DESC);
 
 INSERT INTO library_data (init) VALUES (0);
 INSERT INTO config_data (

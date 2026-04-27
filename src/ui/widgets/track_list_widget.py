@@ -2,9 +2,12 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from pathlib import Path
+import time
 from typing import Sequence
 
-from PySide6.QtCore import Signal, Qt, QItemSelectionModel
+from PySide6.QtCore import QEvent, Signal, Qt, QItemSelectionModel, QUrl
+from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QHeaderView,
     QHBoxLayout,
@@ -18,7 +21,7 @@ from PySide6.QtWidgets import (
     QWidgetAction,
 )
 
-from db.database import get_directories, get_track_rows
+from db.database import get_directories, get_duplicate_track_ids, get_track_by_id, get_track_rows
 from ui.library_routes import LibraryRoute, tracks_album, tracks_artist
 from ui.widgets.empty_state_widget import EmptyStateWidget
 from ui.models.track_table_model import TrackTableModel
@@ -29,7 +32,8 @@ from ui.style_loader import load_stylesheet
 from ui.widgets.sortable_header_view import SortableHeaderView
 from ui.widgets.library_table_utils import should_load_more
 from ui.widgets.track_list_rows import build_track_list_rows
-from core.tracklist_models import DownloadState
+from core.tracklist_models import DownloadState, LyricsState
+
 
 TRACK_DURATION_COLUMN_WIDTH = 92
 TRACK_LYRICS_COLUMN_WIDTH = 118
@@ -37,8 +41,10 @@ TRACK_ACTIONS_COLUMN_WIDTH = 142
 
 
 class TrackListWidget(QWidget):
+    previewTrack = Signal(int)    # track_id
     playTrack = Signal(int)       # track_id
     refreshTrack = Signal(int)    # track_id
+    bulkRefreshRequested = Signal(list)  # track_ids
     downloadLyrics = Signal(int)  # track_id
     exportLyricsFiles = Signal(int)  # track_id
     bulkDownloadRequested = Signal(list, str)  # track_ids, mode
@@ -51,9 +57,10 @@ class TrackListWidget(QWidget):
     clearFiltersRequested = Signal()
     configureFoldersRequested = Signal()
 
-    def __init__(self, app_state):
+    def __init__(self, app_state, *, show_bulk_context_actions: bool = True):
         super().__init__()
         self.app_state = app_state
+        self._show_bulk_context_actions = show_bulk_context_actions
         self._active = True
         self._page_size = 250
         self._search = ""
@@ -62,6 +69,7 @@ class TrackListWidget(QWidget):
             plain=True,
             instrumental=False,
             none=True,
+            unsaved=False,
         )
         self._artist_id: int | None = None
         self._album_id: int | None = None
@@ -74,6 +82,7 @@ class TrackListWidget(QWidget):
         self._sort_order = Qt.SortOrder.AscendingOrder
         self._has_more_rows = False
         self._loading_more = False
+        self._duplicate_ids: set[int] = set()
         self._ui_scale = 1.0
 
         self.scope_bar = QWidget()
@@ -110,6 +119,8 @@ class TrackListWidget(QWidget):
         self.table.setAlternatingRowColors(True)
         self.table.setMouseTracking(True)
         self.table.viewport().setMouseTracking(True)
+        self.table.viewport().installEventFilter(self)
+        self._suppress_left_click_until = 0.0
         self.table.setSortingEnabled(False)
         self.header.setSortIndicator(0, Qt.SortOrder.AscendingOrder)
         self.header.sortIndicatorChanged.connect(self._on_sort_changed)
@@ -144,6 +155,7 @@ class TrackListWidget(QWidget):
         # Right-click context menu
         self.table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.table.customContextMenuRequested.connect(self._on_context_menu)
+        self.table.selectionModel().selectionChanged.connect(self._on_selection_changed)
 
         self.empty_state = EmptyStateWidget()
         self.empty_state.actionTriggered.connect(self._on_empty_state_action)
@@ -192,8 +204,8 @@ class TrackListWidget(QWidget):
         if self._active:
             self.refresh()
 
-    def setFilters(self, synced: bool, plain: bool, instrumental: bool, none_: bool):
-        self._filters = dict(synced=synced, plain=plain, instrumental=instrumental, none=none_)
+    def setFilters(self, synced: bool, plain: bool, instrumental: bool, none_: bool, unsaved: bool = False):
+        self._filters = dict(synced=synced, plain=plain, instrumental=instrumental, none=none_, unsaved=unsaved)
         if self._active:
             self.refresh()
 
@@ -263,6 +275,7 @@ class TrackListWidget(QWidget):
             plain_lyrics_tracks=self._filters["plain"],
             instrumental_tracks=self._filters["instrumental"],
             no_lyrics_tracks=self._filters["none"],
+            unsaved_draft_only=self._filters.get("unsaved", False),
             limit=self._page_size + 1,
             offset=0 if reset else self.model.rowCount(),
             artist_id=self._artist_id,
@@ -275,7 +288,10 @@ class TrackListWidget(QWidget):
         self._has_more_rows = len(rows) > self._page_size
         visible_rows = rows[: self._page_size]
 
-        ui_rows = build_track_list_rows(visible_rows, self._download_states)
+        if reset:
+            self._duplicate_ids = get_duplicate_track_ids(db)
+
+        ui_rows = build_track_list_rows(visible_rows, self._download_states, self._duplicate_ids)
 
         if reset:
             self.model.set_rows(ui_rows)
@@ -314,6 +330,11 @@ class TrackListWidget(QWidget):
         track_id = self.model.track_id_at(index.row())
         if track_id is not None:
             self.playTrack.emit(int(track_id))
+
+    def _on_selection_changed(self, *_args) -> None:
+        track_id = self.selected_track_id()
+        if track_id is not None:
+            self.previewTrack.emit(int(track_id))
 
     def _on_context_menu(self, pos):
         idx = self.table.indexAt(pos)
@@ -354,42 +375,57 @@ class TrackListWidget(QWidget):
         count = len(selected_ids)
         count_text = f"{count} track selected" if count == 1 else f"{count} tracks selected"
         add_section("Selection", count_text)
+        act_refresh_selected = menu.addAction(f"Refresh selected from disk ({count})")
         act_play = menu.addAction("Play now")
         act_play.setEnabled(has_focused_track)
 
         menu.addSeparator()
         add_section("Focused Track")
-        act_refresh = menu.addAction("Refresh from disk")
+        act_open_folder = menu.addAction("Open containing folder")
         act_dl = menu.addAction("Download lyrics")
         act_export = menu.addAction("Export lyrics files")
-        act_refresh.setEnabled(has_focused_track)
+        act_open_folder.setEnabled(has_focused_track)
         act_dl.setEnabled(has_focused_track)
         act_export.setEnabled(has_focused_track)
 
-        menu.addSeparator()
         count_suffix = f"({len(selected_ids)})"
-        add_section("Download Selection")
-        act_dl_selected = menu.addAction(f"Use current mode {count_suffix}")
-        act_dl_synced = menu.addAction(f"Synced only {count_suffix}")
-        act_dl_plain = menu.addAction(f"Plain only {count_suffix}")
+        if self._show_bulk_context_actions:
+            menu.addSeparator()
+            add_section("Download Selection")
+            act_dl_selected = menu.addAction(f"Use current mode {count_suffix}")
+            act_dl_synced = menu.addAction(f"Synced only {count_suffix}")
+            act_dl_plain = menu.addAction(f"Plain only {count_suffix}")
 
-        menu.addSeparator()
-        add_section("Lyrics State")
-        act_instr = menu.addAction(f"Mark as instrumental {count_suffix}")
-        act_uninstr = menu.addAction(f"Unmark instrumental {count_suffix}")
+            menu.addSeparator()
+            add_section("Lyrics State")
+            act_instr = menu.addAction(f"Mark as instrumental {count_suffix}")
+            act_uninstr = menu.addAction(f"Unmark instrumental {count_suffix}")
 
-        menu.addSeparator()
-        add_section("Publish Selection")
-        act_pub_synced = menu.addAction(f"Publish synced {count_suffix}")
-        act_pub_plain = menu.addAction(f"Publish plain {count_suffix}")
+            menu.addSeparator()
+            add_section("Publish Selection")
+            act_pub_synced = menu.addAction(f"Publish synced {count_suffix}")
+            act_pub_plain = menu.addAction(f"Publish plain {count_suffix}")
+        else:
+            act_dl_selected = None
+            act_dl_synced = None
+            act_dl_plain = None
+            act_instr = None
+            act_uninstr = None
+            act_pub_synced = None
+            act_pub_plain = None
 
         chosen = menu.exec(self.table.viewport().mapToGlobal(pos))
+        if chosen is None:
+            self._suppress_next_table_left_click()
+            return
         if chosen == act_play:
             if current_track_id is not None:
                 self.playTrack.emit(int(current_track_id))
-        elif chosen == act_refresh:
+        elif chosen == act_refresh_selected:
+            self.bulkRefreshRequested.emit(selected_ids)
+        elif chosen == act_open_folder:
             if current_track_id is not None:
-                self.refreshTrack.emit(int(current_track_id))
+                self._open_track_folder(int(current_track_id))
         elif chosen == act_dl:
             if current_track_id is not None:
                 self.downloadLyrics.emit(int(current_track_id))
@@ -410,6 +446,33 @@ class TrackListWidget(QWidget):
             self.bulkPublishRequested.emit(selected_ids, True)
         elif chosen == act_pub_plain:
             self.bulkPublishRequested.emit(selected_ids, False)
+
+    def eventFilter(self, watched, event):
+        if watched is self.table.viewport() and event.type() in {
+            QEvent.Type.MouseButtonPress,
+            QEvent.Type.MouseButtonRelease,
+            QEvent.Type.MouseButtonDblClick,
+        }:
+            if (
+                event.button() == Qt.MouseButton.LeftButton
+                and time.monotonic() < self._suppress_left_click_until
+            ):
+                event.accept()
+                return True
+        return super().eventFilter(watched, event)
+
+    def _suppress_next_table_left_click(self) -> None:
+        self._suppress_left_click_until = time.monotonic() + 0.35
+
+    def _open_track_folder(self, track_id: int) -> bool:
+        track = get_track_by_id(self.app_state.db, int(track_id))
+        file_path = str(track.file_path or "").strip()
+        if not file_path:
+            return False
+        folder = Path(file_path).expanduser().parent
+        if not str(folder) or not folder.exists():
+            return False
+        return QDesktopServices.openUrl(QUrl.fromLocalFile(str(folder)))
 
     def _emit_artist_navigation(self, artist_id: int) -> None:
         self.openArtist.emit(int(artist_id))
@@ -568,6 +631,24 @@ class TrackListWidget(QWidget):
         self.model._rows[row] = replace(current, download_state=normalized)
         idx = self.model.index(row, 3)
         self.model.dataChanged.emit(idx, idx, [Qt.DisplayRole, Qt.UserRole])
+
+    def set_dirty_lyrics_state(self, track_id: int, has_dirty_lyrics: bool) -> None:
+        row = self.model.row_for_track_id(int(track_id))
+        if row < 0:
+            return
+        current = self.model._rows[row]
+        self.model._rows[row] = replace(current, has_dirty_lyrics=bool(has_dirty_lyrics))
+        idx = self.model.index(row, 2)
+        self.model.dataChanged.emit(idx, idx, [Qt.DisplayRole, Qt.ForegroundRole, Qt.FontRole, Qt.UserRole])
+
+    def update_track_lyrics_state(self, track_id: int, lyrics_state: LyricsState) -> None:
+        row = self.model.row_for_track_id(int(track_id))
+        if row < 0:
+            return
+        current = self.model._rows[row]
+        self.model._rows[row] = replace(current, lyrics_state=lyrics_state, has_dirty_lyrics=False)
+        idx = self.model.index(row, 2)
+        self.model.dataChanged.emit(idx, idx, [Qt.DisplayRole, Qt.ForegroundRole, Qt.FontRole, Qt.UserRole])
 
     def get_download_state(self, track_id: int) -> DownloadState:
         return self._download_states.get(int(track_id), DownloadState.IDLE)

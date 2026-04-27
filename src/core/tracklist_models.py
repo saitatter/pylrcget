@@ -27,4 +27,6 @@ class TrackListRow:
     album_id: int | None
     duration_s: int | None
     lyrics_state: LyricsState
+    has_dirty_lyrics: bool = False
     download_state: DownloadState = DownloadState.IDLE
+    is_duplicate: bool = False

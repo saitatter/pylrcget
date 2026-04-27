@@ -1,11 +1,16 @@
 from __future__ import annotations
 
 import unittest
+from pathlib import Path
+from types import SimpleNamespace
+from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
 from PySide6.QtWidgets import QHeaderView
 
 from ui.library_routes import tracks_album, tracks_artist
+from ui.widgets.lrclib_browser_widget import _BrowserPublishDialog
+from ui.widgets.lyrics_editor_widget import LyricsEditorWidget
 from tests.test_support import (
     HAS_QT,
     AlbumListWidget,
@@ -175,6 +180,28 @@ class TrackListWidgetTests(unittest.TestCase):
             widget.deleteLater()
             app_state.db.close()
 
+
+@unittest.skipUnless(HAS_QT, "PySide6 is required for widget tests")
+class LyricsPasteBehaviorTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.app = qt_app()
+
+    def test_plain_lyrics_editor_rejects_rich_text_paste(self):
+        widget = LyricsEditorWidget()
+        try:
+            self.assertFalse(widget.plain.acceptRichText())
+        finally:
+            widget.deleteLater()
+
+    def test_browser_publish_lyrics_fields_reject_rich_text_paste(self):
+        dialog = _BrowserPublishDialog("https://lrclib.net")
+        try:
+            self.assertFalse(dialog._pub_synced.acceptRichText())
+            self.assertFalse(dialog._pub_plain.acceptRichText())
+        finally:
+            dialog.deleteLater()
+
     def test_track_table_keeps_lyrics_status_column_visible(self):
         app_state = simple_app_state()
         widget = TrackListWidget(app_state)
@@ -189,6 +216,41 @@ class TrackListWidgetTests(unittest.TestCase):
             self.assertGreaterEqual(widget.table.columnWidth(1), 90)
             self.assertEqual(widget.header.sectionResizeMode(2), QHeaderView.ResizeMode.Fixed)
             self.assertGreaterEqual(widget.table.columnWidth(2), 100)
+        finally:
+            widget.deleteLater()
+            app_state.db.close()
+
+    def test_open_track_folder_opens_parent_directory(self):
+        app_state = simple_app_state()
+        widget = TrackListWidget(app_state)
+        try:
+            with TemporaryDirectory() as tmp:
+                audio_path = Path(tmp) / "artist" / "song.mp3"
+                audio_path.parent.mkdir()
+                track = SimpleNamespace(file_path=str(audio_path))
+
+                with patch("ui.widgets.track_list_widget.get_track_by_id", return_value=track), patch(
+                    "ui.widgets.track_list_widget.QDesktopServices.openUrl", return_value=True
+                ) as open_url:
+                    self.assertTrue(widget._open_track_folder(7))
+
+                open_url.assert_called_once()
+                self.assertEqual(Path(open_url.call_args.args[0].toLocalFile()), audio_path.parent)
+        finally:
+            widget.deleteLater()
+            app_state.db.close()
+
+    def test_open_track_folder_ignores_missing_path(self):
+        app_state = simple_app_state()
+        widget = TrackListWidget(app_state)
+        try:
+            track = SimpleNamespace(file_path="")
+            with patch("ui.widgets.track_list_widget.get_track_by_id", return_value=track), patch(
+                "ui.widgets.track_list_widget.QDesktopServices.openUrl"
+            ) as open_url:
+                self.assertFalse(widget._open_track_folder(7))
+
+            open_url.assert_not_called()
         finally:
             widget.deleteLater()
             app_state.db.close()

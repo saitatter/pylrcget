@@ -208,6 +208,26 @@ QLabel#LibraryBreadcrumbSeparator {
     padding: 0 2px;
 }
 
+QWidget#SelectionActionsBar {
+    background: {{color-bg-panel}};
+    border: 1px solid {{color-border-strong}};
+    border-radius: {{radius-lg}};
+}
+
+QLabel#SelectionActionsLabel {
+    color: {{color-text-muted}};
+    font-size: {{font-size-xs}};
+    font-weight: 700;
+    padding: 0 6px;
+}
+
+QPushButton#SelectionActionButton {
+    min-height: 28px;
+    padding: 4px 9px;
+    font-size: {{font-size-xs}};
+    font-weight: 600;
+}
+
 QLabel#ScanLabel {
     color: {{color-text-soft}};
     font-size: {{font-size-sm}};

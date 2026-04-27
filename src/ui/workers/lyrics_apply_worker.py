@@ -71,11 +71,12 @@ class LyricsApplyCandidatesWorker(QThread):
         if synced_text:
             if not plain_text:
                 plain_text = plain_text_from_lrc(synced_text)
-            track = update_track_synced_lyrics(db, int(candidate.track_id), synced_text, plain_text)
+            update_track_synced_lyrics(db, int(candidate.track_id), synced_text, plain_text)
         elif plain_text:
-            track = update_track_plain_lyrics(db, int(candidate.track_id), plain_text)
+            update_track_plain_lyrics(db, int(candidate.track_id), plain_text)
         else:
             return None
+        track = get_track_by_id(db, int(candidate.track_id))
         sync_track_outputs_with_result(track, config)
         return track
 

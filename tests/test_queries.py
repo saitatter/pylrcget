@@ -10,15 +10,19 @@ from core.models import FsTrack
 from tests.test_support import make_fs_track, touch_text
 from db.database import add_tracks, get_album_rows, initialize_database
 from db.queries import (
+    clear_track_dirty_lyrics,
     find_artist,
     get_config,
     get_download_history_rows,
     get_publish_history_rows,
+    get_track_by_id,
     refresh_track_from_file,
     record_download_history_batch,
     record_download_history,
     record_publish_history,
     set_config,
+    update_track_dirty_lyrics,
+    update_track_plain_lyrics,
 )
 
 
@@ -324,5 +328,31 @@ class TrackRefreshQueryTests(unittest.TestCase):
                 self.assertIsNone(refreshed)
                 remaining = db.execute("SELECT COUNT(*) AS count FROM tracks").fetchone()
                 self.assertEqual(int(remaining["count"]), 0)
+            finally:
+                db.close()
+
+    def test_dirty_lyrics_can_be_saved_and_cleared(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db = initialize_database(tmp)
+            try:
+                audio = Path(tmp) / "song.mp3"
+                touch_text(audio, "a")
+                add_tracks(db, [make_fs_track(audio, artist="Artist A", album="Album A", title="Song A")])
+
+                track_id = int(db.execute("SELECT id FROM tracks LIMIT 1").fetchone()["id"])
+                update_track_plain_lyrics(db, track_id, "saved plain")
+                update_track_dirty_lyrics(db, track_id, "", "draft plain")
+                dirty = get_track_by_id(db, track_id)
+
+                self.assertTrue(dirty.dirty_lyrics_present)
+                self.assertEqual(dirty.dirty_txt_lyrics, "draft plain")
+                self.assertEqual(dirty.txt_lyrics, "saved plain")
+
+                clear_track_dirty_lyrics(db, track_id)
+                cleared = get_track_by_id(db, track_id)
+
+                self.assertFalse(cleared.dirty_lyrics_present)
+                self.assertIsNone(cleared.dirty_txt_lyrics)
+                self.assertEqual(cleared.txt_lyrics, "saved plain")
             finally:
                 db.close()

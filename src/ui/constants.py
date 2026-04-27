@@ -1,0 +1,12 @@
+"""Shared UI timing and layout constants."""
+
+# Debounce intervals (milliseconds)
+DIRTY_LYRICS_FLUSH_MS = 500
+PLAYBACK_SPEED_SAVE_MS = 350
+PLAYBACK_VOLUME_SAVE_MS = 250
+SEARCH_DEBOUNCE_MS = 180
+FEEDBACK_RESET_MS = 1800
+
+# Layout
+LIBRARY_PANE_MIN_WIDTH = 180
+LYRICS_PANE_MIN_WIDTH = 480

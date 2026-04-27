@@ -3,7 +3,6 @@ from __future__ import annotations
 import logging
 import time
 from dataclasses import dataclass
-from typing import List, Optional
 
 from PySide6.QtCore import Qt, QThread, Signal, QTimer
 from PySide6.QtWidgets import (
@@ -185,7 +184,7 @@ class PublishLyricsDialog(QDialog):
         duration_s: float,
         lyrics_text: str,
         is_synced: bool,
-        lint_result: Optional[List[LintProblem]] = None,
+        lint_result: list[LintProblem] | None = None,
         lrclib_instance: str = "https://lrclib.net",
         parent=None
     ):
@@ -302,7 +301,7 @@ class PublishLyricsDialog(QDialog):
             "isSynced": bool(is_synced),
         }
 
-    def _populate_lint(self, problems: List[LintProblem]):
+    def _populate_lint(self, problems: list[LintProblem]):
         self.lint_table.setRowCount(len(problems))
         for r, p in enumerate(problems):
             self.lint_table.setItem(r, 0, QTableWidgetItem(str(p.line)))

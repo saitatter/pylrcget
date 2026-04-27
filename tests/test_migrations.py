@@ -11,7 +11,7 @@ from db.migrations import upgrade_database_if_needed
 
 
 class MigrationTests(unittest.TestCase):
-    def test_fresh_database_initializes_current_schema_at_v1(self):
+    def test_fresh_database_initializes_current_schema(self):
         with tempfile.TemporaryDirectory() as tmp:
             db_path = Path(tmp) / "pylrcget.db.sqlite3"
             db = sqlite3.connect(str(db_path))
@@ -38,6 +38,12 @@ class MigrationTests(unittest.TestCase):
                     }
                     <= config_columns
                 )
+                track_columns = {
+                    row["name"] for row in db.execute("PRAGMA table_info(tracks)").fetchall()
+                }
+                self.assertTrue(
+                    {"dirty_lrc_lyrics", "dirty_txt_lyrics", "dirty_lyrics_present"} <= track_columns
+                )
 
                 row = db.execute(
                     """
@@ -58,6 +64,48 @@ class MigrationTests(unittest.TestCase):
                 self.assertEqual(row["font_size_mode"], "normal")
                 self.assertEqual(int(row["show_album_art"]), 1)
                 self.assertEqual(row["startup_view"], "remember_last")
+            finally:
+                db.close()
+
+    def test_v1_database_upgrades_dirty_lyrics_columns(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db_path = Path(tmp) / "pylrcget.db.sqlite3"
+            db = sqlite3.connect(str(db_path))
+            db.row_factory = sqlite3.Row
+            try:
+                db.execute(
+                    """
+                    CREATE TABLE tracks (
+                        id INTEGER PRIMARY KEY,
+                        file_path TEXT,
+                        file_name TEXT,
+                        title TEXT,
+                        title_lower TEXT,
+                        album_id INTEGER,
+                        artist_id INTEGER,
+                        duration FLOAT,
+                        lrc_lyrics TEXT,
+                        txt_lyrics TEXT,
+                        instrumental BOOLEAN DEFAULT 0,
+                        track_number INTEGER,
+                        modified_time REAL,
+                        file_size INTEGER
+                    )
+                    """
+                )
+                db.execute("PRAGMA user_version=1")
+                db.commit()
+
+                upgrade_database_if_needed(db, 1)
+
+                version = int(db.execute("PRAGMA user_version").fetchone()[0])
+                self.assertEqual(version, CURRENT_DB_VERSION)
+                track_columns = {
+                    row["name"] for row in db.execute("PRAGMA table_info(tracks)").fetchall()
+                }
+                self.assertTrue(
+                    {"dirty_lrc_lyrics", "dirty_txt_lyrics", "dirty_lyrics_present"} <= track_columns
+                )
             finally:
                 db.close()
 

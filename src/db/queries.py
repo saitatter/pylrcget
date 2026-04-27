@@ -3,23 +3,30 @@ from __future__ import annotations
 import os
 import re
 import sqlite3
+import threading
 from datetime import datetime, timezone
-from typing import List, Sequence
+from typing import Sequence
 
 from core.models import FsTrack
 from core.utils import prepare_input
-from db.models import Album, Artist, Config, Track
+from db.models import Config, Track
 from library import scan_library
+
+
+def _escape_like(value: str) -> str:
+    """Escape SQL LIKE metacharacters so they match literally."""
+    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
 
 # -------------------------------
 # DIRECTORIES
 # -------------------------------
-def get_directories(db: sqlite3.Connection) -> List[str]:
+def get_directories(db: sqlite3.Connection) -> list[str]:
     cursor = db.execute("SELECT path FROM directories")
     return [row["path"] for row in cursor.fetchall()]
 
 
-def set_directories(db: sqlite3.Connection, directories: List[str]) -> None:
+def set_directories(db: sqlite3.Connection, directories: list[str]) -> None:
     db.execute("DELETE FROM directories")
     for path in directories:
         db.execute("INSERT INTO directories (path) VALUES (?)", (path,))
@@ -35,14 +42,22 @@ def get_init(db: sqlite3.Connection) -> bool:
 
 
 def set_init(db: sqlite3.Connection, init: bool) -> None:
-    db.execute("UPDATE library_data SET init = ? WHERE 1", (init,))
+    db.execute("UPDATE library_data SET init = ? WHERE id = 1", (init,))
     db.commit()
 
 
 # -------------------------------
 # CONFIG
 # -------------------------------
+_config_cache: Config | None = None
+_config_cache_lock = threading.Lock()
+
+
 def get_config(db: sqlite3.Connection) -> Config:
+    global _config_cache
+    with _config_cache_lock:
+        if _config_cache is not None:
+            return _config_cache
     row = db.execute("""
         SELECT skip_tracks_with_synced_lyrics,
                skip_tracks_with_plain_lyrics,
@@ -69,7 +84,7 @@ def get_config(db: sqlite3.Connection) -> Config:
         LIMIT 1
     """).fetchone()
 
-    return Config(
+    config = Config(
         skip_tracks_with_synced_lyrics=bool(row["skip_tracks_with_synced_lyrics"]),
         skip_tracks_with_plain_lyrics=bool(row["skip_tracks_with_plain_lyrics"]),
         download_lyrics_mode=(row["download_lyrics_mode"] or "prefer_synced"),
@@ -92,9 +107,13 @@ def get_config(db: sqlite3.Connection) -> Config:
         playback_volume=float(row["playback_volume"] if row["playback_volume"] is not None else 0.7),
         last_library_route=row["last_library_route"] or "",
     )
+    with _config_cache_lock:
+        _config_cache = config
+    return config
 
 
 def set_config(db: sqlite3.Connection, config: Config) -> None:
+    global _config_cache
     db.execute("""
         UPDATE config_data
         SET skip_tracks_with_synced_lyrics = ?,
@@ -118,7 +137,7 @@ def set_config(db: sqlite3.Connection, config: Config) -> None:
             playback_speed = ?,
             playback_volume = ?,
             last_library_route = ?
-        WHERE 1
+        WHERE id = 1
     """, (
         config.skip_tracks_with_synced_lyrics,
         config.skip_tracks_with_plain_lyrics,
@@ -143,6 +162,8 @@ def set_config(db: sqlite3.Connection, config: Config) -> None:
         config.last_library_route,
     ))
     db.commit()
+    with _config_cache_lock:
+        _config_cache = None
 
 
 # -------------------------------
@@ -190,8 +211,8 @@ def get_artist_rows(
     params: list[object] = []
 
     if search_query:
-        q += " AND ar.name LIKE ?"
-        params.append(f"%{search_query}%")
+        q += " AND ar.name LIKE ? ESCAPE '\\'"
+        params.append(f"%{_escape_like(search_query)}%")
 
     order = "DESC" if str(sort_order).lower() == "desc" else "ASC"
     order_map = {
@@ -199,9 +220,10 @@ def get_artist_rows(
         1: f"album_count {order}, ar.name COLLATE NOCASE {order}",
         2: f"track_count {order}, ar.name COLLATE NOCASE {order}",
     }
+    col = int(sort_column) if int(sort_column) in order_map else 0
     q += f"""
     GROUP BY ar.id, ar.name
-    ORDER BY {order_map.get(int(sort_column), order_map[0])}
+    ORDER BY {order_map[col]}
     """
     if limit:
         q += f" LIMIT {int(limit)} OFFSET {max(0, int(offset))}"
@@ -226,18 +248,6 @@ def get_artist_by_id(db: sqlite3.Connection, artist_id: int) -> dict:
         raise KeyError(f"Artist not found: {artist_id}")
     cols = [c[0] for c in cur.description]
     return dict(zip(cols, row))
-
-
-def get_artists(db: sqlite3.Connection) -> List[Artist]:
-    query = """
-        SELECT artists.id, artists.name, COUNT(tracks.id) AS tracks_count
-        FROM artists
-        JOIN tracks ON tracks.artist_id = artists.id
-        GROUP BY artists.id, artists.name
-        ORDER BY artists.name_lower ASC
-    """
-    rows = db.execute(query).fetchall()
-    return [Artist.from_row(row) for row in rows]
 
 
 # -------------------------------
@@ -296,8 +306,8 @@ def get_album_rows(
     params: list[object] = []
 
     if search_query:
-        q += " AND (a.name LIKE ? OR COALESCE(NULLIF(a.album_artist_name, ''), ar.name, '') LIKE ? OR a.album_artist_name LIKE ?)"
-        like = f"%{search_query}%"
+        q += " AND (a.name LIKE ? ESCAPE '\\' OR COALESCE(NULLIF(a.album_artist_name, ''), ar.name, '') LIKE ? ESCAPE '\\' OR a.album_artist_name LIKE ? ESCAPE '\\')"
+        like = f"%{_escape_like(search_query)}%"
         params += [like, like, like]
 
     if artist_ids:
@@ -314,9 +324,10 @@ def get_album_rows(
         1: f"COALESCE(NULLIF(a.album_artist_name, ''), ar.name, '') COLLATE NOCASE {order}, a.name COLLATE NOCASE {order}",
         2: f"track_count {order}, a.name COLLATE NOCASE {order}",
     }
+    col = int(sort_column) if int(sort_column) in order_map else 0
     q += f"""
     GROUP BY a.id, a.name, a.album_artist_name, ar.name
-    ORDER BY {order_map.get(int(sort_column), order_map[0])}
+    ORDER BY {order_map[col]}
     """
     if limit:
         q += f" LIMIT {int(limit)} OFFSET {max(0, int(offset))}"
@@ -324,19 +335,6 @@ def get_album_rows(
     cur = db.execute(q, params)
     cols = [c[0] for c in cur.description]
     return [dict(zip(cols, row)) for row in cur.fetchall()]
-
-
-def get_albums(db: sqlite3.Connection) -> List[Album]:
-    query = """
-        SELECT albums.id, albums.name, albums.album_artist_name,
-               COUNT(tracks.id) AS tracks_count
-        FROM albums
-        JOIN tracks ON tracks.album_id = albums.id
-        GROUP BY albums.id, albums.name, albums.album_artist_name
-        ORDER BY albums.name_lower ASC
-    """
-    rows = db.execute(query).fetchall()
-    return [Album.from_row(row) for row in rows]
 
 
 def get_album_by_id(db: sqlite3.Connection, album_id: int) -> dict:
@@ -380,6 +378,9 @@ def get_track_by_id(db: sqlite3.Connection, track_id: int) -> Track:
             albums.image_path,
             txt_lyrics,
             lrc_lyrics,
+            dirty_txt_lyrics,
+            dirty_lrc_lyrics,
+            dirty_lyrics_present,
             instrumental
         FROM tracks
         JOIN albums ON tracks.album_id = albums.id
@@ -388,23 +389,7 @@ def get_track_by_id(db: sqlite3.Connection, track_id: int) -> Track:
         LIMIT 1
     """, (int(track_id),)).fetchone()
 
-    return Track(
-        id=row["id"],
-        file_path=row["file_path"],
-        file_name=row["file_name"],
-        title=row["title"],
-        artist_name=row["artist_name"],
-        artist_id=row["artist_id"],
-        album_name=row["album_name"],
-        album_artist_name=row["album_artist_name"],
-        album_id=row["album_id"],
-        duration=row["duration"],
-        track_number=row["track_number"],
-        txt_lyrics=row["txt_lyrics"],
-        lrc_lyrics=row["lrc_lyrics"],
-        image_path=row["image_path"],
-        instrumental=bool(row["instrumental"]),
-    )
+    return Track.from_row(row)
 
 
 def add_track(db: sqlite3.Connection, track: FsTrack, *, commit: bool = True) -> None:
@@ -450,13 +435,65 @@ def add_track(db: sqlite3.Connection, track: FsTrack, *, commit: bool = True) ->
         db.commit()
 
 
-def add_tracks(db: sqlite3.Connection, tracks: List[FsTrack], *, commit: bool = True) -> None:
+def get_existing_file_paths(db: sqlite3.Connection, paths: list[str]) -> set[str]:
+    """Return the subset of *paths* that already exist in the tracks table."""
+    result: set[str] = set()
+    chunk_size = 500
+    for i in range(0, len(paths), chunk_size):
+        chunk = paths[i : i + chunk_size]
+        placeholders = ",".join("?" for _ in chunk)
+        rows = db.execute(
+            f"SELECT file_path FROM tracks WHERE file_path IN ({placeholders})",
+            chunk,
+        ).fetchall()
+        result.update(row["file_path"] for row in rows)
+    return result
+
+
+def add_tracks(db: sqlite3.Connection, tracks: list[FsTrack], *, commit: bool = True) -> None:
     if not tracks:
         return
 
     def _do_add() -> None:
+        # Pre-load artist and album caches to avoid per-track lookups
+        artist_cache: dict[str, int] = {
+            row[1]: row[0]
+            for row in db.execute("SELECT id, name_lower FROM artists").fetchall()
+        }
+        album_cache: dict[tuple[str, str], int] = {
+            (row[1], row[2]): row[0]
+            for row in db.execute("SELECT id, name_lower, album_artist_name_lower FROM albums").fetchall()
+        }
         for t in tracks:
-            add_track(db, t, commit=False)
+            # Resolve artist
+            artist_key = prepare_input(t.artist)
+            artist_id = artist_cache.get(artist_key)
+            if artist_id is None:
+                artist_id = add_artist(db, t.artist, commit=False)
+                artist_cache[artist_key] = artist_id
+
+            # Resolve album
+            album_key = (prepare_input(t.album), prepare_input(t.album_artist))
+            album_id = album_cache.get(album_key)
+            if album_id is None:
+                album_id = add_album(db, t.album, t.album_artist, commit=False)
+                album_cache[album_key] = album_id
+
+            is_instrumental = t.instrumental or bool(
+                t.lrc_lyrics and re.search(r"\[au:\s*instrumental\]", t.lrc_lyrics)
+            )
+            db.execute("""
+                INSERT OR IGNORE INTO tracks (
+                    file_path, file_name, title, title_lower,
+                    album_id, artist_id, duration, track_number,
+                    txt_lyrics, lrc_lyrics, instrumental, modified_time, file_size
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                t.file_path, t.file_name, t.title, prepare_input(t.title),
+                album_id, artist_id, t.duration, t.track_number,
+                t.txt_lyrics, t.lrc_lyrics, is_instrumental,
+                t.modified_time, t.file_size,
+            ))
 
     if commit:
         with db:
@@ -465,14 +502,14 @@ def add_tracks(db: sqlite3.Connection, tracks: List[FsTrack], *, commit: bool = 
         _do_add()
 
 
-def get_tracks(db: sqlite3.Connection) -> List[Track]:
+def get_tracks(db: sqlite3.Connection) -> list[Track]:
     cursor = db.execute("""
         SELECT
             tracks.id, file_path, file_name, title,
             artists.name AS artist_name, tracks.artist_id,
             albums.name AS album_name, albums.album_artist_name,
             album_id, duration, track_number, modified_time, file_size,
-            albums.image_path, txt_lyrics, lrc_lyrics, instrumental
+            albums.image_path, txt_lyrics, lrc_lyrics, dirty_txt_lyrics, dirty_lrc_lyrics, dirty_lyrics_present, instrumental
         FROM tracks
         JOIN albums ON tracks.album_id = albums.id
         JOIN artists ON tracks.artist_id = artists.id
@@ -488,6 +525,7 @@ def get_track_rows(
     plain_lyrics_tracks: bool,
     instrumental_tracks: bool,
     no_lyrics_tracks: bool,
+    unsaved_draft_only: bool = False,
     limit: int | None = None,
     offset: int = 0,
     artist_id: int | None = None,
@@ -503,19 +541,22 @@ def get_track_rows(
     q = prepare_input(search_query or "")
     if q:
         conditions.append(
-            "(tracks.title_lower LIKE ? OR artists.name_lower LIKE ? OR albums.name_lower LIKE ? OR albums.album_artist_name_lower LIKE ?)"
+            "(tracks.title_lower LIKE ? ESCAPE '\\' OR artists.name_lower LIKE ? ESCAPE '\\' OR albums.name_lower LIKE ? ESCAPE '\\' OR albums.album_artist_name_lower LIKE ? ESCAPE '\\')"
         )
-        like = f"%{q}%"
+        like = f"%{_escape_like(q)}%"
         params.extend([like, like, like, like])
 
-    if not synced_lyrics_tracks:
-        conditions.append("(tracks.lrc_lyrics IS NULL OR tracks.lrc_lyrics = '[au: instrumental]')")
-    if not plain_lyrics_tracks:
-        conditions.append("(tracks.txt_lyrics IS NULL OR tracks.lrc_lyrics IS NOT NULL)")
-    if not instrumental_tracks:
-        conditions.append("tracks.instrumental = 0")
-    if not no_lyrics_tracks:
-        conditions.append("(tracks.txt_lyrics IS NOT NULL OR tracks.lrc_lyrics IS NOT NULL OR tracks.instrumental = 1)")
+    if unsaved_draft_only:
+        conditions.append("tracks.dirty_lyrics_present = 1")
+    else:
+        if not synced_lyrics_tracks:
+            conditions.append("(tracks.lrc_lyrics IS NULL OR tracks.lrc_lyrics = '[au: instrumental]')")
+        if not plain_lyrics_tracks:
+            conditions.append("(tracks.txt_lyrics IS NULL OR tracks.lrc_lyrics IS NOT NULL)")
+        if not instrumental_tracks:
+            conditions.append("tracks.instrumental = 0")
+        if not no_lyrics_tracks:
+            conditions.append("(tracks.txt_lyrics IS NOT NULL OR tracks.lrc_lyrics IS NOT NULL OR tracks.instrumental = 1)")
 
     if artist_ids:
         placeholders = ", ".join("?" for _ in artist_ids)
@@ -548,7 +589,8 @@ def get_track_rows(
         ),
         3: f"tracks.title_lower {order}, tracks.id {order}",
     }
-    order_clause = order_map.get(int(sort_column), order_map[0])
+    col = int(sort_column) if int(sort_column) in order_map else 0
+    order_clause = order_map[col]
     limit_clause = f"LIMIT {int(limit)} OFFSET {max(0, int(offset))}" if limit else ""
 
     query = f"""
@@ -562,6 +604,9 @@ def get_track_rows(
             tracks.duration,
             tracks.txt_lyrics,
             tracks.lrc_lyrics,
+            tracks.dirty_txt_lyrics,
+            tracks.dirty_lrc_lyrics,
+            tracks.dirty_lyrics_present,
             tracks.instrumental
         FROM tracks
         JOIN artists ON tracks.artist_id = artists.id
@@ -576,48 +621,75 @@ def get_track_rows(
 # -------------------------------
 # UPDATES / BULK OPS
 # -------------------------------
-def update_track_synced_lyrics(db: sqlite3.Connection, track_id: int, synced_lyrics: str, plain_lyrics: str) -> Track:
+def update_track_synced_lyrics(db: sqlite3.Connection, track_id: int, synced_lyrics: str, plain_lyrics: str) -> None:
     synced_lyrics = (synced_lyrics or "").strip() or None
     plain_lyrics = (plain_lyrics or "").strip() or None
 
     db.execute("""
         UPDATE tracks
-        SET lrc_lyrics = ?, txt_lyrics = ?, instrumental = 0
+        SET lrc_lyrics = ?, txt_lyrics = ?, dirty_lrc_lyrics = NULL, dirty_txt_lyrics = NULL, dirty_lyrics_present = 0, instrumental = 0
         WHERE id = ?
     """, (synced_lyrics, plain_lyrics, int(track_id)))
     db.commit()
-    return get_track_by_id(db, track_id)
 
 
-def update_track_plain_lyrics(db: sqlite3.Connection, track_id: int, plain_lyrics: str) -> Track:
+def update_track_plain_lyrics(db: sqlite3.Connection, track_id: int, plain_lyrics: str) -> None:
     plain_lyrics = (plain_lyrics or "").strip() or None
     db.execute("""
         UPDATE tracks
-        SET txt_lyrics = ?, lrc_lyrics = NULL, instrumental = 0
+        SET txt_lyrics = ?, lrc_lyrics = NULL, dirty_lrc_lyrics = NULL, dirty_txt_lyrics = NULL, dirty_lyrics_present = 0, instrumental = 0
         WHERE id = ?
     """, (plain_lyrics, int(track_id)))
     db.commit()
-    return get_track_by_id(db, track_id)
 
 
-def update_track_null_lyrics(db: sqlite3.Connection, track_id: int) -> Track:
+def update_track_null_lyrics(db: sqlite3.Connection, track_id: int) -> None:
     db.execute("""
         UPDATE tracks
-        SET txt_lyrics = NULL, lrc_lyrics = NULL, instrumental = 0
+        SET txt_lyrics = NULL, lrc_lyrics = NULL, dirty_lrc_lyrics = NULL, dirty_txt_lyrics = NULL, dirty_lyrics_present = 0, instrumental = 0
         WHERE id = ?
     """, (int(track_id),))
     db.commit()
-    return get_track_by_id(db, track_id)
 
 
-def update_track_instrumental(db: sqlite3.Connection, track_id: int) -> Track:
+def update_track_dirty_lyrics(db: sqlite3.Connection, track_id: int, synced_lyrics: str, plain_lyrics: str) -> None:
+    synced_lyrics = (synced_lyrics or "").strip() or None
+    plain_lyrics = (plain_lyrics or "").strip() or None
+
+    db.execute(
+        """
+        UPDATE tracks
+        SET dirty_lrc_lyrics = ?,
+            dirty_txt_lyrics = ?,
+            dirty_lyrics_present = 1
+        WHERE id = ?
+        """,
+        (synced_lyrics, plain_lyrics, int(track_id)),
+    )
+    db.commit()
+
+
+def clear_track_dirty_lyrics(db: sqlite3.Connection, track_id: int) -> None:
+    db.execute(
+        """
+        UPDATE tracks
+        SET dirty_lrc_lyrics = NULL,
+            dirty_txt_lyrics = NULL,
+            dirty_lyrics_present = 0
+        WHERE id = ?
+        """,
+        (int(track_id),),
+    )
+    db.commit()
+
+
+def update_track_instrumental(db: sqlite3.Connection, track_id: int) -> None:
     db.execute("""
         UPDATE tracks
-        SET txt_lyrics = NULL, lrc_lyrics = '[au: instrumental]', instrumental = 1
+        SET txt_lyrics = NULL, lrc_lyrics = '[au: instrumental]', dirty_lrc_lyrics = NULL, dirty_txt_lyrics = NULL, dirty_lyrics_present = 0, instrumental = 1
         WHERE id = ?
     """, (int(track_id),))
     db.commit()
-    return get_track_by_id(db, track_id)
 
 
 def refresh_track_from_file(db: sqlite3.Connection, track_id: int) -> Track | None:
@@ -677,6 +749,9 @@ def refresh_track_from_file(db: sqlite3.Connection, track_id: int) -> Track | No
             track_number = ?,
             txt_lyrics = ?,
             lrc_lyrics = ?,
+            dirty_txt_lyrics = NULL,
+            dirty_lrc_lyrics = NULL,
+            dirty_lyrics_present = 0,
             instrumental = ?,
             modified_time = ?,
             file_size = ?
@@ -715,6 +790,9 @@ def mark_tracks_instrumental(db: sqlite3.Connection, track_ids: list[int]) -> No
             UPDATE tracks
             SET txt_lyrics = NULL,
                 lrc_lyrics = '[au: instrumental]',
+                dirty_txt_lyrics = NULL,
+                dirty_lrc_lyrics = NULL,
+                dirty_lyrics_present = 0,
                 instrumental = 1
             WHERE id = ?
         """, [(i,) for i in ids])
@@ -737,7 +815,10 @@ def unmark_tracks_instrumental(db: sqlite3.Connection, track_ids: list[int]) -> 
                 lrc_lyrics = CASE
                     WHEN lrc_lyrics = '[au: instrumental]' THEN NULL
                     ELSE lrc_lyrics
-                END
+                END,
+                dirty_txt_lyrics = NULL,
+                dirty_lrc_lyrics = NULL,
+                dirty_lyrics_present = 0
             WHERE id = ?
         """, [(i,) for i in ids])
         db.commit()
@@ -755,7 +836,7 @@ def get_track_ids(
     plain_lyrics: bool,
     instrumental: bool,
     no_lyrics: bool,
-) -> List[int]:
+) -> list[int]:
     conditions: list[str] = []
 
     if not synced_lyrics:
@@ -777,7 +858,7 @@ def get_album_track_ids(
     album_id: int,
     without_plain_lyrics: bool,
     without_synced_lyrics: bool,
-) -> List[int]:
+) -> list[int]:
     conditions: list[str] = []
     if without_plain_lyrics:
         conditions.append("txt_lyrics IS NULL")
@@ -796,7 +877,7 @@ def get_artist_track_ids(
     artist_id: int,
     without_plain_lyrics: bool,
     without_synced_lyrics: bool,
-) -> List[int]:
+) -> list[int]:
     conditions: list[str] = []
     if without_plain_lyrics:
         conditions.append("txt_lyrics IS NULL")
@@ -830,16 +911,6 @@ def get_track_ids_for_download_mode(db: sqlite3.Connection, download_mode: str) 
         f"SELECT id FROM tracks WHERE {where_clause} ORDER BY title_lower ASC"
     ).fetchall()
     return [int(r["id"]) for r in rows]
-
-
-# -------------------------------
-# CLEAN LIBRARY
-# -------------------------------
-def clean_library(db: sqlite3.Connection) -> None:
-    db.execute("DELETE FROM tracks")
-    db.execute("DELETE FROM albums")
-    db.execute("DELETE FROM artists")
-    db.commit()
 
 
 def get_library_file_index(db: sqlite3.Connection) -> dict[str, tuple[float | None, int | None]]:
@@ -899,17 +970,36 @@ def prune_library(db: sqlite3.Connection) -> None:
     db.commit()
 
 
+def get_duplicate_track_ids(db: sqlite3.Connection) -> set[int]:
+    """Return track IDs that share the same title + artist + rounded duration."""
+    rows = db.execute("""
+        SELECT t.id
+        FROM tracks t
+        JOIN artists a ON t.artist_id = a.id
+        WHERE EXISTS (
+            SELECT 1
+            FROM tracks t2
+            JOIN artists a2 ON t2.artist_id = a2.id
+            WHERE t2.title_lower = t.title_lower
+              AND a2.name_lower = a.name_lower
+              AND ROUND(t2.duration) = ROUND(t.duration)
+              AND t2.id != t.id
+        )
+    """).fetchall()
+    return {int(r["id"]) for r in rows}
+
+
 # -------------------------------
 # GET TRACKS BY ALBUM / ARTIST
 # -------------------------------
-def get_album_tracks(db: sqlite3.Connection, album_id: int) -> List[Track]:
+def get_album_tracks(db: sqlite3.Connection, album_id: int) -> list[Track]:
     query = """
         SELECT
             tracks.id, file_path, file_name, title,
             artists.name AS artist_name, tracks.artist_id,
             albums.name AS album_name, albums.album_artist_name,
             album_id, duration, track_number,
-            albums.image_path, txt_lyrics, lrc_lyrics, instrumental
+            albums.image_path, txt_lyrics, lrc_lyrics, dirty_txt_lyrics, dirty_lrc_lyrics, dirty_lyrics_present, instrumental
         FROM tracks
         JOIN albums ON tracks.album_id = albums.id
         JOIN artists ON tracks.artist_id = artists.id
@@ -920,14 +1010,14 @@ def get_album_tracks(db: sqlite3.Connection, album_id: int) -> List[Track]:
     return [Track.from_row(row) for row in rows]
 
 
-def get_artist_tracks(db: sqlite3.Connection, artist_id: int) -> List[Track]:
+def get_artist_tracks(db: sqlite3.Connection, artist_id: int) -> list[Track]:
     query = """
         SELECT
             tracks.id, file_path, file_name, title,
             artists.name AS artist_name, tracks.artist_id,
             albums.name AS album_name, albums.album_artist_name,
             album_id, duration, track_number,
-            albums.image_path, txt_lyrics, lrc_lyrics, instrumental
+            albums.image_path, txt_lyrics, lrc_lyrics, dirty_txt_lyrics, dirty_lrc_lyrics, dirty_lyrics_present, instrumental
         FROM tracks
         JOIN albums ON tracks.album_id = albums.id
         JOIN artists ON tracks.artist_id = artists.id
@@ -1119,3 +1209,45 @@ def get_download_history_rows(
         {limit_clause}
     """
     return db.execute(query).fetchall()
+
+
+# -------------------------------
+# SEARCH HISTORY
+# -------------------------------
+def record_search_history(
+    db: sqlite3.Connection,
+    *,
+    artist: str,
+    title: str,
+    album: str = "",
+) -> None:
+    searched_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+    db.execute(
+        "INSERT INTO search_history (artist, title, album, searched_at) VALUES (?, ?, ?, ?)",
+        (
+            (artist or "").strip(),
+            (title or "").strip(),
+            (album or "").strip(),
+            searched_at,
+        ),
+    )
+    db.commit()
+
+
+def get_recent_search_queries(
+    db: sqlite3.Connection,
+    *,
+    limit: int = 50,
+) -> list[dict]:
+    """Return recent unique artist/title/album combinations, newest first."""
+    rows = db.execute(
+        """
+        SELECT artist, title, album, MAX(searched_at) AS last_searched
+        FROM search_history
+        GROUP BY artist, title, album
+        ORDER BY last_searched DESC
+        LIMIT ?
+        """,
+        (int(limit),),
+    ).fetchall()
+    return [{"artist": r["artist"], "title": r["title"], "album": r["album"]} for r in rows]

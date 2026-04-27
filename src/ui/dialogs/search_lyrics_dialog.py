@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Optional
+import sqlite3
 
 from PySide6.QtCore import Qt, QThread, Signal
 from PySide6.QtGui import QColor
@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
 )
 
 from core.lrclib_client import LrcLibAPI
+from db.database import get_recent_search_queries, record_search_history
 
 logger = logging.getLogger(__name__)
 
@@ -57,6 +58,7 @@ class SearchLyricsDialog(QDialog):
         self,
         lrclib_instance: str,
         *,
+        db: sqlite3.Connection | None = None,
         initial_query: str = "",
         initial_artist: str = "",
         initial_title: str = "",
@@ -67,8 +69,9 @@ class SearchLyricsDialog(QDialog):
         self.setWindowTitle("Search LRCLIB")
         self.resize(750, 500)
         self.lrclib_instance = lrclib_instance
+        self._db = db
         self._results: list = []
-        self._worker: Optional[_SearchWorker] = None
+        self._worker: _SearchWorker | None = None
 
         layout = QVBoxLayout(self)
 
@@ -114,6 +117,15 @@ class SearchLyricsDialog(QDialog):
         refine_row.addWidget(self.clear_album_btn)
         refine_row.addWidget(self.free_text_btn)
         layout.addLayout(refine_row)
+
+        # Recent searches row
+        self._history_row = QHBoxLayout()
+        self._history_label = QLabel("Recent:")
+        self._history_row.addWidget(self._history_label)
+        self._history_buttons: list[QPushButton] = []
+        self._history_row.addStretch(1)
+        layout.addLayout(self._history_row)
+        self._populate_history()
 
         self.status_label = QLabel("")
         layout.addWidget(self.status_label)
@@ -189,6 +201,7 @@ class SearchLyricsDialog(QDialog):
         self.status_label.setText("Searching...")
         self.table.setRowCount(0)
         self._results.clear()
+        self._record_search(artist, title, album)
 
         self._worker = _SearchWorker(query, artist, title, album, self.lrclib_instance, self)
         self._worker.finished.connect(self._on_search_finished)
@@ -265,3 +278,57 @@ class SearchLyricsDialog(QDialog):
         r = self._results[idx]
         self.lyricsSelected.emit(r.plain_lyrics or "", r.synced_lyrics or "")
         self.accept()
+
+    def _populate_history(self) -> None:
+        """Show up to 5 recent search queries as quick-fill buttons."""
+        # Clear old buttons
+        for btn in self._history_buttons:
+            self._history_row.removeWidget(btn)
+            btn.deleteLater()
+        self._history_buttons.clear()
+
+        if not self._db:
+            self._history_label.hide()
+            return
+
+        try:
+            entries = get_recent_search_queries(self._db, limit=5)
+        except Exception:
+            self._history_label.hide()
+            return
+
+        if not entries:
+            self._history_label.hide()
+            return
+
+        self._history_label.show()
+        for entry in entries:
+            parts = [p for p in (entry["artist"], entry["title"]) if p]
+            label = " — ".join(parts) or entry.get("album", "")
+            if not label:
+                continue
+            btn = QPushButton(label[:40])
+            btn.setToolTip(f"Artist: {entry['artist']}\nTitle: {entry['title']}\nAlbum: {entry['album']}")
+            btn.setFlat(True)
+            btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            btn.clicked.connect(lambda _checked=False, e=entry: self._apply_history_entry(e))
+            # Insert before the stretch
+            self._history_row.insertWidget(self._history_row.count() - 1, btn)
+            self._history_buttons.append(btn)
+
+    def _apply_history_entry(self, entry: dict) -> None:
+        self.query_edit.clear()
+        self.artist_edit.setText(entry.get("artist", ""))
+        self.title_edit.setText(entry.get("title", ""))
+        self.album_edit.setText(entry.get("album", ""))
+        self._do_search()
+
+    def _record_search(self, artist: str, title: str, album: str) -> None:
+        if not self._db:
+            return
+        if not artist.strip() and not title.strip():
+            return
+        try:
+            record_search_history(self._db, artist=artist, title=title, album=album)
+        except Exception:
+            pass

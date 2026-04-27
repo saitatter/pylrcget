@@ -37,10 +37,41 @@ def upgrade_database_if_needed(db: sqlite3.Connection, existing_version: int) ->
         return
 
     if existing_version == 0:
-        logger.info("Initialize database version 1...")
+        logger.info("Initialize database version %d...", CURRENT_DB_VERSION)
         db.execute("PRAGMA journal_mode=WAL")
         db.executescript(SCHEMA_V1_SQL)
         db.execute(f"PRAGMA user_version={CURRENT_DB_VERSION}")
+        db.commit()
+        return
+
+    if existing_version < 2:
+        logger.info("Upgrade database version %d -> 2...", existing_version)
+        # Dirty lyrics draft columns
+        db.execute("ALTER TABLE tracks ADD COLUMN dirty_lrc_lyrics TEXT")
+        db.execute("ALTER TABLE tracks ADD COLUMN dirty_txt_lyrics TEXT")
+        db.execute("ALTER TABLE tracks ADD COLUMN dirty_lyrics_present BOOLEAN DEFAULT 0")
+        # Deduplicate any existing rows before adding unique constraint
+        db.execute("""
+            DELETE FROM tracks WHERE id NOT IN (
+                SELECT MIN(id) FROM tracks GROUP BY file_path
+            )
+        """)
+        db.execute("DROP INDEX IF EXISTS idx_tracks_file_path")
+        db.execute("CREATE UNIQUE INDEX idx_tracks_file_path ON tracks(file_path)")
+        db.execute("CREATE INDEX IF NOT EXISTS idx_tracks_dirty ON tracks(dirty_lyrics_present)")
+        db.execute("CREATE INDEX IF NOT EXISTS idx_tracks_title_lower ON tracks(title_lower)")
+        # Search history table
+        db.execute("""
+            CREATE TABLE IF NOT EXISTS search_history (
+                id INTEGER PRIMARY KEY,
+                artist TEXT NOT NULL,
+                title TEXT NOT NULL,
+                album TEXT NOT NULL DEFAULT '',
+                searched_at TEXT NOT NULL
+            )
+        """)
+        db.execute("CREATE INDEX IF NOT EXISTS idx_search_history_searched_at ON search_history(searched_at DESC)")
+        db.execute("PRAGMA user_version=2")
         db.commit()
         return
 

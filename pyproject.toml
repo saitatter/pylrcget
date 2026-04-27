@@ -3,6 +3,21 @@ name = "pylrcget"
 version = "1.2.0"
 description = "Desktop-native lyrics manager and player built with PySide6"
 requires-python = ">=3.10"
+dependencies = [
+    "PySide6",
+    "mutagen",
+    "requests",
+    "packaging",
+]
+
+[project.optional-dependencies]
+ai = [
+    "torch",
+    "torchaudio",
+    "openai-whisper",
+    "demucs",
+    "soundfile",
+]
 
 [tool.semantic_release]
 version_toml = ["pyproject.toml:project.version"]

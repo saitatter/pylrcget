@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Optional
 
 from PySide6.QtCore import Qt, QThread, QTimer, Signal
 from PySide6.QtGui import QColor, QFont
@@ -109,10 +108,12 @@ class _BrowserPublishDialog(QDialog):
         form_layout.addRow("Duration:", self._pub_duration)
 
         self._pub_synced = QTextEdit()
+        self._pub_synced.setAcceptRichText(False)
         self._pub_synced.setPlaceholderText("[00:00.00] Paste synced lyrics here...")
         form_layout.addRow("Synced lyrics:", self._pub_synced)
 
         self._pub_plain = QTextEdit()
+        self._pub_plain.setAcceptRichText(False)
         self._pub_plain.setPlaceholderText("Paste plain lyrics here...")
         form_layout.addRow("Plain lyrics:", self._pub_plain)
 
@@ -278,7 +279,7 @@ class LrclibBrowserWidget(QWidget):
         super().__init__(parent)
         self._app_state = app_state
         self._results: list = []
-        self._search_worker: Optional[_SearchWorker] = None
+        self._search_worker: _SearchWorker | None = None
         self._selected_result = None
         self._lrclib_url = "https://lrclib.net/api"
 

@@ -4,7 +4,6 @@ from __future__ import annotations
 import logging
 import re
 from bisect import bisect_right
-from typing import List, Optional, Tuple
 
 from PySide6.QtCore import QRect, QSize, Qt, Signal, QTimer
 from PySide6.QtGui import QColor, QKeySequence, QShortcut
@@ -19,8 +18,14 @@ from PySide6.QtWidgets import (
 from ui.spacing import SPACE_2, SPACE_3, set_layout_spacing
 from ui.style_loader import load_stylesheet
 from ui.widgets.empty_state_widget import EmptyStateWidget
+from core.utils import (
+    LRC_TS_RE as _TS_RE,
+    _ts_to_ms,
+    ms_to_ts as _ms_to_ts,
+    parse_ts_str as _parse_ts_str,
+    parse_lrc,
+)
 
-_TS_RE = re.compile(r"\[(\d+):(\d+)(?:\.(\d+))?\]")
 TIMESTAMP_MS_ROLE = Qt.ItemDataRole.UserRole
 TIMESTAMP_VALID_ROLE = Qt.ItemDataRole.UserRole + 1
 SHIFT_SPIN_MIN_WIDTH = 96
@@ -122,101 +127,6 @@ class FlowLayout(QLayout):
         return y - rect.y() + margins.bottom()
 
 
-def _ts_to_ms(mm: str, ss: str, frac: str | None) -> int:
-    m = int(mm)
-    s = int(ss)
-    if frac is None:
-        ms = 0
-    else:
-        frac = frac.strip()
-        if len(frac) == 1:
-            ms = int(frac) * 100
-        elif len(frac) == 2:
-            ms = int(frac) * 10
-        else:
-            ms = int(frac[:3])
-    return (m * 60 + s) * 1000 + ms
-
-
-def _ms_to_ts(ms: int) -> str:
-    """Format milliseconds as mm:ss.xx (centiseconds)."""
-    if ms < 0:
-        ms = 0
-    total_s = ms // 1000
-    m = total_s // 60
-    s = total_s % 60
-    cs = (ms % 1000) // 10
-    return f"{m:02d}:{s:02d}.{cs:02d}"
-
-
-def _parse_ts_str(ts: str) -> Optional[int]:
-    """
-    Accepts:
-      - mm:ss
-      - mm:ss.xx
-      - mm:ss.xxx
-    """
-    t = (ts or "").strip()
-    if not t:
-        return None
-
-    # normalize comma to dot
-    t = t.replace(",", ".")
-
-    # mm:ss(.frac)
-    m = re.match(r"^(\d+):(\d{1,2})(?:\.(\d{1,3}))?$", t)
-    if not m:
-        return None
-
-    mm = m.group(1)
-    ss = m.group(2)
-    frac = m.group(3)
-
-    # reuse _ts_to_ms frac logic: but it expects strings
-    try:
-        return _ts_to_ms(mm, ss, frac)
-    except (ValueError, TypeError):
-        return None
-
-
-def parse_lrc(lrc_text: str) -> List[Tuple[int, str]]:
-    """
-    Returns list of (time_ms, text) sorted by time.
-    Supports multiple timestamps per line.
-    Ignores metadata tags like [ar:], [ti:], etc.
-    """
-    out: List[Tuple[int, str]] = []
-    if not lrc_text:
-        return out
-
-    for raw_line in lrc_text.splitlines():
-        line = raw_line.rstrip("\n")
-        # Keep truly empty raw lines only if you want blank rows with no timestamp.
-        # For synced LRC, blank lines without timestamp can't be placed on a timeline, so we ignore them.
-        if not line.strip():
-            continue
-
-        # ignore metadata
-        if line.startswith("[ar:") or line.startswith("[ti:") or line.startswith("[al:") or line.startswith("[by:") or line.startswith("[offset:") or line.startswith("[au:"):
-            continue
-
-        matches = list(_TS_RE.finditer(line))
-        if not matches:
-            continue
-
-        text = _TS_RE.sub("", line)
-        # Keep empty lyrics lines (timestamp-only lines).
-        # Don't .strip() here if you want to preserve intentional spaces; usually not needed.
-        text = text.strip()
-
-        for m in matches:
-            t = _ts_to_ms(m.group(1), m.group(2), m.group(3))
-            out.append((t, text))
-
-    out.sort(key=lambda x: x[0])
-    return out
-
-
 class LyricsEditorWidget(QWidget):
     """
     Right-side lyrics panel:
@@ -235,6 +145,9 @@ class LyricsEditorWidget(QWidget):
     publishSyncedRequested = Signal()
     publishPlainRequested = Signal()
     saveRequested = Signal(str, str)     # lrc_text, plain_text
+    dirtyDraftChanged = Signal(str, str)  # lrc_text, plain_text
+    discardDraftRequested = Signal()
+    autoSyncRequested = Signal()
     downloadRequested = Signal()
     searchRequested = Signal()
     exportFilesRequested = Signal()
@@ -243,14 +156,18 @@ class LyricsEditorWidget(QWidget):
         super().__init__(parent)
 
         self._current_pos_ms: int = 0
-        self._times: List[int] = []
+        self._times: list[int] = []
         self._current_index: int = -1
         self._invalid_rows: set[int] = set()
         self._default_button_text: dict[QPushButton, str] = {}
         self._publish_synced_available = False
         self._publish_plain_available = False
+        self._loading_track = False
+        self._has_dirty_draft = False
         self._reaction_delay_ms: int = 0
         self._current_position_provider = None
+        self._saved_lrc: str = ""
+        self._saved_txt: str = ""
 
         # Snapshot-based undo/redo for the synced table editor
         self._undo_stack: list[list[tuple[int, str]]] = []
@@ -270,6 +187,39 @@ class LyricsEditorWidget(QWidget):
         self.title.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
         self.title.setObjectName("LyricsTitle")
         title_row.addWidget(self.title, 1)
+        self.dirty_badge = QLabel("")
+        self.dirty_badge.setObjectName("LyricsDirtyBadge")
+        self.dirty_badge.hide()
+        title_row.addWidget(self.dirty_badge)
+
+        self.btn_discard_draft = QPushButton("Discard")
+        self.btn_discard_draft.setObjectName("LyricsDiscardDraft")
+        self.btn_discard_draft.setToolTip("Discard draft and revert to saved lyrics")
+        self.btn_discard_draft.hide()
+        self.btn_discard_draft.clicked.connect(self.discardDraftRequested.emit)
+        title_row.addWidget(self.btn_discard_draft)
+
+        self.btn_show_diff = QPushButton("Diff")
+        self.btn_show_diff.setObjectName("LyricsShowDiff")
+        self.btn_show_diff.setToolTip("Show differences between saved and draft lyrics")
+        self.btn_show_diff.hide()
+        self.btn_show_diff.clicked.connect(self._show_diff)
+        title_row.addWidget(self.btn_show_diff)
+
+        self.btn_switch_mode = QPushButton("Switch to Synced")
+        self.btn_switch_mode.setObjectName("LyricsSwitchMode")
+        self.btn_switch_mode.setToolTip("Toggle between synced (timestamped) and plain text editing")
+        self.btn_switch_mode.hide()
+        self.btn_switch_mode.clicked.connect(self._toggle_editor_mode)
+        title_row.addWidget(self.btn_switch_mode)
+
+        self.btn_auto_sync = QPushButton("Auto Sync")
+        self.btn_auto_sync.setObjectName("LyricsAutoSync")
+        self.btn_auto_sync.setToolTip("Automatically synchronize lyrics using AI (requires torch, demucs, openai-whisper)")
+        self.btn_auto_sync.hide()
+        self.btn_auto_sync.clicked.connect(self.autoSyncRequested.emit)
+        title_row.addWidget(self.btn_auto_sync)
+
         header.addLayout(title_row)
 
         toolbar = FlowLayout(spacing=SPACE_2)
@@ -383,6 +333,7 @@ class LyricsEditorWidget(QWidget):
 
         # Plain editor (editable if you want)
         self.plain = QTextEdit()
+        self.plain.setAcceptRichText(False)
         self.plain.setPlaceholderText("Lyrics will appear here")
         self.plain.textChanged.connect(self._on_any_edit)
         self.stack.addWidget(self.plain)
@@ -455,6 +406,7 @@ class LyricsEditorWidget(QWidget):
 
     def show_none(self, message: str):
         self._reset_state()
+        self._set_dirty_badge(False)
         self.empty_state.configure(
             icon_name="audio-lines.svg",
             title="No track selected",
@@ -463,8 +415,24 @@ class LyricsEditorWidget(QWidget):
         )
         self.stack.setCurrentWidget(self.empty_state)
 
-    def set_track_lyrics(self, title: str, txt_lyrics: Optional[str], lrc_lyrics: Optional[str], instrumental: bool):
+    def set_track_lyrics(
+        self,
+        title: str,
+        txt_lyrics: str | None,
+        lrc_lyrics: str | None,
+        instrumental: bool,
+        dirty_txt_lyrics: str | None = None,
+        dirty_lrc_lyrics: str | None = None,
+        dirty_lyrics_present: bool = False,
+    ):
+        self._loading_track = True
+        self._saved_lrc = (lrc_lyrics or "").strip()
+        self._saved_txt = (txt_lyrics or "").strip()
         self.title.setText(title or "Lyrics")
+        has_dirty_draft = bool(
+            dirty_lyrics_present
+            and ((dirty_txt_lyrics or "").strip() or (dirty_lrc_lyrics or "").strip())
+        )
 
         if instrumental:
             self._reset_state()
@@ -475,13 +443,15 @@ class LyricsEditorWidget(QWidget):
                 action_text=None,
             )
             self.stack.setCurrentWidget(self.empty_state)
+            self._set_dirty_badge(False)
+            self._loading_track = False
             return
 
-        lrc = (lrc_lyrics or "").strip()
-        txt = (txt_lyrics or "").strip()
+        lrc = (dirty_lrc_lyrics or lrc_lyrics or "").strip()
+        txt = (dirty_txt_lyrics or txt_lyrics or "").strip()
 
-        self._publish_synced_available = bool(lrc)
-        self._publish_plain_available = bool(txt)
+        self._publish_synced_available = bool((lrc_lyrics or "").strip()) and not has_dirty_draft
+        self._publish_plain_available = bool((txt_lyrics or "").strip()) and not has_dirty_draft
         self.btn_publish_synced.setEnabled(self._publish_synced_available)
         self.btn_publish_plain.setEnabled(self._publish_plain_available)
 
@@ -500,11 +470,14 @@ class LyricsEditorWidget(QWidget):
                     self.plain.blockSignals(True)
                     self.plain.setPlainText("\n".join([t.rstrip() for _, t in pairs]).rstrip())
                     self.plain.blockSignals(False)
+                self._set_dirty_badge(has_dirty_draft)
+                self._loading_track = False
                 return
 
         # else fall back to plain
         if txt:
             self._set_plain(txt)
+            self._set_dirty_badge(has_dirty_draft)
         else:
             self._reset_state()
             self.empty_state.configure(
@@ -516,6 +489,8 @@ class LyricsEditorWidget(QWidget):
                 tertiary_action_text="Write Lyrics",
             )
             self.stack.setCurrentWidget(self.empty_state)
+            self._set_dirty_badge(False)
+        self._loading_track = False
 
     # --- internal helpers ---
     def _reset_state(self):
@@ -540,6 +515,25 @@ class LyricsEditorWidget(QWidget):
         self.btn_del.setEnabled(False)
         self.btn_save.setEnabled(False)
         self.btn_export_files.setEnabled(False)
+        self.btn_switch_mode.hide()
+        self.btn_auto_sync.hide()
+
+    def _set_dirty_badge(self, visible: bool) -> None:
+        self._has_dirty_draft = bool(visible)
+        self.dirty_badge.setText("Unsaved draft" if visible else "")
+        self.dirty_badge.setVisible(bool(visible))
+        self.btn_discard_draft.setVisible(bool(visible))
+        self.btn_show_diff.setVisible(bool(visible))
+
+    def _show_diff(self) -> None:
+        from ui.dialogs.lyrics_diff_dialog import LyricsDiffDialog
+
+        saved = self._saved_lrc or self._saved_txt or ""
+        _draft_lrc, draft_txt = self._current_lyrics_text()
+        draft = _draft_lrc or draft_txt or ""
+
+        dlg = LyricsDiffDialog(saved, draft, title="Lyrics Diff — Saved vs Draft", parent=self.window())
+        dlg.exec()
 
     def _set_plain(self, txt: str):
         self._reset_state()
@@ -559,11 +553,41 @@ class LyricsEditorWidget(QWidget):
         self.btn_shift_selected.setEnabled(False)
         self.btn_shift_all_from_first.setEnabled(False)
         self.btn_export_files.setEnabled(True)
+        self.btn_switch_mode.setText("Switch to Synced")
+        self.btn_switch_mode.setVisible(True)
+        self.btn_auto_sync.setVisible(True)
 
     def _start_writing_lyrics(self):
         """Switch to an empty plain editor so the user can write lyrics from scratch."""
         self._set_plain("")
         self.plain.setFocus()
+
+    def _toggle_editor_mode(self):
+        """Switch between synced (table) and plain text editing modes."""
+        if self.stack.currentWidget() is self.table:
+            # Synced → Plain: cache synced pairs so we can restore timestamps
+            self._cached_synced_pairs = self._take_snapshot()
+            lines: list[str] = []
+            for r in range(self.table.rowCount()):
+                it_text = self.table.item(r, 1)
+                lines.append(it_text.text().rstrip() if it_text else "")
+            txt = "\n".join(lines).rstrip()
+            self._set_plain(txt)
+            self._emit_dirty_draft_changed()
+        elif self.stack.currentWidget() is self.plain:
+            # Plain → Synced: restore cached timestamps when line count matches
+            txt = (self.plain.toPlainText() or "").strip()
+            if not txt:
+                return
+            lines = txt.splitlines()
+            cached = getattr(self, "_cached_synced_pairs", None)
+            if cached and len(cached) == len(lines):
+                pairs = [(ms, line.rstrip()) for (ms, _), line in zip(cached, lines)]
+            else:
+                pairs = [(0, line.rstrip()) for line in lines]
+            self._cached_synced_pairs = None
+            self._set_synced(pairs)
+            self._emit_dirty_draft_changed()
 
     # --- Undo / Redo (snapshot-based for synced table) ---
     def _take_snapshot(self) -> list[tuple[int, str]]:
@@ -634,7 +658,7 @@ class LyricsEditorWidget(QWidget):
         self._restore_snapshot(snapshot)
         self._set_validation_message("Redo", state="success")
 
-    def _set_synced(self, pairs: List[Tuple[int, str]]):
+    def _set_synced(self, pairs: list[tuple[int, str]]):
         self._reset_state()
         self.stack.setCurrentWidget(self.table)
 
@@ -671,9 +695,12 @@ class LyricsEditorWidget(QWidget):
         self.btn_shift_selected.setEnabled(has_selection)
         self.btn_save.setEnabled(not self._invalid_rows)
         self.btn_export_files.setEnabled(True)
+        self.btn_switch_mode.setText("Switch to Plain")
+        self.btn_switch_mode.setVisible(True)
+        self.btn_auto_sync.setVisible(True)
 
     def _rebuild_times_cache(self):
-        times: List[int] = []
+        times: list[int] = []
         for r in range(self.table.rowCount()):
             it_time = self.table.item(r, 0)
             ms = int(it_time.data(TIMESTAMP_MS_ROLE) or 0) if it_time else 0
@@ -681,28 +708,40 @@ class LyricsEditorWidget(QWidget):
         self._times = times
 
     def _refresh_row_styles(self):
+        from ui.theme_tokens import STYLE_TOKENS
         current_row = self._current_index if self.stack.currentWidget() is self.table else -1
         selected_row = self.table.currentRow()
 
+        default_fg = QColor(STYLE_TOKENS.get("color-text", "#e5e7eb"))
+        invalid_bg = QColor(STYLE_TOKENS.get("color-error-bg", "#3f1418"))
+        invalid_fg = QColor(STYLE_TOKENS.get("color-error-text", "#fecaca"))
+        current_selected_bg = QColor(STYLE_TOKENS.get("color-selection-bg", "#0b2942"))
+        current_selected_fg = QColor(STYLE_TOKENS.get("color-selection-text", "#e0f2fe"))
+        current_bg = QColor(STYLE_TOKENS.get("color-table-row-hover", "#0f2235"))
+        current_fg = QColor(STYLE_TOKENS.get("color-accent-alt", "#bae6fd"))
+        selected_bg = QColor(STYLE_TOKENS.get("color-bg-control", "#172554"))
+        selected_fg = QColor(STYLE_TOKENS.get("color-text-strong", "#dbeafe"))
+
+        self.table.blockSignals(True)
         for row in range(self.table.rowCount()):
             is_current = row == current_row
             is_selected = row == selected_row
             is_invalid = row in self._invalid_rows
 
             bg = None
-            fg = QColor("#e5e7eb")
+            fg = default_fg
             if is_invalid:
-                bg = QColor("#3f1418")
-                fg = QColor("#fecaca")
+                bg = invalid_bg
+                fg = invalid_fg
             elif is_current and is_selected:
-                bg = QColor("#0b2942")
-                fg = QColor("#e0f2fe")
+                bg = current_selected_bg
+                fg = current_selected_fg
             elif is_current:
-                bg = QColor("#0f2235")
-                fg = QColor("#bae6fd")
+                bg = current_bg
+                fg = current_fg
             elif is_selected:
-                bg = QColor("#172554")
-                fg = QColor("#dbeafe")
+                bg = selected_bg
+                fg = selected_fg
 
             for col in range(self.table.columnCount()):
                 item = self.table.item(row, col)
@@ -713,6 +752,7 @@ class LyricsEditorWidget(QWidget):
                 else:
                     item.setBackground(bg)
                 item.setForeground(fg)
+        self.table.blockSignals(False)
 
     def _update_save_enabled(self):
         if self.stack.currentWidget() is self.table:
@@ -734,6 +774,7 @@ class LyricsEditorWidget(QWidget):
         # Any edit in plain view keeps save enabled
         if self.stack.currentWidget() is self.plain:
             self._update_save_enabled()
+            self._emit_dirty_draft_changed()
 
     def _on_table_selection_changed(self):
         has = bool(self._selected_rows())
@@ -764,6 +805,7 @@ class LyricsEditorWidget(QWidget):
     def _on_table_item_changed(self, item: QTableWidgetItem):
         # If user edited the Time cell, validate and update ms
         if item.column() != 0:
+            self._emit_dirty_draft_changed()
             return
 
         row = item.row()
@@ -778,6 +820,7 @@ class LyricsEditorWidget(QWidget):
             )
             self._update_save_enabled()
             self._refresh_row_styles()
+            self._emit_dirty_draft_changed()
             return
 
         item.setData(TIMESTAMP_MS_ROLE, int(new_ms))
@@ -796,6 +839,39 @@ class LyricsEditorWidget(QWidget):
         self._rebuild_times_cache()
         self._update_save_enabled()
         self._refresh_row_styles()
+        self._emit_dirty_draft_changed()
+
+    def _current_lyrics_text(self) -> tuple[str, str]:
+        if self.stack.currentWidget() is self.table:
+            pairs: list[tuple[int, str]] = []
+            for r in range(self.table.rowCount()):
+                it_time = self.table.item(r, 0)
+                it_text = self.table.item(r, 1)
+                ms = int(it_time.data(TIMESTAMP_MS_ROLE) or 0) if it_time else 0
+                text = it_text.text() if it_text else ""
+                pairs.append((ms, text.rstrip()))
+
+            pairs.sort(key=lambda x: x[0])
+            lrc_lines: list[str] = []
+            for ms, text in pairs:
+                t = _ms_to_ts(ms)
+                lrc_lines.append(f"[{t}] {text.strip()}" if text.strip() else f"[{t}]")
+            return "\n".join(lrc_lines).strip(), "\n".join([text.rstrip() for _, text in pairs]).rstrip()
+
+        if self.stack.currentWidget() is self.plain:
+            return "", (self.plain.toPlainText() or "").strip()
+
+        return "", ""
+
+    def _emit_dirty_draft_changed(self) -> None:
+        if self._loading_track:
+            return
+        if self.stack.currentWidget() not in {self.table, self.plain}:
+            return
+        lrc, txt = self._current_lyrics_text()
+        has_changes = (lrc.strip() != self._saved_lrc) or (txt.strip() != self._saved_txt)
+        self._set_dirty_badge(has_changes)
+        self.dirtyDraftChanged.emit(lrc, txt)
 
     def _add_line_after_selection(self):
         self._push_undo()
@@ -825,6 +901,7 @@ class LyricsEditorWidget(QWidget):
         self.table.selectRow(insert_at)
         self.table.setCurrentCell(insert_at, 1)
         self.table.editItem(self.table.item(insert_at, 1))
+        self._emit_dirty_draft_changed()
 
     def _delete_selected_line(self):
         rows = self._selected_rows()
@@ -850,6 +927,7 @@ class LyricsEditorWidget(QWidget):
             self._set_validation_message("")
         self._update_save_enabled()
         self._refresh_row_styles()
+        self._emit_dirty_draft_changed()
 
     def _snap_selected_line_to_current_time(self):
         row = self.table.currentRow()
@@ -887,6 +965,7 @@ class LyricsEditorWidget(QWidget):
                 self._set_validation_message("Snapped selected line to current playback time.", state="success")
         self._update_save_enabled()
         self._refresh_row_styles()
+        self._emit_dirty_draft_changed()
 
     def _shift_selected_lines_by_custom_amount(self):
         delta_ms = int(round(float(self.shift_spin.value()) * 1000.0))
@@ -950,6 +1029,7 @@ class LyricsEditorWidget(QWidget):
         self._rebuild_times_cache()
         self._update_save_enabled()
         self._refresh_row_styles()
+        self._emit_dirty_draft_changed()
         return True
 
     def _rows_that_would_collapse_to_zero(self, rows: list[int], delta_ms: int) -> list[int]:
@@ -984,37 +1064,13 @@ class LyricsEditorWidget(QWidget):
                     state="error",
                 )
                 return
-            pairs: List[Tuple[int, str]] = []
-            for r in range(self.table.rowCount()):
-                it_time = self.table.item(r, 0)
-                it_text = self.table.item(r, 1)
-                ms = int(it_time.data(TIMESTAMP_MS_ROLE) or 0) if it_time else 0
-                text = it_text.text() if it_text else ""
-                # Keep empty lines (timestamp-only)
-                pairs.append((ms, text.rstrip()))
-
-            # sort by time
-            pairs.sort(key=lambda x: x[0])
-
-            lrc_lines: list[str] = []
-            for ms, text in pairs:
-                t = _ms_to_ts(ms)
-                if text.strip():
-                    lrc_lines.append(f"[{t}] {text.strip()}")
-                else:
-                    # Timestamp-only line (blank lyric line)
-                    lrc_lines.append(f"[{t}]")
-            lrc = "\n".join(lrc_lines).strip()
-
-            # Preserve blank lines in plain view
-            plain = "\n".join([text.rstrip() for _, text in pairs]).rstrip()
-
+            lrc, plain = self._current_lyrics_text()
             self.saveRequested.emit(lrc, plain)
             return
 
         # Plain view: save plain only
         if self.stack.currentWidget() is self.plain:
-            txt = (self.plain.toPlainText() or "").strip()
+            _lrc, txt = self._current_lyrics_text()
             self.saveRequested.emit("", txt)
             return
 
