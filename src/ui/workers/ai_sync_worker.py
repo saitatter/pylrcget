@@ -21,23 +21,23 @@ logger = logging.getLogger(__name__)
 def _check_ai_sync_available() -> tuple[bool, str]:
     """Check whether the required AI sync dependencies are installed."""
     missing: list[str] = []
-    try:
-        import torch  # noqa: F401
-    except ImportError:
-        missing.append("torch")
-    try:
-        import demucs  # noqa: F401
-    except ImportError:
-        missing.append("demucs")
-    try:
-        import whisper  # noqa: F401
-    except ImportError:
-        missing.append("openai-whisper")
+    deps = [
+        ("torch", "torch"),
+        ("torchaudio", "torchaudio"),
+        ("soundfile", "soundfile"),
+        ("demucs", "demucs"),
+        ("whisper", "openai-whisper"),
+    ]
+    for module, package in deps:
+        try:
+            __import__(module)
+        except ImportError:
+            missing.append(package)
     if missing:
         return False, (
             f"Missing dependencies: {', '.join(missing)}.\n\n"
             "Install them with:\n"
-            "  pip install torch demucs openai-whisper"
+            f"  pip install {' '.join(missing)}"
         )
     return True, ""
 
