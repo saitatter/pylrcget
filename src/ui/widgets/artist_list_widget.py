@@ -25,6 +25,7 @@ from ui.widgets.sortable_header_view import SortableHeaderView
 class ArtistListWidget(QWidget):
     playTrack = Signal(int)
     refreshTrack = Signal(int)
+    bulkRefreshRequested = Signal(list)
     downloadLyrics = Signal(int)
     exportLyricsFiles = Signal(int)
     bulkDownloadRequested = Signal(list, str)
@@ -102,6 +103,7 @@ class ArtistListWidget(QWidget):
         self.album_browser.setRouteTab("artists")
         self.album_browser.playTrack.connect(self.playTrack.emit)
         self.album_browser.refreshTrack.connect(self.refreshTrack.emit)
+        self.album_browser.bulkRefreshRequested.connect(self.bulkRefreshRequested.emit)
         self.album_browser.downloadLyrics.connect(self.downloadLyrics.emit)
         self.album_browser.exportLyricsFiles.connect(self.exportLyricsFiles.emit)
         self.album_browser.bulkDownloadRequested.connect(self.bulkDownloadRequested.emit)

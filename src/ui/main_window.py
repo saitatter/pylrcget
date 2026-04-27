@@ -180,8 +180,15 @@ class MainWindow(QMainWindow):
         splitter = QSplitter(Qt.Orientation.Horizontal)
         self.content_splitter = splitter
 
-        self.track_list = TrackListWidget(self.app_state)
-        splitter.addWidget(self.track_list)
+        self.track_pane = QWidget()
+        track_pane_layout = QVBoxLayout(self.track_pane)
+        set_layout_spacing(track_pane_layout, margins=0, spacing=SPACE_2)
+        self._create_selection_actions_bar()
+
+        self.track_list = TrackListWidget(self.app_state, show_bulk_context_actions=False)
+        track_pane_layout.addWidget(self.selection_actions_bar)
+        track_pane_layout.addWidget(self.track_list, 1)
+        splitter.addWidget(self.track_pane)
 
         self.lyrics_view = LyricsEditorWidget()
         self.lyrics_view.show_none("Select a track to see lyrics")
@@ -195,7 +202,7 @@ class MainWindow(QMainWindow):
         splitter.setStretchFactor(1, 2)
         splitter.setCollapsible(0, False)
         splitter.setCollapsible(1, False)
-        self.track_list.setMinimumWidth(LIBRARY_PANE_MIN_WIDTH)
+        self.track_pane.setMinimumWidth(LIBRARY_PANE_MIN_WIDTH)
         self.lyrics_view.setMinimumWidth(LYRICS_PANE_MIN_WIDTH)
 
         tracks_layout.addWidget(splitter)
@@ -378,6 +385,7 @@ class MainWindow(QMainWindow):
         # --- Signals from track list ---
         self.track_list.playTrack.connect(self.on_play_track)
         self.track_list.refreshTrack.connect(self.on_refresh_track)
+        self.track_list.bulkRefreshRequested.connect(self.on_refresh_tracks)
         self.track_list.downloadLyrics.connect(self.on_download_lyrics)
         self.track_list.exportLyricsFiles.connect(self._export_track_sidecars)
         self.track_list.bulkDownloadRequested.connect(self._on_bulk_download_requested)
@@ -391,6 +399,7 @@ class MainWindow(QMainWindow):
         self.lyrics_view.searchRequested.connect(self._search_current_track_lyrics)
         self.albums_tab.playTrack.connect(self.on_play_track)
         self.albums_tab.refreshTrack.connect(self.on_refresh_track)
+        self.albums_tab.bulkRefreshRequested.connect(self.on_refresh_tracks)
         self.albums_tab.downloadLyrics.connect(self.on_download_lyrics)
         self.albums_tab.exportLyricsFiles.connect(self._export_track_sidecars)
         self.albums_tab.bulkDownloadRequested.connect(self._on_bulk_download_requested)
@@ -403,6 +412,7 @@ class MainWindow(QMainWindow):
         self.albums_tab.configureFoldersRequested.connect(self.open_config_modal)
         self.artists_tab.playTrack.connect(self.on_play_track)
         self.artists_tab.refreshTrack.connect(self.on_refresh_track)
+        self.artists_tab.bulkRefreshRequested.connect(self.on_refresh_tracks)
         self.artists_tab.downloadLyrics.connect(self.on_download_lyrics)
         self.artists_tab.exportLyricsFiles.connect(self._export_track_sidecars)
         self.artists_tab.bulkDownloadRequested.connect(self._on_bulk_download_requested)
@@ -424,18 +434,130 @@ class MainWindow(QMainWindow):
         self._selection_label = QLabel("")
         self.statusBar().addPermanentWidget(self._selection_label)
         self.track_list.table.selectionModel().selectionChanged.connect(self._update_selection_counter)
+        self.track_list.table.selectionModel().selectionChanged.connect(self._update_selection_actions_bar)
+        self.tabs.currentChanged.connect(self._update_selection_actions_bar)
 
         # initial load
         self._apply_track_filters()
         self.show_queued_notifications()
         self._update_responsive_layout()
         self._apply_startup_view()
+        self._update_selection_actions_bar()
         QTimer.singleShot(0, self._maybe_show_first_run_onboarding)
 
         self._apply_styles()
 
         # Restore persisted window state (geometry, splitter sizes, tab index)
         self._restore_window_state()
+
+    def _create_selection_actions_bar(self) -> None:
+        self.selection_actions_bar = QWidget()
+        self.selection_actions_bar.setObjectName("SelectionActionsBar")
+        layout = QHBoxLayout(self.selection_actions_bar)
+        set_layout_spacing(layout, margins=(SPACE_2, 0, SPACE_2, 0), spacing=SPACE_1)
+
+        self.selection_actions_label = QLabel("No selection")
+        self.selection_actions_label.setObjectName("SelectionActionsLabel")
+        layout.addWidget(self.selection_actions_label)
+
+        self.selection_action_buttons: list[QPushButton] = []
+
+        def add_button(text: str, tooltip: str, handler) -> QPushButton:
+            button = QPushButton(text)
+            button.setObjectName("SelectionActionButton")
+            button.setToolTip(tooltip)
+            button.clicked.connect(handler)
+            layout.addWidget(button)
+            self.selection_action_buttons.append(button)
+            return button
+
+        add_button(
+            "Refresh selected",
+            "Refresh the selected tracks from their source files on disk.",
+            self._refresh_selected_tracks,
+        )
+        add_button(
+            "Download: current mode",
+            "Download lyrics for the selected tracks using the global download mode.",
+            lambda: self._download_selected_tracks("use_global"),
+        )
+        add_button(
+            "Download synced",
+            "Download only synced lyrics for the selected tracks.",
+            lambda: self._download_selected_tracks("synced_only"),
+        )
+        add_button(
+            "Download plain",
+            "Download only plain lyrics for the selected tracks.",
+            lambda: self._download_selected_tracks("plain_only"),
+        )
+        add_button(
+            "Mark instrumental",
+            "Mark the selected tracks as instrumental and clear their lyrics.",
+            self._mark_selected_tracks_instrumental,
+        )
+        add_button(
+            "Unmark instrumental",
+            "Remove the instrumental flag from the selected tracks.",
+            self._unmark_selected_tracks_instrumental,
+        )
+        add_button(
+            "Publish synced",
+            "Publish synced lyrics from the selected tracks to LRCLIB.",
+            lambda: self._publish_selected_tracks(True),
+        )
+        add_button(
+            "Publish plain",
+            "Publish plain lyrics from the selected tracks to LRCLIB.",
+            lambda: self._publish_selected_tracks(False),
+        )
+        layout.addStretch(1)
+
+    def _selected_track_ids_for_toolbar(self) -> list[int]:
+        if not hasattr(self, "track_list"):
+            return []
+        return self.track_list.selected_track_ids()
+
+    def _download_selected_tracks(self, mode: str) -> None:
+        track_ids = self._selected_track_ids_for_toolbar()
+        if track_ids:
+            self._on_bulk_download_requested(track_ids, mode)
+
+    def _refresh_selected_tracks(self) -> None:
+        track_ids = self._selected_track_ids_for_toolbar()
+        if track_ids:
+            self.on_refresh_tracks(track_ids)
+
+    def _mark_selected_tracks_instrumental(self) -> None:
+        track_ids = self._selected_track_ids_for_toolbar()
+        if track_ids:
+            self._on_mark_instrumental(track_ids)
+
+    def _unmark_selected_tracks_instrumental(self) -> None:
+        track_ids = self._selected_track_ids_for_toolbar()
+        if track_ids:
+            self._on_unmark_instrumental(track_ids)
+
+    def _publish_selected_tracks(self, is_synced: bool) -> None:
+        track_ids = self._selected_track_ids_for_toolbar()
+        if track_ids:
+            self.publish_history.publish_batch(track_ids, is_synced)
+
+    def _update_selection_actions_bar(self, *_args) -> None:
+        if not hasattr(self, "selection_actions_bar"):
+            return
+
+        show_toolbar = self.tabs.currentWidget() is self.tracks_tab
+        self.selection_actions_bar.setVisible(show_toolbar)
+        if not show_toolbar:
+            return
+
+        count = len(self._selected_track_ids_for_toolbar())
+        has_selection = count > 0
+        label = f"Selected tracks: {count}" if has_selection else "Selected tracks: none"
+        self.selection_actions_label.setText(label)
+        for button in self.selection_action_buttons:
+            button.setEnabled(has_selection)
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
@@ -769,40 +891,62 @@ class MainWindow(QMainWindow):
         self._set_track_lyrics_views(track)
 
     def on_refresh_track(self, track_id: int) -> None:
-        try:
-            refreshed = refresh_track_from_file(self.app_state.db, int(track_id))
-        except (sqlite3.Error, OSError, ValueError) as exc:
-            log_and_notify(
-                self.app_state,
-                logger,
-                logging.ERROR,
-                exception_message("Failed to refresh track from disk", exc),
-                "error",
-                show_status=self._show_status_message,
-                status_timeout_ms=4000,
-            )
+        self.on_refresh_tracks([int(track_id)])
+
+    def on_refresh_tracks(self, track_ids: list[int]) -> None:
+        track_ids = [int(track_id) for track_id in track_ids if track_id is not None]
+        if not track_ids:
             return
 
+        selected_before = set(track_ids)
+        refreshed_tracks = {}
+        removed_ids: set[int] = set()
+
+        for track_id in track_ids:
+            try:
+                refreshed = refresh_track_from_file(self.app_state.db, int(track_id))
+            except (sqlite3.Error, OSError, ValueError) as exc:
+                log_and_notify(
+                    self.app_state,
+                    logger,
+                    logging.ERROR,
+                    exception_message("Failed to refresh track from disk", exc),
+                    "error",
+                    show_status=self._show_status_message,
+                    status_timeout_ms=4000,
+                )
+                return
+
+            if refreshed is None:
+                removed_ids.add(int(track_id))
+            else:
+                refreshed_tracks[int(track_id)] = refreshed
+
         self._refresh_visible_library_view_after_downloads()
+        self.track_list.restore_selection(selected_before - removed_ids)
 
         current_track_id = self._current_player_track_id()
-        if refreshed is None:
-            if current_track_id == int(track_id):
-                self._clear_current_player_track()
+        if current_track_id in removed_ids:
+            self._clear_current_player_track()
+        elif current_track_id in refreshed_tracks:
+            refreshed = refreshed_tracks[current_track_id]
+            self._update_current_player_track_meta(refreshed)
+            self._set_track_lyrics_views(refreshed)
+
+        refreshed_count = len(refreshed_tracks)
+        removed_count = len(removed_ids)
+        if removed_count:
             notify_user(
                 self.app_state,
-                "Track removed from library because the source file was not found.",
+                f"Refreshed {refreshed_count} track(s). Removed {removed_count} missing track(s).",
                 "warning",
                 show_status=self._show_status_message,
                 status_timeout_ms=3500,
             )
             return
 
-        if current_track_id == int(track_id):
-            self._update_current_player_track_meta(refreshed)
-            self._set_track_lyrics_views(refreshed)
-
-        self._show_status_message("Track refreshed from disk.", 2500)
+        suffix = "s" if refreshed_count != 1 else ""
+        self._show_status_message(f"Refreshed {refreshed_count} track{suffix} from disk.", 2500)
 
     def play_next(self):
         if not self._queue_ids:

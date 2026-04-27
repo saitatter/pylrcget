@@ -3,9 +3,10 @@ from __future__ import annotations
 
 from dataclasses import replace
 from pathlib import Path
+import time
 from typing import Sequence
 
-from PySide6.QtCore import Signal, Qt, QItemSelectionModel, QUrl
+from PySide6.QtCore import QEvent, Signal, Qt, QItemSelectionModel, QUrl
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QHeaderView,
@@ -33,6 +34,7 @@ from ui.widgets.library_table_utils import should_load_more
 from ui.widgets.track_list_rows import build_track_list_rows
 from core.tracklist_models import DownloadState
 
+
 TRACK_DURATION_COLUMN_WIDTH = 92
 TRACK_LYRICS_COLUMN_WIDTH = 118
 TRACK_ACTIONS_COLUMN_WIDTH = 142
@@ -41,6 +43,7 @@ TRACK_ACTIONS_COLUMN_WIDTH = 142
 class TrackListWidget(QWidget):
     playTrack = Signal(int)       # track_id
     refreshTrack = Signal(int)    # track_id
+    bulkRefreshRequested = Signal(list)  # track_ids
     downloadLyrics = Signal(int)  # track_id
     exportLyricsFiles = Signal(int)  # track_id
     bulkDownloadRequested = Signal(list, str)  # track_ids, mode
@@ -53,9 +56,10 @@ class TrackListWidget(QWidget):
     clearFiltersRequested = Signal()
     configureFoldersRequested = Signal()
 
-    def __init__(self, app_state):
+    def __init__(self, app_state, *, show_bulk_context_actions: bool = True):
         super().__init__()
         self.app_state = app_state
+        self._show_bulk_context_actions = show_bulk_context_actions
         self._active = True
         self._page_size = 250
         self._search = ""
@@ -112,6 +116,8 @@ class TrackListWidget(QWidget):
         self.table.setAlternatingRowColors(True)
         self.table.setMouseTracking(True)
         self.table.viewport().setMouseTracking(True)
+        self.table.viewport().installEventFilter(self)
+        self._suppress_left_click_until = 0.0
         self.table.setSortingEnabled(False)
         self.header.setSortIndicator(0, Qt.SortOrder.AscendingOrder)
         self.header.sortIndicatorChanged.connect(self._on_sort_changed)
@@ -356,44 +362,54 @@ class TrackListWidget(QWidget):
         count = len(selected_ids)
         count_text = f"{count} track selected" if count == 1 else f"{count} tracks selected"
         add_section("Selection", count_text)
+        act_refresh_selected = menu.addAction(f"Refresh selected from disk ({count})")
         act_play = menu.addAction("Play now")
         act_play.setEnabled(has_focused_track)
 
         menu.addSeparator()
         add_section("Focused Track")
-        act_refresh = menu.addAction("Refresh from disk")
         act_open_folder = menu.addAction("Open containing folder")
         act_dl = menu.addAction("Download lyrics")
         act_export = menu.addAction("Export lyrics files")
-        act_refresh.setEnabled(has_focused_track)
         act_open_folder.setEnabled(has_focused_track)
         act_dl.setEnabled(has_focused_track)
         act_export.setEnabled(has_focused_track)
 
-        menu.addSeparator()
         count_suffix = f"({len(selected_ids)})"
-        add_section("Download Selection")
-        act_dl_selected = menu.addAction(f"Use current mode {count_suffix}")
-        act_dl_synced = menu.addAction(f"Synced only {count_suffix}")
-        act_dl_plain = menu.addAction(f"Plain only {count_suffix}")
+        if self._show_bulk_context_actions:
+            menu.addSeparator()
+            add_section("Download Selection")
+            act_dl_selected = menu.addAction(f"Use current mode {count_suffix}")
+            act_dl_synced = menu.addAction(f"Synced only {count_suffix}")
+            act_dl_plain = menu.addAction(f"Plain only {count_suffix}")
 
-        menu.addSeparator()
-        add_section("Lyrics State")
-        act_instr = menu.addAction(f"Mark as instrumental {count_suffix}")
-        act_uninstr = menu.addAction(f"Unmark instrumental {count_suffix}")
+            menu.addSeparator()
+            add_section("Lyrics State")
+            act_instr = menu.addAction(f"Mark as instrumental {count_suffix}")
+            act_uninstr = menu.addAction(f"Unmark instrumental {count_suffix}")
 
-        menu.addSeparator()
-        add_section("Publish Selection")
-        act_pub_synced = menu.addAction(f"Publish synced {count_suffix}")
-        act_pub_plain = menu.addAction(f"Publish plain {count_suffix}")
+            menu.addSeparator()
+            add_section("Publish Selection")
+            act_pub_synced = menu.addAction(f"Publish synced {count_suffix}")
+            act_pub_plain = menu.addAction(f"Publish plain {count_suffix}")
+        else:
+            act_dl_selected = None
+            act_dl_synced = None
+            act_dl_plain = None
+            act_instr = None
+            act_uninstr = None
+            act_pub_synced = None
+            act_pub_plain = None
 
         chosen = menu.exec(self.table.viewport().mapToGlobal(pos))
+        if chosen is None:
+            self._suppress_next_table_left_click()
+            return
         if chosen == act_play:
             if current_track_id is not None:
                 self.playTrack.emit(int(current_track_id))
-        elif chosen == act_refresh:
-            if current_track_id is not None:
-                self.refreshTrack.emit(int(current_track_id))
+        elif chosen == act_refresh_selected:
+            self.bulkRefreshRequested.emit(selected_ids)
         elif chosen == act_open_folder:
             if current_track_id is not None:
                 self._open_track_folder(int(current_track_id))
@@ -417,6 +433,23 @@ class TrackListWidget(QWidget):
             self.bulkPublishRequested.emit(selected_ids, True)
         elif chosen == act_pub_plain:
             self.bulkPublishRequested.emit(selected_ids, False)
+
+    def eventFilter(self, watched, event):
+        if watched is self.table.viewport() and event.type() in {
+            QEvent.Type.MouseButtonPress,
+            QEvent.Type.MouseButtonRelease,
+            QEvent.Type.MouseButtonDblClick,
+        }:
+            if (
+                event.button() == Qt.MouseButton.LeftButton
+                and time.monotonic() < self._suppress_left_click_until
+            ):
+                event.accept()
+                return True
+        return super().eventFilter(watched, event)
+
+    def _suppress_next_table_left_click(self) -> None:
+        self._suppress_left_click_until = time.monotonic() + 0.35
 
     def _open_track_folder(self, track_id: int) -> bool:
         track = get_track_by_id(self.app_state.db, int(track_id))
