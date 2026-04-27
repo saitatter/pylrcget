@@ -51,7 +51,7 @@ from ui.dialogs.about_dialog import AboutDialog
 from ui.icon_loader import load_app_icon
 from ui.player_bar import PlayerBar
 from ui.widgets.lyrics_editor_widget import LyricsEditorWidget
-from ui.widgets.lyrics_editor_widget import parse_lrc, _ms_to_ts
+from core.utils import parse_lrc, ms_to_ts as _ms_to_ts
 from ui.dialogs.first_run_dialog import FirstRunDialog
 from player.player import NowPlaying, Player
 from ui.services.lyrics_download_service import sync_track_outputs_with_result

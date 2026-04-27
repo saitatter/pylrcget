@@ -19,6 +19,12 @@ from PySide6.QtWidgets import (
 from ui.spacing import SPACE_2, SPACE_3, set_layout_spacing
 from ui.style_loader import load_stylesheet
 from ui.widgets.empty_state_widget import EmptyStateWidget
+from core.utils import (
+    _ts_to_ms,
+    ms_to_ts as _ms_to_ts,
+    parse_ts_str as _parse_ts_str,
+    parse_lrc,
+)
 
 _TS_RE = re.compile(r"\[(\d+):(\d+)(?:\.(\d+))?\]")
 TIMESTAMP_MS_ROLE = Qt.ItemDataRole.UserRole
@@ -120,101 +126,6 @@ class FlowLayout(QLayout):
         if rows:
             y -= spacing
         return y - rect.y() + margins.bottom()
-
-
-def _ts_to_ms(mm: str, ss: str, frac: str | None) -> int:
-    m = int(mm)
-    s = int(ss)
-    if frac is None:
-        ms = 0
-    else:
-        frac = frac.strip()
-        if len(frac) == 1:
-            ms = int(frac) * 100
-        elif len(frac) == 2:
-            ms = int(frac) * 10
-        else:
-            ms = int(frac[:3])
-    return (m * 60 + s) * 1000 + ms
-
-
-def _ms_to_ts(ms: int) -> str:
-    """Format milliseconds as mm:ss.xx (centiseconds)."""
-    if ms < 0:
-        ms = 0
-    total_s = ms // 1000
-    m = total_s // 60
-    s = total_s % 60
-    cs = (ms % 1000) // 10
-    return f"{m:02d}:{s:02d}.{cs:02d}"
-
-
-def _parse_ts_str(ts: str) -> Optional[int]:
-    """
-    Accepts:
-      - mm:ss
-      - mm:ss.xx
-      - mm:ss.xxx
-    """
-    t = (ts or "").strip()
-    if not t:
-        return None
-
-    # normalize comma to dot
-    t = t.replace(",", ".")
-
-    # mm:ss(.frac)
-    m = re.match(r"^(\d+):(\d{1,2})(?:\.(\d{1,3}))?$", t)
-    if not m:
-        return None
-
-    mm = m.group(1)
-    ss = m.group(2)
-    frac = m.group(3)
-
-    # reuse _ts_to_ms frac logic: but it expects strings
-    try:
-        return _ts_to_ms(mm, ss, frac)
-    except (ValueError, TypeError):
-        return None
-
-
-def parse_lrc(lrc_text: str) -> List[Tuple[int, str]]:
-    """
-    Returns list of (time_ms, text) sorted by time.
-    Supports multiple timestamps per line.
-    Ignores metadata tags like [ar:], [ti:], etc.
-    """
-    out: List[Tuple[int, str]] = []
-    if not lrc_text:
-        return out
-
-    for raw_line in lrc_text.splitlines():
-        line = raw_line.rstrip("\n")
-        # Keep truly empty raw lines only if you want blank rows with no timestamp.
-        # For synced LRC, blank lines without timestamp can't be placed on a timeline, so we ignore them.
-        if not line.strip():
-            continue
-
-        # ignore metadata
-        if line.startswith("[ar:") or line.startswith("[ti:") or line.startswith("[al:") or line.startswith("[by:") or line.startswith("[offset:") or line.startswith("[au:"):
-            continue
-
-        matches = list(_TS_RE.finditer(line))
-        if not matches:
-            continue
-
-        text = _TS_RE.sub("", line)
-        # Keep empty lyrics lines (timestamp-only lines).
-        # Don't .strip() here if you want to preserve intentional spaces; usually not needed.
-        text = text.strip()
-
-        for m in matches:
-            t = _ts_to_ms(m.group(1), m.group(2), m.group(3))
-            out.append((t, text))
-
-    out.sort(key=lambda x: x[0])
-    return out
 
 
 class LyricsEditorWidget(QWidget):
