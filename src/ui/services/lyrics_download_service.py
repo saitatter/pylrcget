@@ -253,14 +253,16 @@ def apply_lyrics_match_to_track(
     if mode == "plain_only":
         if plain:
             notify("Saving plain lyrics...")
-            track = update_track_plain_lyrics(db, track_id, plain)
+            update_track_plain_lyrics(db, track_id, plain)
+            track = get_track_by_id(db, track_id)
             sync_track_outputs(db, track, notify, config=config)
             return True, f"Downloaded plain lyrics.{score_note}", track
         if synced:
             derived_plain = _strip_empty(_strip_timestamps(synced))
             if derived_plain:
                 notify("Saving plain lyrics derived from synced lyrics...")
-                track = update_track_plain_lyrics(db, track_id, derived_plain)
+                update_track_plain_lyrics(db, track_id, derived_plain)
+                track = get_track_by_id(db, track_id)
                 sync_track_outputs(db, track, notify, config=config)
                 return True, f"Downloaded plain lyrics.{score_note}", track
         return False, f"No plain lyrics found on LRCLIB for this track.{score_note}", None
@@ -269,7 +271,8 @@ def apply_lyrics_match_to_track(
         if not plain:
             plain = _strip_empty(_strip_timestamps(synced))
         notify("Saving synced + plain lyrics...")
-        track = update_track_synced_lyrics(db, track_id, synced, plain or "")
+        update_track_synced_lyrics(db, track_id, synced, plain or "")
+        track = get_track_by_id(db, track_id)
         sync_track_outputs(db, track, notify, config=config)
         return True, f"Downloaded synced lyrics.{score_note}", track
 
@@ -277,7 +280,8 @@ def apply_lyrics_match_to_track(
         if mode == "synced_only":
             return False, f"Only plain lyrics were found; synced-only mode is enabled.{score_note}", None
         notify("Saving plain lyrics...")
-        track = update_track_plain_lyrics(db, track_id, plain)
+        update_track_plain_lyrics(db, track_id, plain)
+        track = get_track_by_id(db, track_id)
         sync_track_outputs(db, track, notify, config=config)
         return True, f"Downloaded plain lyrics.{score_note}", track
 

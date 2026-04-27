@@ -628,7 +628,7 @@ def get_track_rows(
 # -------------------------------
 # UPDATES / BULK OPS
 # -------------------------------
-def update_track_synced_lyrics(db: sqlite3.Connection, track_id: int, synced_lyrics: str, plain_lyrics: str) -> Track:
+def update_track_synced_lyrics(db: sqlite3.Connection, track_id: int, synced_lyrics: str, plain_lyrics: str) -> None:
     synced_lyrics = (synced_lyrics or "").strip() or None
     plain_lyrics = (plain_lyrics or "").strip() or None
 
@@ -638,10 +638,9 @@ def update_track_synced_lyrics(db: sqlite3.Connection, track_id: int, synced_lyr
         WHERE id = ?
     """, (synced_lyrics, plain_lyrics, int(track_id)))
     db.commit()
-    return get_track_by_id(db, track_id)
 
 
-def update_track_plain_lyrics(db: sqlite3.Connection, track_id: int, plain_lyrics: str) -> Track:
+def update_track_plain_lyrics(db: sqlite3.Connection, track_id: int, plain_lyrics: str) -> None:
     plain_lyrics = (plain_lyrics or "").strip() or None
     db.execute("""
         UPDATE tracks
@@ -649,20 +648,18 @@ def update_track_plain_lyrics(db: sqlite3.Connection, track_id: int, plain_lyric
         WHERE id = ?
     """, (plain_lyrics, int(track_id)))
     db.commit()
-    return get_track_by_id(db, track_id)
 
 
-def update_track_null_lyrics(db: sqlite3.Connection, track_id: int) -> Track:
+def update_track_null_lyrics(db: sqlite3.Connection, track_id: int) -> None:
     db.execute("""
         UPDATE tracks
         SET txt_lyrics = NULL, lrc_lyrics = NULL, dirty_lrc_lyrics = NULL, dirty_txt_lyrics = NULL, dirty_lyrics_present = 0, instrumental = 0
         WHERE id = ?
     """, (int(track_id),))
     db.commit()
-    return get_track_by_id(db, track_id)
 
 
-def update_track_dirty_lyrics(db: sqlite3.Connection, track_id: int, synced_lyrics: str, plain_lyrics: str) -> Track:
+def update_track_dirty_lyrics(db: sqlite3.Connection, track_id: int, synced_lyrics: str, plain_lyrics: str) -> None:
     synced_lyrics = (synced_lyrics or "").strip() or None
     plain_lyrics = (plain_lyrics or "").strip() or None
 
@@ -677,10 +674,9 @@ def update_track_dirty_lyrics(db: sqlite3.Connection, track_id: int, synced_lyri
         (synced_lyrics, plain_lyrics, int(track_id)),
     )
     db.commit()
-    return get_track_by_id(db, track_id)
 
 
-def clear_track_dirty_lyrics(db: sqlite3.Connection, track_id: int) -> Track:
+def clear_track_dirty_lyrics(db: sqlite3.Connection, track_id: int) -> None:
     db.execute(
         """
         UPDATE tracks
@@ -692,17 +688,15 @@ def clear_track_dirty_lyrics(db: sqlite3.Connection, track_id: int) -> Track:
         (int(track_id),),
     )
     db.commit()
-    return get_track_by_id(db, track_id)
 
 
-def update_track_instrumental(db: sqlite3.Connection, track_id: int) -> Track:
+def update_track_instrumental(db: sqlite3.Connection, track_id: int) -> None:
     db.execute("""
         UPDATE tracks
         SET txt_lyrics = NULL, lrc_lyrics = '[au: instrumental]', dirty_lrc_lyrics = NULL, dirty_txt_lyrics = NULL, dirty_lyrics_present = 0, instrumental = 1
         WHERE id = ?
     """, (int(track_id),))
     db.commit()
-    return get_track_by_id(db, track_id)
 
 
 def refresh_track_from_file(db: sqlite3.Connection, track_id: int) -> Track | None:

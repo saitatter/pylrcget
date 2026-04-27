@@ -15,6 +15,7 @@ from db.queries import (
     get_config,
     get_download_history_rows,
     get_publish_history_rows,
+    get_track_by_id,
     refresh_track_from_file,
     record_download_history_batch,
     record_download_history,
@@ -340,13 +341,15 @@ class TrackRefreshQueryTests(unittest.TestCase):
 
                 track_id = int(db.execute("SELECT id FROM tracks LIMIT 1").fetchone()["id"])
                 update_track_plain_lyrics(db, track_id, "saved plain")
-                dirty = update_track_dirty_lyrics(db, track_id, "", "draft plain")
+                update_track_dirty_lyrics(db, track_id, "", "draft plain")
+                dirty = get_track_by_id(db, track_id)
 
                 self.assertTrue(dirty.dirty_lyrics_present)
                 self.assertEqual(dirty.dirty_txt_lyrics, "draft plain")
                 self.assertEqual(dirty.txt_lyrics, "saved plain")
 
-                cleared = clear_track_dirty_lyrics(db, track_id)
+                clear_track_dirty_lyrics(db, track_id)
+                cleared = get_track_by_id(db, track_id)
 
                 self.assertFalse(cleared.dirty_lyrics_present)
                 self.assertIsNone(cleared.dirty_txt_lyrics)

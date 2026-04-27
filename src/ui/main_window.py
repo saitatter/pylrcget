@@ -1045,7 +1045,8 @@ class MainWindow(QMainWindow):
             return track
 
         try:
-            cleaned = clear_track_dirty_lyrics(self.app_state.db, int(track.id))
+            clear_track_dirty_lyrics(self.app_state.db, int(track.id))
+            cleaned = get_track_by_id(self.app_state.db, int(track.id))
         except sqlite3.Error as exc:
             logger.warning("Failed to normalize dirty lyrics state for track %s: %s", track.id, exc)
             return track
