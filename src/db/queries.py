@@ -380,6 +380,9 @@ def get_track_by_id(db: sqlite3.Connection, track_id: int) -> Track:
             albums.image_path,
             txt_lyrics,
             lrc_lyrics,
+            dirty_txt_lyrics,
+            dirty_lrc_lyrics,
+            dirty_lyrics_present,
             instrumental
         FROM tracks
         JOIN albums ON tracks.album_id = albums.id
@@ -388,23 +391,7 @@ def get_track_by_id(db: sqlite3.Connection, track_id: int) -> Track:
         LIMIT 1
     """, (int(track_id),)).fetchone()
 
-    return Track(
-        id=row["id"],
-        file_path=row["file_path"],
-        file_name=row["file_name"],
-        title=row["title"],
-        artist_name=row["artist_name"],
-        artist_id=row["artist_id"],
-        album_name=row["album_name"],
-        album_artist_name=row["album_artist_name"],
-        album_id=row["album_id"],
-        duration=row["duration"],
-        track_number=row["track_number"],
-        txt_lyrics=row["txt_lyrics"],
-        lrc_lyrics=row["lrc_lyrics"],
-        image_path=row["image_path"],
-        instrumental=bool(row["instrumental"]),
-    )
+    return Track.from_row(row)
 
 
 def add_track(db: sqlite3.Connection, track: FsTrack, *, commit: bool = True) -> None:
@@ -472,7 +459,7 @@ def get_tracks(db: sqlite3.Connection) -> List[Track]:
             artists.name AS artist_name, tracks.artist_id,
             albums.name AS album_name, albums.album_artist_name,
             album_id, duration, track_number, modified_time, file_size,
-            albums.image_path, txt_lyrics, lrc_lyrics, instrumental
+            albums.image_path, txt_lyrics, lrc_lyrics, dirty_txt_lyrics, dirty_lrc_lyrics, dirty_lyrics_present, instrumental
         FROM tracks
         JOIN albums ON tracks.album_id = albums.id
         JOIN artists ON tracks.artist_id = artists.id
@@ -562,6 +549,9 @@ def get_track_rows(
             tracks.duration,
             tracks.txt_lyrics,
             tracks.lrc_lyrics,
+            tracks.dirty_txt_lyrics,
+            tracks.dirty_lrc_lyrics,
+            tracks.dirty_lyrics_present,
             tracks.instrumental
         FROM tracks
         JOIN artists ON tracks.artist_id = artists.id
@@ -582,7 +572,7 @@ def update_track_synced_lyrics(db: sqlite3.Connection, track_id: int, synced_lyr
 
     db.execute("""
         UPDATE tracks
-        SET lrc_lyrics = ?, txt_lyrics = ?, instrumental = 0
+        SET lrc_lyrics = ?, txt_lyrics = ?, dirty_lrc_lyrics = NULL, dirty_txt_lyrics = NULL, dirty_lyrics_present = 0, instrumental = 0
         WHERE id = ?
     """, (synced_lyrics, plain_lyrics, int(track_id)))
     db.commit()
@@ -593,7 +583,7 @@ def update_track_plain_lyrics(db: sqlite3.Connection, track_id: int, plain_lyric
     plain_lyrics = (plain_lyrics or "").strip() or None
     db.execute("""
         UPDATE tracks
-        SET txt_lyrics = ?, lrc_lyrics = NULL, instrumental = 0
+        SET txt_lyrics = ?, lrc_lyrics = NULL, dirty_lrc_lyrics = NULL, dirty_txt_lyrics = NULL, dirty_lyrics_present = 0, instrumental = 0
         WHERE id = ?
     """, (plain_lyrics, int(track_id)))
     db.commit()
@@ -603,9 +593,42 @@ def update_track_plain_lyrics(db: sqlite3.Connection, track_id: int, plain_lyric
 def update_track_null_lyrics(db: sqlite3.Connection, track_id: int) -> Track:
     db.execute("""
         UPDATE tracks
-        SET txt_lyrics = NULL, lrc_lyrics = NULL, instrumental = 0
+        SET txt_lyrics = NULL, lrc_lyrics = NULL, dirty_lrc_lyrics = NULL, dirty_txt_lyrics = NULL, dirty_lyrics_present = 0, instrumental = 0
         WHERE id = ?
     """, (int(track_id),))
+    db.commit()
+    return get_track_by_id(db, track_id)
+
+
+def update_track_dirty_lyrics(db: sqlite3.Connection, track_id: int, synced_lyrics: str, plain_lyrics: str) -> Track:
+    synced_lyrics = (synced_lyrics or "").strip() or None
+    plain_lyrics = (plain_lyrics or "").strip() or None
+
+    db.execute(
+        """
+        UPDATE tracks
+        SET dirty_lrc_lyrics = ?,
+            dirty_txt_lyrics = ?,
+            dirty_lyrics_present = 1
+        WHERE id = ?
+        """,
+        (synced_lyrics, plain_lyrics, int(track_id)),
+    )
+    db.commit()
+    return get_track_by_id(db, track_id)
+
+
+def clear_track_dirty_lyrics(db: sqlite3.Connection, track_id: int) -> Track:
+    db.execute(
+        """
+        UPDATE tracks
+        SET dirty_lrc_lyrics = NULL,
+            dirty_txt_lyrics = NULL,
+            dirty_lyrics_present = 0
+        WHERE id = ?
+        """,
+        (int(track_id),),
+    )
     db.commit()
     return get_track_by_id(db, track_id)
 
@@ -613,7 +636,7 @@ def update_track_null_lyrics(db: sqlite3.Connection, track_id: int) -> Track:
 def update_track_instrumental(db: sqlite3.Connection, track_id: int) -> Track:
     db.execute("""
         UPDATE tracks
-        SET txt_lyrics = NULL, lrc_lyrics = '[au: instrumental]', instrumental = 1
+        SET txt_lyrics = NULL, lrc_lyrics = '[au: instrumental]', dirty_lrc_lyrics = NULL, dirty_txt_lyrics = NULL, dirty_lyrics_present = 0, instrumental = 1
         WHERE id = ?
     """, (int(track_id),))
     db.commit()
@@ -677,6 +700,9 @@ def refresh_track_from_file(db: sqlite3.Connection, track_id: int) -> Track | No
             track_number = ?,
             txt_lyrics = ?,
             lrc_lyrics = ?,
+            dirty_txt_lyrics = NULL,
+            dirty_lrc_lyrics = NULL,
+            dirty_lyrics_present = 0,
             instrumental = ?,
             modified_time = ?,
             file_size = ?
@@ -715,6 +741,9 @@ def mark_tracks_instrumental(db: sqlite3.Connection, track_ids: list[int]) -> No
             UPDATE tracks
             SET txt_lyrics = NULL,
                 lrc_lyrics = '[au: instrumental]',
+                dirty_txt_lyrics = NULL,
+                dirty_lrc_lyrics = NULL,
+                dirty_lyrics_present = 0,
                 instrumental = 1
             WHERE id = ?
         """, [(i,) for i in ids])
@@ -737,7 +766,10 @@ def unmark_tracks_instrumental(db: sqlite3.Connection, track_ids: list[int]) -> 
                 lrc_lyrics = CASE
                     WHEN lrc_lyrics = '[au: instrumental]' THEN NULL
                     ELSE lrc_lyrics
-                END
+                END,
+                dirty_txt_lyrics = NULL,
+                dirty_lrc_lyrics = NULL,
+                dirty_lyrics_present = 0
             WHERE id = ?
         """, [(i,) for i in ids])
         db.commit()
@@ -909,7 +941,7 @@ def get_album_tracks(db: sqlite3.Connection, album_id: int) -> List[Track]:
             artists.name AS artist_name, tracks.artist_id,
             albums.name AS album_name, albums.album_artist_name,
             album_id, duration, track_number,
-            albums.image_path, txt_lyrics, lrc_lyrics, instrumental
+            albums.image_path, txt_lyrics, lrc_lyrics, dirty_txt_lyrics, dirty_lrc_lyrics, dirty_lyrics_present, instrumental
         FROM tracks
         JOIN albums ON tracks.album_id = albums.id
         JOIN artists ON tracks.artist_id = artists.id
@@ -927,7 +959,7 @@ def get_artist_tracks(db: sqlite3.Connection, artist_id: int) -> List[Track]:
             artists.name AS artist_name, tracks.artist_id,
             albums.name AS album_name, albums.album_artist_name,
             album_id, duration, track_number,
-            albums.image_path, txt_lyrics, lrc_lyrics, instrumental
+            albums.image_path, txt_lyrics, lrc_lyrics, dirty_txt_lyrics, dirty_lrc_lyrics, dirty_lyrics_present, instrumental
         FROM tracks
         JOIN albums ON tracks.album_id = albums.id
         JOIN artists ON tracks.artist_id = artists.id

@@ -77,15 +77,18 @@ class TrackTableModel(QAbstractTableModel):
             if col == 1:
                 return fmt_duration(row.duration_s)
             if col == 2:
-                return {
+                label = {
                     LyricsState.NONE: "No lyrics",
                     LyricsState.PLAIN: "Plain",
                     LyricsState.SYNCED: "Synced",
                     LyricsState.INSTRUMENTAL: "Instrumental",
                 }.get(row.lyrics_state, row.lyrics_state)
+                return f"{label} *" if row.has_dirty_lyrics else label
             if col == 3:
                 return ""
         if role == Qt.ForegroundRole and col == 2:
+            if row.has_dirty_lyrics:
+                return QColor(STYLE_TOKENS.get("color-warning-border", "#f59e0b"))
             color_map = {
                 LyricsState.NONE: QColor(STYLE_TOKENS.get("color-error-border", "#ef4444")),
                 LyricsState.PLAIN: QColor(STYLE_TOKENS.get("color-warning-border", "#f59e0b")),
@@ -95,7 +98,8 @@ class TrackTableModel(QAbstractTableModel):
             return color_map.get(row.lyrics_state, QColor(STYLE_TOKENS.get("color-text-muted", "#94a3b8")))
         if role == Qt.FontRole and col == 2:
             font = QFont()
-            font.setWeight(QFont.Weight.DemiBold)
+            font.setWeight(QFont.Weight.Bold if row.has_dirty_lyrics else QFont.Weight.DemiBold)
+            font.setItalic(bool(row.has_dirty_lyrics))
             return font
         if role == Qt.TextAlignmentRole and col in {1, 2, 3}:
             return int(Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignVCenter)

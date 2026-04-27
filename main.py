@@ -1,6 +1,7 @@
 import os
 import sys
 import logging
+import shutil
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
@@ -27,29 +28,38 @@ def debug_print_schema(db) -> None:
         for _cid, name, col_type, _notnull, _default, _pk in cur.fetchall():
             print(f"- {name} ({col_type})")
 
+def _migrate_old_nested_app_data(base: str) -> None:
+    # Migrate from old nested layout (PyLrcGet/PyLrcGet -> PyLrcGet).
+    old_nested = os.path.join(base, "PyLrcGet")
+    if not os.path.isdir(old_nested):
+        return
+    base_path = Path(base).resolve()
+    old_nested_path = Path(old_nested).resolve()
+    if old_nested_path.parent != base_path or old_nested_path.name != "PyLrcGet":
+        logging.warning("Refusing to remove unexpected old app data path: %s", old_nested)
+        return
+
+    for item in os.listdir(old_nested):
+        src = os.path.join(old_nested, item)
+        dst = os.path.join(base, item)
+        if not os.path.exists(dst):
+            try:
+                os.rename(src, dst)
+            except OSError as exc:
+                logging.warning("Failed to migrate app data from %s to %s: %s", src, dst, exc)
+
+    try:
+        shutil.rmtree(old_nested_path)
+    except OSError:
+        logging.warning("Failed to remove old app data directory %s", old_nested, exc_info=True)
+
 def get_app_data_dir() -> str:
     app = QApplication.instance()
     if app is not None and not app.applicationName():
         app.setApplicationName("PyLrcGet")
     base = QStandardPaths.writableLocation(QStandardPaths.AppDataLocation)
 
-    # Migrate from old nested layout (PyLrcGet/PyLrcGet → PyLrcGet)
-    old_nested = os.path.join(base, "PyLrcGet")
-    if os.path.isdir(old_nested):
-        for item in os.listdir(old_nested):
-            src = os.path.join(old_nested, item)
-            dst = os.path.join(base, item)
-            if not os.path.exists(dst):
-                try:
-                    os.rename(src, dst)
-                except OSError as exc:
-                    logging.warning("Failed to migrate app data from %s to %s: %s", src, dst, exc)
-        # Remove old subfolder if empty
-        try:
-            os.rmdir(old_nested)
-        except OSError as exc:
-            logging.warning("Failed to remove old app data directory %s: %s", old_nested, exc)
-
+    _migrate_old_nested_app_data(base)
     os.makedirs(base, exist_ok=True)
     return base
 

@@ -37,10 +37,19 @@ def upgrade_database_if_needed(db: sqlite3.Connection, existing_version: int) ->
         return
 
     if existing_version == 0:
-        logger.info("Initialize database version 1...")
+        logger.info("Initialize database version 2...")
         db.execute("PRAGMA journal_mode=WAL")
         db.executescript(SCHEMA_V1_SQL)
-        db.execute(f"PRAGMA user_version={CURRENT_DB_VERSION}")
+        db.execute("PRAGMA user_version=2")
+        db.commit()
+        return
+
+    if existing_version == 1:
+        logger.info("Upgrade database version 1 -> 2...")
+        db.execute("ALTER TABLE tracks ADD COLUMN dirty_lrc_lyrics TEXT")
+        db.execute("ALTER TABLE tracks ADD COLUMN dirty_txt_lyrics TEXT")
+        db.execute("ALTER TABLE tracks ADD COLUMN dirty_lyrics_present BOOLEAN DEFAULT 0")
+        db.execute("PRAGMA user_version=2")
         db.commit()
         return
 

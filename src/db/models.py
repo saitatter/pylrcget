@@ -22,6 +22,9 @@ class Track:
     lrc_lyrics: Optional[str]
     duration: float
     instrumental: bool
+    dirty_txt_lyrics: Optional[str] = None
+    dirty_lrc_lyrics: Optional[str] = None
+    dirty_lyrics_present: bool = False
 
     @staticmethod
     def from_row(row: sqlite3.Row) -> "Track":
@@ -44,6 +47,9 @@ class Track:
             track_number=opt("track_number"),
             txt_lyrics=opt("txt_lyrics"),
             lrc_lyrics=opt("lrc_lyrics"),
+            dirty_txt_lyrics=opt("dirty_txt_lyrics"),
+            dirty_lrc_lyrics=opt("dirty_lrc_lyrics"),
+            dirty_lyrics_present=bool(opt("dirty_lyrics_present")),
             image_path=opt("image_path"),
             instrumental=bool(row["instrumental"]),
         )

@@ -41,6 +41,7 @@ TRACK_ACTIONS_COLUMN_WIDTH = 142
 
 
 class TrackListWidget(QWidget):
+    previewTrack = Signal(int)    # track_id
     playTrack = Signal(int)       # track_id
     refreshTrack = Signal(int)    # track_id
     bulkRefreshRequested = Signal(list)  # track_ids
@@ -152,6 +153,7 @@ class TrackListWidget(QWidget):
         # Right-click context menu
         self.table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.table.customContextMenuRequested.connect(self._on_context_menu)
+        self.table.selectionModel().selectionChanged.connect(self._on_selection_changed)
 
         self.empty_state = EmptyStateWidget()
         self.empty_state.actionTriggered.connect(self._on_empty_state_action)
@@ -322,6 +324,11 @@ class TrackListWidget(QWidget):
         track_id = self.model.track_id_at(index.row())
         if track_id is not None:
             self.playTrack.emit(int(track_id))
+
+    def _on_selection_changed(self, *_args) -> None:
+        track_id = self.selected_track_id()
+        if track_id is not None:
+            self.previewTrack.emit(int(track_id))
 
     def _on_context_menu(self, pos):
         idx = self.table.indexAt(pos)
@@ -618,6 +625,15 @@ class TrackListWidget(QWidget):
         self.model._rows[row] = replace(current, download_state=normalized)
         idx = self.model.index(row, 3)
         self.model.dataChanged.emit(idx, idx, [Qt.DisplayRole, Qt.UserRole])
+
+    def set_dirty_lyrics_state(self, track_id: int, has_dirty_lyrics: bool) -> None:
+        row = self.model.row_for_track_id(int(track_id))
+        if row < 0:
+            return
+        current = self.model._rows[row]
+        self.model._rows[row] = replace(current, has_dirty_lyrics=bool(has_dirty_lyrics))
+        idx = self.model.index(row, 2)
+        self.model.dataChanged.emit(idx, idx, [Qt.DisplayRole, Qt.ForegroundRole, Qt.FontRole, Qt.UserRole])
 
     def get_download_state(self, track_id: int) -> DownloadState:
         return self._download_states.get(int(track_id), DownloadState.IDLE)

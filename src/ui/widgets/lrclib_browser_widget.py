@@ -109,10 +109,12 @@ class _BrowserPublishDialog(QDialog):
         form_layout.addRow("Duration:", self._pub_duration)
 
         self._pub_synced = QTextEdit()
+        self._pub_synced.setAcceptRichText(False)
         self._pub_synced.setPlaceholderText("[00:00.00] Paste synced lyrics here...")
         form_layout.addRow("Synced lyrics:", self._pub_synced)
 
         self._pub_plain = QTextEdit()
+        self._pub_plain.setAcceptRichText(False)
         self._pub_plain.setPlaceholderText("Paste plain lyrics here...")
         form_layout.addRow("Plain lyrics:", self._pub_plain)
 

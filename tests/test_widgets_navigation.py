@@ -9,6 +9,8 @@ from unittest.mock import patch
 from PySide6.QtWidgets import QHeaderView
 
 from ui.library_routes import tracks_album, tracks_artist
+from ui.widgets.lrclib_browser_widget import _BrowserPublishDialog
+from ui.widgets.lyrics_editor_widget import LyricsEditorWidget
 from tests.test_support import (
     HAS_QT,
     AlbumListWidget,
@@ -177,6 +179,28 @@ class TrackListWidgetTests(unittest.TestCase):
         finally:
             widget.deleteLater()
             app_state.db.close()
+
+
+@unittest.skipUnless(HAS_QT, "PySide6 is required for widget tests")
+class LyricsPasteBehaviorTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.app = qt_app()
+
+    def test_plain_lyrics_editor_rejects_rich_text_paste(self):
+        widget = LyricsEditorWidget()
+        try:
+            self.assertFalse(widget.plain.acceptRichText())
+        finally:
+            widget.deleteLater()
+
+    def test_browser_publish_lyrics_fields_reject_rich_text_paste(self):
+        dialog = _BrowserPublishDialog("https://lrclib.net")
+        try:
+            self.assertFalse(dialog._pub_synced.acceptRichText())
+            self.assertFalse(dialog._pub_plain.acceptRichText())
+        finally:
+            dialog.deleteLater()
 
     def test_track_table_keeps_lyrics_status_column_visible(self):
         app_state = simple_app_state()

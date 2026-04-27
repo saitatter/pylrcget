@@ -9,6 +9,7 @@ def build_track_list_rows(rows, download_states: dict[int, DownloadState]) -> li
         instrumental = bool(row["instrumental"])
         lrc = row["lrc_lyrics"]
         txt = row["txt_lyrics"]
+        has_dirty_lyrics = bool(row["dirty_lyrics_present"] and (row["dirty_lrc_lyrics"] or row["dirty_txt_lyrics"]))
 
         if instrumental or lrc == "[au: instrumental]":
             state = LyricsState.INSTRUMENTAL
@@ -33,6 +34,7 @@ def build_track_list_rows(rows, download_states: dict[int, DownloadState]) -> li
                 album_id=int(row["album_id"]) if row["album_id"] is not None else None,
                 duration_s=duration_s,
                 lyrics_state=state,
+                has_dirty_lyrics=has_dirty_lyrics,
                 download_state=download_states.get(track_id, DownloadState.IDLE),
             )
         )

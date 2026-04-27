@@ -23,6 +23,7 @@ from ui.widgets.sortable_header_view import SortableHeaderView
 
 
 class ArtistListWidget(QWidget):
+    previewTrack = Signal(int)
     playTrack = Signal(int)
     refreshTrack = Signal(int)
     bulkRefreshRequested = Signal(list)
@@ -102,6 +103,7 @@ class ArtistListWidget(QWidget):
         self.album_browser = AlbumListWidget(self.app_state)
         self.album_browser.setRouteTab("artists")
         self.album_browser.playTrack.connect(self.playTrack.emit)
+        self.album_browser.previewTrack.connect(self.previewTrack.emit)
         self.album_browser.refreshTrack.connect(self.refreshTrack.emit)
         self.album_browser.bulkRefreshRequested.connect(self.bulkRefreshRequested.emit)
         self.album_browser.downloadLyrics.connect(self.downloadLyrics.emit)
@@ -159,6 +161,9 @@ class ArtistListWidget(QWidget):
 
     def set_download_state(self, track_id: int, state: str) -> None:
         self.album_browser.set_download_state(track_id, state)
+
+    def set_dirty_lyrics_state(self, track_id: int, has_dirty_lyrics: bool) -> None:
+        self.album_browser.set_dirty_lyrics_state(track_id, has_dirty_lyrics)
 
     def get_download_state(self, track_id: int) -> str:
         return self.album_browser.get_download_state(track_id)
