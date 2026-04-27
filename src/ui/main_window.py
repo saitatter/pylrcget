@@ -159,6 +159,7 @@ class MainWindow(QMainWindow):
         QShortcut(QKeySequence("Ctrl+Left"), self, activated=self.play_prev)
         QShortcut(QKeySequence.StandardKey.Save, self, activated=self._save_active_lyrics)
         QShortcut(QKeySequence.StandardKey.Find, self, activated=self._focus_search)
+        QShortcut(QKeySequence("Escape"), self, activated=self._clear_search)
         QShortcut(QKeySequence("Ctrl+/"), self, activated=self._toggle_hotkey_hints)
 
         self.central_widget = QWidget()
@@ -1738,6 +1739,12 @@ class MainWindow(QMainWindow):
         """Ctrl+F: focus the search box."""
         self.top_bar.search_box.setFocus()
         self.top_bar.search_box.selectAll()
+
+    def _clear_search(self):
+        """Escape: clear the search box and return focus to the track list."""
+        if self.top_bar.search_box.hasFocus():
+            self.top_bar.search_box.clear()
+            self.top_bar.search_box.clearFocus()
 
     def _toggle_hotkey_hints(self) -> None:
         visible = self.hotkey_hints.toggle()
