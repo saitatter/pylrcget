@@ -366,7 +366,7 @@ class LyricsDownloadControllerTests(unittest.TestCase):
 
                 after_apply = get_track_by_id(db, track_id)
                 self.assertEqual(after_apply.lrc_lyrics, "[00:01.00]plain text")
-                self.assertEqual(after_apply.txt_lyrics, "plain text")
+                self.assertIsNone(after_apply.txt_lyrics)
                 self.assertEqual(download_states[track_id], "success")
                 self.assertIn(("Applied lyrics to 1 downloaded track.", "success"), notifications)
                 self.assertIn("view", refreshed)

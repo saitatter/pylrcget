@@ -220,7 +220,7 @@ class LyricsDownloadWorkerTests(unittest.TestCase):
 
                 refreshed = get_track_by_id(db, int(track["id"]))
                 self.assertEqual(refreshed.lrc_lyrics, "[00:01.00]plain text")
-                self.assertEqual(refreshed.txt_lyrics, "plain text")
+                self.assertIsNone(refreshed.txt_lyrics)
             finally:
                 db.close()
 

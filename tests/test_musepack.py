@@ -10,7 +10,7 @@ from mutagen.apev2 import APEBinaryValue
 
 from tests.test_support import touch_text
 from core.artwork import extract_embedded_cover_bytes
-from core.embed_lyrics import embed_lyrics_in_file
+from core.embed_lyrics import embed_lyrics_for_track, embed_lyrics_in_file
 from library.scan_library import new_fs_track_from_path, read_embedded_lyrics
 
 
@@ -90,6 +90,20 @@ class MusepackSupportTests(unittest.TestCase):
         self.assertTrue(fake_audio.add_tags_called)
         self.assertTrue(fake_audio.saved)
         self.assertEqual(str(fake_audio.tags["UNSYNCEDLYRICS"]), "Plain lyrics")
+        self.assertEqual(str(fake_audio.tags["LYRICS"]), "[00:01.00]Synced lyrics")
+
+    def test_embed_lyrics_for_track_does_not_derive_plain_from_synced(self):
+        fake_audio = _FakeMusepackAudio(tags=None)
+        track = SimpleNamespace(
+            file_path="song.mpc",
+            txt_lyrics=None,
+            lrc_lyrics="[00:01.00]Synced lyrics",
+        )
+
+        with patch("core.embed_lyrics.Musepack", return_value=fake_audio):
+            embed_lyrics_for_track(track)
+
+        self.assertNotIn("UNSYNCEDLYRICS", fake_audio.tags)
         self.assertEqual(str(fake_audio.tags["LYRICS"]), "[00:01.00]Synced lyrics")
 
     def test_extract_embedded_cover_bytes_reads_musepack_ape_binary_value(self):

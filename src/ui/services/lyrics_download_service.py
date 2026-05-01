@@ -272,10 +272,8 @@ def apply_lyrics_match_to_track(
         return False, f"No plain lyrics found on LRCLIB for this track.{score_note}", None
 
     if synced:
-        if not plain:
-            plain = _strip_empty(_strip_timestamps(synced))
-        notify("Saving synced + plain lyrics...")
-        update_track_synced_lyrics(db, track_id, synced, plain or "")
+        notify("Saving synced lyrics...")
+        update_track_synced_lyrics(db, track_id, synced, "")
         track = get_track_by_id(db, track_id)
         sync_track_outputs(db, track, notify, config=config)
         return True, f"Downloaded synced lyrics.{score_note}", track
