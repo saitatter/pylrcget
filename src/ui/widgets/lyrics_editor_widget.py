@@ -575,9 +575,15 @@ class LyricsEditorWidget(QWidget):
             self._set_plain(txt)
             self._emit_dirty_draft_changed()
         elif self.stack.currentWidget() is self.plain:
-            # Plain → Synced: restore cached timestamps when line count matches
+            # Plain → Synced: parse pasted LRC first, otherwise restore cached timestamps.
             txt = (self.plain.toPlainText() or "").strip()
             if not txt:
+                return
+            parsed = parse_lrc(txt)
+            if parsed:
+                self._cached_synced_pairs = None
+                self._set_synced(parsed)
+                self._emit_dirty_draft_changed()
                 return
             lines = txt.splitlines()
             cached = getattr(self, "_cached_synced_pairs", None)

@@ -422,6 +422,7 @@ class MainWindow(QMainWindow):
         self.track_list.bulkRefreshRequested.connect(self.on_refresh_tracks)
         self.track_list.downloadLyrics.connect(self.on_download_lyrics)
         self.track_list.exportLyricsFiles.connect(self._export_track_sidecars)
+        self.track_list.importLyricsFile.connect(self._import_lyrics_file_as_draft)
         self.track_list.bulkDownloadRequested.connect(self._on_bulk_download_requested)
         self.track_list.bulkPublishRequested.connect(self.publish_history.publish_batch)
         self.track_list.navigateRequested.connect(self.navigate_to)
@@ -435,6 +436,7 @@ class MainWindow(QMainWindow):
         self.albums_tab.bulkRefreshRequested.connect(self.on_refresh_tracks)
         self.albums_tab.downloadLyrics.connect(self.on_download_lyrics)
         self.albums_tab.exportLyricsFiles.connect(self._export_track_sidecars)
+        self.albums_tab.importLyricsFile.connect(self._import_lyrics_file_as_draft)
         self.albums_tab.bulkDownloadRequested.connect(self._on_bulk_download_requested)
         self.albums_tab.navigateRequested.connect(self.navigate_to)
         self.albums_tab.markInstrumental.connect(self._on_mark_instrumental)
@@ -449,6 +451,7 @@ class MainWindow(QMainWindow):
         self.artists_tab.bulkRefreshRequested.connect(self.on_refresh_tracks)
         self.artists_tab.downloadLyrics.connect(self.on_download_lyrics)
         self.artists_tab.exportLyricsFiles.connect(self._export_track_sidecars)
+        self.artists_tab.importLyricsFile.connect(self._import_lyrics_file_as_draft)
         self.artists_tab.bulkDownloadRequested.connect(self._on_bulk_download_requested)
         self.artists_tab.navigateRequested.connect(self.navigate_to)
         self.artists_tab.markInstrumental.connect(self._on_mark_instrumental)
@@ -611,13 +614,14 @@ class MainWindow(QMainWindow):
                     event.acceptProposedAction()
                     return
                 ext = os.path.splitext(path)[1].lower()
-                if ext in AUDIO_EXTS:
+                if ext in AUDIO_EXTS or ext in {".lrc", ".txt"}:
                     event.acceptProposedAction()
                     return
 
     def dropEvent(self, event):
         dropped_dirs: list[str] = []
         dropped_files: list[str] = []
+        dropped_lyrics: list[str] = []
         for url in event.mimeData().urls():
             if not url.isLocalFile():
                 continue
@@ -628,8 +632,10 @@ class MainWindow(QMainWindow):
                 ext = os.path.splitext(path)[1].lower()
                 if ext in AUDIO_EXTS:
                     dropped_files.append(os.path.normpath(path))
+                elif ext in {".lrc", ".txt"}:
+                    dropped_lyrics.append(os.path.normpath(path))
 
-        if not dropped_dirs and not dropped_files:
+        if not dropped_dirs and not dropped_files and not dropped_lyrics:
             return
         event.acceptProposedAction()
 
@@ -637,6 +643,8 @@ class MainWindow(QMainWindow):
             self._handle_dropped_directories(dropped_dirs)
         if dropped_files:
             self._handle_dropped_files(dropped_files)
+        if dropped_lyrics and self._editing_track_id is not None:
+            self._import_lyrics_file_as_draft(int(self._editing_track_id), dropped_lyrics[0])
 
     def _handle_dropped_directories(self, dropped_dirs: list[str]) -> None:
         existing = get_directories(self.app_state.db)
@@ -716,6 +724,76 @@ class MainWindow(QMainWindow):
                 "info",
                 show_status=self._show_status_message,
                 status_timeout_ms=3000,
+            )
+
+    def _import_lyrics_file_as_draft(self, track_id: int, file_path: str) -> None:
+        ext = os.path.splitext(file_path)[1].lower()
+        if ext not in {".lrc", ".txt"}:
+            return
+
+        try:
+            with open(file_path, "r", encoding="utf-8-sig", errors="replace") as handle:
+                text = handle.read().strip()
+        except OSError as exc:
+            log_and_notify(
+                self.app_state,
+                logger,
+                logging.ERROR,
+                exception_message("Failed to read lyrics file", exc),
+                "error",
+                show_status=self._show_status_message,
+                status_timeout_ms=4000,
+            )
+            return
+
+        if not text:
+            notify_user(
+                self.app_state,
+                "Lyrics file is empty.",
+                "warning",
+                show_status=self._show_status_message,
+                status_timeout_ms=3000,
+            )
+            return
+
+        if ext == ".lrc":
+            if not parse_lrc(text):
+                notify_user(
+                    self.app_state,
+                    "The dropped .lrc file does not contain valid timestamps.",
+                    "warning",
+                    show_status=self._show_status_message,
+                    status_timeout_ms=4000,
+                )
+                return
+            lrc, plain = _canonical_lyrics_pair(text, "")
+        else:
+            lrc, plain = "", text
+
+        try:
+            update_track_dirty_lyrics(self.app_state.db, int(track_id), lrc, plain)
+            track = get_track_by_id(self.app_state.db, int(track_id))
+            if self._editing_track_id == int(track_id):
+                self._set_track_lyrics_views(track)
+            self.track_list.set_dirty_lyrics_state(int(track_id), True)
+            self.albums_tab.set_dirty_lyrics_state(int(track_id), True)
+            self.artists_tab.set_dirty_lyrics_state(int(track_id), True)
+            notify_user(
+                self.app_state,
+                f"Loaded {os.path.basename(file_path)} as an unsaved lyrics draft.",
+                "success",
+                show_status=self._show_status_message,
+                status_timeout_ms=4000,
+            )
+        except (sqlite3.Error, ValueError) as exc:
+            log_and_notify(
+                self.app_state,
+                logger,
+                logging.ERROR,
+                exception_message("Failed to load lyrics file as draft", exc),
+                "error",
+                show_status=self._show_status_message,
+                status_timeout_ms=4000,
             )
 
     def closeEvent(self, event: QCloseEvent) -> None:

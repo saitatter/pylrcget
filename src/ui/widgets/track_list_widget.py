@@ -47,6 +47,7 @@ class TrackListWidget(QWidget):
     bulkRefreshRequested = Signal(list)  # track_ids
     downloadLyrics = Signal(int)  # track_id
     exportLyricsFiles = Signal(int)  # track_id
+    importLyricsFile = Signal(int, str)  # track_id, file_path
     bulkDownloadRequested = Signal(list, str)  # track_ids, mode
     bulkPublishRequested = Signal(list, bool)   # track_ids, is_synced
     openArtist = Signal(int)
@@ -119,6 +120,8 @@ class TrackListWidget(QWidget):
         self.table.setAlternatingRowColors(True)
         self.table.setMouseTracking(True)
         self.table.viewport().setMouseTracking(True)
+        self.table.setAcceptDrops(True)
+        self.table.viewport().setAcceptDrops(True)
         self.table.viewport().installEventFilter(self)
         self._suppress_left_click_until = 0.0
         self.table.setSortingEnabled(False)
@@ -449,6 +452,20 @@ class TrackListWidget(QWidget):
 
     def eventFilter(self, watched, event):
         if watched is self.table.viewport() and event.type() in {
+            QEvent.Type.DragEnter,
+            QEvent.Type.DragMove,
+            QEvent.Type.Drop,
+        }:
+            lyrics_path = self._lyrics_file_from_mime(event.mimeData())
+            idx = self.table.indexAt(self._event_position(event))
+            track_id = self.model.track_id_at(idx.row()) if idx.isValid() else None
+            if lyrics_path and track_id is not None:
+                event.acceptProposedAction()
+                if event.type() == QEvent.Type.Drop:
+                    self.importLyricsFile.emit(int(track_id), lyrics_path)
+                return True
+
+        if watched is self.table.viewport() and event.type() in {
             QEvent.Type.MouseButtonPress,
             QEvent.Type.MouseButtonRelease,
             QEvent.Type.MouseButtonDblClick,
@@ -460,6 +477,24 @@ class TrackListWidget(QWidget):
                 event.accept()
                 return True
         return super().eventFilter(watched, event)
+
+    @staticmethod
+    def _event_position(event):
+        if hasattr(event, "position"):
+            return event.position().toPoint()
+        return event.pos()
+
+    @staticmethod
+    def _lyrics_file_from_mime(mime_data) -> str:
+        if not mime_data.hasUrls():
+            return ""
+        for url in mime_data.urls():
+            if not url.isLocalFile():
+                continue
+            path = url.toLocalFile()
+            if Path(path).suffix.lower() in {".lrc", ".txt"} and Path(path).is_file():
+                return str(path)
+        return ""
 
     def _suppress_next_table_left_click(self) -> None:
         self._suppress_left_click_until = time.monotonic() + 0.35

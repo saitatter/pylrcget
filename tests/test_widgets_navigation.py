@@ -194,6 +194,20 @@ class LyricsPasteBehaviorTests(unittest.TestCase):
         finally:
             widget.deleteLater()
 
+    def test_switch_to_synced_parses_pasted_lrc(self):
+        widget = LyricsEditorWidget()
+        try:
+            widget._set_plain("[ar: Artist]\n[ti: Song]\n[00:01.20] First line\n[00:03.00] Second line")
+            widget._toggle_editor_mode()
+
+            self.assertEqual(widget.table.rowCount(), 2)
+            self.assertEqual(widget.table.item(0, 1).text(), "First line")
+            self.assertEqual(widget.table.item(1, 1).text(), "Second line")
+            self.assertEqual(widget.table.item(0, 0).text(), "00:01.20")
+            self.assertEqual(widget.table.item(1, 0).text(), "00:03.00")
+        finally:
+            widget.deleteLater()
+
     def test_browser_publish_lyrics_fields_reject_rich_text_paste(self):
         dialog = _BrowserPublishDialog("https://lrclib.net")
         try:
