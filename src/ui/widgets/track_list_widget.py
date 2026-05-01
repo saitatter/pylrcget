@@ -22,7 +22,7 @@ from PySide6.QtWidgets import (
 )
 
 from db.database import get_directories, get_duplicate_track_ids, get_track_by_id, get_track_rows
-from ui.library_routes import LibraryRoute, tracks_album, tracks_artist
+from ui.library_routes import LibraryRoute, albums_detail, artists_detail
 from ui.widgets.empty_state_widget import EmptyStateWidget
 from ui.models.track_table_model import TrackTableModel
 from ui.delegates.actions_delegate import ActionsDelegate
@@ -511,11 +511,11 @@ class TrackListWidget(QWidget):
 
     def _emit_artist_navigation(self, artist_id: int) -> None:
         self.openArtist.emit(int(artist_id))
-        self.navigateRequested.emit(tracks_artist((int(artist_id),)))
+        self.navigateRequested.emit(artists_detail((int(artist_id),)))
 
     def _emit_album_navigation(self, album_id: int) -> None:
         self.openAlbum.emit(int(album_id))
-        self.navigateRequested.emit(tracks_album((int(album_id),)))
+        self.navigateRequested.emit(albums_detail((int(album_id),)))
 
     def set_now_playing(self, track_id: int | None):
         if track_id is None:

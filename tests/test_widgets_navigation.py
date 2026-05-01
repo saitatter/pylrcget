@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 from PySide6.QtWidgets import QHeaderView
 
-from ui.library_routes import tracks_album, tracks_artist
+from ui.library_routes import albums_detail, artists_detail, tracks_album, tracks_artist
 from ui.controllers.top_bar_controller import TopBarController
 from ui.widgets.lrclib_browser_widget import _BrowserPublishDialog
 from ui.widgets.lyrics_editor_widget import LyricsEditorWidget
@@ -177,6 +177,22 @@ class TrackListWidgetTests(unittest.TestCase):
             self.assertEqual(widget._album_id, 11)
             self.assertIsNone(widget._artist_id)
             self.assertEqual(widget._scope_label, "Album: Kid A")
+        finally:
+            widget.deleteLater()
+            app_state.db.close()
+
+    def test_metadata_link_navigation_targets_album_and_artist_tabs(self):
+        app_state = simple_app_state()
+        widget = TrackListWidget(app_state)
+        routes = []
+        try:
+            widget.navigateRequested.connect(routes.append)
+
+            widget._emit_artist_navigation(7)
+            widget._emit_album_navigation(11)
+
+            self.assertEqual(routes[0], artists_detail((7,)))
+            self.assertEqual(routes[1], albums_detail((11,)))
         finally:
             widget.deleteLater()
             app_state.db.close()

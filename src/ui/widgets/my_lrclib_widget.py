@@ -2,9 +2,26 @@ from __future__ import annotations
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QColor, QStandardItem, QStandardItemModel
-from PySide6.QtWidgets import QFrame, QGridLayout, QLabel, QMenu, QTableView, QTabWidget, QVBoxLayout, QWidget
+from PySide6.QtWidgets import (
+    QFrame,
+    QGridLayout,
+    QHBoxLayout,
+    QLabel,
+    QMenu,
+    QMessageBox,
+    QPushButton,
+    QTableView,
+    QTabWidget,
+    QVBoxLayout,
+    QWidget,
+)
 
-from db.queries import get_download_history_rows, get_publish_history_rows
+from db.queries import (
+    clear_download_history,
+    clear_publish_history,
+    get_download_history_rows,
+    get_publish_history_rows,
+)
 from ui.style_loader import load_stylesheet
 from ui.theme_tokens import STYLE_TOKENS
 from ui.widgets.empty_state_widget import EmptyStateWidget
@@ -72,9 +89,13 @@ class MyLrclibWidget(QWidget):
             empty_body="Use Download Missing or download lyrics for a selection, and the results will be kept here as a persistent local history.",
             default_sort_column=5,
         )
+        self.clear_published_btn = self._build_clear_button("Clear Published")
+        self.clear_downloads_btn = self._build_clear_button("Clear Downloads")
+        self.clear_published_btn.clicked.connect(self._clear_published_history)
+        self.clear_downloads_btn.clicked.connect(self._clear_download_history)
 
-        self.tabs.addTab(self._wrap_page(self.publish_table, self.publish_empty), "Published")
-        self.tabs.addTab(self._wrap_page(self.download_table, self.download_empty), "Downloads")
+        self.tabs.addTab(self._wrap_page(self.publish_table, self.publish_empty, self.clear_published_btn), "Published")
+        self.tabs.addTab(self._wrap_page(self.download_table, self.download_empty, self.clear_downloads_btn), "Downloads")
 
         self._apply_styles()
         self.refresh()
@@ -101,6 +122,12 @@ class MyLrclibWidget(QWidget):
         value_label = getattr(card, "_value_label", None)
         if isinstance(value_label, QLabel):
             value_label.setText(str(int(value)))
+
+    @staticmethod
+    def _build_clear_button(text: str) -> QPushButton:
+        button = QPushButton(text)
+        button.setObjectName("MyLrclibClearButton")
+        return button
 
     def _build_table_page(
         self,
@@ -152,11 +179,16 @@ class MyLrclibWidget(QWidget):
         return table, model, empty_state
 
     @staticmethod
-    def _wrap_page(table: QTableView, empty_state: EmptyStateWidget) -> QWidget:
+    def _wrap_page(table: QTableView, empty_state: EmptyStateWidget, clear_button: QPushButton) -> QWidget:
         page = QWidget()
         root = QVBoxLayout(page)
         root.setContentsMargins(0, 0, 0, 0)
         root.setSpacing(8)
+        actions = QHBoxLayout()
+        actions.setContentsMargins(0, 0, 0, 0)
+        actions.addStretch(1)
+        actions.addWidget(clear_button)
+        root.addLayout(actions)
         root.addWidget(table)
         root.addWidget(empty_state)
         return page
@@ -189,6 +221,7 @@ class MyLrclibWidget(QWidget):
                 ]
             )
         self._apply_page_visibility(self.publish_table, self.publish_empty, self.publish_model.rowCount() > 0)
+        self.clear_published_btn.setEnabled(self.publish_model.rowCount() > 0)
 
     def refresh_downloads(self) -> None:
         self.download_model.setRowCount(0)
@@ -214,6 +247,7 @@ class MyLrclibWidget(QWidget):
                 ]
             )
         self._apply_page_visibility(self.download_table, self.download_empty, self.download_model.rowCount() > 0)
+        self.clear_downloads_btn.setEnabled(self.download_model.rowCount() > 0)
         self._update_summary(rows)
 
     @staticmethod
@@ -285,6 +319,37 @@ class MyLrclibWidget(QWidget):
         chosen = menu.exec(table.viewport().mapToGlobal(pos))
         if chosen == act_play and track_id is not None:
             self.playTrack.emit(track_id)
+
+    def _confirm_clear(self, title: str, text: str) -> bool:
+        return QMessageBox.question(
+            self,
+            title,
+            text,
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        ) == QMessageBox.StandardButton.Yes
+
+    def _clear_published_history(self) -> None:
+        if self.publish_model.rowCount() <= 0:
+            return
+        if not self._confirm_clear(
+            "Clear Published History",
+            "Clear all local published contribution history?",
+        ):
+            return
+        clear_publish_history(self.app_state.db)
+        self.refresh()
+
+    def _clear_download_history(self) -> None:
+        if self.download_model.rowCount() <= 0:
+            return
+        if not self._confirm_clear(
+            "Clear Download History",
+            "Clear all local lyrics download history?",
+        ):
+            return
+        clear_download_history(self.app_state.db)
+        self.refresh()
 
     @staticmethod
     def _display_kind(value: str | None) -> str:
@@ -369,6 +434,9 @@ QLabel#MyLrclibMetricValue {
     color: %(text_strong)s;
     font-size: 24px;
     font-weight: 700;
+}
+QPushButton#MyLrclibClearButton {
+    padding: 5px 12px;
 }
         """ % {
             "panel": STYLE_TOKENS.get("color-bg-panel", "#111827"),

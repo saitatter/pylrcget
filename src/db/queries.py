@@ -1098,6 +1098,11 @@ def get_publish_history_rows(
     return db.execute(query).fetchall()
 
 
+def clear_publish_history(db: sqlite3.Connection) -> None:
+    db.execute("DELETE FROM publish_history")
+    db.commit()
+
+
 def record_download_history(
     db: sqlite3.Connection,
     *,
@@ -1210,6 +1215,11 @@ def get_download_history_rows(
         {limit_clause}
     """
     return db.execute(query).fetchall()
+
+
+def clear_download_history(db: sqlite3.Connection) -> None:
+    db.execute("DELETE FROM download_history")
+    db.commit()
 
 
 # -------------------------------
