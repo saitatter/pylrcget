@@ -92,7 +92,7 @@ class MusepackSupportTests(unittest.TestCase):
         self.assertEqual(str(fake_audio.tags["UNSYNCEDLYRICS"]), "Plain lyrics")
         self.assertEqual(str(fake_audio.tags["LYRICS"]), "[00:01.00]Synced lyrics")
 
-    def test_embed_lyrics_for_track_does_not_derive_plain_from_synced(self):
+    def test_embed_lyrics_for_track_derives_plain_from_synced_for_compatibility(self):
         fake_audio = _FakeMusepackAudio(tags=None)
         track = SimpleNamespace(
             file_path="song.mpc",
@@ -103,7 +103,7 @@ class MusepackSupportTests(unittest.TestCase):
         with patch("core.embed_lyrics.Musepack", return_value=fake_audio):
             embed_lyrics_for_track(track)
 
-        self.assertNotIn("UNSYNCEDLYRICS", fake_audio.tags)
+        self.assertEqual(str(fake_audio.tags["UNSYNCEDLYRICS"]), "Synced lyrics")
         self.assertEqual(str(fake_audio.tags["LYRICS"]), "[00:01.00]Synced lyrics")
 
     def test_extract_embedded_cover_bytes_reads_musepack_ape_binary_value(self):

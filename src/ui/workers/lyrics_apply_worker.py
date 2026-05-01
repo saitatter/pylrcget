@@ -78,7 +78,8 @@ class LyricsApplyCandidatesWorker(QThread):
                 return None
             update_track_plain_lyrics(db, int(candidate.track_id), plain_text)
         elif synced_text:
-            update_track_synced_lyrics(db, int(candidate.track_id), synced_text, "")
+            existing_track = get_track_by_id(db, int(candidate.track_id))
+            update_track_synced_lyrics(db, int(candidate.track_id), synced_text, existing_track.txt_lyrics or "")
         elif plain_text and mode != "synced_only":
             update_track_plain_lyrics(db, int(candidate.track_id), plain_text)
         else:

@@ -276,10 +276,12 @@ class LibraryScannerIncrementalTests(unittest.TestCase):
                 duration=210.0,
             )
             with (
-                patch("ui.workers.library_scanner.read_audio_metadata", return_value=(object(), fake_metadata)),
+                patch("ui.workers.library_scanner.read_audio_metadata", return_value=(object(), fake_metadata)) as read_metadata,
                 patch("ui.workers.library_scanner.new_fs_track_from_path", side_effect=fake_new_fs_track),
             ):
                 scanner.run()
+
+            read_metadata.assert_called_once_with(str(added))
 
             db2 = sqlite3.connect(db_path)
             db2.row_factory = sqlite3.Row

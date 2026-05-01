@@ -85,6 +85,7 @@ class TrackListWidget(QWidget):
         self._loading_more = False
         self._duplicate_ids: set[int] = set()
         self._ui_scale = 1.0
+        self._drag_lyrics_path = ""
 
         self.scope_bar = QWidget()
         self.scope_bar.setObjectName("TrackScopeBar")
@@ -456,14 +457,21 @@ class TrackListWidget(QWidget):
             QEvent.Type.DragMove,
             QEvent.Type.Drop,
         }:
-            lyrics_path = self._lyrics_file_from_mime(event.mimeData())
+            if event.type() == QEvent.Type.DragEnter:
+                self._drag_lyrics_path = self._lyrics_file_from_mime(event.mimeData(), check_exists=True)
+            elif event.type() == QEvent.Type.Drop:
+                self._drag_lyrics_path = self._lyrics_file_from_mime(event.mimeData(), check_exists=True)
+            lyrics_path = self._drag_lyrics_path
             idx = self.table.indexAt(self._event_position(event))
             track_id = self.model.track_id_at(idx.row()) if idx.isValid() else None
             if lyrics_path and track_id is not None:
                 event.acceptProposedAction()
                 if event.type() == QEvent.Type.Drop:
                     self.importLyricsFile.emit(int(track_id), lyrics_path)
+                    self._drag_lyrics_path = ""
                 return True
+            if event.type() == QEvent.Type.Drop:
+                self._drag_lyrics_path = ""
 
         if watched is self.table.viewport() and event.type() in {
             QEvent.Type.MouseButtonPress,
@@ -485,14 +493,14 @@ class TrackListWidget(QWidget):
         return event.pos()
 
     @staticmethod
-    def _lyrics_file_from_mime(mime_data) -> str:
+    def _lyrics_file_from_mime(mime_data, *, check_exists: bool = False) -> str:
         if not mime_data.hasUrls():
             return ""
         for url in mime_data.urls():
             if not url.isLocalFile():
                 continue
             path = url.toLocalFile()
-            if Path(path).suffix.lower() in {".lrc", ".txt"} and Path(path).is_file():
+            if Path(path).suffix.lower() in {".lrc", ".txt"} and (not check_exists or Path(path).is_file()):
                 return str(path)
         return ""
 

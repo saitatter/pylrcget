@@ -273,7 +273,8 @@ def apply_lyrics_match_to_track(
 
     if synced:
         notify("Saving synced lyrics...")
-        update_track_synced_lyrics(db, track_id, synced, "")
+        existing_track = get_track_by_id(db, track_id)
+        update_track_synced_lyrics(db, track_id, synced, existing_track.txt_lyrics or "")
         track = get_track_by_id(db, track_id)
         sync_track_outputs(db, track, notify, config=config)
         return True, f"Downloaded synced lyrics.{score_note}", track

@@ -16,6 +16,8 @@ from mutagen.oggvorbis import OggVorbis
 from mutagen.oggopus import OggOpus
 from mutagen.mp4 import MP4
 
+from core.utils import plain_text_from_lrc
+
 # Convention:
 #   - Synced LRC goes into:   LYRICS
 #   - Unsynced (plain) goes into: UNSYNCEDLYRICS
@@ -52,6 +54,8 @@ def embed_lyrics_for_track(track: TrackWithLyrics) -> None:
     path = track.file_path
     plain = _norm(getattr(track, "txt_lyrics", None))
     synced = _norm(getattr(track, "lrc_lyrics", None))
+    if synced and not plain:
+        plain = _norm(plain_text_from_lrc(synced))
 
     embed_lyrics_in_file(path, plain, synced)
 
