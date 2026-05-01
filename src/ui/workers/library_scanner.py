@@ -20,6 +20,15 @@ from db.database import (
     prune_library,
 )
 
+
+def _read_metadata_for_scan(path: str):
+    try:
+        return read_audio_metadata(path)
+    except Exception as exc:
+        logger.warning("Skipping unreadable audio file during scan: %s (%s)", path, exc)
+        return None
+
+
 class LibraryScanner(QThread):
     progress_signal = Signal(int, int, str, float)     # scanned, total, current path, elapsed seconds
     finished_signal = Signal(bool, str)    # ok, message
@@ -84,11 +93,7 @@ class LibraryScanner(QThread):
                 existing = existing_index.get(p)
                 metadata = existing[1] if existing is not None else None
                 if metadata is None:
-                    try:
-                        metadata_result = read_audio_metadata(p)
-                    except Exception as exc:
-                        logger.warning("Skipping unreadable audio file during scan: %s (%s)", p, exc)
-                        continue
+                    metadata_result = _read_metadata_for_scan(p)
                     if metadata_result is None:
                         continue
                     _audio, metadata = metadata_result
@@ -105,11 +110,7 @@ class LibraryScanner(QThread):
                     continue
 
                 if existing is not None:
-                    try:
-                        metadata_result = read_audio_metadata(p)
-                    except Exception as exc:
-                        logger.warning("Skipping unreadable audio file during scan: %s (%s)", p, exc)
-                        continue
+                    metadata_result = _read_metadata_for_scan(p)
                     if metadata_result is None:
                         continue
                     _audio, metadata = metadata_result

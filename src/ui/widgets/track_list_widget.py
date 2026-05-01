@@ -459,8 +459,6 @@ class TrackListWidget(QWidget):
         }:
             if event.type() == QEvent.Type.DragEnter:
                 self._drag_lyrics_path = self._lyrics_file_from_mime(event.mimeData(), check_exists=True)
-            elif event.type() == QEvent.Type.Drop:
-                self._drag_lyrics_path = self._lyrics_file_from_mime(event.mimeData(), check_exists=True)
             lyrics_path = self._drag_lyrics_path
             idx = self.table.indexAt(self._event_position(event))
             track_id = self.model.track_id_at(idx.row()) if idx.isValid() else None
