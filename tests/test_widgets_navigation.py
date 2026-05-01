@@ -8,7 +8,8 @@ from unittest.mock import patch
 
 from PySide6.QtWidgets import QHeaderView
 
-from ui.library_routes import tracks_album, tracks_artist
+from ui.library_routes import albums_detail, artists_detail, tracks_album, tracks_artist
+from ui.controllers.top_bar_controller import TopBarController
 from ui.widgets.lrclib_browser_widget import _BrowserPublishDialog
 from ui.widgets.lyrics_editor_widget import LyricsEditorWidget
 from tests.test_support import (
@@ -180,6 +181,22 @@ class TrackListWidgetTests(unittest.TestCase):
             widget.deleteLater()
             app_state.db.close()
 
+    def test_metadata_link_navigation_targets_album_and_artist_tabs(self):
+        app_state = simple_app_state()
+        widget = TrackListWidget(app_state)
+        routes = []
+        try:
+            widget.navigateRequested.connect(routes.append)
+
+            widget._emit_artist_navigation(7)
+            widget._emit_album_navigation(11)
+
+            self.assertEqual(routes[0], artists_detail((7,)))
+            self.assertEqual(routes[1], albums_detail((11,)))
+        finally:
+            widget.deleteLater()
+            app_state.db.close()
+
 
 @unittest.skipUnless(HAS_QT, "PySide6 is required for widget tests")
 class LyricsPasteBehaviorTests(unittest.TestCase):
@@ -191,6 +208,20 @@ class LyricsPasteBehaviorTests(unittest.TestCase):
         widget = LyricsEditorWidget()
         try:
             self.assertFalse(widget.plain.acceptRichText())
+        finally:
+            widget.deleteLater()
+
+    def test_switch_to_synced_parses_pasted_lrc(self):
+        widget = LyricsEditorWidget()
+        try:
+            widget._set_plain("[ar: Artist]\n[ti: Song]\n[00:01.20] First line\n[00:03.00] Second line")
+            widget._toggle_editor_mode()
+
+            self.assertEqual(widget.table.rowCount(), 2)
+            self.assertEqual(widget.table.item(0, 1).text(), "First line")
+            self.assertEqual(widget.table.item(1, 1).text(), "Second line")
+            self.assertEqual(widget.table.item(0, 0).text(), "00:01.20")
+            self.assertEqual(widget.table.item(1, 0).text(), "00:03.00")
         finally:
             widget.deleteLater()
 
@@ -219,6 +250,25 @@ class LyricsPasteBehaviorTests(unittest.TestCase):
         finally:
             widget.deleteLater()
             app_state.db.close()
+
+    def test_download_missing_tooltip_does_not_populate_status_bar(self):
+        noop = lambda *args, **kwargs: None
+        widget = TopBarController(
+            on_refresh=noop,
+            on_download_missing=noop,
+            on_open_settings=noop,
+            on_open_about=noop,
+            on_toggle_logs=noop,
+            on_toggle_hotkey_hints=noop,
+            on_schedule_search=noop,
+            on_filter_changed=noop,
+        )
+        try:
+            widget.set_download_missing_mode("prefer_synced")
+            self.assertIn("Download missing lyrics", widget.btn_download_missing.toolTip())
+            self.assertEqual(widget.btn_download_missing.statusTip(), "")
+        finally:
+            widget.deleteLater()
 
     def test_open_track_folder_opens_parent_directory(self):
         app_state = simple_app_state()

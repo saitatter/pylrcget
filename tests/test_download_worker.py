@@ -220,7 +220,44 @@ class LyricsDownloadWorkerTests(unittest.TestCase):
 
                 refreshed = get_track_by_id(db, int(track["id"]))
                 self.assertEqual(refreshed.lrc_lyrics, "[00:01.00]plain text")
-                self.assertEqual(refreshed.txt_lyrics, "plain text")
+                self.assertIsNone(refreshed.txt_lyrics)
+            finally:
+                db.close()
+
+    def test_synced_download_preserves_existing_plain_lyrics(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db = initialize_database(tmp)
+            try:
+                audio = Path(tmp) / "preserve_plain.mp3"
+                touch_text(audio, "a")
+                add_tracks(db, [make_fs_track(audio, artist="Artist", album="Album", title="Song")])
+                track = db.execute("SELECT id FROM tracks LIMIT 1").fetchone()
+                self.assertIsNotNone(track)
+                track_id = int(track["id"])
+                db.execute("UPDATE tracks SET txt_lyrics = ? WHERE id = ?", ("existing plain", track_id))
+                db.commit()
+
+                finished: list[tuple[bool, str, int]] = []
+                worker = LyricsDownloadWorker(
+                    db_path=str(Path(tmp) / "pylrcget.db.sqlite3"),
+                    track_id=track_id,
+                    download_mode="prefer_synced",
+                )
+                worker.finished.connect(lambda ok, msg, tid: finished.append((ok, msg, tid)))
+
+                fake_lyrics = SimpleNamespace(
+                    synced_lyrics="[00:01.00]synced text",
+                    plain_lyrics="lrclib plain should not replace",
+                )
+                with patch("ui.services.lyrics_download_service.LrcLibAPI") as api_cls:
+                    api_cls.return_value.get_lyrics.return_value = fake_lyrics
+                    worker.run()
+
+                self.assertEqual(len(finished), 1)
+                self.assertTrue(finished[0][0])
+                refreshed = get_track_by_id(db, track_id)
+                self.assertEqual(refreshed.lrc_lyrics, "[00:01.00]synced text")
+                self.assertEqual(refreshed.txt_lyrics, "existing plain")
             finally:
                 db.close()
 

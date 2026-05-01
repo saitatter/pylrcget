@@ -11,7 +11,7 @@ from unittest.mock import patch
 from PySide6.QtCore import QObject, Signal
 
 from tests import test_support as _test_support  # noqa: F401
-from db.queries import get_config, get_track_by_id, set_config
+from db.queries import get_config, get_track_by_id, set_config, update_track_plain_lyrics
 from db.database import add_tracks, initialize_database
 from tests.test_support import make_fs_track, qt_app, touch_text
 from ui.controllers.lyrics_download_controller import LyricsDownloadController
@@ -326,6 +326,7 @@ class LyricsDownloadControllerTests(unittest.TestCase):
                 touch_text(audio, "a")
                 add_tracks(db, [make_fs_track(audio, artist="Air Supply", album="Greatest Hits", title="All Out Of Love")])
                 track_id = int(db.execute("SELECT id FROM tracks LIMIT 1").fetchone()["id"])
+                update_track_plain_lyrics(db, track_id, "existing plain")
                 app_state = SimpleNamespace(db=db, db_path=str(Path(tmp) / "pylrcget.db.sqlite3"))
                 overlay = _FakeOverlay()
                 controller, _, notifications, download_states, refreshed = self._make_controller(app_state, overlay)
@@ -355,7 +356,7 @@ class LyricsDownloadControllerTests(unittest.TestCase):
 
                     before_apply = get_track_by_id(db, track_id)
                     self.assertIsNone(before_apply.lrc_lyrics)
-                    self.assertIsNone(before_apply.txt_lyrics)
+                    self.assertEqual(before_apply.txt_lyrics, "existing plain")
 
                     worker.finishedBatch.emit(
                         True,
@@ -366,7 +367,7 @@ class LyricsDownloadControllerTests(unittest.TestCase):
 
                 after_apply = get_track_by_id(db, track_id)
                 self.assertEqual(after_apply.lrc_lyrics, "[00:01.00]plain text")
-                self.assertEqual(after_apply.txt_lyrics, "plain text")
+                self.assertEqual(after_apply.txt_lyrics, "existing plain")
                 self.assertEqual(download_states[track_id], "success")
                 self.assertIn(("Applied lyrics to 1 downloaded track.", "success"), notifications)
                 self.assertIn("view", refreshed)

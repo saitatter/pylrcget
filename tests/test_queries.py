@@ -10,6 +10,8 @@ from core.models import FsTrack
 from tests.test_support import make_fs_track, touch_text
 from db.database import add_tracks, get_album_rows, initialize_database
 from db.queries import (
+    clear_download_history,
+    clear_publish_history,
     clear_track_dirty_lyrics,
     find_artist,
     get_config,
@@ -131,6 +133,26 @@ class PublishHistoryQueryTests(unittest.TestCase):
             finally:
                 db.close()
 
+    def test_clear_publish_history_removes_local_history(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db = initialize_database(tmp)
+            try:
+                record_publish_history(
+                    db,
+                    track_id=None,
+                    title="Song A",
+                    artist_name="Artist A",
+                    album_name="Album A",
+                    publish_kind="plain",
+                    lrclib_instance="https://lrclib.net/api",
+                )
+
+                self.assertEqual(len(get_publish_history_rows(db)), 1)
+                clear_publish_history(db)
+                self.assertEqual(get_publish_history_rows(db), [])
+            finally:
+                db.close()
+
 
 class DownloadHistoryQueryTests(unittest.TestCase):
     def test_record_download_history_persists_and_sorts_latest_first(self):
@@ -174,6 +196,28 @@ class DownloadHistoryQueryTests(unittest.TestCase):
                 self.assertEqual(rows[0]["download_mode"], "synced_only")
                 self.assertEqual(int(rows[0]["track_exists"]), 1)
                 self.assertEqual(int(rows[1]["id"]), first_id)
+            finally:
+                db.close()
+
+    def test_clear_download_history_removes_local_history(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db = initialize_database(tmp)
+            try:
+                record_download_history(
+                    db,
+                    track_id=None,
+                    title="Song A",
+                    artist_name="Artist A",
+                    album_name="Album A",
+                    download_mode="prefer_synced",
+                    download_status="plain",
+                    message="Downloaded plain lyrics.",
+                    lrclib_instance="https://lrclib.net/api",
+                )
+
+                self.assertEqual(len(get_download_history_rows(db)), 1)
+                clear_download_history(db)
+                self.assertEqual(get_download_history_rows(db), [])
             finally:
                 db.close()
 

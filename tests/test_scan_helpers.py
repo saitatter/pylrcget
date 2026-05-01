@@ -11,6 +11,7 @@ from tests import test_support as _test_support  # noqa: F401
 from tests.test_support import make_fs_track, touch_text
 from db.database import add_tracks, get_library_file_index, initialize_database
 from library.scan_library import (
+    AudioMetadata,
     MutagenError,
     get_audio_file_signature,
     iter_audio_paths,
@@ -58,6 +59,29 @@ class ScanLibraryHelpersTests(unittest.TestCase):
             self.assertIsNotNone(sig[0])
             self.assertEqual(sig[1], audio.stat().st_size + txt.stat().st_size + lrc.stat().st_size)
             self.assertEqual(sig[0], max(audio.stat().st_mtime, txt.stat().st_mtime, lrc.stat().st_mtime))
+
+    def test_get_audio_file_signature_includes_metadata_named_sidecars(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            audio = root / "01-track.flac"
+            lrc = root / "Artist - Song Title.lrc"
+            metadata = AudioMetadata(
+                title="Song Title",
+                album="Album",
+                artist="Artist",
+                album_artist="Artist",
+                track_number=1,
+                duration=180.0,
+            )
+
+            touch_text(audio, "audio")
+            time.sleep(0.02)
+            touch_text(lrc, "[00:01.00]synced")
+
+            sig = get_audio_file_signature(str(audio), metadata=metadata, lyrics_file_pattern="{artist} - {title}")
+            self.assertIsNotNone(sig[0])
+            self.assertEqual(sig[1], audio.stat().st_size + lrc.stat().st_size)
+            self.assertEqual(sig[0], max(audio.stat().st_mtime, lrc.stat().st_mtime))
 
     def test_iter_audio_paths_and_preview_apply_path_and_regex_exclusions(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -159,6 +183,41 @@ class ScanLibraryHelpersTests(unittest.TestCase):
             self.assertEqual(track_lookup_only.txt_lyrics, "lookup plain")
             self.assertEqual(track_lookup_only.lrc_lyrics, "[00:02.00]lookup synced")
 
+    def test_new_fs_track_from_path_reads_artist_title_lrc_sidecar(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            audio = root / "01-track.flac"
+            lrc = root / "Artist - Song Title.lrc"
+            touch_text(audio, "audio")
+            touch_text(lrc, "[00:01.00]synced")
+
+            class _FakeAudio:
+                def __init__(self) -> None:
+                    self.info = type("Info", (), {"length": 180.0})()
+
+                def get(self, key):
+                    mapping = {
+                        "title": ["Song Title"],
+                        "album": ["Album"],
+                        "artist": ["Artist"],
+                        "albumartist": ["Artist"],
+                        "tracknumber": ["01"],
+                    }
+                    return mapping.get(key)
+
+            with patch("library.scan_library.MutagenFile", return_value=_FakeAudio()), patch(
+                "library.scan_library.read_embedded_lyrics",
+                return_value=(None, None),
+            ):
+                track = new_fs_track_from_path(
+                    str(audio),
+                    lyrics_file_pattern="{artist} - {title}",
+                )
+
+            self.assertIsNotNone(track)
+            assert track is not None
+            self.assertEqual(track.lrc_lyrics, "[00:01.00]synced")
+
 
 class LibraryScannerIncrementalTests(unittest.TestCase):
     def test_library_scanner_skips_unchanged_reindexes_new_and_removes_missing(self):
@@ -188,7 +247,7 @@ class LibraryScannerIncrementalTests(unittest.TestCase):
 
             calls: list[str] = []
 
-            def fake_new_fs_track(path: str, *, signature=None, lyrics_lookup_subdir=None):
+            def fake_new_fs_track(path: str, *, signature=None, lyrics_lookup_subdir=None, **_kwargs):
                 calls.append(Path(path).name)
                 if Path(path).name == "added.mp3":
                     return FsTrack(
@@ -208,8 +267,21 @@ class LibraryScannerIncrementalTests(unittest.TestCase):
                 return None
 
             scanner = LibraryScanner(db_path, [str(music_dir)])
-            with patch("ui.workers.library_scanner.new_fs_track_from_path", side_effect=fake_new_fs_track):
+            fake_metadata = AudioMetadata(
+                title="Added",
+                album="Album 3",
+                artist="Artist 3",
+                album_artist="Artist 3",
+                track_number=1,
+                duration=210.0,
+            )
+            with (
+                patch("ui.workers.library_scanner.read_audio_metadata", return_value=(object(), fake_metadata)) as read_metadata,
+                patch("ui.workers.library_scanner.new_fs_track_from_path", side_effect=fake_new_fs_track),
+            ):
                 scanner.run()
+
+            read_metadata.assert_called_once_with(str(added))
 
             db2 = sqlite3.connect(db_path)
             db2.row_factory = sqlite3.Row

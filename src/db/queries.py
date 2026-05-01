@@ -720,6 +720,7 @@ def refresh_track_from_file(db: sqlite3.Connection, track_id: int) -> Track | No
     refreshed = scan_library.new_fs_track_from_path(
         source_path,
         lyrics_lookup_subdir=config.lyrics_lookup_subdir,
+        lyrics_file_pattern=config.lyrics_file_pattern,
     )
     if refreshed is None:
         raise ValueError(f"Could not refresh track from file: {source_path}")
@@ -924,6 +925,45 @@ def get_library_file_index(db: sqlite3.Connection) -> dict[str, tuple[float | No
     }
 
 
+def get_library_scan_index(
+    db: sqlite3.Connection,
+) -> dict[str, tuple[tuple[float | None, int | None], scan_library.AudioMetadata]]:
+    rows = db.execute(
+        """
+        SELECT
+            tracks.file_path,
+            tracks.modified_time,
+            tracks.file_size,
+            tracks.title,
+            tracks.duration,
+            tracks.track_number,
+            artists.name AS artist_name,
+            albums.name AS album_name,
+            COALESCE(NULLIF(albums.album_artist_name, ''), artists.name, '') AS album_artist_name
+        FROM tracks
+        JOIN artists ON tracks.artist_id = artists.id
+        JOIN albums ON tracks.album_id = albums.id
+        """
+    ).fetchall()
+    return {
+        row["file_path"]: (
+            (
+                float(row["modified_time"]) if row["modified_time"] is not None else None,
+                int(row["file_size"]) if row["file_size"] is not None else None,
+            ),
+            scan_library.AudioMetadata(
+                title=str(row["title"] or ""),
+                album=str(row["album_name"] or "Unknown Album"),
+                artist=str(row["artist_name"] or "Unknown Artist"),
+                album_artist=str(row["album_artist_name"] or row["artist_name"] or "Unknown Artist"),
+                track_number=int(row["track_number"]) if row["track_number"] is not None else None,
+                duration=float(row["duration"] or 0.0),
+            ),
+        )
+        for row in rows
+    }
+
+
 def delete_tracks_by_paths(db: sqlite3.Connection, paths: list[str], *, commit: bool = True) -> None:
     if not paths:
         return
@@ -1097,6 +1137,11 @@ def get_publish_history_rows(
     return db.execute(query).fetchall()
 
 
+def clear_publish_history(db: sqlite3.Connection) -> None:
+    db.execute("DELETE FROM publish_history")
+    db.commit()
+
+
 def record_download_history(
     db: sqlite3.Connection,
     *,
@@ -1209,6 +1254,11 @@ def get_download_history_rows(
         {limit_clause}
     """
     return db.execute(query).fetchall()
+
+
+def clear_download_history(db: sqlite3.Connection) -> None:
+    db.execute("DELETE FROM download_history")
+    db.commit()
 
 
 # -------------------------------

@@ -4,6 +4,10 @@ QWidget {
     font-family: {{font-family-base}};
 }
 
+QLabel {
+    background: transparent;
+}
+
 QMainWindow, QMenuBar, QStatusBar, QSplitter::handle {
     background-color: {{color-bg-app}};
 }

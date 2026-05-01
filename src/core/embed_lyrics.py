@@ -16,6 +16,8 @@ from mutagen.oggvorbis import OggVorbis
 from mutagen.oggopus import OggOpus
 from mutagen.mp4 import MP4
 
+from core.utils import plain_text_from_lrc
+
 # Convention:
 #   - Synced LRC goes into:   LYRICS
 #   - Unsynced (plain) goes into: UNSYNCEDLYRICS
@@ -31,20 +33,6 @@ ASF_PLAIN_KEY = "WM/Lyrics"
 ASF_SYNCED_KEY = "LRCLIB_LRC"
 
 logger = logging.getLogger(__name__)
-
-
-def _strip_timestamps(lrc: str) -> str:
-    """Remove [mm:ss.xx] tokens from LRC to derive plain lyrics."""
-    out_lines: list[str] = []
-    for line in lrc.splitlines():
-        line = line.strip()
-        if not line:
-            continue
-        # Remove any leading [....] blocks (timestamps or tags) repeatedly.
-        while line.startswith("[") and "]" in line:
-            line = line.split("]", 1)[1].lstrip()
-        out_lines.append(line)
-    return "\n".join(out_lines).strip()
 
 
 def _norm(s: str | None) -> str | None:
@@ -66,10 +54,8 @@ def embed_lyrics_for_track(track: TrackWithLyrics) -> None:
     path = track.file_path
     plain = _norm(getattr(track, "txt_lyrics", None))
     synced = _norm(getattr(track, "lrc_lyrics", None))
-
-    # If we only have synced lyrics, derive plain lyrics from it.
     if synced and not plain:
-        plain = _norm(_strip_timestamps(synced))
+        plain = _norm(plain_text_from_lrc(synced))
 
     embed_lyrics_in_file(path, plain, synced)
 

@@ -10,14 +10,24 @@ from library.scan_library import (
     get_audio_file_signature,
     iter_audio_paths,
     new_fs_track_from_path,
+    read_audio_metadata,
 )
 from db.database import (
     add_tracks,
     delete_tracks_by_paths,
-    get_library_file_index,
+    get_library_scan_index,
     get_orphan_lyrics_index,
     prune_library,
 )
+
+
+def _read_metadata_for_scan(path: str):
+    try:
+        return read_audio_metadata(path)
+    except Exception as exc:
+        logger.warning("Skipping unreadable audio file during scan: %s (%s)", path, exc)
+        return None
+
 
 class LibraryScanner(QThread):
     progress_signal = Signal(int, int, str, float)     # scanned, total, current path, elapsed seconds
@@ -31,6 +41,7 @@ class LibraryScanner(QThread):
         excluded_paths: str = "",
         excluded_patterns: str = "",
         lyrics_lookup_subdir: str = "",
+        lyrics_file_pattern: str = "",
     ):
         super().__init__()
         self.db_path = db_path
@@ -38,6 +49,7 @@ class LibraryScanner(QThread):
         self.excluded_paths = excluded_paths
         self.excluded_patterns = excluded_patterns
         self.lyrics_lookup_subdir = lyrics_lookup_subdir
+        self.lyrics_file_pattern = lyrics_file_pattern
 
     def run(self):
         db = None
@@ -47,7 +59,7 @@ class LibraryScanner(QThread):
             db = sqlite3.connect(self.db_path)
             db.row_factory = sqlite3.Row
 
-            existing_index = get_library_file_index(db)
+            existing_index = get_library_scan_index(db)
             paths = iter_audio_paths(
                 self.directories,
                 excluded_paths=self.excluded_paths,
@@ -78,20 +90,46 @@ class LibraryScanner(QThread):
                     return
 
                 scanned += 1
-                signature = get_audio_file_signature(p, self.lyrics_lookup_subdir)
-                if existing_index.get(p) == signature:
+                existing = existing_index.get(p)
+                metadata = existing[1] if existing is not None else None
+                if metadata is None:
+                    metadata_result = _read_metadata_for_scan(p)
+                    if metadata_result is None:
+                        continue
+                    _audio, metadata = metadata_result
+                signature = get_audio_file_signature(
+                    p,
+                    self.lyrics_lookup_subdir,
+                    metadata=metadata,
+                    lyrics_file_pattern=self.lyrics_file_pattern,
+                )
+                if existing is not None and existing[0] == signature:
                     unchanged += 1
                     if scanned % 200 == 0:
                         self.progress_signal.emit(scanned, total, p, time.perf_counter() - started_at)
                     continue
 
-                if p in existing_index:
+                if existing is not None:
+                    metadata_result = _read_metadata_for_scan(p)
+                    if metadata_result is None:
+                        continue
+                    _audio, metadata = metadata_result
+                    signature = get_audio_file_signature(
+                        p,
+                        self.lyrics_lookup_subdir,
+                        metadata=metadata,
+                        lyrics_file_pattern=self.lyrics_file_pattern,
+                    )
+
+                if existing is not None:
                     pending_replacements.append(p)
 
                 t = new_fs_track_from_path(
                     p,
                     signature=signature,
                     lyrics_lookup_subdir=self.lyrics_lookup_subdir,
+                    lyrics_file_pattern=self.lyrics_file_pattern,
+                    metadata=metadata,
                 )
 
                 if t is not None:

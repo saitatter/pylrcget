@@ -243,7 +243,6 @@ class TopBarController(QWidget):
     def set_download_missing_mode(self, mode: str) -> None:
         tooltip = download_missing_tooltip(mode)
         self.btn_download_missing.setToolTip(tooltip)
-        self.btn_download_missing.setStatusTip(tooltip)
 
     def set_logs_checked(self, checked: bool) -> None:
         self.btn_logs.setChecked(bool(checked))

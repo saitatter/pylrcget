@@ -22,7 +22,7 @@ from PySide6.QtWidgets import (
 )
 
 from db.database import get_directories, get_duplicate_track_ids, get_track_by_id, get_track_rows
-from ui.library_routes import LibraryRoute, tracks_album, tracks_artist
+from ui.library_routes import LibraryRoute, albums_detail, artists_detail
 from ui.widgets.empty_state_widget import EmptyStateWidget
 from ui.models.track_table_model import TrackTableModel
 from ui.delegates.actions_delegate import ActionsDelegate
@@ -47,6 +47,7 @@ class TrackListWidget(QWidget):
     bulkRefreshRequested = Signal(list)  # track_ids
     downloadLyrics = Signal(int)  # track_id
     exportLyricsFiles = Signal(int)  # track_id
+    importLyricsFile = Signal(int, str)  # track_id, file_path
     bulkDownloadRequested = Signal(list, str)  # track_ids, mode
     bulkPublishRequested = Signal(list, bool)   # track_ids, is_synced
     openArtist = Signal(int)
@@ -84,6 +85,7 @@ class TrackListWidget(QWidget):
         self._loading_more = False
         self._duplicate_ids: set[int] = set()
         self._ui_scale = 1.0
+        self._drag_lyrics_path = ""
 
         self.scope_bar = QWidget()
         self.scope_bar.setObjectName("TrackScopeBar")
@@ -119,6 +121,8 @@ class TrackListWidget(QWidget):
         self.table.setAlternatingRowColors(True)
         self.table.setMouseTracking(True)
         self.table.viewport().setMouseTracking(True)
+        self.table.setAcceptDrops(True)
+        self.table.viewport().setAcceptDrops(True)
         self.table.viewport().installEventFilter(self)
         self._suppress_left_click_until = 0.0
         self.table.setSortingEnabled(False)
@@ -449,6 +453,25 @@ class TrackListWidget(QWidget):
 
     def eventFilter(self, watched, event):
         if watched is self.table.viewport() and event.type() in {
+            QEvent.Type.DragEnter,
+            QEvent.Type.DragMove,
+            QEvent.Type.Drop,
+        }:
+            if event.type() == QEvent.Type.DragEnter:
+                self._drag_lyrics_path = self._lyrics_file_from_mime(event.mimeData(), check_exists=True)
+            lyrics_path = self._drag_lyrics_path
+            idx = self.table.indexAt(self._event_position(event))
+            track_id = self.model.track_id_at(idx.row()) if idx.isValid() else None
+            if lyrics_path and track_id is not None:
+                event.acceptProposedAction()
+                if event.type() == QEvent.Type.Drop:
+                    self.importLyricsFile.emit(int(track_id), lyrics_path)
+                    self._drag_lyrics_path = ""
+                return True
+            if event.type() == QEvent.Type.Drop:
+                self._drag_lyrics_path = ""
+
+        if watched is self.table.viewport() and event.type() in {
             QEvent.Type.MouseButtonPress,
             QEvent.Type.MouseButtonRelease,
             QEvent.Type.MouseButtonDblClick,
@@ -460,6 +483,24 @@ class TrackListWidget(QWidget):
                 event.accept()
                 return True
         return super().eventFilter(watched, event)
+
+    @staticmethod
+    def _event_position(event):
+        if hasattr(event, "position"):
+            return event.position().toPoint()
+        return event.pos()
+
+    @staticmethod
+    def _lyrics_file_from_mime(mime_data, *, check_exists: bool = False) -> str:
+        if not mime_data.hasUrls():
+            return ""
+        for url in mime_data.urls():
+            if not url.isLocalFile():
+                continue
+            path = url.toLocalFile()
+            if Path(path).suffix.lower() in {".lrc", ".txt"} and (not check_exists or Path(path).is_file()):
+                return str(path)
+        return ""
 
     def _suppress_next_table_left_click(self) -> None:
         self._suppress_left_click_until = time.monotonic() + 0.35
@@ -476,11 +517,11 @@ class TrackListWidget(QWidget):
 
     def _emit_artist_navigation(self, artist_id: int) -> None:
         self.openArtist.emit(int(artist_id))
-        self.navigateRequested.emit(tracks_artist((int(artist_id),)))
+        self.navigateRequested.emit(artists_detail((int(artist_id),)))
 
     def _emit_album_navigation(self, album_id: int) -> None:
         self.openAlbum.emit(int(album_id))
-        self.navigateRequested.emit(tracks_album((int(album_id),)))
+        self.navigateRequested.emit(albums_detail((int(album_id),)))
 
     def set_now_playing(self, track_id: int | None):
         if track_id is None:
