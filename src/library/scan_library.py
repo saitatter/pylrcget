@@ -5,6 +5,7 @@ import os
 import logging
 import re
 from pathlib import Path
+from dataclasses import dataclass
 
 from mutagen import File as MutagenFile
 from mutagen.asf import ASF
@@ -34,6 +35,16 @@ ASF_PLAIN_KEYS = ("WM/Lyrics", "LYRICS", "UNSYNCEDLYRICS")
 ASF_SYNCED_KEYS = ("LRCLIB_LRC", "SYNCEDLYRICS")
 APE_PLAIN_KEYS = ("UNSYNCEDLYRICS", "lyrics")
 APE_SYNCED_KEYS = ("LYRICS", "LRCLIB_LRC")
+
+
+@dataclass(frozen=True)
+class AudioMetadata:
+    title: str
+    album: str
+    artist: str
+    album_artist: str
+    track_number: int | None
+    duration: float
 
 
 def _read_vorbis_lyrics(audio) -> tuple[str | None, str | None]:
@@ -189,8 +200,16 @@ def preview_audio_path_exclusions(
 def get_audio_file_signature(
     path: str,
     lyrics_lookup_subdir: str | None = None,
+    *,
+    metadata: AudioMetadata | None = None,
+    lyrics_file_pattern: str | None = None,
 ) -> tuple[float | None, int | None]:
-    return get_audio_file_signature_with_lookup(path, lyrics_lookup_subdir)
+    return get_audio_file_signature_with_lookup(
+        path,
+        lyrics_lookup_subdir,
+        metadata=metadata,
+        lyrics_file_pattern=lyrics_file_pattern,
+    )
 
 
 def _normalized_lyrics_lookup_subdir(lyrics_lookup_subdir: str | None) -> str:
@@ -205,33 +224,22 @@ def _normalized_lyrics_lookup_subdir(lyrics_lookup_subdir: str | None) -> str:
     return os.path.join(*parts)
 
 
-def _sidecar_base_candidates(path: str, lyrics_lookup_subdir: str | None = None) -> list[str]:
-    audio_path = Path(path)
-    candidates: list[Path] = [audio_path.with_suffix("")]
-
-    normalized_subdir = _normalized_lyrics_lookup_subdir(lyrics_lookup_subdir)
-    if normalized_subdir:
-        candidates.append(audio_path.parent / normalized_subdir / audio_path.stem)
-
-    unique: list[str] = []
-    seen: set[str] = set()
-    for candidate in candidates:
-        rendered = os.path.normcase(str(candidate))
-        if rendered in seen:
-            continue
-        seen.add(rendered)
-        unique.append(str(candidate))
-    return unique
-
-
 def get_audio_file_signature_with_lookup(
     path: str,
     lyrics_lookup_subdir: str | None = None,
+    *,
+    metadata: AudioMetadata | None = None,
+    lyrics_file_pattern: str | None = None,
 ) -> tuple[float | None, int | None]:
     newest_mtime: float | None = None
     total_size = 0
     candidates = [path]
-    for base in _sidecar_base_candidates(path, lyrics_lookup_subdir):
+    for base in _sidecar_base_candidates(
+        path,
+        lyrics_lookup_subdir,
+        metadata=metadata,
+        lyrics_file_pattern=lyrics_file_pattern,
+    ):
         candidates.extend([base + ".txt", base + ".lrc"])
 
     for candidate in candidates:
@@ -263,11 +271,153 @@ def _parse_track_number(raw: str | None) -> int | None:
     except (ValueError, IndexError):
         return None
 
-def _read_sidecar(path: str, lyrics_lookup_subdir: str | None = None) -> tuple[str | None, str | None]:
+
+def read_audio_metadata(path: str) -> tuple[object, AudioMetadata] | None:
+    audio = MutagenFile(path, easy=True)
+    if audio is None:
+        return None
+
+    title = _first(audio, "title")
+    album = _first(audio, "album")
+    artist = _first(audio, "artist")
+
+    title = title or os.path.splitext(os.path.basename(path))[0]
+    album = album or "Unknown Album"
+    artist = artist or "Unknown Artist"
+
+    album_artist = (
+        _first(audio, "albumartist")
+        or _first(audio, "album artist")
+        or artist
+    )
+
+    track_number = _parse_track_number(_first(audio, "tracknumber"))
+
+    duration = 0.0
+    try:
+        if getattr(audio, "info", None) and getattr(audio.info, "length", None):
+            duration = float(audio.info.length)
+    except (TypeError, ValueError):
+        duration = 0.0
+
+    return audio, AudioMetadata(
+        title=title,
+        album=album,
+        artist=artist,
+        album_artist=album_artist,
+        track_number=track_number,
+        duration=duration,
+    )
+
+
+def _safe_sidecar_component(value: str) -> str:
+    cleaned = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", (value or "").strip())
+    cleaned = re.sub(r"\s+", " ", cleaned)
+    return cleaned.strip(" .")
+
+
+def _render_sidecar_pattern(pattern: str, path: str, metadata: AudioMetadata) -> str:
+    values = {
+        "artist": _safe_sidecar_component(metadata.artist),
+        "title": _safe_sidecar_component(metadata.title),
+        "album": _safe_sidecar_component(metadata.album),
+        "track": _safe_sidecar_component(str(metadata.track_number) if metadata.track_number is not None else ""),
+        "filename": _safe_sidecar_component(Path(path).stem),
+    }
+    try:
+        rendered = pattern.format(**values).strip()
+    except (KeyError, ValueError, IndexError):
+        rendered = ""
+    return _safe_sidecar_component(rendered)
+
+
+def _metadata_sidecar_names(
+    path: str,
+    metadata: AudioMetadata | None,
+    lyrics_file_pattern: str | None = None,
+) -> list[str]:
+    names = [_safe_sidecar_component(Path(path).stem)]
+    if metadata is not None:
+        title = _safe_sidecar_component(metadata.title)
+        artist = _safe_sidecar_component(metadata.artist)
+        album_artist = _safe_sidecar_component(metadata.album_artist)
+        track = _safe_sidecar_component(str(metadata.track_number) if metadata.track_number is not None else "")
+
+        if title:
+            names.append(title)
+        if artist and title:
+            names.append(f"{artist} - {title}")
+        if album_artist and album_artist != artist and title:
+            names.append(f"{album_artist} - {title}")
+        if track and title:
+            names.append(f"{track}. {title}")
+            names.append(f"{track} - {title}")
+            if metadata.track_number is not None:
+                padded_track = f"{metadata.track_number:02d}"
+                names.append(f"{padded_track}. {title}")
+                names.append(f"{padded_track} - {title}")
+
+        rendered = _render_sidecar_pattern(lyrics_file_pattern or "", path, metadata)
+        if rendered:
+            names.append(rendered)
+
+    unique: list[str] = []
+    seen: set[str] = set()
+    for name in names:
+        if not name:
+            continue
+        key = os.path.normcase(name)
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(name)
+    return unique
+
+
+def _sidecar_base_candidates(
+    path: str,
+    lyrics_lookup_subdir: str | None = None,
+    *,
+    metadata: AudioMetadata | None = None,
+    lyrics_file_pattern: str | None = None,
+) -> list[str]:
+    audio_path = Path(path)
+    names = _metadata_sidecar_names(path, metadata, lyrics_file_pattern)
+    dirs: list[Path] = [audio_path.parent]
+
+    normalized_subdir = _normalized_lyrics_lookup_subdir(lyrics_lookup_subdir)
+    if normalized_subdir:
+        dirs.append(audio_path.parent / normalized_subdir)
+
+    unique: list[str] = []
+    seen: set[str] = set()
+    for directory in dirs:
+        for name in names:
+            candidate = directory / name
+            rendered = os.path.normcase(str(candidate))
+            if rendered in seen:
+                continue
+            seen.add(rendered)
+            unique.append(str(candidate))
+    return unique
+
+
+def _read_sidecar(
+    path: str,
+    lyrics_lookup_subdir: str | None = None,
+    *,
+    metadata: AudioMetadata | None = None,
+    lyrics_file_pattern: str | None = None,
+) -> tuple[str | None, str | None]:
     txt = None
     lrc = None
 
-    for base in _sidecar_base_candidates(path, lyrics_lookup_subdir):
+    for base in _sidecar_base_candidates(
+        path,
+        lyrics_lookup_subdir,
+        metadata=metadata,
+        lyrics_file_pattern=lyrics_file_pattern,
+    ):
         txt_path = base + ".txt"
         lrc_path = base + ".lrc"
 
@@ -464,48 +614,26 @@ def new_fs_track_from_path(
     *,
     signature: tuple[float | None, int | None] | None = None,
     lyrics_lookup_subdir: str | None = None,
+    lyrics_file_pattern: str | None = None,
+    metadata: AudioMetadata | None = None,
 ) -> FsTrack | None:
     try:
-        audio = MutagenFile(path, easy=True)
-        if audio is None:
-            return None
-
-        # title/album/artist extraction
-        def _first(easy, key: str) -> str | None:
-            v = easy.get(key)
-            if not v:
+        metadata_result = None if metadata is not None else read_audio_metadata(path)
+        if metadata is None:
+            if metadata_result is None:
                 return None
-            if isinstance(v, list):
-                return (str(v[0]).strip() if v else None) or None
-            s = str(v).strip()
-            return s or None
-
-        title = _first(audio, "title")
-        album = _first(audio, "album")
-        artist = _first(audio, "artist")
-
-        title = title or os.path.splitext(os.path.basename(path))[0]
-        album = album or "Unknown Album"
-        artist = artist or "Unknown Artist"
-
-        album_artist = (
-            _first(audio, "albumartist")
-            or _first(audio, "album artist")
-            or artist
-        )
-
-        track_number = _parse_track_number(_first(audio, "tracknumber"))
-
-        duration = 0.0
-        try:
-            if getattr(audio, "info", None) and getattr(audio.info, "length", None):
-                duration = float(audio.info.length)
-        except (TypeError, ValueError):
-            duration = 0.0
+            _audio, metadata = metadata_result
+        elif MutagenFile(path, easy=True) is None:
+            return None
 
         # Preferred order: embedded, same-folder sidecars, then optional subfolder sidecars.
         txt_embedded, lrc_embedded = read_embedded_lyrics(path)
-        txt_sidecar, lrc_sidecar = _read_sidecar(path, lyrics_lookup_subdir)
+        txt_sidecar, lrc_sidecar = _read_sidecar(
+            path,
+            lyrics_lookup_subdir,
+            metadata=metadata,
+            lyrics_file_pattern=lyrics_file_pattern,
+        )
 
         txt_lyrics = txt_embedded or txt_sidecar
         lrc_lyrics = lrc_embedded or lrc_sidecar
@@ -513,20 +641,25 @@ def new_fs_track_from_path(
         modified_time, file_size = (
             signature
             if signature is not None
-            else get_audio_file_signature_with_lookup(path, lyrics_lookup_subdir)
+            else get_audio_file_signature_with_lookup(
+                path,
+                lyrics_lookup_subdir,
+                metadata=metadata,
+                lyrics_file_pattern=lyrics_file_pattern,
+            )
         )
 
         return FsTrack(
             file_path=path,
             file_name=os.path.basename(path),
-            title=title,
-            album=album,
-            artist=artist,
-            album_artist=album_artist,
-            duration=duration,
+            title=metadata.title,
+            album=metadata.album,
+            artist=metadata.artist,
+            album_artist=metadata.album_artist,
+            duration=metadata.duration,
             txt_lyrics=txt_lyrics,
             lrc_lyrics=lrc_lyrics,
-            track_number=track_number,
+            track_number=metadata.track_number,
             modified_time=modified_time,
             file_size=file_size,
         )

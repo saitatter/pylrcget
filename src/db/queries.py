@@ -720,6 +720,7 @@ def refresh_track_from_file(db: sqlite3.Connection, track_id: int) -> Track | No
     refreshed = scan_library.new_fs_track_from_path(
         source_path,
         lyrics_lookup_subdir=config.lyrics_lookup_subdir,
+        lyrics_file_pattern=config.lyrics_file_pattern,
     )
     if refreshed is None:
         raise ValueError(f"Could not refresh track from file: {source_path}")

@@ -10,6 +10,7 @@ from library.scan_library import (
     get_audio_file_signature,
     iter_audio_paths,
     new_fs_track_from_path,
+    read_audio_metadata,
 )
 from db.database import (
     add_tracks,
@@ -31,6 +32,7 @@ class LibraryScanner(QThread):
         excluded_paths: str = "",
         excluded_patterns: str = "",
         lyrics_lookup_subdir: str = "",
+        lyrics_file_pattern: str = "",
     ):
         super().__init__()
         self.db_path = db_path
@@ -38,6 +40,7 @@ class LibraryScanner(QThread):
         self.excluded_paths = excluded_paths
         self.excluded_patterns = excluded_patterns
         self.lyrics_lookup_subdir = lyrics_lookup_subdir
+        self.lyrics_file_pattern = lyrics_file_pattern
 
     def run(self):
         db = None
@@ -78,7 +81,20 @@ class LibraryScanner(QThread):
                     return
 
                 scanned += 1
-                signature = get_audio_file_signature(p, self.lyrics_lookup_subdir)
+                try:
+                    metadata_result = read_audio_metadata(p)
+                except Exception as exc:
+                    logger.warning("Skipping unreadable audio file during scan: %s (%s)", p, exc)
+                    continue
+                if metadata_result is None:
+                    continue
+                _audio, metadata = metadata_result
+                signature = get_audio_file_signature(
+                    p,
+                    self.lyrics_lookup_subdir,
+                    metadata=metadata,
+                    lyrics_file_pattern=self.lyrics_file_pattern,
+                )
                 if existing_index.get(p) == signature:
                     unchanged += 1
                     if scanned % 200 == 0:
@@ -92,6 +108,8 @@ class LibraryScanner(QThread):
                     p,
                     signature=signature,
                     lyrics_lookup_subdir=self.lyrics_lookup_subdir,
+                    lyrics_file_pattern=self.lyrics_file_pattern,
+                    metadata=metadata,
                 )
 
                 if t is not None:

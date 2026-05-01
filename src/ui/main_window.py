@@ -682,6 +682,7 @@ class MainWindow(QMainWindow):
             fs_track = new_fs_track_from_path(
                 file_path,
                 lyrics_lookup_subdir=config.lyrics_lookup_subdir,
+                lyrics_file_pattern=config.lyrics_file_pattern,
             )
             if fs_track is None:
                 skipped += 1
@@ -873,6 +874,7 @@ class MainWindow(QMainWindow):
             excluded_paths=config.scan_excluded_paths,
             excluded_patterns=config.scan_excluded_patterns,
             lyrics_lookup_subdir=config.lyrics_lookup_subdir,
+            lyrics_file_pattern=config.lyrics_file_pattern,
         )
         self.scanner.progress_signal.connect(self._update_scan_progress)
         self.scanner.finished_signal.connect(self._scan_finished)
