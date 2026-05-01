@@ -623,8 +623,6 @@ def new_fs_track_from_path(
             if metadata_result is None:
                 return None
             _audio, metadata = metadata_result
-        elif MutagenFile(path, easy=True) is None:
-            return None
 
         # Preferred order: embedded, same-folder sidecars, then optional subfolder sidecars.
         txt_embedded, lrc_embedded = read_embedded_lyrics(path)
