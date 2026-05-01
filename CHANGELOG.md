@@ -1,4 +1,22 @@
 # Changelog
+## v1.4.0 (2026-05-01)
+
+### ✨ Features
+* **lyrics:** Improve download and sidecar workflows ([4034293](https://github.com/saitatter/pylrcget/commit/403429397f715fa8290f7e91b2a5363650922177))
+* **lyrics:** Import lyric files as drafts ([4034293](https://github.com/saitatter/pylrcget/commit/403429397f715fa8290f7e91b2a5363650922177))
+* **ui:** Polish navigation and history controls ([4034293](https://github.com/saitatter/pylrcget/commit/403429397f715fa8290f7e91b2a5363650922177))
+
+### 🐛 Fixes
+* **lyrics:** Save only selected download format ([4034293](https://github.com/saitatter/pylrcget/commit/403429397f715fa8290f7e91b2a5363650922177))
+* **scanner:** Detect metadata-named lrc sidecars ([4034293](https://github.com/saitatter/pylrcget/commit/403429397f715fa8290f7e91b2a5363650922177))
+* **scanner:** Avoid duplicate metadata reads ([4034293](https://github.com/saitatter/pylrcget/commit/403429397f715fa8290f7e91b2a5363650922177))
+* **ui:** Keep download tooltip out of status bar ([4034293](https://github.com/saitatter/pylrcget/commit/403429397f715fa8290f7e91b2a5363650922177))
+* **lyrics:** Address review regressions ([4034293](https://github.com/saitatter/pylrcget/commit/403429397f715fa8290f7e91b2a5363650922177))
+
+### ♻️ Refactors
+* **ui:** Simplify review cleanup paths ([4034293](https://github.com/saitatter/pylrcget/commit/403429397f715fa8290f7e91b2a5363650922177))
+
+
 ## v1.3.0 (2026-04-27)
 
 ### ✨ Features
