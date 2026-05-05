@@ -6,8 +6,12 @@ from types import SimpleNamespace
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
-from PySide6.QtWidgets import QHeaderView, QPushButton, QWidget
+from PySide6.QtCore import QEvent, QPointF, QRect
+from PySide6.QtGui import QMouseEvent, QStandardItem, QStandardItemModel
+from PySide6.QtWidgets import QHeaderView, QPushButton, QStyleOptionViewItem, QTableView, QWidget
 
+from core.tracklist_models import DownloadState, LyricsState, TrackListRow
+from ui.delegates.actions_delegate import ActionsDelegate
 from ui.library_routes import albums_detail, artists_detail, tracks_album, tracks_artist
 from ui.controllers.top_bar_controller import TopBarController
 from ui.widgets.hotkey_hints import HotkeyHintManager
@@ -323,6 +327,59 @@ class LyricsPasteBehaviorTests(unittest.TestCase):
             self.assertTrue(badge.isVisible())
         finally:
             parent.deleteLater()
+
+    def test_track_action_buttons_track_individual_hover(self):
+        table = QTableView()
+        model = QStandardItemModel(1, 4)
+        item = QStandardItem("")
+        item.setData(
+            TrackListRow(
+                track_id=1,
+                title="Song",
+                artist="Artist",
+                artist_id=None,
+                album="Album",
+                album_id=None,
+                duration_s=120,
+                lyrics_state=LyricsState.NONE,
+                download_state=DownloadState.IDLE,
+            ),
+            Qt.ItemDataRole.UserRole,
+        )
+        model.setItem(0, 3, item)
+        table.setModel(model)
+        delegate = ActionsDelegate(table)
+        option = QStyleOptionViewItem()
+        option.widget = table
+        option.rect = QRect(0, 0, 150, 44)
+        refresh_rect, download_rect = delegate._button_rects(option.rect)
+        index = model.index(0, 3)
+        try:
+            refresh_event = QMouseEvent(
+                QEvent.Type.MouseMove,
+                QPointF(refresh_rect.center()),
+                QPointF(refresh_rect.center()),
+                QPointF(refresh_rect.center()),
+                Qt.MouseButton.NoButton,
+                Qt.MouseButton.NoButton,
+                Qt.KeyboardModifier.NoModifier,
+            )
+            self.assertTrue(delegate.editorEvent(refresh_event, model, option, index))
+            self.assertEqual(delegate._hover_button, "refresh")
+
+            download_event = QMouseEvent(
+                QEvent.Type.MouseMove,
+                QPointF(download_rect.center()),
+                QPointF(download_rect.center()),
+                QPointF(download_rect.center()),
+                Qt.MouseButton.NoButton,
+                Qt.MouseButton.NoButton,
+                Qt.KeyboardModifier.NoModifier,
+            )
+            self.assertTrue(delegate.editorEvent(download_event, model, option, index))
+            self.assertEqual(delegate._hover_button, "download")
+        finally:
+            table.deleteLater()
 
     def test_open_track_folder_opens_parent_directory(self):
         app_state = simple_app_state()
