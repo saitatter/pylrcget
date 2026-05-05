@@ -7,8 +7,8 @@ from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
 from PySide6.QtCore import QEvent, QPointF, QRect
-from PySide6.QtGui import QMouseEvent, QStandardItem, QStandardItemModel
-from PySide6.QtWidgets import QHeaderView, QPushButton, QStyleOptionViewItem, QTableView, QWidget
+from PySide6.QtGui import QColor, QImage, QMouseEvent, QPainter, QStandardItem, QStandardItemModel
+from PySide6.QtWidgets import QHeaderView, QPushButton, QStyle, QStyleOptionViewItem, QTableView, QWidget
 
 from core.tracklist_models import DownloadState, LyricsState, TrackListRow
 from ui.delegates.actions_delegate import ActionsDelegate
@@ -461,6 +461,46 @@ class LyricsPasteBehaviorTests(unittest.TestCase):
             self.assertEqual(delegate._hover_button, "download")
         finally:
             table.deleteLater()
+
+    def test_track_action_buttons_keep_theme_background_when_row_selected(self):
+        table = QTableView()
+        model = QStandardItemModel(1, 4)
+        item = QStandardItem("")
+        item.setData(
+            TrackListRow(
+                track_id=1,
+                title="Song",
+                artist="Artist",
+                artist_id=None,
+                album="Album",
+                album_id=None,
+                duration_s=120,
+                lyrics_state=LyricsState.SYNCED,
+                download_state=DownloadState.IDLE,
+            ),
+            Qt.ItemDataRole.UserRole,
+        )
+        model.setItem(0, 3, item)
+        table.setModel(model)
+        delegate = ActionsDelegate(table)
+        option = QStyleOptionViewItem()
+        option.widget = table
+        option.rect = QRect(0, 0, 150, 44)
+        option.state = QStyle.StateFlag.State_Enabled | QStyle.StateFlag.State_Selected
+        index = model.index(0, 3)
+        _refresh_rect, download_rect = delegate._button_rects(option.rect)
+        image = QImage(option.rect.size(), QImage.Format.Format_ARGB32)
+        image.fill(QColor("#554872"))
+        painter = QPainter(image)
+        try:
+            delegate.paint(painter, option, index)
+        finally:
+            painter.end()
+            table.deleteLater()
+
+        button_sample = image.pixelColor(download_rect.left() + 8, download_rect.center().y())
+        row_sample = image.pixelColor(8, download_rect.center().y())
+        self.assertLess(abs(button_sample.value() - row_sample.value()), 8)
 
     def test_scan_progress_updates_overlay(self):
         window = MainWindow.__new__(MainWindow)

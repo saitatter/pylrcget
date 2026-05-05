@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from PySide6.QtCore import QEvent, Qt, QRect, Signal, QSize
 from PySide6.QtGui import QColor, QCursor, QPainter, QPen
-from PySide6.QtWidgets import QApplication, QStyle, QStyledItemDelegate, QStyleOptionButton, QStyleOptionViewItem
+from PySide6.QtWidgets import QStyle, QStyledItemDelegate, QStyleOptionViewItem
 
 from core.tracklist_models import DownloadState, TrackListRow
 from ui.icon_loader import load_svg_icon
@@ -78,34 +78,31 @@ class ActionsDelegate(QStyledItemDelegate):
         state = getattr(row_obj, "download_state", DownloadState.IDLE) if row_obj else DownloadState.IDLE
 
         refresh_rect, download_rect = self._button_rects(option.rect)
+        selected = bool(option.state & QStyle.State_Selected)
         hover_refresh = self._hover_row == index.row() and self._hover_button == "refresh"
         hover_download = self._hover_row == index.row() and self._hover_button == "download"
-        if hover_refresh:
-            self._draw_hover_panel(painter, refresh_rect)
-        if hover_download and state != DownloadState.LOADING:
-            self._draw_hover_panel(painter, download_rect)
-
-        refresh_opt = QStyleOptionButton()
-        refresh_opt.rect = refresh_rect
-        refresh_opt.icon = self._refresh_icon
         icon_size = int(round(14 * self._ui_scale))
-        refresh_opt.iconSize = QSize(icon_size, icon_size)
-        refresh_opt.state = QStyle.State_Enabled | QStyle.State_Raised
-        if hover_refresh:
-            refresh_opt.state |= QStyle.State_MouseOver
-
-        download_opt = QStyleOptionButton()
-        download_opt.rect = download_rect
-        download_opt.text = {
+        self._draw_action_button(
+            painter,
+            refresh_rect,
+            icon=self._refresh_icon,
+            icon_size=QSize(icon_size, icon_size),
+            hovered=hover_refresh,
+            selected=selected,
+        )
+        download_text = {
             DownloadState.LOADING: "Working...",
             DownloadState.SUCCESS: "Done",
             DownloadState.ERROR: "Retry",
         }.get(state, "Download")
-        download_opt.state = QStyle.State_None if state == DownloadState.LOADING else QStyle.State_Enabled | QStyle.State_Raised
-        if hover_download and state != DownloadState.LOADING:
-            download_opt.state |= QStyle.State_MouseOver
-        QApplication.style().drawControl(QStyle.CE_PushButton, refresh_opt, painter)
-        QApplication.style().drawControl(QStyle.CE_PushButton, download_opt, painter)
+        self._draw_action_button(
+            painter,
+            download_rect,
+            text=download_text,
+            hovered=hover_download and state != DownloadState.LOADING,
+            enabled=state != DownloadState.LOADING,
+            selected=selected,
+        )
 
     def _draw_cell_background(self, painter: QPainter, option, index) -> None:
         if option.state & QStyle.State_Selected:
@@ -116,12 +113,52 @@ class ActionsDelegate(QStyledItemDelegate):
             color = STYLE_TOKENS.get("color-table-bg", "#0f172a")
         painter.fillRect(option.rect, QColor(color))
 
-    def _draw_hover_panel(self, painter: QPainter, rect: QRect) -> None:
+    def _draw_action_button(
+        self,
+        painter: QPainter,
+        rect: QRect,
+        *,
+        text: str = "",
+        icon=None,
+        icon_size: QSize | None = None,
+        hovered: bool = False,
+        enabled: bool = True,
+        selected: bool = False,
+    ) -> None:
         painter.save()
         painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
-        painter.setBrush(QColor(STYLE_TOKENS.get("color-bg-elevated", "#111827")))
-        painter.setPen(QPen(QColor(STYLE_TOKENS.get("color-accent", "#38bdf8")), 1))
-        painter.drawRoundedRect(rect.adjusted(0, 0, -1, -1), 6, 6)
+
+        text_key = "color-text" if enabled else "color-disabled-text"
+        bg_color = QColor(STYLE_TOKENS.get("color-bg-elevated" if hovered else "color-bg-control", "#172033"))
+        border_color = QColor(STYLE_TOKENS.get("color-accent" if hovered else "color-border", "#334155"))
+        has_fill = True
+        if selected:
+            bg_color = QColor(STYLE_TOKENS.get("color-accent", "#38bdf8"))
+            bg_color.setAlpha(110 if hovered else 80)
+            border_color = QColor(STYLE_TOKENS.get("color-accent", "#38bdf8"))
+            border_color.setAlpha(210 if hovered else 130)
+            has_fill = hovered
+        if not enabled:
+            bg_color = QColor(STYLE_TOKENS.get("color-bg-pressed", "#262626"))
+            border_color = QColor(STYLE_TOKENS.get("color-disabled-border", "#4b5563"))
+            if selected:
+                bg_color = QColor(STYLE_TOKENS.get("color-accent", "#38bdf8"))
+                bg_color.setAlpha(24)
+                border_color.setAlpha(80)
+                has_fill = True
+
+        painter.setBrush(bg_color if has_fill else Qt.BrushStyle.NoBrush)
+        painter.setPen(QPen(border_color, 1))
+        painter.drawRoundedRect(rect.adjusted(0, 0, -1, -1), 5, 5)
+
+        if icon is not None:
+            size = icon_size or QSize(14, 14)
+            icon_rect = QRect(0, 0, size.width(), size.height())
+            icon_rect.moveCenter(rect.center())
+            icon.paint(painter, icon_rect, Qt.AlignmentFlag.AlignCenter)
+        elif text:
+            painter.setPen(QColor(STYLE_TOKENS.get(text_key, "#e5e7eb")))
+            painter.drawText(rect, Qt.AlignmentFlag.AlignCenter, text)
         painter.restore()
 
     def editorEvent(self, event, model, option, index) -> bool:
