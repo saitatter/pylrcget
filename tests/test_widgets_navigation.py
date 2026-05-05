@@ -488,7 +488,7 @@ class LyricsPasteBehaviorTests(unittest.TestCase):
         option.rect = QRect(0, 0, 150, 44)
         option.state = QStyle.StateFlag.State_Enabled | QStyle.StateFlag.State_Selected
         index = model.index(0, 3)
-        _refresh_rect, download_rect = delegate._button_rects(option.rect)
+        refresh_rect, download_rect = delegate._button_rects(option.rect)
         image = QImage(option.rect.size(), QImage.Format.Format_ARGB32)
         image.fill(QColor("#554872"))
         painter = QPainter(image)
@@ -500,7 +500,23 @@ class LyricsPasteBehaviorTests(unittest.TestCase):
 
         button_sample = image.pixelColor(download_rect.left() + 8, download_rect.center().y())
         row_sample = image.pixelColor(8, download_rect.center().y())
+        self.assertNotEqual(row_sample.name(), "#000000")
         self.assertLess(abs(button_sample.value() - row_sample.value()), 8)
+
+        image.fill(QColor("#554872"))
+        delegate._hover_row = 0
+        delegate._hover_button = "download"
+        painter = QPainter(image)
+        try:
+            delegate.paint(painter, option, index)
+        finally:
+            painter.end()
+
+        hover_button_sample = image.pixelColor(download_rect.left() + 8, download_rect.center().y())
+        hover_row_sample = image.pixelColor(8, download_rect.center().y())
+        hover_cell_background = image.pixelColor(refresh_rect.left() - 4, download_rect.center().y())
+        self.assertGreater(hover_button_sample.value(), hover_row_sample.value())
+        self.assertLess(abs(hover_cell_background.value() - hover_row_sample.value()), 8)
 
     def test_scan_progress_updates_overlay(self):
         window = MainWindow.__new__(MainWindow)

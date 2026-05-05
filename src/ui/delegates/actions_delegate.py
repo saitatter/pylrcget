@@ -10,6 +10,19 @@ from ui.icon_loader import load_svg_icon
 from ui.theme_tokens import STYLE_TOKENS
 
 
+def _theme_color(key: str, fallback: str) -> QColor:
+    value = STYLE_TOKENS.get(key, fallback)
+    if value.startswith("rgba(") and value.endswith(")"):
+        parts = [part.strip() for part in value[5:-1].split(",")]
+        if len(parts) == 4:
+            color = QColor(int(parts[0]), int(parts[1]), int(parts[2]))
+            alpha = float(parts[3])
+            color.setAlphaF(alpha if alpha <= 1 else alpha / 255)
+            return color
+    color = QColor(value)
+    return color if color.isValid() else QColor(fallback)
+
+
 class ActionsDelegate(QStyledItemDelegate):
     downloadClicked = Signal(int)  # track_id
     refreshClicked = Signal(int)  # track_id
@@ -106,12 +119,12 @@ class ActionsDelegate(QStyledItemDelegate):
 
     def _draw_cell_background(self, painter: QPainter, option, index) -> None:
         if option.state & QStyle.State_Selected:
-            color = STYLE_TOKENS.get("color-selection-bg", "#0b2942")
+            return
         elif index.row() % 2 == 1:
-            color = STYLE_TOKENS.get("color-table-alt", "#111827")
+            color = _theme_color("color-table-alt", "#111827")
         else:
-            color = STYLE_TOKENS.get("color-table-bg", "#0f172a")
-        painter.fillRect(option.rect, QColor(color))
+            color = _theme_color("color-table-bg", "#0f172a")
+        painter.fillRect(option.rect, color)
 
     def _draw_action_button(
         self,
@@ -129,20 +142,20 @@ class ActionsDelegate(QStyledItemDelegate):
         painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
 
         text_key = "color-text" if enabled else "color-disabled-text"
-        bg_color = QColor(STYLE_TOKENS.get("color-bg-elevated" if hovered else "color-bg-control", "#172033"))
-        border_color = QColor(STYLE_TOKENS.get("color-accent" if hovered else "color-border", "#334155"))
+        bg_color = _theme_color("color-bg-elevated" if hovered else "color-bg-control", "#172033")
+        border_color = _theme_color("color-accent" if hovered else "color-border", "#334155")
         has_fill = True
         if selected:
-            bg_color = QColor(STYLE_TOKENS.get("color-accent", "#38bdf8"))
+            bg_color = _theme_color("color-accent", "#38bdf8")
             bg_color.setAlpha(110 if hovered else 80)
-            border_color = QColor(STYLE_TOKENS.get("color-accent", "#38bdf8"))
+            border_color = _theme_color("color-accent", "#38bdf8")
             border_color.setAlpha(210 if hovered else 130)
             has_fill = hovered
         if not enabled:
-            bg_color = QColor(STYLE_TOKENS.get("color-bg-pressed", "#262626"))
-            border_color = QColor(STYLE_TOKENS.get("color-disabled-border", "#4b5563"))
+            bg_color = _theme_color("color-bg-pressed", "#262626")
+            border_color = _theme_color("color-disabled-border", "#4b5563")
             if selected:
-                bg_color = QColor(STYLE_TOKENS.get("color-accent", "#38bdf8"))
+                bg_color = _theme_color("color-accent", "#38bdf8")
                 bg_color.setAlpha(24)
                 border_color.setAlpha(80)
                 has_fill = True
@@ -157,7 +170,7 @@ class ActionsDelegate(QStyledItemDelegate):
             icon_rect.moveCenter(rect.center())
             icon.paint(painter, icon_rect, Qt.AlignmentFlag.AlignCenter)
         elif text:
-            painter.setPen(QColor(STYLE_TOKENS.get(text_key, "#e5e7eb")))
+            painter.setPen(_theme_color(text_key, "#e5e7eb"))
             painter.drawText(rect, Qt.AlignmentFlag.AlignCenter, text)
         painter.restore()
 
