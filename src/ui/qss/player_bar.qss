@@ -60,7 +60,7 @@ QToolButton:pressed {
 QToolButton#BtnPlay {
     background: {{color-bg-elevated}};
     border: 1px solid {{color-border}};
-    border-radius: {{radius-pill}};
+    border-radius: 22px;
     padding: 0;
     min-width: 44px;
     min-height: 44px;
@@ -81,12 +81,26 @@ QToolButton#BtnPlay:pressed {
 
 QToolButton#BtnPrev,
 QToolButton#BtnNext {
+    background: transparent;
+    border: 1px solid transparent;
     padding: 0;
     min-width: 28px;
     min-height: 28px;
     max-width: 28px;
     max-height: 28px;
-    border-radius: {{radius-pill}};
+    border-radius: 14px;
+}
+
+QToolButton#BtnPrev:hover,
+QToolButton#BtnNext:hover {
+    background: {{color-bg-control}};
+    border-color: {{color-accent}};
+    color: {{color-accent}};
+}
+
+QToolButton#BtnPrev:pressed,
+QToolButton#BtnNext:pressed {
+    background: {{color-bg-pressed}};
 }
 
 QLabel {
@@ -95,6 +109,16 @@ QLabel {
     background: transparent;
     border: none;
     padding: 0;
+}
+
+QLabel#HotkeyHintBadge {
+    background: {{color-accent}};
+    color: {{color-bg-app}};
+    border: 1px solid {{color-accent-alt}};
+    border-radius: {{radius-pill}};
+    padding: 1px 6px;
+    font-size: {{font-size-xs}};
+    font-weight: 800;
 }
 
 QLabel#NowPlaying {

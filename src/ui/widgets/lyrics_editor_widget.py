@@ -225,11 +225,11 @@ class LyricsEditorWidget(QWidget):
         toolbar = FlowLayout(spacing=SPACE_2)
 
         self.btn_snap = QPushButton("Snap")
-        self.btn_snap.setToolTip("Set the selected line's timestamp to the current playback position")
+        self.btn_snap.setToolTip("Set the selected line's timestamp to the current playback position (Ctrl+Enter)")
         self.btn_shift_minus = QPushButton("-0.1s")
-        self.btn_shift_minus.setToolTip("Shift selected lines 100ms earlier")
+        self.btn_shift_minus.setToolTip("Shift selected lines 100ms earlier (Left)")
         self.btn_shift_plus = QPushButton("+0.1s")
-        self.btn_shift_plus.setToolTip("Shift selected lines 100ms later")
+        self.btn_shift_plus.setToolTip("Shift selected lines 100ms later (Right)")
         self.shift_spin = QDoubleSpinBox()
         self.shift_spin.setRange(-30.0, 30.0)
         self.shift_spin.setDecimals(2)
@@ -241,13 +241,13 @@ class LyricsEditorWidget(QWidget):
         self.shift_spin.setButtonSymbols(QDoubleSpinBox.ButtonSymbols.NoButtons)
         self.shift_spin.setMinimumWidth(SHIFT_SPIN_MIN_WIDTH)
         self.btn_shift_selected = QPushButton("Shift Selected")
-        self.btn_shift_selected.setToolTip("Shift selected lines by the custom amount")
+        self.btn_shift_selected.setToolTip("Shift selected lines by the custom amount (Shift+Enter)")
         self.btn_shift_all_from_first = QPushButton("Shift All from First")
-        self.btn_shift_all_from_first.setToolTip("Align all lines so the first line matches the current playback position")
+        self.btn_shift_all_from_first.setToolTip("Align all lines so the first line matches the current playback position (Ctrl+Shift+Enter)")
         self.btn_add = QPushButton("+ Line")
-        self.btn_add.setToolTip("Insert a new line after the current selection")
+        self.btn_add.setToolTip("Insert a new line after the current selection (Insert)")
         self.btn_del = QPushButton("Delete")
-        self.btn_del.setToolTip("Delete the selected line")
+        self.btn_del.setToolTip("Delete the selected line (Delete)")
         self.btn_save = QPushButton("Save")
         self.btn_save.setToolTip("Save lyrics to the library (Ctrl+S)")
         self.btn_export_files = QPushButton("Export Files")
@@ -359,6 +359,16 @@ class LyricsEditorWidget(QWidget):
         self._shortcut_undo.activated.connect(self._undo)
         self._shortcut_redo = QShortcut(QKeySequence.StandardKey.Redo, self)
         self._shortcut_redo.activated.connect(self._redo)
+        self._shortcut_snap = self._make_shortcut("Ctrl+Return", self._snap_selected_line_to_current_time)
+        self._shortcut_snap_enter = self._make_shortcut("Ctrl+Enter", self._snap_selected_line_to_current_time)
+        self._shortcut_shift_minus = self._make_shortcut("Left", lambda: self._shift_selected_lines(-100))
+        self._shortcut_shift_plus = self._make_shortcut("Right", lambda: self._shift_selected_lines(100))
+        self._shortcut_shift_selected = self._make_shortcut("Shift+Return", self._shift_selected_lines_by_custom_amount)
+        self._shortcut_shift_selected_enter = self._make_shortcut("Shift+Enter", self._shift_selected_lines_by_custom_amount)
+        self._shortcut_shift_all = self._make_shortcut("Ctrl+Shift+Return", self._shift_all_lines_from_first_delta)
+        self._shortcut_shift_all_enter = self._make_shortcut("Ctrl+Shift+Enter", self._shift_all_lines_from_first_delta)
+        self._shortcut_add_line = self._make_shortcut("Insert", self._add_line_after_selection)
+        self._shortcut_delete_line = self._make_shortcut("Delete", self._delete_selected_line)
 
         self._default_button_text = {
             self.btn_save: "Save",
@@ -369,6 +379,12 @@ class LyricsEditorWidget(QWidget):
 
         self._apply_styles()
         self.show_none("Choose a track to review or edit its lyrics.")
+
+    def _make_shortcut(self, key: str, callback) -> QShortcut:
+        shortcut = QShortcut(QKeySequence(key), self.table)
+        shortcut.setContext(Qt.ShortcutContext.WidgetWithChildrenShortcut)
+        shortcut.activated.connect(callback)
+        return shortcut
 
     # --- public API ---
     def on_player_position(self, ms: int):

@@ -1,8 +1,11 @@
 # ui/library_scanner.py (or wherever LibraryScanner is defined)
 import dataclasses
 import logging
+import os
 import sqlite3
 import time
+from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
+from dataclasses import dataclass
 from PySide6.QtCore import QThread, Signal
 
 from core.utils import prepare_input
@@ -21,12 +24,56 @@ from db.database import (
 )
 
 
+logger = logging.getLogger(__name__)
+LIBRARY_SCAN_MAX_WORKERS = 4
+LIBRARY_SCAN_MAX_PENDING_MULTIPLIER = 4
+
+
+@dataclass(frozen=True)
+class _ScanTaskResult:
+    path: str
+    replace_existing: bool
+    track: object | None
+
+
 def _read_metadata_for_scan(path: str):
     try:
         return read_audio_metadata(path)
     except Exception as exc:
         logger.warning("Skipping unreadable audio file during scan: %s (%s)", path, exc)
         return None
+
+
+def _scan_worker_count() -> int:
+    cpu_count = os.cpu_count() or LIBRARY_SCAN_MAX_WORKERS
+    return max(1, min(LIBRARY_SCAN_MAX_WORKERS, cpu_count))
+
+
+def _scan_track_for_path(
+    path: str,
+    *,
+    replace_existing: bool,
+    lyrics_lookup_subdir: str,
+    lyrics_file_pattern: str,
+) -> _ScanTaskResult:
+    metadata_result = _read_metadata_for_scan(path)
+    if metadata_result is None:
+        return _ScanTaskResult(path=path, replace_existing=replace_existing, track=None)
+    _audio, metadata = metadata_result
+    signature = get_audio_file_signature(
+        path,
+        lyrics_lookup_subdir,
+        metadata=metadata,
+        lyrics_file_pattern=lyrics_file_pattern,
+    )
+    track = new_fs_track_from_path(
+        path,
+        signature=signature,
+        lyrics_lookup_subdir=lyrics_lookup_subdir,
+        lyrics_file_pattern=lyrics_file_pattern,
+        metadata=metadata,
+    )
+    return _ScanTaskResult(path=path, replace_existing=replace_existing, track=track)
 
 
 class LibraryScanner(QThread):
@@ -82,88 +129,129 @@ class LibraryScanner(QThread):
 
             batch = []
             pending_replacements: list[str] = []
-            for p in paths:
-                if self.isInterruptionRequested():
-                    if db is not None:
-                        db.rollback()
-                    self.finished_signal.emit(False, "Library scan cancelled.")
+            max_workers = _scan_worker_count()
+            max_pending = max_workers * LIBRARY_SCAN_MAX_PENDING_MULTIPLIER
+            futures: dict[Future[_ScanTaskResult], None] = {}
+            executor = ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="library-scan")
+            executor_shutdown_wait = True
+
+            def cancel_scan() -> None:
+                nonlocal executor_shutdown_wait
+                executor_shutdown_wait = False
+                executor.shutdown(wait=False, cancel_futures=True)
+                if db is not None:
+                    db.rollback()
+                self.finished_signal.emit(False, "Library scan cancelled.")
+
+            def flush_batch(current_path: str) -> None:
+                if not batch and not pending_replacements:
+                    return
+                with db:
+                    delete_tracks_by_paths(db, pending_replacements, commit=False)
+                    add_tracks(db, batch, commit=False)
+                batch.clear()
+                pending_replacements.clear()
+                self.progress_signal.emit(scanned, total, current_path, time.perf_counter() - started_at)
+
+            def handle_scan_result(result: _ScanTaskResult) -> None:
+                nonlocal reattached, updated
+                if result.replace_existing:
+                    pending_replacements.append(result.path)
+                t = result.track
+                if t is None:
                     return
 
-                scanned += 1
-                existing = existing_index.get(p)
-                metadata = existing[1] if existing is not None else None
-                if metadata is None:
-                    metadata_result = _read_metadata_for_scan(p)
-                    if metadata_result is None:
-                        continue
-                    _audio, metadata = metadata_result
-                signature = get_audio_file_signature(
-                    p,
-                    self.lyrics_lookup_subdir,
-                    metadata=metadata,
-                    lyrics_file_pattern=self.lyrics_file_pattern,
-                )
-                if existing is not None and existing[0] == signature:
-                    unchanged += 1
-                    if scanned % 200 == 0:
-                        self.progress_signal.emit(scanned, total, p, time.perf_counter() - started_at)
-                    continue
-
-                if existing is not None:
-                    metadata_result = _read_metadata_for_scan(p)
-                    if metadata_result is None:
-                        continue
-                    _audio, metadata = metadata_result
-                    signature = get_audio_file_signature(
-                        p,
-                        self.lyrics_lookup_subdir,
-                        metadata=metadata,
-                        lyrics_file_pattern=self.lyrics_file_pattern,
+                if orphan_index and not t.txt_lyrics and not t.lrc_lyrics:
+                    key = (
+                        prepare_input(t.title),
+                        prepare_input(t.artist),
+                        round(t.duration),
                     )
-
-                if existing is not None:
-                    pending_replacements.append(p)
-
-                t = new_fs_track_from_path(
-                    p,
-                    signature=signature,
-                    lyrics_lookup_subdir=self.lyrics_lookup_subdir,
-                    lyrics_file_pattern=self.lyrics_file_pattern,
-                    metadata=metadata,
-                )
-
-                if t is not None:
-                    # Try to reattach orphan lyrics if the new track has none
-                    if orphan_index and not t.txt_lyrics and not t.lrc_lyrics:
-                        key = (
-                            prepare_input(t.title),
-                            prepare_input(t.artist),
-                            round(t.duration),
+                    orphan = orphan_index.pop(key, None)
+                    if orphan is not None:
+                        t = dataclasses.replace(
+                            t,
+                            txt_lyrics=orphan[0],
+                            lrc_lyrics=orphan[1],
+                            instrumental=orphan[2],
                         )
-                        orphan = orphan_index.pop(key, None)
-                        if orphan is not None:
-                            t = dataclasses.replace(
-                                t,
-                                txt_lyrics=orphan[0],
-                                lrc_lyrics=orphan[1],
-                                instrumental=orphan[2],
-                            )
-                            reattached += 1
-                            logger.info("Reattached orphan lyrics to: %s", p)
+                        reattached += 1
+                        logger.info("Reattached orphan lyrics to: %s", result.path)
 
-                    batch.append(t)
-                    updated += 1
+                batch.append(t)
+                updated += 1
 
-                if len(batch) >= 100:
-                    with db:
-                        delete_tracks_by_paths(db, pending_replacements, commit=False)
-                        add_tracks(db, batch, commit=False)
-                    batch.clear()
-                    pending_replacements.clear()
-                    self.progress_signal.emit(scanned, total, p, time.perf_counter() - started_at)
+            def drain_completed(*, block: bool) -> None:
+                nonlocal scanned
+                if not futures:
+                    return
+                done, _pending = wait(
+                    futures,
+                    timeout=None if block else 0,
+                    return_when=FIRST_COMPLETED,
+                )
+                for future in done:
+                    futures.pop(future, None)
+                    scanned += 1
+                    try:
+                        result = future.result()
+                    except Exception as exc:
+                        logger.warning("Skipping audio file during scan worker failure: %s", exc)
+                        if scanned % 200 == 0:
+                            self.progress_signal.emit(scanned, total, "", time.perf_counter() - started_at)
+                        continue
+                    handle_scan_result(result)
+                    if len(batch) >= 100:
+                        flush_batch(result.path)
+                    elif scanned % 200 == 0:
+                        self.progress_signal.emit(scanned, total, result.path, time.perf_counter() - started_at)
 
-                if scanned % 200 == 0:
-                    self.progress_signal.emit(scanned, total, p, time.perf_counter() - started_at)
+            try:
+                for p in paths:
+                    if self.isInterruptionRequested():
+                        cancel_scan()
+                        return
+
+                    while len(futures) >= max_pending:
+                        if self.isInterruptionRequested():
+                            cancel_scan()
+                            return
+                        drain_completed(block=True)
+
+                    existing = existing_index.get(p)
+                    if existing is not None:
+                        signature = get_audio_file_signature(
+                            p,
+                            self.lyrics_lookup_subdir,
+                            metadata=existing[1],
+                            lyrics_file_pattern=self.lyrics_file_pattern,
+                        )
+                        if existing[0] == signature:
+                            scanned += 1
+                            unchanged += 1
+                            if scanned % 200 == 0:
+                                self.progress_signal.emit(scanned, total, p, time.perf_counter() - started_at)
+                            drain_completed(block=False)
+                            continue
+
+                    futures[
+                        executor.submit(
+                            _scan_track_for_path,
+                            p,
+                            replace_existing=existing is not None,
+                            lyrics_lookup_subdir=self.lyrics_lookup_subdir,
+                            lyrics_file_pattern=self.lyrics_file_pattern,
+                        )
+                    ] = None
+                    drain_completed(block=False)
+
+                while futures:
+                    if self.isInterruptionRequested():
+                        cancel_scan()
+                        return
+                    drain_completed(block=True)
+            finally:
+                executor.shutdown(wait=executor_shutdown_wait, cancel_futures=not executor_shutdown_wait)
 
             if batch or pending_replacements:
                 with db:

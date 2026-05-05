@@ -6,12 +6,13 @@ from types import SimpleNamespace
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
-from PySide6.QtWidgets import QHeaderView
+from PySide6.QtWidgets import QHeaderView, QPushButton, QWidget
 
 from ui.library_routes import albums_detail, artists_detail, tracks_album, tracks_artist
 from ui.controllers.top_bar_controller import TopBarController
+from ui.widgets.hotkey_hints import HotkeyHintManager
 from ui.widgets.lrclib_browser_widget import _BrowserPublishDialog
-from ui.widgets.lyrics_editor_widget import LyricsEditorWidget
+from ui.widgets.lyrics_editor_widget import LyricsEditorWidget, TIMESTAMP_MS_ROLE
 from tests.test_support import (
     HAS_QT,
     AlbumListWidget,
@@ -225,6 +226,27 @@ class LyricsPasteBehaviorTests(unittest.TestCase):
         finally:
             widget.deleteLater()
 
+    def test_lyrics_quick_actions_have_shortcuts(self):
+        widget = LyricsEditorWidget()
+        try:
+            widget._set_synced([(1200, "First line"), (3000, "Second line")])
+            widget.table.selectRow(0)
+
+            self.assertIn("(Left)", widget.btn_shift_minus.toolTip())
+            self.assertIn("(Right)", widget.btn_shift_plus.toolTip())
+            self.assertEqual(widget._shortcut_shift_minus.key().toString(), "Left")
+            self.assertEqual(widget._shortcut_shift_plus.key().toString(), "Right")
+            self.assertEqual(widget._shortcut_snap.key().toString(), "Ctrl+Return")
+            self.assertEqual(widget._shortcut_add_line.key().toString(), "Ins")
+            self.assertEqual(widget._shortcut_delete_line.key().toString(), "Del")
+            self.assertIs(widget._shortcut_shift_plus.parent(), widget.table)
+
+            widget._shortcut_shift_plus.activated.emit()
+            self.assertEqual(widget.table.item(0, 0).text(), "00:01.30")
+            self.assertEqual(widget.table.item(0, 0).data(TIMESTAMP_MS_ROLE), 1300)
+        finally:
+            widget.deleteLater()
+
     def test_browser_publish_lyrics_fields_reject_rich_text_paste(self):
         dialog = _BrowserPublishDialog("https://lrclib.net")
         try:
@@ -269,6 +291,38 @@ class LyricsPasteBehaviorTests(unittest.TestCase):
             self.assertEqual(widget.btn_download_missing.statusTip(), "")
         finally:
             widget.deleteLater()
+
+    def test_player_hotkey_badges_use_shared_badge_style(self):
+        stylesheet = Path("src/ui/qss/player_bar.qss").read_text(encoding="utf-8")
+        self.assertIn("QLabel#HotkeyHintBadge", stylesheet)
+        self.assertIn("background: {{color-accent}};", stylesheet)
+        self.assertIn("border-radius: {{radius-pill}};", stylesheet)
+        self.assertIn("border-radius: 22px;", stylesheet)
+        self.assertIn("border-radius: 14px;", stylesheet)
+        self.assertIn("QToolButton#BtnPrev:hover", stylesheet)
+        self.assertIn("QToolButton#BtnNext:hover", stylesheet)
+
+    def test_hotkey_badge_uses_window_parent_for_small_buttons(self):
+        parent = QWidget()
+        button = QPushButton(parent)
+        button.setGeometry(10, 10, 28, 28)
+        manager = HotkeyHintManager(parent)
+        try:
+            parent.resize(120, 80)
+            parent.show()
+            self.app.processEvents()
+            manager.register(button, "Ctrl+Left")
+            manager.set_visible(True)
+
+            badge = manager._hints[0].badge
+            self.assertIs(badge.parentWidget(), parent)
+            self.assertEqual(badge.text(), "C<")
+            self.assertLessEqual(badge.width(), button.width())
+            self.assertGreaterEqual(badge.x(), button.x())
+            self.assertLessEqual(badge.x() + badge.width(), button.x() + button.width())
+            self.assertTrue(badge.isVisible())
+        finally:
+            parent.deleteLater()
 
     def test_open_track_folder_opens_parent_directory(self):
         app_state = simple_app_state()
