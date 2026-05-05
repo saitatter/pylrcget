@@ -340,7 +340,7 @@ class PlayerBar(QWidget):
             self.cmb_speed.addItem(label, speed)
         self.cmb_speed.setCurrentIndex(0)
         self.cmb_speed.lineEdit().setPlaceholderText("custom")
-        self.cmb_speed.lineEdit().setTextMargins(42, 0, 0, 0)
+        self.cmb_speed.lineEdit().setTextMargins(0, 0, 0, 0)
         self.cmb_speed.lineEdit().installEventFilter(self)
         self.cmb_speed.installEventFilter(self)
         self.lbl_speed_prefix = QLabel("Speed", self.cmb_speed)
@@ -537,8 +537,16 @@ class PlayerBar(QWidget):
 
     def _position_speed_prefix(self) -> None:
         hint = self.lbl_speed_prefix.sizeHint()
+        prefix_width = 44
+        value_slot_width = 50
+        gap = 4
+        group_width = prefix_width + gap + value_slot_width
+        right_offset = 4
+        max_x = max(0, self.cmb_speed.width() - group_width)
+        x = min(max_x, max(0, round((self.cmb_speed.width() - group_width) / 2) + right_offset))
         y = max(0, (self.cmb_speed.height() - hint.height()) // 2)
-        self.lbl_speed_prefix.setGeometry(10, y, hint.width(), hint.height())
+        self.lbl_speed_prefix.setGeometry(x, y, prefix_width, hint.height())
+        self.cmb_speed.lineEdit().setTextMargins(x + prefix_width + gap, 0, 0, 0)
         self.lbl_speed_prefix.raise_()
 
     def _normalize_speed(self, speed: float) -> float:
@@ -652,12 +660,14 @@ class PlayerBar(QWidget):
                 self.cmb_speed.setCurrentIndex(idx)
                 self.cmb_speed.lineEdit().setText(self.cmb_speed.itemText(idx))
                 self.cmb_speed.blockSignals(False)
+                self._position_speed_prefix()
                 return
 
         self.cmb_speed.blockSignals(True)
         self.cmb_speed.setCurrentIndex(-1)
         self.cmb_speed.lineEdit().setText(self._format_speed_label(speed))
         self.cmb_speed.blockSignals(False)
+        self._position_speed_prefix()
 
     def eventFilter(self, watched, event):
         if watched is self.cmb_speed.lineEdit() and event.type() == QEvent.Type.KeyPress:

@@ -18,6 +18,7 @@ from ui.widgets.hotkey_hints import HotkeyHintManager
 from ui.widgets.lrclib_browser_widget import _BrowserPublishDialog
 from ui.widgets.lyrics_editor_widget import LyricsEditorWidget, TIMESTAMP_MS_ROLE
 from ui.main_window import MainWindow
+from ui.player_bar import PlayerBar
 from tests.test_support import (
     HAS_QT,
     AlbumListWidget,
@@ -367,6 +368,32 @@ class LyricsPasteBehaviorTests(unittest.TestCase):
             self.assertTrue(badge.isVisible())
         finally:
             parent.deleteLater()
+
+    def test_player_speed_label_and_value_fit_centered(self):
+        widget = PlayerBar(player=None)
+        try:
+            widget.cmb_speed.resize(100, 28)
+            widget._set_speed_combo_value(1.0)
+            prefix = widget.lbl_speed_prefix.geometry()
+            margins = widget.cmb_speed.lineEdit().textMargins()
+            value_width = widget.cmb_speed.lineEdit().fontMetrics().horizontalAdvance(widget.cmb_speed.lineEdit().text())
+            group_left = prefix.left()
+            group_width = 44 + 4 + 50
+            group_right = group_left + group_width
+
+            self.assertGreaterEqual(group_left, 0)
+            self.assertLessEqual(group_right, widget.cmb_speed.width())
+            self.assertGreaterEqual(group_left - (widget.cmb_speed.width() - group_right), 0)
+            self.assertLessEqual(group_left - (widget.cmb_speed.width() - group_right), 10)
+            self.assertLessEqual(margins.left() + value_width, group_right)
+
+            left_for_one_decimal = widget.lbl_speed_prefix.x()
+            margin_for_one_decimal = margins.left()
+            widget._set_speed_combo_value(1.05)
+            self.assertEqual(widget.lbl_speed_prefix.x(), left_for_one_decimal)
+            self.assertEqual(widget.cmb_speed.lineEdit().textMargins().left(), margin_for_one_decimal)
+        finally:
+            widget.deleteLater()
 
     def test_track_action_buttons_track_individual_hover(self):
         table = QTableView()
