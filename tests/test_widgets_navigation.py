@@ -395,6 +395,20 @@ class LyricsPasteBehaviorTests(unittest.TestCase):
         finally:
             widget.deleteLater()
 
+    def test_player_volume_slider_aligns_with_speed_combo(self):
+        widget = PlayerBar(player=None)
+        try:
+            widget.show()
+            self.app.processEvents()
+
+            self.assertEqual(widget.slider_volume.width(), widget.cmb_speed.width())
+            self.assertEqual(widget.slider_volume.x(), widget.cmb_speed.x())
+            self.assertEqual(widget.lbl_volume.x(), widget.btn_speed_down.x())
+            self.assertEqual(widget.lbl_volume_value.x(), widget.btn_speed_up.x())
+            self.assertEqual(widget.lbl_volume_value.width(), widget.btn_speed_up.width())
+        finally:
+            widget.deleteLater()
+
     def test_track_action_buttons_track_individual_hover(self):
         table = QTableView()
         model = QStandardItemModel(1, 4)
