@@ -17,6 +17,7 @@ from ui.controllers.top_bar_controller import TopBarController
 from ui.widgets.hotkey_hints import HotkeyHintManager
 from ui.widgets.lrclib_browser_widget import _BrowserPublishDialog
 from ui.widgets.lyrics_editor_widget import LyricsEditorWidget, TIMESTAMP_MS_ROLE
+from ui.main_window import MainWindow
 from tests.test_support import (
     HAS_QT,
     AlbumListWidget,
@@ -419,6 +420,25 @@ class LyricsPasteBehaviorTests(unittest.TestCase):
             self.assertEqual(delegate._hover_button, "download")
         finally:
             table.deleteLater()
+
+    def test_scan_progress_updates_overlay(self):
+        window = MainWindow.__new__(MainWindow)
+        overlay_calls: list[tuple[int, int, str, str]] = []
+        window.scan_overlay = SimpleNamespace(
+            update_progress=lambda current, total, label, status: overlay_calls.append((current, total, label, status))
+        )
+        window.progress_bar = SimpleNamespace(
+            maximum=lambda: 100,
+            setRange=lambda *_args: None,
+            setValue=lambda *_args: None,
+        )
+        window.scan_label = SimpleNamespace(setText=lambda *_args: None)
+        window.scan_details = SimpleNamespace(setText=lambda *_args: None)
+
+        MainWindow._update_scan_progress(window, 3, 10, "C:/Music/Song.mp3", 1.25)
+
+        self.assertEqual(overlay_calls[-1][0:3], (3, 10, "Song.mp3"))
+        self.assertIn("30%", overlay_calls[-1][3])
 
     def test_open_track_folder_opens_parent_directory(self):
         app_state = simple_app_state()

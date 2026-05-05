@@ -333,6 +333,8 @@ class MainWindow(QMainWindow):
         self.download_overlay.cancelRequested.connect(self.downloads.cancel)
         self.publish_overlay = DownloadProgressOverlay(self.central_widget, verb="Publish")
         self.publish_overlay.sync_to_parent()
+        self.scan_overlay = DownloadProgressOverlay(self.central_widget, verb="Scan")
+        self.scan_overlay.sync_to_parent()
         self.publish_history = PublishHistoryController(
             self.app_state,
             normalize_lrclib_base=self._normalize_lrclib_base,
@@ -344,14 +346,18 @@ class MainWindow(QMainWindow):
             parent=self,
         )
         self.publish_overlay.cancelRequested.connect(self._cancel_bulk_publish)
+        self.scan_overlay.cancelRequested.connect(self._cancel_scan)
 
         # Background activity button — shows when an overlay is minimized
         self.download_overlay.activeChanged.connect(self._update_bg_activity_button)
         self.publish_overlay.activeChanged.connect(self._update_bg_activity_button)
+        self.scan_overlay.activeChanged.connect(self._update_bg_activity_button)
         self.download_overlay.minimized.connect(self._update_bg_activity_button)
         self.publish_overlay.minimized.connect(self._update_bg_activity_button)
+        self.scan_overlay.minimized.connect(self._update_bg_activity_button)
         self.download_overlay.dismissed.connect(self._update_bg_activity_button)
         self.publish_overlay.dismissed.connect(self._update_bg_activity_button)
+        self.scan_overlay.dismissed.connect(self._update_bg_activity_button)
         self.top_bar.btn_bg_activity.clicked.connect(self._reopen_bg_overlay)
 
         self.lyrics_view.publishSyncedRequested.connect(self.publish_history.publish_synced)
@@ -603,6 +609,8 @@ class MainWindow(QMainWindow):
             self.download_overlay.sync_to_parent()
         if hasattr(self, "publish_overlay"):
             self.publish_overlay.sync_to_parent()
+        if hasattr(self, "scan_overlay"):
+            self.scan_overlay.sync_to_parent()
 
     def dragEnterEvent(self, event):
         if event.mimeData().hasUrls():
@@ -937,12 +945,11 @@ class MainWindow(QMainWindow):
 
         logger.info("Starting library scan across %d folder(s).", len(directories))
 
-        self.scan_row.setVisible(True)
-        self.progress_bar.setValue(0)
+        self.scan_row.setVisible(False)
         self.top_bar.set_actions_label("Scanning Library")
         self.top_bar.set_button_feedback(self.top_bar.btn_refresh, "loading")
-        self.scan_label.setText("Scanning…")
-        self.scan_details.setText(f"Preparing a scan across {len(directories)} folder(s)…")
+        self.scan_overlay.start_batch(f"{len(directories)} folder(s)", 0)
+        self.scan_overlay.update_progress(0, 0, "Library scan", "Counting tracks in selected folders...")
         self.btn_cancel_scan.setEnabled(True)
 
         config = get_config(self.app_state.db)
@@ -971,6 +978,7 @@ class MainWindow(QMainWindow):
             self.progress_bar.setRange(0, 0)
             self.scan_label.setText("Scanning…")
             self.scan_details.setText("Counting tracks in selected folders…")
+            self.scan_overlay.update_progress(0, 0, "Library scan", "Counting tracks in selected folders...")
             return
 
         # determinate
@@ -984,6 +992,12 @@ class MainWindow(QMainWindow):
         self.scan_label.setText(f"Scanning… {scanned}/{total} ({percent}%)")
         self.scan_details.setText(
             f"Current file: {current_name or 'Preparing next file…'}  •  Elapsed: {elapsed_s:.1f}s"
+        )
+        self.scan_overlay.update_progress(
+            scanned,
+            total,
+            current_name or "Library scan",
+            f"{scanned}/{total} ({percent}%)  •  Elapsed: {elapsed_s:.1f}s",
         )
 
     def _on_notify(self, n):
@@ -1022,9 +1036,12 @@ class MainWindow(QMainWindow):
         self.progress_bar.setValue(0)
         self.scan_row.setVisible(False)
         self.btn_cancel_scan.setEnabled(False)
+        self.scan_overlay.finish_batch(msg or ("Library scan finished." if ok else "Library scan failed."), cancelled=not ok and "cancel" in (msg or "").lower())
+        self.scan_overlay.queue_auto_close(5000)
 
         if ok:
             self._apply_track_filters()
+            self.scan_overlay.append_result("Library scan", msg or "Library scan finished successfully.", True)
             notify_user(
                 self.app_state,
                 msg or "Library scan finished successfully.",
@@ -1036,6 +1053,7 @@ class MainWindow(QMainWindow):
             logger.info("Library scan finished successfully: %s", msg or "ok")
         else:
             if "cancel" in (msg or "").lower():
+                self.scan_overlay.append_result("Library scan", msg or "Library scan cancelled.", False)
                 notify_user(
                     self.app_state,
                     msg,
@@ -1046,6 +1064,7 @@ class MainWindow(QMainWindow):
                 self.top_bar.set_button_feedback(self.top_bar.btn_refresh, "idle")
                 logger.warning("Library scan cancelled: %s", msg)
             else:
+                self.scan_overlay.append_result("Library scan", msg or "Library scan failed.", False)
                 log_and_notify(
                     self.app_state,
                     logger,
@@ -1066,6 +1085,7 @@ class MainWindow(QMainWindow):
             return
         self.btn_cancel_scan.setEnabled(False)
         self.scan_details.setText("Cancelling scan after the current batch…")
+        self.scan_overlay.update_progress(-1, 0, "Library scan", "Cancelling scan after the current batch...")
         logger.info("Cancellation requested for library scan.")
         self.scanner.requestInterruption()
 
@@ -2185,7 +2205,8 @@ class MainWindow(QMainWindow):
         """Show the background-activity button when any overlay is active but hidden."""
         dl_bg = self.download_overlay.is_active and not self.download_overlay.isVisible()
         pub_bg = self.publish_overlay.is_active and not self.publish_overlay.isVisible()
-        self.top_bar.btn_bg_activity.setVisible(dl_bg or pub_bg)
+        scan_bg = self.scan_overlay.is_active and not self.scan_overlay.isVisible()
+        self.top_bar.btn_bg_activity.setVisible(dl_bg or pub_bg or scan_bg)
 
     def _reopen_bg_overlay(self) -> None:
         """Re-show whichever overlay is running in the background."""
@@ -2193,6 +2214,8 @@ class MainWindow(QMainWindow):
             self.download_overlay.reopen()
         elif self.publish_overlay.is_active:
             self.publish_overlay.reopen()
+        elif self.scan_overlay.is_active:
+            self.scan_overlay.reopen()
 
     def _publish_instrumental_to_lrclib(self, track_ids: list[int]) -> None:
         from PySide6.QtWidgets import QMessageBox
