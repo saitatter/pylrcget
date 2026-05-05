@@ -175,7 +175,7 @@ class MainWindow(QMainWindow):
         self.layout = QVBoxLayout(self.central_widget)
         set_layout_spacing(self.layout, margins=SPACE_3, spacing=SPACE_3)
 
-        self.toasts = ToastManager(self)
+        self.toasts = ToastManager(self.central_widget)
         self.app_state.notification.connect(self._on_notify)
         self._ui_log_handler = QtLogHandler()
         self._ui_log_handler.setLevel(logging.INFO)
@@ -303,6 +303,7 @@ class MainWindow(QMainWindow):
         # --- PlayerBar ---
         self.player_bar = PlayerBar(self.app_state.player, self)
         self.layout.addWidget(self.player_bar)
+        self.toasts.set_bottom_anchor(self.player_bar)
         self.player_bar.set_prev_next_handlers(self.play_prev, self.play_next)
         self.player_bar.playbackSpeedChanged.connect(self._persist_playback_speed)
         self.player_bar.volumeChanged.connect(self._persist_playback_volume)
@@ -473,9 +474,8 @@ class MainWindow(QMainWindow):
         self._register_hotkey_hints()
         self._sync_download_mode_ui()
 
-        # --- Selection counter in status bar ---
+        # --- Selection counter ---
         self._selection_label = QLabel("")
-        self.statusBar().addPermanentWidget(self._selection_label)
         self.track_list.table.selectionModel().selectionChanged.connect(self._update_selection_counter)
         self.track_list.table.selectionModel().selectionChanged.connect(self._update_selection_actions_bar)
         self.tabs.currentChanged.connect(self._update_selection_actions_bar)
@@ -611,6 +611,8 @@ class MainWindow(QMainWindow):
             self.publish_overlay.sync_to_parent()
         if hasattr(self, "scan_overlay"):
             self.scan_overlay.sync_to_parent()
+        if hasattr(self, "toasts"):
+            self.toasts.sync_to_parent()
 
     def dragEnterEvent(self, event):
         if event.mimeData().hasUrls():
@@ -965,7 +967,7 @@ class MainWindow(QMainWindow):
         self.scanner.finished_signal.connect(self._scan_finished)
         self.scanner.start()
         self.top_bar.btn_refresh.setEnabled(False)
-        self.statusBar().showMessage("Scanning library…")
+        self._show_status_message("Scanning library...")
 
     def _update_scan_progress(self, scanned: int, total: int, current_path: str, elapsed_s: float):
         total = max(int(total), 0)
@@ -1293,10 +1295,14 @@ class MainWindow(QMainWindow):
         return self.track_list.get_download_state(int(track_id))
 
     def _show_status_message(self, message: str, timeout_ms: int | None = None) -> None:
-        if timeout_ms is None:
-            self.statusBar().showMessage(message)
+        message = str(message or "").strip()
+        if not message:
+            self._clear_status_message()
             return
-        self.statusBar().showMessage(message, int(timeout_ms))
+        self.toasts.show_status(message, timeout_ms)
+
+    def _clear_status_message(self) -> None:
+        self.toasts.clear_status()
 
     def _update_selection_counter(self):
         sm = self.track_list.table.selectionModel()
@@ -1314,7 +1320,7 @@ class MainWindow(QMainWindow):
             suffix = "+" if has_more else ""
             self._show_status_message(f"{count}{suffix} result{'s' if count != 1 else ''} for \"{query}\"")
         else:
-            self.statusBar().clearMessage()
+            self._clear_status_message()
 
     def _current_player_track_id(self) -> int | None:
         if not self.app_state.player or not self.app_state.player.track:
@@ -1417,7 +1423,7 @@ class MainWindow(QMainWindow):
             self.artists_tab.set_dirty_lyrics_state(int(track_id), False)
             self._update_single_track_lyrics_state(track)
             self._show_status_message("Lyrics saved.", 2500)
-            self.toasts.show("Lyrics saved.", "success")
+            self.toasts.show_toast("Lyrics saved.", "success")
             for view in self._all_lyrics_views():
                 view.set_save_feedback("success", "Saved")
         except (sqlite3.Error, OSError, ValueError) as exc:

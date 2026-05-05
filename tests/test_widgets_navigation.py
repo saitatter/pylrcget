@@ -17,6 +17,7 @@ from ui.controllers.top_bar_controller import TopBarController
 from ui.widgets.hotkey_hints import HotkeyHintManager
 from ui.widgets.lrclib_browser_widget import _BrowserPublishDialog
 from ui.widgets.lyrics_editor_widget import LyricsEditorWidget, TIMESTAMP_MS_ROLE
+from ui.widgets.toast import ToastManager
 from ui.main_window import MainWindow
 from ui.player_bar import PlayerBar
 from tests.test_support import (
@@ -536,6 +537,60 @@ class LyricsPasteBehaviorTests(unittest.TestCase):
 
         self.assertEqual(overlay_calls[-1][0:3], (3, 10, "Song.mp3"))
         self.assertIn("30%", overlay_calls[-1][3])
+
+    def test_status_message_uses_toast_area_without_changing_layout(self):
+        window = MainWindow.__new__(MainWindow)
+        window.central_widget = QWidget()
+        window.central_widget.resize(480, 320)
+        window.central_widget.show()
+        window.player_bar = QWidget(window.central_widget)
+        window.player_bar.setGeometry(0, 260, 480, 52)
+        window.player_bar.show()
+        window.toasts = ToastManager(window.central_widget)
+        window.toasts.set_bottom_anchor(window.player_bar)
+        try:
+            before = window.central_widget.geometry()
+
+            MainWindow._show_status_message(window, "Lyrics saved.", 2500)
+            self.app.processEvents()
+
+            self.assertEqual(window.central_widget.geometry(), before)
+            self.assertIsNotNone(window.toasts._status_toast)
+            toast = window.toasts._status_toast
+            self.assertTrue(toast.isVisible())
+            self.assertEqual(toast.lbl.text(), "Lyrics saved.")
+            self.assertLessEqual(
+                toast.y() + toast.height(),
+                window.player_bar.y(),
+            )
+
+            window.toasts.show_toast("Saved.", "success", 3000)
+            self.app.processEvents()
+            normal_toast = next(t for t in window.toasts._toasts if t is not toast)
+            self.assertLess(normal_toast.y(), toast.y())
+            self.assertLessEqual(normal_toast.y() + normal_toast.height(), toast.y())
+        finally:
+            window.central_widget.deleteLater()
+
+    def test_status_and_toast_with_same_text_do_not_duplicate(self):
+        host = QWidget()
+        host.resize(480, 320)
+        host.show()
+        manager = ToastManager(host)
+        try:
+            manager.show_status("Lyrics saved.", 2500)
+            manager.show_toast("Lyrics saved.", "success", 3000)
+            self.app.processEvents()
+
+            self.assertEqual(len(manager._toasts), 1)
+            self.assertIsNone(manager._status_toast)
+            self.assertEqual(manager._toasts[0].lbl.text(), "Lyrics saved.")
+
+            manager.show_status("Lyrics saved.", 2500)
+            self.app.processEvents()
+            self.assertEqual(len(manager._toasts), 1)
+        finally:
+            host.deleteLater()
 
     def test_open_track_folder_opens_parent_directory(self):
         app_state = simple_app_state()

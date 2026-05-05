@@ -94,9 +94,18 @@ class ToastWidget(QFrame):
         self._anim_opacity: QPropertyAnimation | None = None
         self._anim_pos: QPropertyAnimation | None = None
 
+    @property
+    def message(self) -> str:
+        return self.lbl.text().strip()
+
     def close_requested(self):
         # Let the manager handle the removal animation.
         self._manager._dismiss_toast(self)
+
+    def update_message(self, message: str):
+        self.data = ToastData(message=message, notify_type=self.data.notify_type, timeout_ms=self.data.timeout_ms)
+        self.lbl.setText(message)
+        self.adjustSize()
 
     def play_in(self, start_pos: QPoint, end_pos: QPoint):
         self.move(start_pos)
@@ -141,7 +150,7 @@ class ToastWidget(QFrame):
 
 class ToastManager(QWidget):
     """
-    Overlay widget that stacks toasts from top -> bottom (like phone notifications).
+    Overlay widget that stacks toasts upward from the player/status area.
     Attach it to a QMainWindow (or any QWidget).
     """
     def __init__(self, host: QWidget):
@@ -152,6 +161,9 @@ class ToastManager(QWidget):
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, False)
 
         self._toasts: list[ToastWidget] = []
+        self._status_toast: ToastWidget | None = None
+        self._status_generation = 0
+        self._bottom_anchor: QWidget | None = None
         self._margin = 14
         self._spacing = 10
         self._max_visible = 5
@@ -160,6 +172,7 @@ class ToastManager(QWidget):
         self._reposition_timer.setSingleShot(True)
         self._reposition_timer.timeout.connect(self._layout_toasts)
 
+        self.sync_to_parent()
         self.raise_()
         self.show()
 
@@ -167,22 +180,45 @@ class ToastManager(QWidget):
         super().resizeEvent(event)
         self._schedule_layout()
 
+    def sync_to_parent(self) -> None:
+        self.setGeometry(self.host.rect())
+        self._schedule_layout()
+
+    def set_bottom_anchor(self, widget: QWidget | None) -> None:
+        self._bottom_anchor = widget
+        self._schedule_layout()
+
     def show_toast(self, message: str, notify_type: str = "info", timeout_ms: int = 3000):
+        message = str(message or "").strip()
+        if not message:
+            return
+        if self._status_toast is not None and self._status_toast.message == message:
+            status_toast = self._status_toast
+            self._status_toast = None
+            if status_toast in self._toasts:
+                self._toasts.remove(status_toast)
+            status_toast.hide()
+            status_toast.deleteLater()
+        elif self._toast_with_message(message) is not None:
+            return
+
         # Keep overlay always covering host
         self.setGeometry(self.host.rect())
         self.raise_()
 
         data = ToastData(message=message, notify_type=notify_type, timeout_ms=timeout_ms)
         toast = ToastWidget(data, parent=self.host, manager=self)
-        toast.setFixedWidth(min(420, max(260, self.width() // 2)))
+        self._set_toast_width(toast)
         toast.raise_()
 
-        # Insert newest at top
-        self._toasts.insert(0, toast)
+        insert_at = 1 if self._status_toast in self._toasts else 0
+        self._toasts.insert(insert_at, toast)
 
         # Enforce max visible: dismiss oldest
         while len(self._toasts) > self._max_visible:
             old = self._toasts.pop()
+            if old is self._status_toast:
+                self._status_toast = None
             old.hide()
             old.deleteLater()
 
@@ -191,9 +227,50 @@ class ToastManager(QWidget):
         # Auto dismiss
         QTimer.singleShot(max(500, int(timeout_ms)), lambda: self._dismiss_toast(toast))
 
+    def show_status(self, message: str, timeout_ms: int | None = None) -> None:
+        message = str(message or "").strip()
+        if not message:
+            self.clear_status()
+            return
+        if self._toast_with_message(message, exclude_status=True) is not None:
+            return
+
+        self.setGeometry(self.host.rect())
+        self.raise_()
+        self._status_generation += 1
+        generation = self._status_generation
+
+        if self._status_toast is None or self._status_toast not in self._toasts:
+            data = ToastData(message=message, notify_type="info", timeout_ms=int(timeout_ms or 0))
+            self._status_toast = ToastWidget(data, parent=self.host, manager=self)
+            self._set_toast_width(self._status_toast)
+            self._status_toast.raise_()
+            self._toasts.insert(0, self._status_toast)
+            self._layout_toasts(animate_new=self._status_toast)
+        else:
+            self._status_toast.update_message(message)
+            self._set_toast_width(self._status_toast)
+            self._layout_toasts()
+
+        if timeout_ms is not None:
+            QTimer.singleShot(
+                max(500, int(timeout_ms)),
+                lambda gen=generation: self.clear_status() if gen == self._status_generation else None,
+            )
+
+    def clear_status(self) -> None:
+        self._status_generation += 1
+        if self._status_toast is None:
+            return
+        toast = self._status_toast
+        self._status_toast = None
+        self._dismiss_toast(toast)
+
     def _dismiss_toast(self, toast: ToastWidget):
         if toast not in self._toasts:
             return
+        if toast is self._status_toast:
+            self._status_toast = None
 
         def remove():
             if toast in self._toasts:
@@ -209,23 +286,23 @@ class ToastManager(QWidget):
         self._reposition_timer.start(0)
 
     def _layout_toasts(self, animate_new: ToastWidget | None = None):
-        # Top-right stack
         self.setGeometry(self.host.rect())
 
-        x_right = self.width() - self._margin
-        y = self._margin
+        x = self._margin
+        y_bottom = self._bottom_limit()
 
-        for i, t in enumerate(self._toasts):
+        for t in self._toasts:
             t.adjustSize()
+            self._set_toast_width(t)
             w = t.width()
             h = t.sizeHint().height()
             t.setFixedHeight(h)
 
-            end_pos = QPoint(x_right - w, y)
-            y += h + self._spacing
+            end_pos = QPoint(x, y_bottom - h)
+            y_bottom -= h + self._spacing
 
             if t is animate_new:
-                start_pos = end_pos + QPoint(0, -12)  # slide down into place
+                start_pos = end_pos + QPoint(0, -12)
                 t.play_in(start_pos=start_pos, end_pos=end_pos)
             else:
                 # Smooth reposition (optional)
@@ -241,3 +318,19 @@ class ToastManager(QWidget):
                     t.show()
 
         self.raise_()
+
+    def _set_toast_width(self, toast: ToastWidget) -> None:
+        toast.setFixedWidth(min(420, max(260, self.width() // 3)))
+
+    def _bottom_limit(self) -> int:
+        if self._bottom_anchor is not None and self._bottom_anchor.isVisible():
+            return max(self._margin, self._bottom_anchor.y() - self._spacing)
+        return max(self._margin, self.height() - self._margin)
+
+    def _toast_with_message(self, message: str, *, exclude_status: bool = False) -> ToastWidget | None:
+        for toast in self._toasts:
+            if exclude_status and toast is self._status_toast:
+                continue
+            if toast.message == message:
+                return toast
+        return None
