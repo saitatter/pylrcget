@@ -251,6 +251,45 @@ class LyricsPasteBehaviorTests(unittest.TestCase):
         finally:
             widget.deleteLater()
 
+    def test_lyrics_validator_blocks_save_until_autofix(self):
+        widget = LyricsEditorWidget()
+        emitted: list[tuple[str, str]] = []
+        widget.saveRequested.connect(lambda lrc, plain: emitted.append((lrc, plain)))
+        try:
+            widget._set_synced([(1200, "First line."), (3000, "Second line")])
+
+            self.assertFalse(widget.btn_save.isEnabled())
+            self.assertFalse(widget.btn_autofix.isHidden())
+            self.assertIn("mark the end", widget.validation_hint.text())
+
+            widget._emit_save()
+            self.assertEqual(emitted, [])
+
+            widget._autofix_validation_problems()
+            self.assertTrue(widget.btn_save.isEnabled())
+            self.assertTrue(widget.btn_autofix.isHidden())
+
+            widget._emit_save()
+            self.assertEqual(len(emitted), 1)
+            self.assertIn("[00:08.00]", emitted[0][0])
+            self.assertNotIn("First line.", emitted[0][0])
+        finally:
+            widget.deleteLater()
+
+    def test_plain_lyrics_validator_blocks_save(self):
+        widget = LyricsEditorWidget()
+        emitted: list[tuple[str, str]] = []
+        widget.saveRequested.connect(lambda lrc, plain: emitted.append((lrc, plain)))
+        try:
+            widget._set_plain("[00:01.00] Not plain")
+
+            self.assertFalse(widget.btn_save.isEnabled())
+            self.assertFalse(widget.btn_autofix.isEnabled())
+            widget._emit_save()
+            self.assertEqual(emitted, [])
+        finally:
+            widget.deleteLater()
+
     def test_browser_publish_lyrics_fields_reject_rich_text_paste(self):
         dialog = _BrowserPublishDialog("https://lrclib.net")
         try:

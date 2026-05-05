@@ -25,6 +25,13 @@ from core.utils import (
     parse_ts_str as _parse_ts_str,
     parse_lrc,
 )
+from core.lyrics_validator import (
+    LyricsValidationProblem,
+    autofix_plain_lyrics,
+    autofix_synced_lyrics,
+    validate_plain_lyrics,
+    validate_synced_lyrics,
+)
 
 TIMESTAMP_MS_ROLE = Qt.ItemDataRole.UserRole
 TIMESTAMP_VALID_ROLE = Qt.ItemDataRole.UserRole + 1
@@ -159,6 +166,8 @@ class LyricsEditorWidget(QWidget):
         self._times: list[int] = []
         self._current_index: int = -1
         self._invalid_rows: set[int] = set()
+        self._lint_rows: set[int] = set()
+        self._validation_problems: list[LyricsValidationProblem] = []
         self._default_button_text: dict[QPushButton, str] = {}
         self._publish_synced_available = False
         self._publish_plain_available = False
@@ -248,6 +257,10 @@ class LyricsEditorWidget(QWidget):
         self.btn_add.setToolTip("Insert a new line after the current selection (Insert)")
         self.btn_del = QPushButton("Delete")
         self.btn_del.setToolTip("Delete the selected line (Delete)")
+        self.btn_autofix = QPushButton("Autofix")
+        self.btn_autofix.setObjectName("LyricsAutofix")
+        self.btn_autofix.setToolTip("Automatically fix safe lyrics validation issues")
+        self.btn_autofix.hide()
         self.btn_save = QPushButton("Save")
         self.btn_save.setToolTip("Save lyrics to the library (Ctrl+S)")
         self.btn_export_files = QPushButton("Export Files")
@@ -271,6 +284,7 @@ class LyricsEditorWidget(QWidget):
         self.btn_shift_all_from_first.clicked.connect(self._shift_all_lines_from_first_delta)
         self.btn_add.clicked.connect(self._add_line_after_selection)
         self.btn_del.clicked.connect(self._delete_selected_line)
+        self.btn_autofix.clicked.connect(self._autofix_validation_problems)
         self.btn_save.clicked.connect(self._emit_save)
         self.btn_export_files.clicked.connect(self.exportFilesRequested.emit)
 
@@ -282,6 +296,7 @@ class LyricsEditorWidget(QWidget):
         toolbar.addWidget(self.btn_shift_all_from_first)
         toolbar.addWidget(self.btn_add)
         toolbar.addWidget(self.btn_del)
+        toolbar.addWidget(self.btn_autofix)
         toolbar.addWidget(self.btn_save)
         toolbar.addWidget(self.btn_export_files)
 
@@ -302,6 +317,7 @@ class LyricsEditorWidget(QWidget):
             self.btn_shift_all_from_first,
             self.btn_add,
             self.btn_del,
+            self.btn_autofix,
             self.btn_save,
             self.btn_export_files,
             self.btn_publish_synced,
@@ -515,6 +531,8 @@ class LyricsEditorWidget(QWidget):
         self._publish_synced_available = False
         self._publish_plain_available = False
         self._invalid_rows.clear()
+        self._lint_rows.clear()
+        self._validation_problems = []
         self._undo_stack.clear()
         self._redo_stack.clear()
         self.table.blockSignals(True)
@@ -529,6 +547,8 @@ class LyricsEditorWidget(QWidget):
         self.btn_shift_all_from_first.setEnabled(False)
         self.btn_add.setEnabled(False)
         self.btn_del.setEnabled(False)
+        self.btn_autofix.setEnabled(False)
+        self.btn_autofix.hide()
         self.btn_save.setEnabled(False)
         self.btn_export_files.setEnabled(False)
         self.btn_switch_mode.hide()
@@ -559,7 +579,6 @@ class LyricsEditorWidget(QWidget):
         self.stack.setCurrentWidget(self.plain)
 
         # plain editing
-        self.btn_save.setEnabled(True)
         self.btn_add.setEnabled(False)
         self.btn_del.setEnabled(False)
         self.btn_snap.setEnabled(False)
@@ -572,6 +591,7 @@ class LyricsEditorWidget(QWidget):
         self.btn_switch_mode.setText("Switch to Synced")
         self.btn_switch_mode.setVisible(True)
         self.btn_auto_sync.setVisible(True)
+        self._validate_current_lyrics()
 
     def _start_writing_lyrics(self):
         """Switch to an empty plain editor so the user can write lyrics from scratch."""
@@ -651,7 +671,7 @@ class LyricsEditorWidget(QWidget):
             self._times.append(ms)
         self.table.blockSignals(False)
         self._rebuild_times_cache()
-        self._update_save_enabled()
+        self._validate_current_lyrics()
         self._refresh_row_styles()
 
     def _undo(self):
@@ -715,11 +735,11 @@ class LyricsEditorWidget(QWidget):
         self.btn_shift_plus.setEnabled(has_selection)
         self.shift_spin.setEnabled(has_selection)
         self.btn_shift_selected.setEnabled(has_selection)
-        self.btn_save.setEnabled(not self._invalid_rows)
         self.btn_export_files.setEnabled(True)
         self.btn_switch_mode.setText("Switch to Plain")
         self.btn_switch_mode.setVisible(True)
         self.btn_auto_sync.setVisible(True)
+        self._validate_current_lyrics()
 
     def _rebuild_times_cache(self):
         times: list[int] = []
@@ -748,7 +768,7 @@ class LyricsEditorWidget(QWidget):
         for row in range(self.table.rowCount()):
             is_current = row == current_row
             is_selected = row == selected_row
-            is_invalid = row in self._invalid_rows
+            is_invalid = row in self._invalid_rows or row in self._lint_rows
 
             bg = None
             fg = default_fg
@@ -778,9 +798,9 @@ class LyricsEditorWidget(QWidget):
 
     def _update_save_enabled(self):
         if self.stack.currentWidget() is self.table:
-            self.btn_save.setEnabled(not self._invalid_rows)
+            self.btn_save.setEnabled(not self._invalid_rows and not self._validation_problems)
         elif self.stack.currentWidget() is self.plain:
-            self.btn_save.setEnabled(True)
+            self.btn_save.setEnabled(not self._validation_problems)
         else:
             self.btn_save.setEnabled(False)
 
@@ -792,10 +812,51 @@ class LyricsEditorWidget(QWidget):
         self.validation_hint.update()
         self.validation_hint.setVisible(bool(message))
 
+    def _validate_current_lyrics(self, *, show_success: bool = False) -> bool:
+        if self.stack.currentWidget() is self.table:
+            problems = self._timestamp_problems() + validate_synced_lyrics(self._take_snapshot())
+        elif self.stack.currentWidget() is self.plain:
+            problems = validate_plain_lyrics(self.plain.toPlainText() or "")
+        else:
+            problems = []
+
+        self._validation_problems = problems
+        self._lint_rows = {problem.line - 1 for problem in problems if problem.line > 0}
+        can_autofix = any(problem.fixable for problem in problems)
+        self.btn_autofix.setVisible(bool(problems))
+        self.btn_autofix.setEnabled(can_autofix)
+
+        if problems:
+            self._set_validation_message(self._format_validation_message(problems), state="error")
+        elif show_success:
+            self._set_validation_message("Lyrics validation passed.", state="success")
+        else:
+            self._set_validation_message("")
+
+        self._update_save_enabled()
+        return not problems
+
+    def _timestamp_problems(self) -> list[LyricsValidationProblem]:
+        return [
+            LyricsValidationProblem(
+                line=row + 1,
+                message="Timestamp must use mm:ss, mm:ss.xx or mm:ss.xxx.",
+            )
+            for row in sorted(self._invalid_rows)
+        ]
+
+    @staticmethod
+    def _format_validation_message(problems: list[LyricsValidationProblem]) -> str:
+        head = problems[:3]
+        lines = [f"Line {problem.line}: {problem.message}" for problem in head]
+        if len(problems) > len(head):
+            lines.append(f"...and {len(problems) - len(head)} more issue(s).")
+        return "\n".join(lines)
+
     def _on_any_edit(self):
         # Any edit in plain view keeps save enabled
         if self.stack.currentWidget() is self.plain:
-            self._update_save_enabled()
+            self._validate_current_lyrics()
             self._emit_dirty_draft_changed()
 
     def _on_table_selection_changed(self):
@@ -827,6 +888,8 @@ class LyricsEditorWidget(QWidget):
     def _on_table_item_changed(self, item: QTableWidgetItem):
         # If user edited the Time cell, validate and update ms
         if item.column() != 0:
+            self._validate_current_lyrics()
+            self._refresh_row_styles()
             self._emit_dirty_draft_changed()
             return
 
@@ -836,11 +899,7 @@ class LyricsEditorWidget(QWidget):
             item.setData(TIMESTAMP_VALID_ROLE, False)
             item.setToolTip("Use mm:ss, mm:ss.xx or mm:ss.xxx")
             self._invalid_rows.add(row)
-            self._set_validation_message(
-                f"Line {row + 1}: timestamp must use mm:ss, mm:ss.xx or mm:ss.xxx.",
-                state="error",
-            )
-            self._update_save_enabled()
+            self._validate_current_lyrics()
             self._refresh_row_styles()
             self._emit_dirty_draft_changed()
             return
@@ -850,16 +909,8 @@ class LyricsEditorWidget(QWidget):
         item.setToolTip("Timestamp is valid")
         item.setText(_ms_to_ts(int(new_ms)))  # normalize format
         self._invalid_rows.discard(row)
-        if self._invalid_rows:
-            next_row = min(self._invalid_rows)
-            self._set_validation_message(
-                f"Line {next_row + 1}: timestamp must use mm:ss, mm:ss.xx or mm:ss.xxx.",
-                state="error",
-            )
-        else:
-            self._set_validation_message("Timestamps look good.", state="success")
         self._rebuild_times_cache()
-        self._update_save_enabled()
+        self._validate_current_lyrics(show_success=True)
         self._refresh_row_styles()
         self._emit_dirty_draft_changed()
 
@@ -923,6 +974,7 @@ class LyricsEditorWidget(QWidget):
         self.table.selectRow(insert_at)
         self.table.setCurrentCell(insert_at, 1)
         self.table.editItem(self.table.item(insert_at, 1))
+        self._validate_current_lyrics()
         self._emit_dirty_draft_changed()
 
     def _delete_selected_line(self):
@@ -939,15 +991,7 @@ class LyricsEditorWidget(QWidget):
             if self.table.item(r, 0) and self.table.item(r, 0).data(TIMESTAMP_VALID_ROLE) is False
         }
         self._rebuild_times_cache()
-        if self._invalid_rows:
-            next_row = min(self._invalid_rows)
-            self._set_validation_message(
-                f"Line {next_row + 1}: timestamp must use mm:ss, mm:ss.xx or mm:ss.xxx.",
-                state="error",
-            )
-        else:
-            self._set_validation_message("")
-        self._update_save_enabled()
+        self._validate_current_lyrics()
         self._refresh_row_styles()
         self._emit_dirty_draft_changed()
 
@@ -970,13 +1014,7 @@ class LyricsEditorWidget(QWidget):
         self._invalid_rows.discard(row)
 
         self._rebuild_times_cache()
-        if self._invalid_rows:
-            next_row = min(self._invalid_rows)
-            self._set_validation_message(
-                f"Line {next_row + 1}: timestamp must use mm:ss, mm:ss.xx or mm:ss.xxx.",
-                state="error",
-            )
-        else:
+        if self._validate_current_lyrics():
             if self._reaction_delay_ms:
                 direction = "earlier" if self._reaction_delay_ms < 0 else "later"
                 self._set_validation_message(
@@ -985,7 +1023,6 @@ class LyricsEditorWidget(QWidget):
                 )
             else:
                 self._set_validation_message("Snapped selected line to current playback time.", state="success")
-        self._update_save_enabled()
         self._refresh_row_styles()
         self._emit_dirty_draft_changed()
 
@@ -1049,7 +1086,7 @@ class LyricsEditorWidget(QWidget):
             self._invalid_rows.discard(row)
         self.table.blockSignals(False)
         self._rebuild_times_cache()
-        self._update_save_enabled()
+        self._validate_current_lyrics()
         self._refresh_row_styles()
         self._emit_dirty_draft_changed()
         return True
@@ -1067,6 +1104,32 @@ class LyricsEditorWidget(QWidget):
                 collapse_rows.append(row)
         return collapse_rows
 
+    def _autofix_validation_problems(self) -> None:
+        if not any(problem.fixable for problem in self._validation_problems):
+            return
+
+        if self.stack.currentWidget() is self.table:
+            self._push_undo()
+            self._restore_snapshot(autofix_synced_lyrics(self._take_snapshot()))
+        elif self.stack.currentWidget() is self.plain:
+            fixed = autofix_plain_lyrics(self.plain.toPlainText() or "")
+            if fixed == (self.plain.toPlainText() or ""):
+                return
+            self.plain.setPlainText(fixed)
+        else:
+            return
+
+        if self._validate_current_lyrics(show_success=True):
+            self._set_validation_message("Autofix applied. Lyrics validation passed.", state="success")
+        else:
+            self._set_validation_message(
+                "Autofix applied. Some issues still need manual changes:\n"
+                + self._format_validation_message(self._validation_problems),
+                state="error",
+            )
+        self._refresh_row_styles()
+        self._emit_dirty_draft_changed()
+
     def _current_playback_ms(self) -> int:
         provider = self._current_position_provider
         if provider is not None:
@@ -1079,12 +1142,7 @@ class LyricsEditorWidget(QWidget):
     def _emit_save(self):
         # Synced view: build LRC + plain
         if self.stack.currentWidget() is self.table:
-            if self._invalid_rows:
-                next_row = min(self._invalid_rows)
-                self._set_validation_message(
-                    f"Fix the timestamp on line {next_row + 1} before saving.",
-                    state="error",
-                )
+            if not self._validate_current_lyrics():
                 return
             lrc, plain = self._current_lyrics_text()
             self.saveRequested.emit(lrc, plain)
@@ -1092,6 +1150,8 @@ class LyricsEditorWidget(QWidget):
 
         # Plain view: save plain only
         if self.stack.currentWidget() is self.plain:
+            if not self._validate_current_lyrics():
+                return
             _lrc, txt = self._current_lyrics_text()
             self.saveRequested.emit("", txt)
             return
