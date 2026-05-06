@@ -1,4 +1,21 @@
 # Changelog
+## v1.5.0 (2026-05-06)
+
+### ✨ Features
+* Improve player controls and library scans ([f10e70f](https://github.com/saitatter/pylrcget/commit/f10e70fa862e6aa0aed474bed1cba7a621670f8f))
+* Add lyrics validation autofix ([f10e70f](https://github.com/saitatter/pylrcget/commit/f10e70fa862e6aa0aed474bed1cba7a621670f8f))
+* Show library scan progress overlay ([f10e70f](https://github.com/saitatter/pylrcget/commit/f10e70fa862e6aa0aed474bed1cba7a621670f8f))
+
+### 🐛 Fixes
+* Refine player and overlay ux ([f10e70f](https://github.com/saitatter/pylrcget/commit/f10e70fa862e6aa0aed474bed1cba7a621670f8f))
+* Refine track action hover states ([f10e70f](https://github.com/saitatter/pylrcget/commit/f10e70fa862e6aa0aed474bed1cba7a621670f8f))
+* Refine speed control alignment ([f10e70f](https://github.com/saitatter/pylrcget/commit/f10e70fa862e6aa0aed474bed1cba7a621670f8f))
+* Align player volume controls ([f10e70f](https://github.com/saitatter/pylrcget/commit/f10e70fa862e6aa0aed474bed1cba7a621670f8f))
+* Blend track action buttons on selection ([f10e70f](https://github.com/saitatter/pylrcget/commit/f10e70fa862e6aa0aed474bed1cba7a621670f8f))
+* Keep track action hover isolated ([f10e70f](https://github.com/saitatter/pylrcget/commit/f10e70fa862e6aa0aed474bed1cba7a621670f8f))
+* Unify status and toast overlays ([f10e70f](https://github.com/saitatter/pylrcget/commit/f10e70fa862e6aa0aed474bed1cba7a621670f8f))
+
+
 ## v1.4.0 (2026-05-01)
 
 ### ✨ Features
