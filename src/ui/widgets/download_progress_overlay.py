@@ -33,8 +33,8 @@ class DownloadProgressOverlay(QWidget):
         self.hide()
 
         self._verb = verb  # "Download" or "Publish"
-        self._verb_ing = f"{verb.rstrip('e')}ing" if verb.endswith('e') else f"{verb}ing"
-        self._verb_ed = f"{verb.rstrip('e')}ed" if verb.endswith('e') else f"{verb}ed"
+        self._verb_ing = "Scanning" if verb == "Scan" else f"{verb.rstrip('e')}ing" if verb.endswith('e') else f"{verb}ing"
+        self._verb_ed = "Scanned" if verb == "Scan" else f"{verb.rstrip('e')}ed" if verb.endswith('e') else f"{verb}ed"
         self._active = False
         self._ok_count = 0
         self._fail_count = 0

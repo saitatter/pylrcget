@@ -175,7 +175,7 @@ class MainWindow(QMainWindow):
         self.layout = QVBoxLayout(self.central_widget)
         set_layout_spacing(self.layout, margins=SPACE_3, spacing=SPACE_3)
 
-        self.toasts = ToastManager(self)
+        self.toasts = ToastManager(self.central_widget)
         self.app_state.notification.connect(self._on_notify)
         self._ui_log_handler = QtLogHandler()
         self._ui_log_handler.setLevel(logging.INFO)
@@ -303,6 +303,7 @@ class MainWindow(QMainWindow):
         # --- PlayerBar ---
         self.player_bar = PlayerBar(self.app_state.player, self)
         self.layout.addWidget(self.player_bar)
+        self.toasts.set_bottom_anchor(self.player_bar)
         self.player_bar.set_prev_next_handlers(self.play_prev, self.play_next)
         self.player_bar.playbackSpeedChanged.connect(self._persist_playback_speed)
         self.player_bar.volumeChanged.connect(self._persist_playback_volume)
@@ -333,6 +334,8 @@ class MainWindow(QMainWindow):
         self.download_overlay.cancelRequested.connect(self.downloads.cancel)
         self.publish_overlay = DownloadProgressOverlay(self.central_widget, verb="Publish")
         self.publish_overlay.sync_to_parent()
+        self.scan_overlay = DownloadProgressOverlay(self.central_widget, verb="Scan")
+        self.scan_overlay.sync_to_parent()
         self.publish_history = PublishHistoryController(
             self.app_state,
             normalize_lrclib_base=self._normalize_lrclib_base,
@@ -344,14 +347,18 @@ class MainWindow(QMainWindow):
             parent=self,
         )
         self.publish_overlay.cancelRequested.connect(self._cancel_bulk_publish)
+        self.scan_overlay.cancelRequested.connect(self._cancel_scan)
 
         # Background activity button — shows when an overlay is minimized
         self.download_overlay.activeChanged.connect(self._update_bg_activity_button)
         self.publish_overlay.activeChanged.connect(self._update_bg_activity_button)
+        self.scan_overlay.activeChanged.connect(self._update_bg_activity_button)
         self.download_overlay.minimized.connect(self._update_bg_activity_button)
         self.publish_overlay.minimized.connect(self._update_bg_activity_button)
+        self.scan_overlay.minimized.connect(self._update_bg_activity_button)
         self.download_overlay.dismissed.connect(self._update_bg_activity_button)
         self.publish_overlay.dismissed.connect(self._update_bg_activity_button)
+        self.scan_overlay.dismissed.connect(self._update_bg_activity_button)
         self.top_bar.btn_bg_activity.clicked.connect(self._reopen_bg_overlay)
 
         self.lyrics_view.publishSyncedRequested.connect(self.publish_history.publish_synced)
@@ -467,9 +474,8 @@ class MainWindow(QMainWindow):
         self._register_hotkey_hints()
         self._sync_download_mode_ui()
 
-        # --- Selection counter in status bar ---
+        # --- Selection counter ---
         self._selection_label = QLabel("")
-        self.statusBar().addPermanentWidget(self._selection_label)
         self.track_list.table.selectionModel().selectionChanged.connect(self._update_selection_counter)
         self.track_list.table.selectionModel().selectionChanged.connect(self._update_selection_actions_bar)
         self.tabs.currentChanged.connect(self._update_selection_actions_bar)
@@ -603,6 +609,10 @@ class MainWindow(QMainWindow):
             self.download_overlay.sync_to_parent()
         if hasattr(self, "publish_overlay"):
             self.publish_overlay.sync_to_parent()
+        if hasattr(self, "scan_overlay"):
+            self.scan_overlay.sync_to_parent()
+        if hasattr(self, "toasts"):
+            self.toasts.sync_to_parent()
 
     def dragEnterEvent(self, event):
         if event.mimeData().hasUrls():
@@ -937,12 +947,11 @@ class MainWindow(QMainWindow):
 
         logger.info("Starting library scan across %d folder(s).", len(directories))
 
-        self.scan_row.setVisible(True)
-        self.progress_bar.setValue(0)
+        self.scan_row.setVisible(False)
         self.top_bar.set_actions_label("Scanning Library")
         self.top_bar.set_button_feedback(self.top_bar.btn_refresh, "loading")
-        self.scan_label.setText("Scanning…")
-        self.scan_details.setText(f"Preparing a scan across {len(directories)} folder(s)…")
+        self.scan_overlay.start_batch(f"{len(directories)} folder(s)", 0)
+        self.scan_overlay.update_progress(0, 0, "Library scan", "Counting tracks in selected folders...")
         self.btn_cancel_scan.setEnabled(True)
 
         config = get_config(self.app_state.db)
@@ -958,7 +967,7 @@ class MainWindow(QMainWindow):
         self.scanner.finished_signal.connect(self._scan_finished)
         self.scanner.start()
         self.top_bar.btn_refresh.setEnabled(False)
-        self.statusBar().showMessage("Scanning library…")
+        self._show_status_message("Scanning library...")
 
     def _update_scan_progress(self, scanned: int, total: int, current_path: str, elapsed_s: float):
         total = max(int(total), 0)
@@ -971,6 +980,7 @@ class MainWindow(QMainWindow):
             self.progress_bar.setRange(0, 0)
             self.scan_label.setText("Scanning…")
             self.scan_details.setText("Counting tracks in selected folders…")
+            self.scan_overlay.update_progress(0, 0, "Library scan", "Counting tracks in selected folders...")
             return
 
         # determinate
@@ -984,6 +994,12 @@ class MainWindow(QMainWindow):
         self.scan_label.setText(f"Scanning… {scanned}/{total} ({percent}%)")
         self.scan_details.setText(
             f"Current file: {current_name or 'Preparing next file…'}  •  Elapsed: {elapsed_s:.1f}s"
+        )
+        self.scan_overlay.update_progress(
+            scanned,
+            total,
+            current_name or "Library scan",
+            f"{scanned}/{total} ({percent}%)  •  Elapsed: {elapsed_s:.1f}s",
         )
 
     def _on_notify(self, n):
@@ -1022,9 +1038,12 @@ class MainWindow(QMainWindow):
         self.progress_bar.setValue(0)
         self.scan_row.setVisible(False)
         self.btn_cancel_scan.setEnabled(False)
+        self.scan_overlay.finish_batch(msg or ("Library scan finished." if ok else "Library scan failed."), cancelled=not ok and "cancel" in (msg or "").lower())
+        self.scan_overlay.queue_auto_close(5000)
 
         if ok:
             self._apply_track_filters()
+            self.scan_overlay.append_result("Library scan", msg or "Library scan finished successfully.", True)
             notify_user(
                 self.app_state,
                 msg or "Library scan finished successfully.",
@@ -1036,6 +1055,7 @@ class MainWindow(QMainWindow):
             logger.info("Library scan finished successfully: %s", msg or "ok")
         else:
             if "cancel" in (msg or "").lower():
+                self.scan_overlay.append_result("Library scan", msg or "Library scan cancelled.", False)
                 notify_user(
                     self.app_state,
                     msg,
@@ -1046,6 +1066,7 @@ class MainWindow(QMainWindow):
                 self.top_bar.set_button_feedback(self.top_bar.btn_refresh, "idle")
                 logger.warning("Library scan cancelled: %s", msg)
             else:
+                self.scan_overlay.append_result("Library scan", msg or "Library scan failed.", False)
                 log_and_notify(
                     self.app_state,
                     logger,
@@ -1066,6 +1087,7 @@ class MainWindow(QMainWindow):
             return
         self.btn_cancel_scan.setEnabled(False)
         self.scan_details.setText("Cancelling scan after the current batch…")
+        self.scan_overlay.update_progress(-1, 0, "Library scan", "Cancelling scan after the current batch...")
         logger.info("Cancellation requested for library scan.")
         self.scanner.requestInterruption()
 
@@ -1273,10 +1295,14 @@ class MainWindow(QMainWindow):
         return self.track_list.get_download_state(int(track_id))
 
     def _show_status_message(self, message: str, timeout_ms: int | None = None) -> None:
-        if timeout_ms is None:
-            self.statusBar().showMessage(message)
+        message = str(message or "").strip()
+        if not message:
+            self._clear_status_message()
             return
-        self.statusBar().showMessage(message, int(timeout_ms))
+        self.toasts.show_status(message, timeout_ms)
+
+    def _clear_status_message(self) -> None:
+        self.toasts.clear_status()
 
     def _update_selection_counter(self):
         sm = self.track_list.table.selectionModel()
@@ -1294,7 +1320,7 @@ class MainWindow(QMainWindow):
             suffix = "+" if has_more else ""
             self._show_status_message(f"{count}{suffix} result{'s' if count != 1 else ''} for \"{query}\"")
         else:
-            self.statusBar().clearMessage()
+            self._clear_status_message()
 
     def _current_player_track_id(self) -> int | None:
         if not self.app_state.player or not self.app_state.player.track:
@@ -1397,7 +1423,7 @@ class MainWindow(QMainWindow):
             self.artists_tab.set_dirty_lyrics_state(int(track_id), False)
             self._update_single_track_lyrics_state(track)
             self._show_status_message("Lyrics saved.", 2500)
-            self.toasts.show("Lyrics saved.", "success")
+            self.toasts.show_toast("Lyrics saved.", "success")
             for view in self._all_lyrics_views():
                 view.set_save_feedback("success", "Saved")
         except (sqlite3.Error, OSError, ValueError) as exc:
@@ -1844,9 +1870,15 @@ class MainWindow(QMainWindow):
         self.hotkey_hints.register(self.top_bar.search_box, "Ctrl+F")
         self.hotkey_hints.register(self.top_bar.btn_hotkeys, "Ctrl+/")
         self.hotkey_hints.register(self.track_list.table, "Enter")
-        self.hotkey_hints.register(self.lyrics_view.btn_save, "Ctrl+S")
-        self.hotkey_hints.register(self.albums_lyrics_view.btn_save, "Ctrl+S")
-        self.hotkey_hints.register(self.artists_lyrics_view.btn_save, "Ctrl+S")
+        for view in self._all_lyrics_views():
+            self.hotkey_hints.register(view.btn_snap, "Ctrl+Enter")
+            self.hotkey_hints.register(view.btn_shift_minus, "Left")
+            self.hotkey_hints.register(view.btn_shift_plus, "Right")
+            self.hotkey_hints.register(view.btn_shift_selected, "Shift+Enter")
+            self.hotkey_hints.register(view.btn_shift_all_from_first, "Ctrl+Shift+Enter")
+            self.hotkey_hints.register(view.btn_add, "Insert")
+            self.hotkey_hints.register(view.btn_del, "Delete")
+            self.hotkey_hints.register(view.btn_save, "Ctrl+S")
         self.hotkey_hints.register(self.player_bar.btn_prev, "Ctrl+Left")
         self.hotkey_hints.register(self.player_bar.btn_play, "Space")
         self.hotkey_hints.register(self.player_bar.btn_next, "Ctrl+Right")
@@ -2179,7 +2211,8 @@ class MainWindow(QMainWindow):
         """Show the background-activity button when any overlay is active but hidden."""
         dl_bg = self.download_overlay.is_active and not self.download_overlay.isVisible()
         pub_bg = self.publish_overlay.is_active and not self.publish_overlay.isVisible()
-        self.top_bar.btn_bg_activity.setVisible(dl_bg or pub_bg)
+        scan_bg = self.scan_overlay.is_active and not self.scan_overlay.isVisible()
+        self.top_bar.btn_bg_activity.setVisible(dl_bg or pub_bg or scan_bg)
 
     def _reopen_bg_overlay(self) -> None:
         """Re-show whichever overlay is running in the background."""
@@ -2187,6 +2220,8 @@ class MainWindow(QMainWindow):
             self.download_overlay.reopen()
         elif self.publish_overlay.is_active:
             self.publish_overlay.reopen()
+        elif self.scan_overlay.is_active:
+            self.scan_overlay.reopen()
 
     def _publish_instrumental_to_lrclib(self, track_ids: list[int]) -> None:
         from PySide6.QtWidgets import QMessageBox

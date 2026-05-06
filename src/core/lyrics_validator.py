@@ -1,0 +1,134 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+
+
+@dataclass(frozen=True)
+class LyricsValidationProblem:
+    line: int
+    message: str
+    severity: str = "error"
+    fixable: bool = False
+
+
+def validate_plain_lyrics(text: str) -> list[LyricsValidationProblem]:
+    lines = (text or "").splitlines()
+    trimmed = [line.strip() for line in lines]
+    problems: list[LyricsValidationProblem] = []
+
+    if len(trimmed) == 1 and trimmed[0] == "[au: instrumental]":
+        return problems
+
+    for index, content in enumerate(trimmed):
+        line_no = index + 1
+        if content:
+            if content.startswith("["):
+                problems.append(
+                    LyricsValidationProblem(
+                        line=line_no,
+                        message="Line cannot start with an opening square bracket.",
+                    )
+                )
+            continue
+
+        if (index == 0 and len(trimmed) > 1) or (index > 0 and not trimmed[index - 1]):
+            problems.append(
+                LyricsValidationProblem(
+                    line=line_no,
+                    message="Unnecessary empty line.",
+                    fixable=True,
+                )
+            )
+
+    return problems
+
+
+def autofix_plain_lyrics(text: str) -> str:
+    lines = [line.rstrip() for line in (text or "").splitlines()]
+    fixed: list[str] = []
+    previous_empty = False
+    for line in lines:
+        is_empty = not line.strip()
+        if is_empty and (not fixed or previous_empty):
+            continue
+        fixed.append("" if is_empty else line)
+        previous_empty = is_empty
+    while fixed and not fixed[-1].strip():
+        fixed.pop()
+    return "\n".join(fixed)
+
+
+def validate_synced_lyrics(pairs: list[tuple[int, str]]) -> list[LyricsValidationProblem]:
+    problems: list[LyricsValidationProblem] = []
+    last_non_empty_line: tuple[int, int, str] | None = None
+    previous_empty_line: int | None = None
+    previous_ms: int | None = None
+
+    for index, (ms, text) in enumerate(pairs):
+        line_no = index + 1
+        content = (text or "").strip()
+
+        if previous_ms is not None and int(ms) < previous_ms:
+            problems.append(
+                LyricsValidationProblem(
+                    line=line_no,
+                    message="Timestamps must be monotonically increasing.",
+                    fixable=True,
+                )
+            )
+        previous_ms = int(ms)
+
+        if content:
+            if (content.endswith(".") and not content.endswith("...")) or content.endswith(","):
+                problems.append(
+                    LyricsValidationProblem(
+                        line=line_no,
+                        message="Line should not end with punctuation such as comma or dot.",
+                        fixable=True,
+                    )
+                )
+            last_non_empty_line = (line_no, int(ms), content)
+            previous_empty_line = None
+        else:
+            if previous_empty_line is not None:
+                problems.append(
+                    LyricsValidationProblem(
+                        line=line_no,
+                        message="Unnecessary empty line.",
+                        fixable=True,
+                    )
+                )
+            previous_empty_line = line_no
+
+    if len(pairs) > 1 and last_non_empty_line is not None:
+        line_no, _ms, _content = last_non_empty_line
+        if line_no == len(pairs):
+            problems.append(
+                LyricsValidationProblem(
+                    line=line_no,
+                    message="Expect a synchronized empty line to mark the end of lyrics.",
+                    fixable=True,
+                )
+            )
+
+    return problems
+
+
+def autofix_synced_lyrics(pairs: list[tuple[int, str]]) -> list[tuple[int, str]]:
+    fixed: list[tuple[int, str]] = []
+    for ms, text in sorted(((int(ms), text or "") for ms, text in pairs), key=lambda item: item[0]):
+        content = text.rstrip()
+        stripped = content.rstrip()
+        while stripped.endswith(",") or (stripped.endswith(".") and not stripped.endswith("...")):
+            stripped = stripped[:-1].rstrip()
+        if not stripped and fixed and not fixed[-1][1].strip():
+            continue
+        fixed.append((ms, stripped))
+
+    while fixed and not fixed[-1][1].strip():
+        fixed.pop()
+
+    if len(fixed) > 1 and fixed[-1][1].strip():
+        fixed.append((fixed[-1][0] + 5000, ""))
+
+    return fixed

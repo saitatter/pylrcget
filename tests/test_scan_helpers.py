@@ -4,6 +4,7 @@ import sqlite3
 import tempfile
 import time
 import unittest
+from concurrent.futures import ThreadPoolExecutor as RealThreadPoolExecutor
 from pathlib import Path
 from unittest.mock import patch
 
@@ -18,7 +19,7 @@ from library.scan_library import (
     new_fs_track_from_path,
     preview_audio_path_exclusions,
 )
-from ui.workers.library_scanner import LibraryScanner
+from ui.workers.library_scanner import LibraryScanner, _scan_worker_count
 from core.models import FsTrack
 
 
@@ -220,6 +221,64 @@ class ScanLibraryHelpersTests(unittest.TestCase):
 
 
 class LibraryScannerIncrementalTests(unittest.TestCase):
+    def test_library_scanner_uses_worker_pool_for_first_scan(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db = initialize_database(tmp)
+            db_path = str(Path(tmp) / "pylrcget.db.sqlite3")
+            db.close()
+
+            music_dir = Path(tmp) / "Music"
+            music_dir.mkdir(parents=True, exist_ok=True)
+            first = music_dir / "first.mp3"
+            second = music_dir / "second.mp3"
+            touch_text(first, "first")
+            touch_text(second, "second")
+
+            created_workers: list[int] = []
+
+            class RecordingExecutor(RealThreadPoolExecutor):
+                def __init__(self, *args, max_workers=None, **kwargs):
+                    created_workers.append(int(max_workers or 0))
+                    super().__init__(*args, max_workers=max_workers, **kwargs)
+
+            def fake_new_fs_track(path: str, *, signature=None, **_kwargs):
+                name = Path(path).stem
+                return FsTrack(
+                    file_path=path,
+                    file_name=Path(path).name,
+                    title=name.title(),
+                    album="Album",
+                    artist="Artist",
+                    album_artist="Artist",
+                    duration=120.0,
+                    txt_lyrics=None,
+                    lrc_lyrics=None,
+                    track_number=None,
+                    modified_time=signature[0] if signature else None,
+                    file_size=signature[1] if signature else None,
+                )
+
+            fake_metadata = AudioMetadata(
+                title="Track",
+                album="Album",
+                artist="Artist",
+                album_artist="Artist",
+                track_number=None,
+                duration=120.0,
+            )
+            scanner = LibraryScanner(db_path, [str(music_dir)])
+            with (
+                patch("ui.workers.library_scanner.os.cpu_count", return_value=8),
+                patch("ui.workers.library_scanner.ThreadPoolExecutor", RecordingExecutor),
+                patch("ui.workers.library_scanner.read_audio_metadata", return_value=(object(), fake_metadata)) as read_metadata,
+                patch("ui.workers.library_scanner.new_fs_track_from_path", side_effect=fake_new_fs_track),
+            ):
+                expected_workers = _scan_worker_count()
+                scanner.run()
+
+            self.assertEqual(created_workers, [expected_workers])
+            self.assertEqual(read_metadata.call_count, 2)
+
     def test_library_scanner_skips_unchanged_reindexes_new_and_removes_missing(self):
         with tempfile.TemporaryDirectory() as tmp:
             db = initialize_database(tmp)

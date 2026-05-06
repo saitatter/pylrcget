@@ -554,6 +554,19 @@ class LyricsDownloadControllerTests(unittest.TestCase):
         finally:
             overlay.deleteLater()
 
+    def test_overlay_scan_verb_uses_scanned_summary(self):
+        overlay = DownloadProgressOverlay(verb="Scan")
+        try:
+            overlay.start_batch("2 folder(s)", 4)
+            self.assertIn("Scanning", overlay.title_label.text())
+            overlay.append_result("Library scan", "Updated 2 tracks.", True)
+            overlay.finish_batch("Library scanning complete.")
+
+            self.assertEqual(overlay.ok_label.text(), "1 SCANNED")
+            self.assertEqual(overlay.title_label.text(), "Scan Complete")
+        finally:
+            overlay.deleteLater()
+
 
 if __name__ == "__main__":
     unittest.main()

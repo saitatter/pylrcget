@@ -452,6 +452,9 @@ class TrackListWidget(QWidget):
             self.bulkPublishRequested.emit(selected_ids, False)
 
     def eventFilter(self, watched, event):
+        if watched is self.table.viewport() and event.type() == QEvent.Type.Leave:
+            self.actions.clear_hover(self.table)
+
         if watched is self.table.viewport() and event.type() in {
             QEvent.Type.DragEnter,
             QEvent.Type.DragMove,

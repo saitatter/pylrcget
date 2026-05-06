@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from PySide6.QtCore import QObject, QEvent, Qt
+from PySide6.QtCore import QObject, QEvent, QPoint, Qt
+from PySide6.QtGui import QFont
 from PySide6.QtWidgets import QLabel, QWidget
 
 
@@ -26,7 +27,8 @@ class HotkeyHintManager(QObject):
     def register(self, widget: QWidget, key: str) -> None:
         if not key:
             return
-        badge = QLabel(key, widget)
+        badge_parent = widget.window() if widget.window() is not None else widget
+        badge = QLabel(key, badge_parent)
         badge.setObjectName("HotkeyHintBadge")
         badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
         badge.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
@@ -62,11 +64,58 @@ class HotkeyHintManager(QObject):
         return super().eventFilter(watched, event)
 
     def _position_badge(self, hint: _HotkeyHint) -> None:
-        hint.badge.adjustSize()
+        parent = hint.widget.window() if hint.widget.window() is not None else hint.widget
+        if hint.badge.parentWidget() is not parent:
+            hint.badge.setParent(parent)
+        hint.badge.setText(self._badge_text(hint.widget, hint.key))
+        hint.badge.setFont(self._badge_font(hint.widget, hint.badge))
         size = hint.badge.sizeHint()
-        width = max(size.width() + 10, 28)
-        height = max(size.height() + 4, 18)
-        margin = 4
-        x = max(margin, hint.widget.width() - width - margin)
-        y = margin
-        hint.badge.setGeometry(x, y, width, height)
+        target_height = max(1, hint.widget.height())
+        scale = max(0.72, min(1.0, target_height / 44.0))
+        margin = max(2, int(4 * scale))
+        min_width = int(18 * scale)
+        if target_height < 34:
+            max_width = max(12, hint.widget.width() - 2 * margin)
+            width = min(max(int(size.width() + 4 * scale), min_width), max_width)
+        else:
+            width = max(int(size.width() + 4 * scale), min_width)
+        height = max(int(size.height() + 4 * scale), int(16 * scale))
+
+        if width > hint.widget.width():
+            local_x = (hint.widget.width() - width) // 2
+            local_y = -max(0, height - max(8, hint.widget.height() // 2))
+        else:
+            local_x = max(margin, hint.widget.width() - width - margin)
+            local_y = margin
+        if parent is hint.widget:
+            origin = QPoint(local_x, local_y)
+        else:
+            origin = hint.widget.mapTo(parent, QPoint(local_x, local_y))
+        hint.badge.setGeometry(origin.x(), origin.y(), width, height)
+
+    @staticmethod
+    def _badge_font(widget: QWidget, badge: QLabel) -> QFont:
+        font = QFont(badge.font())
+        target_height = max(1, widget.height())
+        if target_height < 34:
+            font.setPointSize(max(5, font.pointSize() - 3))
+        elif target_height < 40:
+            font.setPointSize(max(7, font.pointSize() - 1))
+        return font
+
+    @staticmethod
+    def _badge_text(widget: QWidget, key: str) -> str:
+        if widget.height() >= 34:
+            return key
+        compact_keys = {
+            "Ctrl+Left": "C<",
+            "Ctrl+Right": "C>",
+            "Space": "Sp",
+        }
+        if key in compact_keys:
+            return compact_keys[key]
+        return (
+            key.replace("Ctrl+", "C+")
+            .replace("Alt+", "A+")
+            .replace("Shift+", "S+")
+        )

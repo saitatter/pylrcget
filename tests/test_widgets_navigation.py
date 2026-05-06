@@ -6,12 +6,20 @@ from types import SimpleNamespace
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
-from PySide6.QtWidgets import QHeaderView
+from PySide6.QtCore import QEvent, QPointF, QRect
+from PySide6.QtGui import QColor, QImage, QMouseEvent, QPainter, QStandardItem, QStandardItemModel
+from PySide6.QtWidgets import QHeaderView, QPushButton, QStyle, QStyleOptionViewItem, QTableView, QWidget
 
+from core.tracklist_models import DownloadState, LyricsState, TrackListRow
+from ui.delegates.actions_delegate import ActionsDelegate
 from ui.library_routes import albums_detail, artists_detail, tracks_album, tracks_artist
 from ui.controllers.top_bar_controller import TopBarController
+from ui.widgets.hotkey_hints import HotkeyHintManager
 from ui.widgets.lrclib_browser_widget import _BrowserPublishDialog
-from ui.widgets.lyrics_editor_widget import LyricsEditorWidget
+from ui.widgets.lyrics_editor_widget import LyricsEditorWidget, TIMESTAMP_MS_ROLE
+from ui.widgets.toast import ToastManager
+from ui.main_window import MainWindow
+from ui.player_bar import PlayerBar
 from tests.test_support import (
     HAS_QT,
     AlbumListWidget,
@@ -225,6 +233,66 @@ class LyricsPasteBehaviorTests(unittest.TestCase):
         finally:
             widget.deleteLater()
 
+    def test_lyrics_quick_actions_have_shortcuts(self):
+        widget = LyricsEditorWidget()
+        try:
+            widget._set_synced([(1200, "First line"), (3000, "Second line")])
+            widget.table.selectRow(0)
+
+            self.assertIn("(Left)", widget.btn_shift_minus.toolTip())
+            self.assertIn("(Right)", widget.btn_shift_plus.toolTip())
+            self.assertEqual(widget._shortcut_shift_minus.key().toString(), "Left")
+            self.assertEqual(widget._shortcut_shift_plus.key().toString(), "Right")
+            self.assertEqual(widget._shortcut_snap.key().toString(), "Ctrl+Return")
+            self.assertEqual(widget._shortcut_add_line.key().toString(), "Ins")
+            self.assertEqual(widget._shortcut_delete_line.key().toString(), "Del")
+            self.assertIs(widget._shortcut_shift_plus.parent(), widget.table)
+
+            widget._shortcut_shift_plus.activated.emit()
+            self.assertEqual(widget.table.item(0, 0).text(), "00:01.30")
+            self.assertEqual(widget.table.item(0, 0).data(TIMESTAMP_MS_ROLE), 1300)
+        finally:
+            widget.deleteLater()
+
+    def test_lyrics_validator_blocks_save_until_autofix(self):
+        widget = LyricsEditorWidget()
+        emitted: list[tuple[str, str]] = []
+        widget.saveRequested.connect(lambda lrc, plain: emitted.append((lrc, plain)))
+        try:
+            widget._set_synced([(1200, "First line."), (3000, "Second line")])
+
+            self.assertFalse(widget.btn_save.isEnabled())
+            self.assertFalse(widget.btn_autofix.isHidden())
+            self.assertIn("mark the end", widget.validation_hint.text())
+
+            widget._emit_save()
+            self.assertEqual(emitted, [])
+
+            widget._autofix_validation_problems()
+            self.assertTrue(widget.btn_save.isEnabled())
+            self.assertTrue(widget.btn_autofix.isHidden())
+
+            widget._emit_save()
+            self.assertEqual(len(emitted), 1)
+            self.assertIn("[00:08.00]", emitted[0][0])
+            self.assertNotIn("First line.", emitted[0][0])
+        finally:
+            widget.deleteLater()
+
+    def test_plain_lyrics_validator_blocks_save(self):
+        widget = LyricsEditorWidget()
+        emitted: list[tuple[str, str]] = []
+        widget.saveRequested.connect(lambda lrc, plain: emitted.append((lrc, plain)))
+        try:
+            widget._set_plain("[00:01.00] Not plain")
+
+            self.assertFalse(widget.btn_save.isEnabled())
+            self.assertFalse(widget.btn_autofix.isEnabled())
+            widget._emit_save()
+            self.assertEqual(emitted, [])
+        finally:
+            widget.deleteLater()
+
     def test_browser_publish_lyrics_fields_reject_rich_text_paste(self):
         dialog = _BrowserPublishDialog("https://lrclib.net")
         try:
@@ -269,6 +337,260 @@ class LyricsPasteBehaviorTests(unittest.TestCase):
             self.assertEqual(widget.btn_download_missing.statusTip(), "")
         finally:
             widget.deleteLater()
+
+    def test_player_hotkey_badges_use_shared_badge_style(self):
+        stylesheet = Path("src/ui/qss/player_bar.qss").read_text(encoding="utf-8")
+        self.assertIn("QLabel#HotkeyHintBadge", stylesheet)
+        self.assertIn("background: {{color-accent}};", stylesheet)
+        self.assertIn("border-radius: {{radius-pill}};", stylesheet)
+        self.assertIn("border-radius: 22px;", stylesheet)
+        self.assertIn("border-radius: 14px;", stylesheet)
+        self.assertIn("QToolButton#BtnPrev:hover", stylesheet)
+        self.assertIn("QToolButton#BtnNext:hover", stylesheet)
+
+    def test_hotkey_badge_uses_window_parent_for_small_buttons(self):
+        parent = QWidget()
+        button = QPushButton(parent)
+        button.setGeometry(10, 10, 28, 28)
+        manager = HotkeyHintManager(parent)
+        try:
+            parent.resize(120, 80)
+            parent.show()
+            self.app.processEvents()
+            manager.register(button, "Ctrl+Left")
+            manager.set_visible(True)
+
+            badge = manager._hints[0].badge
+            self.assertIs(badge.parentWidget(), parent)
+            self.assertEqual(badge.text(), "C<")
+            self.assertLessEqual(badge.width(), button.width())
+            self.assertGreaterEqual(badge.x(), button.x())
+            self.assertLessEqual(badge.x() + badge.width(), button.x() + button.width())
+            self.assertTrue(badge.isVisible())
+        finally:
+            parent.deleteLater()
+
+    def test_player_speed_label_and_value_fit_centered(self):
+        widget = PlayerBar(player=None)
+        try:
+            widget.cmb_speed.resize(100, 28)
+            widget._set_speed_combo_value(1.0)
+            prefix = widget.lbl_speed_prefix.geometry()
+            margins = widget.cmb_speed.lineEdit().textMargins()
+            value_width = widget.cmb_speed.lineEdit().fontMetrics().horizontalAdvance(widget.cmb_speed.lineEdit().text())
+            group_left = prefix.left()
+            group_width = 44 + 4 + 50
+            group_right = group_left + group_width
+
+            self.assertGreaterEqual(group_left, 0)
+            self.assertLessEqual(group_right, widget.cmb_speed.width())
+            self.assertGreaterEqual(group_left - (widget.cmb_speed.width() - group_right), 0)
+            self.assertLessEqual(group_left - (widget.cmb_speed.width() - group_right), 10)
+            self.assertLessEqual(margins.left() + value_width, group_right)
+
+            left_for_one_decimal = widget.lbl_speed_prefix.x()
+            margin_for_one_decimal = margins.left()
+            widget._set_speed_combo_value(1.05)
+            self.assertEqual(widget.lbl_speed_prefix.x(), left_for_one_decimal)
+            self.assertEqual(widget.cmb_speed.lineEdit().textMargins().left(), margin_for_one_decimal)
+        finally:
+            widget.deleteLater()
+
+    def test_player_volume_slider_aligns_with_speed_combo(self):
+        widget = PlayerBar(player=None)
+        try:
+            widget.show()
+            self.app.processEvents()
+
+            self.assertEqual(widget.slider_volume.width(), widget.cmb_speed.width())
+            self.assertEqual(widget.slider_volume.x(), widget.cmb_speed.x())
+            self.assertEqual(widget.lbl_volume.x(), widget.btn_speed_down.x())
+            self.assertEqual(widget.lbl_volume_value.x(), widget.btn_speed_up.x())
+            self.assertEqual(widget.lbl_volume_value.width(), widget.btn_speed_up.width())
+        finally:
+            widget.deleteLater()
+
+    def test_track_action_buttons_track_individual_hover(self):
+        table = QTableView()
+        model = QStandardItemModel(1, 4)
+        item = QStandardItem("")
+        item.setData(
+            TrackListRow(
+                track_id=1,
+                title="Song",
+                artist="Artist",
+                artist_id=None,
+                album="Album",
+                album_id=None,
+                duration_s=120,
+                lyrics_state=LyricsState.NONE,
+                download_state=DownloadState.IDLE,
+            ),
+            Qt.ItemDataRole.UserRole,
+        )
+        model.setItem(0, 3, item)
+        table.setModel(model)
+        delegate = ActionsDelegate(table)
+        option = QStyleOptionViewItem()
+        option.widget = table
+        option.rect = QRect(0, 0, 150, 44)
+        refresh_rect, download_rect = delegate._button_rects(option.rect)
+        index = model.index(0, 3)
+        try:
+            refresh_event = QMouseEvent(
+                QEvent.Type.MouseMove,
+                QPointF(refresh_rect.center()),
+                QPointF(refresh_rect.center()),
+                QPointF(refresh_rect.center()),
+                Qt.MouseButton.NoButton,
+                Qt.MouseButton.NoButton,
+                Qt.KeyboardModifier.NoModifier,
+            )
+            self.assertTrue(delegate.editorEvent(refresh_event, model, option, index))
+            self.assertEqual(delegate._hover_button, "refresh")
+
+            download_event = QMouseEvent(
+                QEvent.Type.MouseMove,
+                QPointF(download_rect.center()),
+                QPointF(download_rect.center()),
+                QPointF(download_rect.center()),
+                Qt.MouseButton.NoButton,
+                Qt.MouseButton.NoButton,
+                Qt.KeyboardModifier.NoModifier,
+            )
+            self.assertTrue(delegate.editorEvent(download_event, model, option, index))
+            self.assertEqual(delegate._hover_button, "download")
+        finally:
+            table.deleteLater()
+
+    def test_track_action_buttons_keep_theme_background_when_row_selected(self):
+        table = QTableView()
+        model = QStandardItemModel(1, 4)
+        item = QStandardItem("")
+        item.setData(
+            TrackListRow(
+                track_id=1,
+                title="Song",
+                artist="Artist",
+                artist_id=None,
+                album="Album",
+                album_id=None,
+                duration_s=120,
+                lyrics_state=LyricsState.SYNCED,
+                download_state=DownloadState.IDLE,
+            ),
+            Qt.ItemDataRole.UserRole,
+        )
+        model.setItem(0, 3, item)
+        table.setModel(model)
+        delegate = ActionsDelegate(table)
+        option = QStyleOptionViewItem()
+        option.widget = table
+        option.rect = QRect(0, 0, 150, 44)
+        option.state = QStyle.StateFlag.State_Enabled | QStyle.StateFlag.State_Selected
+        index = model.index(0, 3)
+        refresh_rect, download_rect = delegate._button_rects(option.rect)
+        image = QImage(option.rect.size(), QImage.Format.Format_ARGB32)
+        image.fill(QColor("#554872"))
+        painter = QPainter(image)
+        try:
+            delegate.paint(painter, option, index)
+        finally:
+            painter.end()
+            table.deleteLater()
+
+        button_sample = image.pixelColor(download_rect.left() + 8, download_rect.center().y())
+        row_sample = image.pixelColor(8, download_rect.center().y())
+        self.assertNotEqual(row_sample.name(), "#000000")
+        self.assertLess(abs(button_sample.value() - row_sample.value()), 8)
+
+        image.fill(QColor("#554872"))
+        delegate._hover_row = 0
+        delegate._hover_button = "download"
+        painter = QPainter(image)
+        try:
+            delegate.paint(painter, option, index)
+        finally:
+            painter.end()
+
+        hover_button_sample = image.pixelColor(download_rect.left() + 8, download_rect.center().y())
+        hover_row_sample = image.pixelColor(8, download_rect.center().y())
+        hover_cell_background = image.pixelColor(refresh_rect.left() - 4, download_rect.center().y())
+        self.assertGreater(hover_button_sample.value(), hover_row_sample.value())
+        self.assertLess(abs(hover_cell_background.value() - hover_row_sample.value()), 8)
+
+    def test_scan_progress_updates_overlay(self):
+        window = MainWindow.__new__(MainWindow)
+        overlay_calls: list[tuple[int, int, str, str]] = []
+        window.scan_overlay = SimpleNamespace(
+            update_progress=lambda current, total, label, status: overlay_calls.append((current, total, label, status))
+        )
+        window.progress_bar = SimpleNamespace(
+            maximum=lambda: 100,
+            setRange=lambda *_args: None,
+            setValue=lambda *_args: None,
+        )
+        window.scan_label = SimpleNamespace(setText=lambda *_args: None)
+        window.scan_details = SimpleNamespace(setText=lambda *_args: None)
+
+        MainWindow._update_scan_progress(window, 3, 10, "C:/Music/Song.mp3", 1.25)
+
+        self.assertEqual(overlay_calls[-1][0:3], (3, 10, "Song.mp3"))
+        self.assertIn("30%", overlay_calls[-1][3])
+
+    def test_status_message_uses_toast_area_without_changing_layout(self):
+        window = MainWindow.__new__(MainWindow)
+        window.central_widget = QWidget()
+        window.central_widget.resize(480, 320)
+        window.central_widget.show()
+        window.player_bar = QWidget(window.central_widget)
+        window.player_bar.setGeometry(0, 260, 480, 52)
+        window.player_bar.show()
+        window.toasts = ToastManager(window.central_widget)
+        window.toasts.set_bottom_anchor(window.player_bar)
+        try:
+            before = window.central_widget.geometry()
+
+            MainWindow._show_status_message(window, "Lyrics saved.", 2500)
+            self.app.processEvents()
+
+            self.assertEqual(window.central_widget.geometry(), before)
+            self.assertIsNotNone(window.toasts._status_toast)
+            toast = window.toasts._status_toast
+            self.assertTrue(toast.isVisible())
+            self.assertEqual(toast.lbl.text(), "Lyrics saved.")
+            self.assertLessEqual(
+                toast.y() + toast.height(),
+                window.player_bar.y(),
+            )
+
+            window.toasts.show_toast("Saved.", "success", 3000)
+            self.app.processEvents()
+            normal_toast = next(t for t in window.toasts._toasts if t is not toast)
+            self.assertLess(normal_toast.y(), toast.y())
+            self.assertLessEqual(normal_toast.y() + normal_toast.height(), toast.y())
+        finally:
+            window.central_widget.deleteLater()
+
+    def test_status_and_toast_with_same_text_do_not_duplicate(self):
+        host = QWidget()
+        host.resize(480, 320)
+        host.show()
+        manager = ToastManager(host)
+        try:
+            manager.show_status("Lyrics saved.", 2500)
+            manager.show_toast("Lyrics saved.", "success", 3000)
+            self.app.processEvents()
+
+            self.assertEqual(len(manager._toasts), 1)
+            self.assertIsNone(manager._status_toast)
+            self.assertEqual(manager._toasts[0].lbl.text(), "Lyrics saved.")
+
+            manager.show_status("Lyrics saved.", 2500)
+            self.app.processEvents()
+            self.assertEqual(len(manager._toasts), 1)
+        finally:
+            host.deleteLater()
 
     def test_open_track_folder_opens_parent_directory(self):
         app_state = simple_app_state()
