@@ -19,7 +19,7 @@ jobs:
       commit_sha: ${{ steps.semantic-release.outputs.commit_sha }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -56,12 +56,12 @@ jobs:
             portable_name: pylrcget-macos-portable
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           ref: ${{ needs.release.outputs.commit_sha }}
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.11"
 
@@ -163,19 +163,19 @@ jobs:
             "${{ matrix.installer_name }}"
 
       - name: Upload workflow artifact (archive)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.archive_name }}
           path: ${{ matrix.archive_name }}
 
       - name: Upload workflow artifact (installer)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.installer_name }}
           path: ${{ matrix.installer_name }}
 
       - name: Upload workflow artifact (portable)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.portable_name }}
           path: ${{ matrix.portable_name }}
