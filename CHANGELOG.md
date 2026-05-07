@@ -1,4 +1,10 @@
 # Changelog
+## v1.5.1 (2026-05-07)
+
+### 🧰 CI & Build
+* Add dependabot updates ([e971215](https://github.com/saitatter/pylrcget/commit/e971215a7fe2216d106edd8478c3ba7ee1c3fbcc))
+
+
 ## v1.5.0 (2026-05-06)
 
 ### ✨ Features
