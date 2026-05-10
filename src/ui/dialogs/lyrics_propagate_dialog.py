@@ -68,10 +68,10 @@ class LyricsDiffButtonDelegate(QStyledItemDelegate):
         has_fill = True
         if selected:
             bg_color = _theme_color("color-accent", "#38bdf8")
-            bg_color.setAlpha(110 if hovered else 80)
+            bg_color.setAlpha(150 if hovered else 118)
             border_color = _theme_color("color-accent", "#38bdf8")
-            border_color.setAlpha(210 if hovered else 130)
-            has_fill = hovered
+            border_color.setAlpha(235 if hovered else 205)
+            has_fill = True
         if not enabled:
             bg_color = _theme_color("color-bg-pressed", "#262626")
             border_color = _theme_color("color-disabled-border", "#4b5563")
