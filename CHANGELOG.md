@@ -1,4 +1,19 @@
 # Changelog
+## v1.8.0 (2026-05-10)
+
+### ✨ Features
+* Add lyric diff to sync dialog ([de8215f](https://github.com/saitatter/pylrcget/commit/de8215f5f1cd7be076bcdb63be9d3078ebdaebda))
+* Sync lyrics to similar tracks ([4aa2666](https://github.com/saitatter/pylrcget/commit/4aa26660a883d40927a29a2cd927480333e40d29))
+
+### 🐛 Fixes
+* Match sync dialog table styling ([ad157a2](https://github.com/saitatter/pylrcget/commit/ad157a27dbc9e073d0d1bd0fc0cf283f94571b27))
+* Improve selected sync diff button contrast ([200dea7](https://github.com/saitatter/pylrcget/commit/200dea70e3d20f0e32d1060c533ddff39efe6c6c))
+* Render sync diff action with delegate ([0ad29b6](https://github.com/saitatter/pylrcget/commit/0ad29b6385dfc4a3fb842039729770fdadb6729a))
+* Center diff button in sync table ([115d267](https://github.com/saitatter/pylrcget/commit/115d267695f61e52727c30c0754901b8a89147ca))
+* Polish sync dialog diff action ([1cdffc0](https://github.com/saitatter/pylrcget/commit/1cdffc040023558d4e1b308be1bd4528134c2938))
+* Require exact metadata for lyric sync matches ([5bea010](https://github.com/saitatter/pylrcget/commit/5bea010b0185abf08125f5bcce3f1572a4492439))
+
+
 ## v1.7.0 (2026-05-10)
 
 ### ✨ Features
