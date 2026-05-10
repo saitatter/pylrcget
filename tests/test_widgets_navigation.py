@@ -502,11 +502,17 @@ class LyricsPasteBehaviorTests(unittest.TestCase):
         )
         try:
             headers = [dialog.table.horizontalHeaderItem(index).text() for index in range(dialog.table.columnCount())]
-            self.assertEqual(headers, ["Apply", "Track", "Artist", "Album", "Duration", "Match"])
+            self.assertEqual(headers, ["Apply", "Track", "Artist", "Album", "Duration", "Match", "Diff"])
             self.assertNotIn("Title", headers)
             self.assertNotIn("Artist/Time", headers)
-            self.assertIsInstance(dialog.diff_button, QPushButton)
-            self.assertTrue(dialog.diff_button.isEnabled())
+            diff_cell = dialog.table.cellWidget(0, 6)
+            self.assertIsNotNone(diff_cell)
+            diff_button = diff_cell.findChild(QPushButton)
+            self.assertIsNotNone(diff_button)
+            self.assertEqual(diff_button.text(), "Diff")
+            self.assertEqual(diff_button.width(), 54)
+            self.assertEqual(diff_button.height(), 26)
+            self.assertTrue(diff_button.isEnabled())
             self.assertEqual(dialog.selected_track_ids(), [42])
         finally:
             dialog.deleteLater()
