@@ -5,12 +5,20 @@ import sqlite3
 import time
 
 from PySide6.QtCore import QThread, Signal
+from requests import exceptions as requests_exceptions
 
 from core.utils import plain_text_from_lrc
 from db.queries import get_config, get_track_by_id
 from core.lrclib_client import LrcLibAPI, RateLimitError, ServerError
 
 logger = logging.getLogger(__name__)
+
+_RETRYABLE_PUBLISH_ERRORS = (
+    RateLimitError,
+    ServerError,
+    requests_exceptions.Timeout,
+    requests_exceptions.ConnectionError,
+)
 
 
 class BulkPublishWorker(QThread):
@@ -122,7 +130,7 @@ class BulkPublishWorker(QThread):
                     synced_lyrics=synced.strip() if synced else None,
                 )
                 return
-            except (RateLimitError, ServerError) as exc:
+            except _RETRYABLE_PUBLISH_ERRORS as exc:
                 if attempt >= max_retries:
                     raise
                 logger.warning(

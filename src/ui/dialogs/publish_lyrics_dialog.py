@@ -10,12 +10,20 @@ from PySide6.QtWidgets import (
     QTableWidget, QTableWidgetItem, QWidget, QStackedWidget
 )
 import re
+from requests import exceptions as requests_exceptions
 
 from core.lrclib_client import LrcLibAPI, IncorrectPublishTokenError, LrcLibError, RateLimitError, ServerError
 
 from ui.spacing import SPACE_2, SPACE_3, SPACE_4, set_layout_spacing
 
 logger = logging.getLogger(__name__)
+
+_RETRYABLE_PUBLISH_ERRORS = (
+    RateLimitError,
+    ServerError,
+    requests_exceptions.Timeout,
+    requests_exceptions.ConnectionError,
+)
 
 @dataclass(frozen=True)
 class LintProblem:
@@ -146,7 +154,7 @@ class PublishWorker(QThread):
                 logger.exception("Publish token rejected by LRCLIB")
                 self.finished.emit(False, "Publish token was rejected. Try again.")
                 return
-            except (RateLimitError, ServerError) as e:
+            except _RETRYABLE_PUBLISH_ERRORS as e:
                 if attempt < max_retries:
                     logger.warning(
                         "Publish attempt %d/%d failed (%s), retrying in %.1fs...",
@@ -157,7 +165,11 @@ class PublishWorker(QThread):
                     backoff_s *= 2
                     continue
                 logger.warning("Publish failed after %d attempts: %s", max_retries, e)
-                self.finished.emit(False, f"Publish failed after {max_retries} attempts: {e}")
+                self.finished.emit(
+                    False,
+                    "Publish failed after multiple attempts because LRCLIB did not respond in time. "
+                    "Please try again in a moment.",
+                )
                 return
             except LrcLibError as e:
                 logger.exception("LRCLIB API error during publish")
