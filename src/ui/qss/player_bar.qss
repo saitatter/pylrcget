@@ -180,7 +180,7 @@ QWidget#PlayerExtras QLabel#MetaLabel {
 QLabel#NowPlayingCover {
     background: {{color-bg-pressed}};
     border: 1px solid {{color-cover-border}};
-    border-radius: 10px;
+    border-radius: 12px;
 }
 
 QSlider#PlayerSlider::groove:horizontal {

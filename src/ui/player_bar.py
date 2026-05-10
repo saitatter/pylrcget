@@ -28,13 +28,13 @@ logger = logging.getLogger(__name__)
 
 PLAYER_META_MIN_WIDTH = 220
 PLAYER_META_COMPACT_MIN_WIDTH = 170
-PLAYER_META_ARTWORK_WIDTH = 34
+PLAYER_META_ARTWORK_WIDTH = 46
 PLAYER_EXTRAS_MIN_WIDTH = 230
 PLAYER_EXTRAS_COMPACT_MIN_WIDTH = 205
 PLAYER_CENTER_MIN_WIDTH = 340
 PLAYER_CENTER_COMPACT_MIN_WIDTH = 260
-PLAYER_COVER_SIZE = 52
-PLAYER_COVER_COMPACT_SIZE = 44
+PLAYER_COVER_SIZE = 64
+PLAYER_COVER_COMPACT_SIZE = 52
 PLAYER_BAR_HEIGHT = 104
 PLAYER_BAR_COMPACT_HEIGHT = 92
 
@@ -196,11 +196,12 @@ class PlayerBar(QWidget):
 
         self.lbl_cover = QLabel()
         self.lbl_cover.setObjectName("NowPlayingCover")
-        self.lbl_cover.setFixedSize(56, 56)
-        self.lbl_cover.setPixmap(_artwork_pixmap("?", None, None, 56))
+        self.lbl_cover.setFixedSize(PLAYER_COVER_SIZE, PLAYER_COVER_SIZE)
+        self.lbl_cover.setPixmap(_artwork_pixmap("?", None, None, PLAYER_COVER_SIZE))
 
         text_stack = QVBoxLayout()
         set_layout_spacing(text_stack, spacing=2)
+        text_stack.setAlignment(Qt.AlignmentFlag.AlignVCenter)
 
         self.lbl_title = QLabel("Nothing playing")
         self.lbl_title.setObjectName("NowPlaying")
@@ -228,10 +229,10 @@ class PlayerBar(QWidget):
         text_stack.addWidget(self.lbl_title)
         text_stack.addWidget(self.lbl_artist)
         text_stack.addWidget(self.lbl_album)
-        text_stack.addStretch(1)
 
         left_layout.addWidget(self.lbl_cover, 0, Qt.AlignVCenter)
         left_layout.addLayout(text_stack, 1)
+        left_layout.setAlignment(text_stack, Qt.AlignmentFlag.AlignVCenter)
 
         self.center_panel = QWidget()
         self.center_panel.setObjectName("PlayerCenter")

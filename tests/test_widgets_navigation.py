@@ -19,7 +19,7 @@ from ui.widgets.lrclib_browser_widget import _BrowserPublishDialog
 from ui.widgets.lyrics_editor_widget import LyricsEditorWidget, TIMESTAMP_MS_ROLE
 from ui.widgets.toast import ToastManager
 from ui.main_window import MainWindow
-from ui.player_bar import PlayerBar
+from ui.player_bar import PLAYER_COVER_SIZE, PlayerBar
 from ui.theme_tokens import get_theme_tokens
 from tests.test_support import (
     HAS_QT,
@@ -426,6 +426,26 @@ class LyricsPasteBehaviorTests(unittest.TestCase):
             widget._set_speed_combo_value(1.05)
             self.assertEqual(widget.lbl_speed_prefix.x(), left_for_one_decimal)
             self.assertEqual(widget.cmb_speed.lineEdit().textMargins().left(), margin_for_one_decimal)
+        finally:
+            widget.deleteLater()
+
+    def test_player_cover_is_larger_and_text_is_centered(self):
+        widget = PlayerBar(player=None)
+        try:
+            widget.resize(1000, 120)
+            widget.show()
+            self.app.processEvents()
+
+            self.assertEqual(widget.lbl_cover.width(), PLAYER_COVER_SIZE)
+            self.assertEqual(widget.lbl_cover.height(), PLAYER_COVER_SIZE)
+
+            text_widgets = [widget.lbl_title, widget.lbl_artist, widget.lbl_album]
+            text_top = min(label.geometry().top() for label in text_widgets if label.isVisible())
+            text_bottom = max(label.geometry().bottom() for label in text_widgets if label.isVisible())
+            text_center_y = (text_top + text_bottom) // 2
+            cover_center_y = widget.lbl_cover.geometry().center().y()
+
+            self.assertLessEqual(abs(text_center_y - cover_center_y), 4)
         finally:
             widget.deleteLater()
 
