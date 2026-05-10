@@ -25,6 +25,7 @@ class TrackListRow:
     artist_id: int | None
     album: str | None
     album_id: int | None
+    track_number: int | None
     duration_s: int | None
     lyrics_state: LyricsState
     has_dirty_lyrics: bool = False

@@ -6,8 +6,8 @@ from types import SimpleNamespace
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
-from PySide6.QtCore import QEvent, QPointF, QRect
-from PySide6.QtGui import QColor, QImage, QMouseEvent, QPainter, QStandardItem, QStandardItemModel
+from PySide6.QtCore import QEvent, QPoint, QPointF, QRect
+from PySide6.QtGui import QColor, QFont, QFontMetrics, QImage, QMouseEvent, QPainter, QStandardItem, QStandardItemModel
 from PySide6.QtWidgets import QHeaderView, QPushButton, QStyle, QStyleOptionViewItem, QTableView, QWidget
 
 from core.tracklist_models import DownloadState, LyricsState, TrackListRow
@@ -206,6 +206,66 @@ class TrackListWidgetTests(unittest.TestCase):
             widget.deleteLater()
             app_state.db.close()
 
+    def test_track_metadata_delegate_handles_links_in_track_column(self):
+        app_state = simple_app_state()
+        widget = TrackListWidget(app_state)
+        opened_albums: list[int] = []
+        try:
+            widget.openAlbum.connect(opened_albums.append)
+            widget.model.set_rows(
+                [
+                    TrackListRow(
+                        track_id=1,
+                        title="Song",
+                        artist="Radiohead",
+                        artist_id=7,
+                        album="Kid A",
+                        album_id=11,
+                        track_number=1,
+                        duration_s=120,
+                        lyrics_state=LyricsState.SYNCED,
+                    )
+                ]
+            )
+            widget.resize(900, 260)
+            widget.show()
+            self.app.processEvents()
+
+            track_index = widget.model.index(0, 1)
+            rect = widget.table.visualRect(track_index)
+            option = QStyleOptionViewItem()
+            option.widget = widget.table
+            option.rect = rect
+            option.font = widget.table.font()
+
+            content = rect.adjusted(10, 6, -10, -6)
+            meta_font = QFont(option.font)
+            meta_font.setPointSize(max(meta_font.pointSize() - 1, 9))
+            metrics = QFontMetrics(meta_font)
+            meta_rect = QRect(content.left(), content.bottom() - metrics.height(), content.width(), metrics.height())
+            _, _, _, album_rect, _ = widget.track_info._metadata_layout(
+                meta_rect,
+                metrics,
+                widget.model._rows[0],
+            )
+            pos = album_rect.center()
+            release = QMouseEvent(
+                QEvent.Type.MouseButtonRelease,
+                QPointF(pos),
+                QPointF(pos),
+                QPointF(widget.table.viewport().mapToGlobal(pos)),
+                Qt.MouseButton.LeftButton,
+                Qt.MouseButton.LeftButton,
+                Qt.KeyboardModifier.NoModifier,
+            )
+
+            self.assertTrue(widget.track_info.editorEvent(release, widget.model, option, track_index))
+            self.assertEqual(opened_albums, [11])
+            self.assertFalse(widget.track_info.editorEvent(release, widget.model, option, widget.model.index(0, 0)))
+        finally:
+            widget.deleteLater()
+            app_state.db.close()
+
 
 @unittest.skipUnless(HAS_QT, "PySide6 is required for widget tests")
 class LyricsPasteBehaviorTests(unittest.TestCase):
@@ -306,16 +366,19 @@ class LyricsPasteBehaviorTests(unittest.TestCase):
         app_state = simple_app_state()
         widget = TrackListWidget(app_state)
         try:
-            self.assertEqual(widget.model.columnCount(), 4)
-            self.assertEqual(widget.model.headerData(2, Qt.Orientation.Horizontal, Qt.ItemDataRole.DisplayRole), "Lyrics")
+            self.assertEqual(widget.model.columnCount(), 5)
+            self.assertEqual(widget.model.headerData(0, Qt.Orientation.Horizontal, Qt.ItemDataRole.DisplayRole), "#")
+            self.assertEqual(widget.model.headerData(3, Qt.Orientation.Horizontal, Qt.ItemDataRole.DisplayRole), "Lyrics")
             self.assertEqual(
-                widget.model.headerData(2, Qt.Orientation.Horizontal, Qt.ItemDataRole.TextAlignmentRole),
+                widget.model.headerData(3, Qt.Orientation.Horizontal, Qt.ItemDataRole.TextAlignmentRole),
                 int(Qt.AlignmentFlag.AlignCenter | Qt.AlignmentFlag.AlignVCenter),
             )
-            self.assertFalse(widget.table.isColumnHidden(2))
-            self.assertGreaterEqual(widget.table.columnWidth(1), 90)
-            self.assertEqual(widget.header.sectionResizeMode(2), QHeaderView.ResizeMode.Fixed)
-            self.assertGreaterEqual(widget.table.columnWidth(2), 100)
+            self.assertFalse(widget.table.isColumnHidden(0))
+            self.assertFalse(widget.table.isColumnHidden(3))
+            self.assertGreaterEqual(widget.table.columnWidth(0), 50)
+            self.assertGreaterEqual(widget.table.columnWidth(2), 90)
+            self.assertEqual(widget.header.sectionResizeMode(3), QHeaderView.ResizeMode.Fixed)
+            self.assertGreaterEqual(widget.table.columnWidth(3), 100)
         finally:
             widget.deleteLater()
             app_state.db.close()
@@ -465,7 +528,7 @@ class LyricsPasteBehaviorTests(unittest.TestCase):
 
     def test_track_action_buttons_track_individual_hover(self):
         table = QTableView()
-        model = QStandardItemModel(1, 4)
+        model = QStandardItemModel(1, 5)
         item = QStandardItem("")
         item.setData(
             TrackListRow(
@@ -475,20 +538,21 @@ class LyricsPasteBehaviorTests(unittest.TestCase):
                 artist_id=None,
                 album="Album",
                 album_id=None,
+                track_number=1,
                 duration_s=120,
                 lyrics_state=LyricsState.NONE,
                 download_state=DownloadState.IDLE,
             ),
             Qt.ItemDataRole.UserRole,
         )
-        model.setItem(0, 3, item)
+        model.setItem(0, 4, item)
         table.setModel(model)
         delegate = ActionsDelegate(table)
         option = QStyleOptionViewItem()
         option.widget = table
         option.rect = QRect(0, 0, 150, 44)
         refresh_rect, download_rect = delegate._button_rects(option.rect)
-        index = model.index(0, 3)
+        index = model.index(0, 4)
         try:
             refresh_event = QMouseEvent(
                 QEvent.Type.MouseMove,
@@ -518,7 +582,7 @@ class LyricsPasteBehaviorTests(unittest.TestCase):
 
     def test_track_action_buttons_keep_theme_background_when_row_selected(self):
         table = QTableView()
-        model = QStandardItemModel(1, 4)
+        model = QStandardItemModel(1, 5)
         item = QStandardItem("")
         item.setData(
             TrackListRow(
@@ -528,20 +592,21 @@ class LyricsPasteBehaviorTests(unittest.TestCase):
                 artist_id=None,
                 album="Album",
                 album_id=None,
+                track_number=1,
                 duration_s=120,
                 lyrics_state=LyricsState.SYNCED,
                 download_state=DownloadState.IDLE,
             ),
             Qt.ItemDataRole.UserRole,
         )
-        model.setItem(0, 3, item)
+        model.setItem(0, 4, item)
         table.setModel(model)
         delegate = ActionsDelegate(table)
         option = QStyleOptionViewItem()
         option.widget = table
         option.rect = QRect(0, 0, 150, 44)
         option.state = QStyle.StateFlag.State_Enabled | QStyle.StateFlag.State_Selected
-        index = model.index(0, 3)
+        index = model.index(0, 4)
         refresh_rect, download_rect = delegate._button_rects(option.rect)
         image = QImage(option.rect.size(), QImage.Format.Format_ARGB32)
         image.fill(QColor("#554872"))

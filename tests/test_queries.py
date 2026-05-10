@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 import tempfile
 import unittest
 from pathlib import Path
@@ -17,6 +18,7 @@ from db.queries import (
     get_config,
     get_download_history_rows,
     get_publish_history_rows,
+    get_track_rows,
     get_track_by_id,
     refresh_track_from_file,
     record_download_history_batch,
@@ -50,6 +52,41 @@ class ArtistAlbumQueryTests(unittest.TestCase):
                 rows = get_album_rows(db, artist_id=artist_a_id)
                 album_names = [row["album_name"] for row in rows]
                 self.assertEqual(album_names, ["Album Shared"])
+            finally:
+                db.close()
+
+    def test_get_track_rows_includes_and_sorts_track_number(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db = initialize_database(tmp)
+            try:
+                first = Path(tmp) / "first.mp3"
+                second = Path(tmp) / "second.mp3"
+                unknown = Path(tmp) / "unknown.mp3"
+                touch_text(first, "a")
+                touch_text(second, "b")
+                touch_text(unknown, "c")
+                add_tracks(
+                    db,
+                    [
+                        replace(make_fs_track(first, artist="Artist", album="Album", title="First"), track_number=2),
+                        replace(make_fs_track(second, artist="Artist", album="Album", title="Second"), track_number=1),
+                        replace(make_fs_track(unknown, artist="Artist", album="Album", title="Unknown"), track_number=None),
+                    ],
+                )
+
+                rows = get_track_rows(
+                    db,
+                    search_query="",
+                    synced_lyrics_tracks=True,
+                    plain_lyrics_tracks=True,
+                    instrumental_tracks=True,
+                    no_lyrics_tracks=True,
+                    sort_column=0,
+                    sort_order="asc",
+                )
+
+                self.assertEqual([row["title"] for row in rows], ["Second", "First", "Unknown"])
+                self.assertEqual([row["track_number"] for row in rows], [1, 2, None])
             finally:
                 db.close()
 

@@ -35,6 +35,7 @@ from ui.widgets.track_list_rows import build_track_list_rows
 from core.tracklist_models import DownloadState, LyricsState
 
 
+TRACK_NUMBER_COLUMN_WIDTH = 56
 TRACK_DURATION_COLUMN_WIDTH = 92
 TRACK_LYRICS_COLUMN_WIDTH = 118
 TRACK_ACTIONS_COLUMN_WIDTH = 142
@@ -79,7 +80,7 @@ class TrackListWidget(QWidget):
         self._scope_label: str = ""
         self._scope_banner_enabled = True
         self._download_states: dict[int, DownloadState] = {}
-        self._sort_column = 0
+        self._sort_column = 1
         self._sort_order = Qt.SortOrder.AscendingOrder
         self._has_more_rows = False
         self._loading_more = False
@@ -108,9 +109,9 @@ class TrackListWidget(QWidget):
         self.header = SortableHeaderView(
             Qt.Orientation.Horizontal,
             self.table,
-            default_sort_column=0,
+            default_sort_column=1,
             default_sort_order=Qt.SortOrder.AscendingOrder,
-            non_sortable_columns={3},
+            non_sortable_columns={4},
         )
         self.table.setHorizontalHeader(self.header)
 
@@ -126,15 +127,16 @@ class TrackListWidget(QWidget):
         self.table.viewport().installEventFilter(self)
         self._suppress_left_click_until = 0.0
         self.table.setSortingEnabled(False)
-        self.header.setSortIndicator(0, Qt.SortOrder.AscendingOrder)
+        self.header.setSortIndicator(1, Qt.SortOrder.AscendingOrder)
         self.header.sortIndicatorChanged.connect(self._on_sort_changed)
         self.table.verticalScrollBar().valueChanged.connect(self._maybe_load_more)
 
         self.header.setStretchLastSection(False)
-        self.header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
-        self.header.setSectionResizeMode(1, QHeaderView.ResizeMode.Fixed)
+        self.header.setSectionResizeMode(0, QHeaderView.ResizeMode.Fixed)
+        self.header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         self.header.setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
         self.header.setSectionResizeMode(3, QHeaderView.ResizeMode.Fixed)
+        self.header.setSectionResizeMode(4, QHeaderView.ResizeMode.Fixed)
         self.table.setObjectName("TrackTable")
         self._apply_column_widths()
 
@@ -146,12 +148,12 @@ class TrackListWidget(QWidget):
         self.actions = ActionsDelegate(self.table)
         self.actions.refreshClicked.connect(self.refreshTrack.emit)
         self.actions.downloadClicked.connect(self.downloadLyrics.emit)
-        self.table.setItemDelegateForColumn(3, self.actions)
+        self.table.setItemDelegateForColumn(4, self.actions)
 
-        self.track_info = TrackInfoDelegate(self.table)
+        self.track_info = TrackInfoDelegate(self.table, track_column=1)
         self.track_info.artistClicked.connect(self._emit_artist_navigation)
         self.track_info.albumClicked.connect(self._emit_album_navigation)
-        self.table.setItemDelegateForColumn(0, self.track_info)
+        self.table.setItemDelegateForColumn(1, self.track_info)
 
         # Double click -> play
         self.table.doubleClicked.connect(self._on_double_click)
@@ -183,9 +185,10 @@ class TrackListWidget(QWidget):
             self.actions.set_ui_scale(self._ui_scale)
 
     def _apply_column_widths(self) -> None:
-        self.table.setColumnWidth(1, int(round(TRACK_DURATION_COLUMN_WIDTH * self._ui_scale)))
-        self.table.setColumnWidth(2, int(round(TRACK_LYRICS_COLUMN_WIDTH * self._ui_scale)))
-        self.table.setColumnWidth(3, int(round(TRACK_ACTIONS_COLUMN_WIDTH * self._ui_scale)))
+        self.table.setColumnWidth(0, int(round(TRACK_NUMBER_COLUMN_WIDTH * self._ui_scale)))
+        self.table.setColumnWidth(2, int(round(TRACK_DURATION_COLUMN_WIDTH * self._ui_scale)))
+        self.table.setColumnWidth(3, int(round(TRACK_LYRICS_COLUMN_WIDTH * self._ui_scale)))
+        self.table.setColumnWidth(4, int(round(TRACK_ACTIONS_COLUMN_WIDTH * self._ui_scale)))
 
     # -------------------------
     # External API
@@ -682,7 +685,7 @@ class TrackListWidget(QWidget):
             return
         current = self.model._rows[row]
         self.model._rows[row] = replace(current, has_dirty_lyrics=bool(has_dirty_lyrics))
-        idx = self.model.index(row, 2)
+        idx = self.model.index(row, 3)
         self.model.dataChanged.emit(idx, idx, [Qt.DisplayRole, Qt.ForegroundRole, Qt.FontRole, Qt.UserRole])
 
     def update_track_lyrics_state(self, track_id: int, lyrics_state: LyricsState) -> None:
@@ -698,7 +701,7 @@ class TrackListWidget(QWidget):
         return self._download_states.get(int(track_id), DownloadState.IDLE)
 
     def _on_sort_changed(self, column: int, order: Qt.SortOrder) -> None:
-        if column == 3:
+        if column == 4:
             return
         self._sort_column = int(column)
         self._sort_order = order

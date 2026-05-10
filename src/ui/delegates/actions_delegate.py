@@ -79,7 +79,7 @@ class ActionsDelegate(QStyledItemDelegate):
         self._hover_row = -1
         self._hover_button = ""
         if view is not None and row >= 0:
-            index = view.model().index(row, 3)
+            index = view.model().index(row, 4)
             view.viewport().update(view.visualRect(index))
 
     def paint(self, painter: QPainter, option, index) -> None:
@@ -175,7 +175,7 @@ class ActionsDelegate(QStyledItemDelegate):
         painter.restore()
 
     def editorEvent(self, event, model, option, index) -> bool:
-        if index.column() != 3:
+        if index.column() != 4:
             return False
         if event.type() == QEvent.Type.MouseMove:
             row_obj: TrackListRow | None = index.data(Qt.UserRole)
@@ -188,7 +188,7 @@ class ActionsDelegate(QStyledItemDelegate):
                 self._hover_button = button
                 if option.widget is not None:
                     if previous_row >= 0:
-                        previous_index = model.index(previous_row, 3)
+                        previous_index = model.index(previous_row, 4)
                         option.widget.viewport().update(option.widget.visualRect(previous_index))
                     option.widget.viewport().update(option.rect)
                     option.widget.viewport().setCursor(

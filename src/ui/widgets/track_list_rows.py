@@ -36,6 +36,7 @@ def build_track_list_rows(
                 artist_id=int(row["artist_id"]) if row["artist_id"] is not None else None,
                 album=row["album_name"] or "",
                 album_id=int(row["album_id"]) if row["album_id"] is not None else None,
+                track_number=int(row["track_number"]) if row["track_number"] is not None else None,
                 duration_s=duration_s,
                 lyrics_state=state,
                 has_dirty_lyrics=has_dirty_lyrics,

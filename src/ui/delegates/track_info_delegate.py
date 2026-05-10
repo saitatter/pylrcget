@@ -12,6 +12,10 @@ class TrackInfoDelegate(QStyledItemDelegate):
     artistClicked = Signal(int)
     albumClicked = Signal(int)
 
+    def __init__(self, parent=None, *, track_column: int = 0) -> None:
+        super().__init__(parent)
+        self._track_column = int(track_column)
+
     @staticmethod
     def _clean_metadata(value: str | None, *, kind: str) -> str:
         text = (value or "").strip()
@@ -95,14 +99,15 @@ class TrackInfoDelegate(QStyledItemDelegate):
 
     def editorEvent(self, event, model, option, index) -> bool:
         del model
-        if index.column() != 0:
+        if index.column() != self._track_column:
             return False
         row: TrackListRow | None = index.data(Qt.UserRole)
         if not row:
             return False
 
         if event.type() == QEvent.Type.MouseMove:
-            target = self._hit_target(option.rect, option.font, row, event.pos())
+            pos = event.position().toPoint() if hasattr(event, "position") else event.pos()
+            target = self._hit_target(option.rect, option.font, row, pos)
             if option.widget:
                 option.widget.viewport().setCursor(QCursor(Qt.CursorShape.PointingHandCursor if target else Qt.CursorShape.ArrowCursor))
             return False
@@ -112,7 +117,8 @@ class TrackInfoDelegate(QStyledItemDelegate):
             return False
 
         if event.type() == QEvent.Type.MouseButtonRelease and event.button() == Qt.MouseButton.LeftButton:
-            target = self._hit_target(option.rect, option.font, row, event.pos())
+            pos = event.position().toPoint() if hasattr(event, "position") else event.pos()
+            target = self._hit_target(option.rect, option.font, row, pos)
             if target == "album" and row.album_id is not None and (row.album or "").strip():
                 self.albumClicked.emit(int(row.album_id))
                 return True

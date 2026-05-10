@@ -585,9 +585,13 @@ def get_track_rows(
     where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
     order = "DESC" if str(sort_order).lower() == "desc" else "ASC"
     order_map = {
-        0: f"artists.name_lower {order}, tracks.title_lower {order}, tracks.id {order}",
-        1: f"tracks.duration IS NULL ASC, tracks.duration {order}, tracks.id {order}",
-        2: (
+        0: (
+            f"tracks.track_number IS NULL ASC, tracks.track_number {order}, "
+            f"tracks.title_lower {order}, tracks.id {order}"
+        ),
+        1: f"artists.name_lower {order}, tracks.title_lower {order}, tracks.id {order}",
+        2: f"tracks.duration IS NULL ASC, tracks.duration {order}, tracks.id {order}",
+        3: (
             "CASE "
             "WHEN tracks.lrc_lyrics IS NOT NULL AND tracks.lrc_lyrics != '[au: instrumental]' THEN 0 "
             "WHEN tracks.txt_lyrics IS NOT NULL THEN 1 "
@@ -595,7 +599,7 @@ def get_track_rows(
             "ELSE 3 END "
             f"{order}, tracks.title_lower {order}, tracks.id {order}"
         ),
-        3: f"tracks.title_lower {order}, tracks.id {order}",
+        4: f"tracks.title_lower {order}, tracks.id {order}",
     }
     col = int(sort_column) if int(sort_column) in order_map else 0
     order_clause = order_map[col]
@@ -609,6 +613,7 @@ def get_track_rows(
             tracks.album_id,
             artists.name AS artist_name,
             albums.name AS album_name,
+            tracks.track_number,
             tracks.duration,
             tracks.txt_lyrics,
             tracks.lrc_lyrics,
