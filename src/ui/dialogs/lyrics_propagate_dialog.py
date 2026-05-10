@@ -1,24 +1,118 @@
 from __future__ import annotations
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QEvent, QRect, Qt, Signal
+from PySide6.QtGui import QCursor, QPainter, QPen
 from PySide6.QtWidgets import (
+    QStyle,
+    QStyledItemDelegate,
+    QStyleOptionViewItem,
     QDialog,
     QDialogButtonBox,
-    QHBoxLayout,
     QHeaderView,
     QLabel,
-    QPushButton,
     QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
-    QWidget,
 )
 
 from db.models import Track
+from ui.delegates.actions_delegate import _theme_color
 
 
 TRACK_ID_ROLE = Qt.ItemDataRole.UserRole
 TRACK_ROLE = Qt.ItemDataRole.UserRole + 1
+HAS_LYRICS_ROLE = Qt.ItemDataRole.UserRole + 2
+
+
+class LyricsDiffButtonDelegate(QStyledItemDelegate):
+    diffClicked = Signal(object)
+
+    def __init__(self, parent=None) -> None:
+        super().__init__(parent)
+        self._hover_row = -1
+
+    def _button_rect(self, cell_rect: QRect) -> QRect:
+        button_w = 54
+        button_h = 26
+        return QRect(
+            cell_rect.center().x() - button_w // 2,
+            cell_rect.center().y() - button_h // 2,
+            button_w,
+            button_h,
+        )
+
+    def paint(self, painter: QPainter, option, index) -> None:
+        item_option = QStyleOptionViewItem(option)
+        item_option.state &= ~QStyle.State_MouseOver
+        super().paint(painter, item_option, index)
+
+        track = index.data(TRACK_ROLE)
+        enabled = bool(index.data(HAS_LYRICS_ROLE)) and isinstance(track, Track)
+        hovered = self._hover_row == index.row()
+        selected = bool(option.state & QStyle.State_Selected)
+        self._draw_button(
+            painter,
+            self._button_rect(option.rect),
+            hovered=hovered,
+            enabled=enabled,
+            selected=selected,
+        )
+
+    def _draw_button(self, painter: QPainter, rect: QRect, *, hovered: bool, enabled: bool, selected: bool) -> None:
+        painter.save()
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+
+        text_key = "color-text" if enabled else "color-disabled-text"
+        bg_color = _theme_color("color-bg-elevated" if hovered else "color-bg-control", "#172033")
+        border_color = _theme_color("color-accent" if hovered else "color-border", "#334155")
+        has_fill = True
+        if selected:
+            bg_color = _theme_color("color-accent", "#38bdf8")
+            bg_color.setAlpha(110 if hovered else 80)
+            border_color = _theme_color("color-accent", "#38bdf8")
+            border_color.setAlpha(210 if hovered else 130)
+            has_fill = hovered
+        if not enabled:
+            bg_color = _theme_color("color-bg-pressed", "#262626")
+            border_color = _theme_color("color-disabled-border", "#4b5563")
+            if selected:
+                bg_color = _theme_color("color-accent", "#38bdf8")
+                bg_color.setAlpha(24)
+                border_color.setAlpha(80)
+                has_fill = True
+
+        painter.setBrush(bg_color if has_fill else Qt.BrushStyle.NoBrush)
+        painter.setPen(QPen(border_color, 1))
+        painter.drawRoundedRect(rect.adjusted(0, 0, -1, -1), 5, 5)
+        painter.setPen(_theme_color(text_key, "#e5e7eb"))
+        painter.drawText(rect, Qt.AlignmentFlag.AlignCenter, "Diff")
+        painter.restore()
+
+    def editorEvent(self, event, model, option, index) -> bool:
+        if index.column() != 6:
+            return False
+        track = index.data(TRACK_ROLE)
+        enabled = bool(index.data(HAS_LYRICS_ROLE)) and isinstance(track, Track)
+        pos = event.position().toPoint() if hasattr(event, "position") else event.pos()
+        hovered = enabled and self._button_rect(option.rect).contains(pos)
+
+        if event.type() == QEvent.Type.MouseMove:
+            previous_row = self._hover_row
+            self._hover_row = index.row() if hovered else -1
+            if previous_row != self._hover_row and option.widget is not None:
+                if previous_row >= 0:
+                    option.widget.viewport().update(option.widget.visualRect(model.index(previous_row, 6)))
+                option.widget.viewport().update(option.rect)
+                option.widget.viewport().setCursor(
+                    QCursor(Qt.CursorShape.PointingHandCursor if hovered else Qt.CursorShape.ArrowCursor)
+                )
+            return hovered
+
+        if event.type() == QEvent.Type.MouseButtonRelease and event.button() == Qt.MouseButton.LeftButton:
+            if hovered:
+                self.diffClicked.emit(track)
+                return True
+        return False
 
 
 class LyricsPropagateDialog(QDialog):
@@ -45,6 +139,7 @@ class LyricsPropagateDialog(QDialog):
         self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.table.verticalHeader().setVisible(False)
         self.table.verticalHeader().setDefaultSectionSize(38)
+        self.table.setMouseTracking(True)
         header = self.table.horizontalHeader()
         header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
@@ -54,6 +149,9 @@ class LyricsPropagateDialog(QDialog):
         header.setSectionResizeMode(5, QHeaderView.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(6, QHeaderView.ResizeMode.Fixed)
         self.table.setColumnWidth(6, 74)
+        self.diff_delegate = LyricsDiffButtonDelegate(self.table)
+        self.diff_delegate.diffClicked.connect(self._show_diff)
+        self.table.setItemDelegateForColumn(6, self.diff_delegate)
         layout.addWidget(self.table, 1)
 
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
@@ -100,28 +198,16 @@ class LyricsPropagateDialog(QDialog):
             self.table.setItem(row, 3, QTableWidgetItem(track.album_name or ""))
             self.table.setItem(row, 4, QTableWidgetItem(_format_duration(track.duration)))
             self.table.setItem(row, 5, QTableWidgetItem(f"{int(match['score'])}%"))
-            self.table.setCellWidget(row, 6, self._make_diff_cell(track))
-
-    def _make_diff_cell(self, track: Track) -> QWidget:
-        cell = QWidget()
-        layout = QHBoxLayout(cell)
-        layout.setContentsMargins(4, 2, 4, 2)
-        layout.setSpacing(0)
-        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-
-        button = QPushButton("Diff")
-        button.setFixedSize(54, 26)
-        button.setObjectName("LyricsSyncDiffButton")
-        target_lyrics = _lyrics_text_for_track(track)
-        button.setEnabled(bool(target_lyrics.strip()))
-        button.setToolTip(
-            "Compare current lyrics with this track's existing lyrics"
-            if target_lyrics.strip()
-            else "This track has no existing lyrics to compare"
-        )
-        button.clicked.connect(lambda _checked=False, t=track: self._show_diff(t))
-        layout.addWidget(button)
-        return cell
+            diff_item = QTableWidgetItem("")
+            diff_item.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
+            diff_item.setData(TRACK_ROLE, track)
+            diff_item.setData(HAS_LYRICS_ROLE, bool(_lyrics_text_for_track(track).strip()))
+            diff_item.setToolTip(
+                "Compare current lyrics with this track's existing lyrics"
+                if diff_item.data(HAS_LYRICS_ROLE)
+                else "This track has no existing lyrics to compare"
+            )
+            self.table.setItem(row, 6, diff_item)
 
     def _show_diff(self, track: Track) -> None:
         from ui.dialogs.lyrics_diff_dialog import LyricsDiffDialog

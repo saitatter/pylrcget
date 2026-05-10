@@ -17,7 +17,7 @@ from ui.controllers.top_bar_controller import TopBarController
 from ui.widgets.hotkey_hints import HotkeyHintManager
 from ui.widgets.lrclib_browser_widget import _BrowserPublishDialog
 from ui.widgets.lyrics_editor_widget import LyricsEditorWidget, TIMESTAMP_MS_ROLE
-from ui.dialogs.lyrics_propagate_dialog import LyricsPropagateDialog
+from ui.dialogs.lyrics_propagate_dialog import HAS_LYRICS_ROLE, LyricsDiffButtonDelegate, LyricsPropagateDialog
 from ui.dialogs.lyrics_diff_dialog import _normalized_diff_lines
 from ui.widgets.toast import ToastManager
 from ui.main_window import MainWindow
@@ -505,14 +505,11 @@ class LyricsPasteBehaviorTests(unittest.TestCase):
             self.assertEqual(headers, ["Apply", "Track", "Artist", "Album", "Duration", "Match", "Diff"])
             self.assertNotIn("Title", headers)
             self.assertNotIn("Artist/Time", headers)
-            diff_cell = dialog.table.cellWidget(0, 6)
-            self.assertIsNotNone(diff_cell)
-            diff_button = diff_cell.findChild(QPushButton)
-            self.assertIsNotNone(diff_button)
-            self.assertEqual(diff_button.text(), "Diff")
-            self.assertEqual(diff_button.width(), 54)
-            self.assertEqual(diff_button.height(), 26)
-            self.assertTrue(diff_button.isEnabled())
+            self.assertIsNone(dialog.table.cellWidget(0, 6))
+            delegate = dialog.table.itemDelegateForColumn(6)
+            self.assertIsInstance(delegate, LyricsDiffButtonDelegate)
+            index = dialog.table.model().index(0, 6)
+            self.assertTrue(index.data(HAS_LYRICS_ROLE))
             self.assertEqual(dialog.selected_track_ids(), [42])
         finally:
             dialog.deleteLater()
