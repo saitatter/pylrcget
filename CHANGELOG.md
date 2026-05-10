@@ -1,4 +1,17 @@
 # Changelog
+## v1.7.0 (2026-05-10)
+
+### ✨ Features
+* Add easier synced lyric line insertion ([b6af4ae](https://github.com/saitatter/pylrcget/commit/b6af4ae78ade7b1908f4521279ecf90c24457bb0))
+* Show sortable track numbers in library ([5f84620](https://github.com/saitatter/pylrcget/commit/5f846206a886326d7ba2afe22128897d9a1d5ee7))
+
+### 🐛 Fixes
+* Scope enter playback shortcut to track lists ([048d7a9](https://github.com/saitatter/pylrcget/commit/048d7a9cdc68541877b6b3dad238d57414f42d3e))
+* Reset download success state ([9c73dae](https://github.com/saitatter/pylrcget/commit/9c73dae43eb551fbd130997bd6e88e07ee304243))
+* Add synced lyrics editor context menu ([ff99a04](https://github.com/saitatter/pylrcget/commit/ff99a049608cd3a0ee286ea9f1d690dd0dc4b5a1))
+* Improve player cover alignment ([3cfe5f6](https://github.com/saitatter/pylrcget/commit/3cfe5f6c7d63103abd32d9e220cdec0ff95ec8dc))
+
+
 ## v1.6.0 (2026-05-10)
 
 ### ✨ Features
