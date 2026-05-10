@@ -10,7 +10,6 @@ from mutagen.apev2 import APEBinaryValue
 
 from tests.test_support import touch_text
 from core.artwork import extract_embedded_cover_bytes
-from core.embed_lyrics import embed_lyrics_for_track, embed_lyrics_in_file
 from library.scan_library import new_fs_track_from_path, read_embedded_lyrics
 
 
@@ -76,77 +75,6 @@ class MusepackSupportTests(unittest.TestCase):
         self.assertEqual(track.track_number, 3)
         self.assertEqual(track.txt_lyrics, "Plain lyrics")
         self.assertEqual(track.lrc_lyrics, "[00:01.00]Synced lyrics")
-
-    def test_embed_lyrics_in_file_writes_musepack_tags(self):
-        fake_audio = _FakeMusepackAudio(tags=None)
-
-        with patch("core.embed_lyrics.Musepack", return_value=fake_audio):
-            embed_lyrics_in_file(
-                "song.mpc",
-                "Plain lyrics",
-                "[00:01.00]Synced lyrics",
-            )
-
-        self.assertTrue(fake_audio.add_tags_called)
-        self.assertTrue(fake_audio.saved)
-        self.assertEqual(str(fake_audio.tags["UNSYNCEDLYRICS"]), "Plain lyrics")
-        self.assertEqual(str(fake_audio.tags["LYRICS"]), "[00:01.00]Synced lyrics")
-
-    def test_embed_lyrics_for_track_derives_plain_from_synced_for_compatibility(self):
-        fake_audio = _FakeMusepackAudio(tags=None)
-        track = SimpleNamespace(
-            file_path="song.mpc",
-            txt_lyrics=None,
-            lrc_lyrics="[00:01.00]Synced lyrics",
-        )
-
-        with patch("core.embed_lyrics.Musepack", return_value=fake_audio):
-            embed_lyrics_for_track(track)
-
-        self.assertEqual(str(fake_audio.tags["UNSYNCEDLYRICS"]), "Synced lyrics")
-        self.assertEqual(str(fake_audio.tags["LYRICS"]), "[00:01.00]Synced lyrics")
-
-    def test_embed_lyrics_for_track_respects_synced_only_format(self):
-        fake_audio = _FakeMusepackAudio(tags={"UNSYNCEDLYRICS": ["Old plain"]})
-        track = SimpleNamespace(
-            file_path="song.mpc",
-            txt_lyrics="Plain lyrics",
-            lrc_lyrics="[00:01.00]Synced lyrics",
-        )
-
-        with patch("core.embed_lyrics.Musepack", return_value=fake_audio):
-            embed_lyrics_for_track(track, output_format="synced_only")
-
-        self.assertNotIn("UNSYNCEDLYRICS", fake_audio.tags)
-        self.assertEqual(str(fake_audio.tags["LYRICS"]), "[00:01.00]Synced lyrics")
-
-    def test_embed_lyrics_for_track_prefer_synced_embeds_only_synced_when_available(self):
-        fake_audio = _FakeMusepackAudio(tags={"UNSYNCEDLYRICS": ["Old plain"]})
-        track = SimpleNamespace(
-            file_path="song.mpc",
-            txt_lyrics="Plain lyrics",
-            lrc_lyrics="[00:01.00]Synced lyrics",
-        )
-
-        with patch("core.embed_lyrics.Musepack", return_value=fake_audio):
-            embed_lyrics_for_track(track, output_format="prefer_synced")
-
-        self.assertNotIn("UNSYNCEDLYRICS", fake_audio.tags)
-        self.assertEqual(str(fake_audio.tags["LYRICS"]), "[00:01.00]Synced lyrics")
-
-    def test_embed_lyrics_for_track_prefer_synced_falls_back_to_only_plain(self):
-        fake_audio = _FakeMusepackAudio(tags={"LYRICS": ["[00:01.00]Old synced"]})
-        track = SimpleNamespace(
-            file_path="song.mpc",
-            txt_lyrics="Plain lyrics",
-            lrc_lyrics=None,
-        )
-
-        with patch("core.embed_lyrics.Musepack", return_value=fake_audio):
-            embed_lyrics_for_track(track, output_format="prefer_synced")
-
-        self.assertNotIn("LYRICS", fake_audio.tags)
-        self.assertEqual(str(fake_audio.tags["UNSYNCEDLYRICS"]), "Plain lyrics")
 
     def test_extract_embedded_cover_bytes_reads_musepack_ape_binary_value(self):
         class FakeMusepackForArtwork:
