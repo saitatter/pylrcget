@@ -39,6 +39,9 @@ class HotkeyHintManager(QObject):
 
     def set_visible(self, visible: bool) -> None:
         self._visible = bool(visible)
+        self.refresh_positions()
+
+    def refresh_positions(self) -> None:
         for hint in self._hints:
             self._position_badge(hint)
             hint.badge.setVisible(self._visible and hint.widget.isVisible())

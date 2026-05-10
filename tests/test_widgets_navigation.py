@@ -370,6 +370,28 @@ class LyricsPasteBehaviorTests(unittest.TestCase):
         finally:
             parent.deleteLater()
 
+    def test_hotkey_badge_refresh_updates_after_layout_shift(self):
+        parent = QWidget()
+        button = QPushButton(parent)
+        button.setGeometry(10, 10, 80, 36)
+        manager = HotkeyHintManager(parent)
+        try:
+            parent.resize(220, 120)
+            parent.show()
+            self.app.processEvents()
+            manager.register(button, "Ctrl+F")
+            manager.set_visible(True)
+            original_pos = manager._hints[0].badge.pos()
+
+            button.move(10, 70)
+            manager.refresh_positions()
+
+            self.assertNotEqual(manager._hints[0].badge.pos(), original_pos)
+            self.assertGreater(manager._hints[0].badge.y(), original_pos.y())
+            self.assertTrue(manager._hints[0].badge.isVisible())
+        finally:
+            parent.deleteLater()
+
     def test_player_speed_label_and_value_fit_centered(self):
         widget = PlayerBar(player=None)
         try:

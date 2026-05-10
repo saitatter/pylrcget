@@ -1018,6 +1018,7 @@ class MainWindow(QMainWindow):
         if normalized_level in {"ERROR", "CRITICAL"}:
             self.top_bar.set_logs_checked(True)
             self.log_panel.setVisible(True)
+            self._refresh_hotkey_hints_after_layout()
             self._show_deduped_toast(message, "error", 4000)
 
     def _show_deduped_toast(self, message: str, notify_type: str, timeout_ms: int) -> None:
@@ -1093,6 +1094,13 @@ class MainWindow(QMainWindow):
 
     def _toggle_logs_panel(self, checked: bool) -> None:
         self.log_panel.setVisible(bool(checked))
+        self._refresh_hotkey_hints_after_layout()
+
+    def _refresh_hotkey_hints_after_layout(self) -> None:
+        if not getattr(self, "hotkey_hints", None) or not self.hotkey_hints.is_visible:
+            return
+        QTimer.singleShot(0, self.hotkey_hints.refresh_positions)
+        QTimer.singleShot(50, self.hotkey_hints.refresh_positions)
 
     # ------------------ track actions ------------------
     def on_play_track(self, track_id: int):
