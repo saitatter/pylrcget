@@ -334,12 +334,32 @@ class LyricsPasteBehaviorTests(unittest.TestCase):
             self.assertEqual(widget._shortcut_shift_plus.key().toString(), "Right")
             self.assertEqual(widget._shortcut_snap.key().toString(), "Ctrl+Return")
             self.assertEqual(widget._shortcut_add_line.key().toString(), "Ins")
+            self.assertEqual(widget._shortcut_add_line_new.key().toString(), "Ctrl+N")
+            self.assertEqual(widget._shortcut_add_line_before.key().toString(), "Ctrl+Shift+N")
             self.assertEqual(widget._shortcut_delete_line.key().toString(), "Del")
             self.assertIs(widget._shortcut_shift_plus.parent(), widget.table)
 
             widget._shortcut_shift_plus.activated.emit()
             self.assertEqual(widget.table.item(0, 0).text(), "00:01.30")
             self.assertEqual(widget.table.item(0, 0).data(TIMESTAMP_MS_ROLE), 1300)
+        finally:
+            widget.deleteLater()
+
+    def test_insert_line_before_selection_can_add_first_row(self):
+        widget = LyricsEditorWidget()
+        try:
+            widget.set_current_position_provider(lambda: 500)
+            widget._set_synced([(1200, "First line"), (3000, "Second line")])
+            widget.table.setCurrentCell(0, 1)
+
+            widget._add_line_before_selection()
+
+            self.assertEqual(widget.table.rowCount(), 3)
+            self.assertEqual(widget.table.item(0, 0).text(), "00:00.50")
+            self.assertEqual(widget.table.item(0, 1).text(), "")
+            self.assertEqual(widget.table.currentRow(), 0)
+            self.assertEqual(widget.table.currentColumn(), 1)
+            self.assertEqual(widget.table.item(1, 1).text(), "First line")
         finally:
             widget.deleteLater()
 

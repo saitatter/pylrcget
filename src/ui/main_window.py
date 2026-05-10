@@ -1897,7 +1897,7 @@ class MainWindow(QMainWindow):
             self.hotkey_hints.register(view.btn_shift_plus, "Right")
             self.hotkey_hints.register(view.btn_shift_selected, "Shift+Enter")
             self.hotkey_hints.register(view.btn_shift_all_from_first, "Ctrl+Shift+Enter")
-            self.hotkey_hints.register(view.btn_add, "Insert")
+            self.hotkey_hints.register(view.btn_add, "Ctrl+N")
             self.hotkey_hints.register(view.btn_del, "Delete")
             self.hotkey_hints.register(view.btn_save, "Ctrl+S")
         self.hotkey_hints.register(self.player_bar.btn_prev, "Ctrl+Left")

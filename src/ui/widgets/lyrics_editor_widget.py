@@ -255,7 +255,7 @@ class LyricsEditorWidget(QWidget):
         self.btn_shift_all_from_first = QPushButton("Shift All from First")
         self.btn_shift_all_from_first.setToolTip("Align all lines so the first line matches the current playback position (Ctrl+Shift+Enter)")
         self.btn_add = QPushButton("+ Line")
-        self.btn_add.setToolTip("Insert a new line after the current selection (Insert)")
+        self.btn_add.setToolTip("Insert a new line after the current selection (Ctrl+N or Insert)")
         self.btn_del = QPushButton("Delete")
         self.btn_del.setToolTip("Delete the selected line (Delete)")
         self.btn_autofix = QPushButton("Autofix")
@@ -389,6 +389,8 @@ class LyricsEditorWidget(QWidget):
         self._shortcut_shift_all = self._make_shortcut("Ctrl+Shift+Return", self._shift_all_lines_from_first_delta)
         self._shortcut_shift_all_enter = self._make_shortcut("Ctrl+Shift+Enter", self._shift_all_lines_from_first_delta)
         self._shortcut_add_line = self._make_shortcut("Insert", self._add_line_after_selection)
+        self._shortcut_add_line_new = self._make_shortcut("Ctrl+N", self._add_line_after_selection)
+        self._shortcut_add_line_before = self._make_shortcut("Ctrl+Shift+N", self._add_line_before_selection)
         self._shortcut_delete_line = self._make_shortcut("Delete", self._delete_selected_line)
 
         self._default_button_text = {
@@ -900,6 +902,10 @@ class LyricsEditorWidget(QWidget):
             selected_rows = [clicked_row]
 
         menu = QMenu(self.table)
+        insert_above_action = menu.addAction("Insert Line Above")
+        insert_below_action = menu.addAction("Insert Line Below")
+        menu.addSeparator()
+
         copy_action = menu.addAction("Copy")
         copy_action.setEnabled(self.table.rowCount() > 0)
 
@@ -911,7 +917,11 @@ class LyricsEditorWidget(QWidget):
         paste_action.setEnabled(bool(QApplication.clipboard().text().strip()))
 
         chosen = menu.exec(self.table.viewport().mapToGlobal(pos))
-        if chosen == copy_action:
+        if chosen == insert_above_action:
+            self._add_line_before_selection()
+        elif chosen == insert_below_action:
+            self._add_line_after_selection()
+        elif chosen == copy_action:
             self._copy_synced_selection_to_clipboard()
         elif copy_all_action is not None and chosen == copy_all_action:
             self._copy_synced_all_to_clipboard()
@@ -1062,9 +1072,18 @@ class LyricsEditorWidget(QWidget):
         self.dirtyDraftChanged.emit(lrc, txt)
 
     def _add_line_after_selection(self):
-        self._push_undo()
         row = self.table.currentRow()
         insert_at = row + 1 if row >= 0 else self.table.rowCount()
+        self._insert_line_at(insert_at)
+
+    def _add_line_before_selection(self):
+        row = self.table.currentRow()
+        insert_at = row if row >= 0 else 0
+        self._insert_line_at(insert_at)
+
+    def _insert_line_at(self, insert_at: int):
+        self._push_undo()
+        insert_at = max(0, min(int(insert_at), self.table.rowCount()))
 
         # default time: current playback time
         ms = int(self._current_playback_ms())
