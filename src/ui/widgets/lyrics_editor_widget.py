@@ -8,11 +8,12 @@ from bisect import bisect_right
 from PySide6.QtCore import QRect, QSize, Qt, Signal, QTimer
 from PySide6.QtGui import QColor, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
+    QApplication,
     QLayout,
     QSizePolicy,
     QWidget, QVBoxLayout, QLabel, QStackedWidget,
     QTextEdit, QTableWidget, QTableWidgetItem,
-    QPushButton, QHBoxLayout, QDoubleSpinBox
+    QPushButton, QHBoxLayout, QDoubleSpinBox, QMenu
 )
 
 from ui.spacing import SPACE_2, SPACE_3, set_layout_spacing
@@ -361,9 +362,11 @@ class LyricsEditorWidget(QWidget):
         self.table.setSelectionBehavior(self.table.SelectionBehavior.SelectRows)
         self.table.setSelectionMode(self.table.SelectionMode.ExtendedSelection)
         self.table.setEditTriggers(self.table.EditTrigger.DoubleClicked | self.table.EditTrigger.EditKeyPressed)
+        self.table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.table.cellClicked.connect(self._on_table_clicked_seek)
         self.table.itemSelectionChanged.connect(self._on_table_selection_changed)
         self.table.itemChanged.connect(self._on_table_item_changed)
+        self.table.customContextMenuRequested.connect(self._show_synced_context_menu)
 
         self.table.setColumnWidth(0, 95)
         self.table.horizontalHeader().setStretchLastSection(True)
@@ -875,6 +878,82 @@ class LyricsEditorWidget(QWidget):
         if not model:
             return []
         return sorted({index.row() for index in model.selectedRows()})
+
+    def _show_synced_context_menu(self, pos) -> None:
+        clicked_row = self.table.rowAt(pos.y())
+        selected_rows = self._selected_rows()
+        if clicked_row >= 0 and clicked_row not in selected_rows:
+            self.table.selectRow(clicked_row)
+            selected_rows = [clicked_row]
+
+        menu = QMenu(self.table)
+        copy_action = menu.addAction("Copy")
+        copy_action.setEnabled(self.table.rowCount() > 0)
+
+        copy_all_action = None
+        if selected_rows and len(selected_rows) != self.table.rowCount():
+            copy_all_action = menu.addAction("Copy All")
+
+        paste_action = menu.addAction("Paste")
+        paste_action.setEnabled(bool(QApplication.clipboard().text().strip()))
+
+        chosen = menu.exec(self.table.viewport().mapToGlobal(pos))
+        if chosen == copy_action:
+            self._copy_synced_selection_to_clipboard()
+        elif copy_all_action is not None and chosen == copy_all_action:
+            self._copy_synced_all_to_clipboard()
+        elif chosen == paste_action:
+            self._paste_synced_from_clipboard()
+
+    def _copy_synced_selection_to_clipboard(self) -> None:
+        rows = self._selected_rows() or list(range(self.table.rowCount()))
+        self._copy_synced_rows_to_clipboard(rows)
+
+    def _copy_synced_all_to_clipboard(self) -> None:
+        self._copy_synced_rows_to_clipboard(list(range(self.table.rowCount())))
+
+    def _copy_synced_rows_to_clipboard(self, rows: list[int]) -> None:
+        text = self._synced_lrc_text_for_rows(rows)
+        if not text:
+            return
+        QApplication.clipboard().setText(text)
+        self._set_validation_message("Copied synced lyrics.", state="success")
+
+    def _synced_lrc_text_for_rows(self, rows: list[int]) -> str:
+        lines: list[str] = []
+        for row in rows:
+            if row < 0 or row >= self.table.rowCount():
+                continue
+            it_time = self.table.item(row, 0)
+            it_text = self.table.item(row, 1)
+            ms = int(it_time.data(TIMESTAMP_MS_ROLE) or 0) if it_time else 0
+            text = it_text.text().strip() if it_text else ""
+            timestamp = _ms_to_ts(ms)
+            lines.append(f"[{timestamp}] {text}" if text else f"[{timestamp}]")
+        return "\n".join(lines).strip()
+
+    def _paste_synced_from_clipboard(self) -> bool:
+        return self._paste_synced_text(QApplication.clipboard().text())
+
+    def _paste_synced_text(self, text: str) -> bool:
+        text = (text or "").strip()
+        if not text:
+            return False
+
+        parsed = parse_lrc(text)
+        pairs = parsed if parsed else [(0, line.rstrip()) for line in text.splitlines()]
+        if not pairs:
+            return False
+
+        self._push_undo()
+        self._restore_snapshot(pairs)
+        if self.table.rowCount():
+            self.table.selectRow(0)
+            self.table.setCurrentCell(0, 1)
+        if not self._invalid_rows and not self._validation_problems:
+            self._set_validation_message("Pasted synced lyrics.", state="success")
+        self._emit_dirty_draft_changed()
+        return True
 
     def _on_table_clicked_seek(self, row: int, col: int):
         it_time = self.table.item(row, 0)

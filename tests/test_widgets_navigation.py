@@ -294,6 +294,34 @@ class LyricsPasteBehaviorTests(unittest.TestCase):
         finally:
             widget.deleteLater()
 
+    def test_synced_lyrics_table_can_copy_selected_lrc_rows(self):
+        widget = LyricsEditorWidget()
+        try:
+            widget._set_synced([(1200, "First line"), (3000, "Second line")])
+            widget.table.selectRow(1)
+
+            widget._copy_synced_selection_to_clipboard()
+
+            self.assertEqual(self.app.clipboard().text(), "[00:03.00] Second line")
+        finally:
+            widget.deleteLater()
+
+    def test_synced_lyrics_table_can_paste_lrc_from_clipboard(self):
+        widget = LyricsEditorWidget()
+        try:
+            widget._set_synced([(1200, "Old line")])
+            self.app.clipboard().setText("[00:02.50] New line\n[00:04.00] Next line")
+
+            self.assertTrue(widget._paste_synced_from_clipboard())
+
+            self.assertEqual(widget.table.rowCount(), 2)
+            self.assertEqual(widget.table.item(0, 0).text(), "00:02.50")
+            self.assertEqual(widget.table.item(0, 1).text(), "New line")
+            self.assertEqual(widget.table.item(1, 0).text(), "00:04.00")
+            self.assertEqual(widget.table.item(1, 1).text(), "Next line")
+        finally:
+            widget.deleteLater()
+
     def test_lyrics_quick_actions_have_shortcuts(self):
         widget = LyricsEditorWidget()
         try:
