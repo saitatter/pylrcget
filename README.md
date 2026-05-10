@@ -33,6 +33,7 @@ PyLrcGet goes beyond bulk lyric downloads and turns the app into a full desktop 
 - Configurable download modes: `Prefer synced`, `Synced only`, `Plain only`
 - Bulk `Download missing lyrics` action based on the active download mode
 - Per-selection download overrides from the track context menu
+- Separate output format choices for sidecar files and embedded lyrics
 - Real-time synced lyrics editor with per-line snapping while audio is playing
 - Configurable reaction delay for timestamping
 - Shift selected lines by preset or custom time offsets
@@ -57,7 +58,9 @@ PyLrcGet goes beyond bulk lyric downloads and turns the app into a full desktop 
 
 - Configurable lyric export directory
 - Configurable filename pattern using placeholders (`{filename}`, `{artist}`, `{title}`, `{album}`, `{track}`)
-- Opt-in sidecar export (`.lrc` / `.txt`)
+- Configurable sidecar contents: synced and plain, synced only, plain only, or prefer synced with plain fallback
+- Opt-in sidecar export (`.lrc` / `.txt`) with stale opposite-format cleanup
+- Configurable embedded lyric contents using the same synced/plain/prefer-synced choices
 - Opt-in embedding into supported audio formats
 
 ### 🎨 Desktop UI
@@ -67,6 +70,7 @@ PyLrcGet goes beyond bulk lyric downloads and turns the app into a full desktop 
 - Native Windows file dialogs for better mapped-drive and network-share support
 - Built-in log panel with live filtering, copy/save actions, and on-disk log files
 - In-app update checker with release notes, download links, and installer launch support
+- Light theme contrast tuned for readable disabled buttons and theme-aware icons
 
 ---
 
@@ -94,7 +98,7 @@ PyLrcGet goes beyond bulk lyric downloads and turns the app into a full desktop 
 | Category | Options |
 |----------|---------|
 | **Library** | Music folders, excluded paths, excluded regex patterns, exclusion preview/test, auto-refresh after folder changes |
-| **Lyrics** | Download mode, save lyrics files, embed lyrics, download directory, filename pattern with live preview, reaction delay, line shift presets |
+| **Lyrics** | Download mode, save lyrics files, file contents, embed lyrics, embedded contents, download directory, filename pattern with live preview, lyrics lookup subfolder, reaction delay, LRCLIB server URL |
 | **Appearance** | Theme selection, UI scale (90–125%), font size (Small/Normal/Large), album art toggle, startup view |
 | **Updates** | In-app version check, release notes preview, download/install actions |
 
@@ -104,13 +108,15 @@ PyLrcGet goes beyond bulk lyric downloads and turns the app into a full desktop 
 
 | Mode | Behavior |
 |------|----------|
-| **Prefer synced, fallback to plain** | Tries synced first, saves plain if synced unavailable |
-| **Synced only** | Saves only synced lyrics, skips plain-only matches |
-| **Plain only** | Saves only plain lyrics, derives plain from synced by stripping timestamps if needed |
+| **Prefer synced, fallback to plain** | Treats tracks without synced lyrics as missing, then falls back to plain lyrics when synced lyrics are unavailable |
+| **Synced only** | Downloads synced lyrics only and skips plain-only matches |
+| **Plain only** | Downloads plain lyrics only, deriving plain text from synced lyrics by stripping timestamps when needed |
 
 The track context menu supports temporary mode overrides for the current selection. The `Tracks` table color-codes lyric state: 🔴 No lyrics · 🟠 Plain · 🟢 Synced · 🔵 Instrumental.
 
 The global `Download missing lyrics` action can also upgrade plain-only tracks to synced when synced lyrics become available on LRCLIB.
+
+File export and embedded lyric format are controlled separately in Settings. For example, `Download mode` can prefer synced lyrics while `File contents` or `Embedded contents` decides whether to write synced lyrics, plain lyrics, both, or synced-with-plain-fallback.
 
 ---
 
@@ -191,14 +197,20 @@ To enable AI auto-sync (optional):
 python -m pip install torch torchaudio openai-whisper demucs soundfile
 ```
 
-### Build standalone executable
+### Build standalone app folder
 
 ```bash
 python -m pip install -r requirements.txt pyinstaller
 pyinstaller --noconfirm pylrcget.spec
 ```
 
-The generated executable is placed in `dist/`.
+The generated app folder is placed in `dist/pylrcget/`.
+
+To build the portable single-file variant:
+
+```bash
+pyinstaller --noconfirm pylrcget-portable.spec
+```
 
 > **Note:** The app falls back to Qt Multimedia when `mpv` is unavailable, so packaged builds remain usable without an external `mpv` binary.
 
@@ -211,7 +223,9 @@ Uses **semantic-release** with Conventional Commits. On every push to `main`, CI
 - Use Conventional Commits: `feat: ...`, `fix: ...`, `chore: ...`
 - Breaking changes: use `!` or a `BREAKING CHANGE:` footer
 - Build artifacts for Windows, Linux, and macOS are attached to GitHub Releases
-- Portable single-file executables are published as `pylrcget-windows-portable.exe`, `pylrcget-linux-portable`, and `pylrcget-macos-portable`
+- Installer assets are published for automatic update/install flows: `pylrcget-windows-installer.exe`, `pylrcget-linux.deb`, and `pylrcget-macos.pkg`
+- Folder-based archives are published as `pylrcget-windows.zip`, `pylrcget-linux.tar.gz`, and `pylrcget-macos.tar.gz`
+- Portable single-file executables are also published as `pylrcget-windows-portable.exe`, `pylrcget-linux-portable`, and `pylrcget-macos-portable`
 
 ### 🛡️ Windows note
 
@@ -224,10 +238,10 @@ The `About` dialog checks GitHub Releases for newer versions:
 | Platform | Supported assets |
 |----------|-----------------|
 | Windows | `pylrcget-windows-installer.exe` (Inno Setup) |
-| macOS | `.dmg`, `.pkg` |
-| Linux | `.AppImage`, `.deb`, `.rpm` |
+| macOS | `pylrcget-macos.pkg` |
+| Linux | `pylrcget-linux.deb` |
 
-Portable single-file builds are also attached to releases for manual download. In-app automatic install continues to prefer platform installer assets when available.
+Folder-based archives and portable single-file builds are also attached to releases for manual download. In-app automatic install continues to prefer platform installer assets when available.
 
 Local feed testing is supported via `PYLRCGET_UPDATE_LATEST_URL` and `PYLRCGET_UPDATE_DEBUG` environment overrides.
 
