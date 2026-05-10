@@ -154,6 +154,20 @@ class MusicFoldersDialog(QDialog):
         appearance_layout_root.addWidget(appearance_box)
         appearance_layout_root.addStretch(1)
 
+        download_box = QGroupBox("Lyrics Download")
+        download_layout = QGridLayout(download_box)
+        self.download_mode_combo = QComboBox()
+        self.download_mode_combo.addItem("Prefer synced, fallback to plain", "prefer_synced")
+        self.download_mode_combo.addItem("Synced only", "synced_only")
+        self.download_mode_combo.addItem("Plain only", "plain_only")
+        download_layout.addWidget(QLabel("Download mode"), 0, 0)
+        download_layout.addWidget(self.download_mode_combo, 0, 1, 1, 3)
+        self.download_mode_hint_label = QLabel("")
+        self.download_mode_hint_label.setObjectName("SettingsValidationHint")
+        self.download_mode_hint_label.setWordWrap(True)
+        download_layout.addWidget(self.download_mode_hint_label, 1, 0, 1, 4)
+        lyrics_tab_layout.addWidget(download_box)
+
         lyrics_box = QGroupBox("Lyrics Export")
         lyrics_layout = QGridLayout(lyrics_box)
 
@@ -166,31 +180,20 @@ class MusicFoldersDialog(QDialog):
         lyrics_layout.addWidget(QLabel("File contents"), 1, 0)
         lyrics_layout.addWidget(self.sidecar_format_combo, 1, 1, 1, 3)
 
-        self.download_mode_combo = QComboBox()
-        self.download_mode_combo.addItem("Prefer synced, fallback to plain", "prefer_synced")
-        self.download_mode_combo.addItem("Synced only", "synced_only")
-        self.download_mode_combo.addItem("Plain only", "plain_only")
-        lyrics_layout.addWidget(QLabel("Download mode"), 2, 0)
-        lyrics_layout.addWidget(self.download_mode_combo, 2, 1, 1, 3)
-        self.download_mode_hint_label = QLabel("")
-        self.download_mode_hint_label.setObjectName("SettingsValidationHint")
-        self.download_mode_hint_label.setWordWrap(True)
-        lyrics_layout.addWidget(self.download_mode_hint_label, 3, 0, 1, 4)
-
         self.output_dir_edit = QLineEdit()
         self.output_dir_edit.setPlaceholderText("Leave empty to save next to the audio file")
         self.browse_output_btn = QPushButton("Browse")
         self.clear_output_btn = QPushButton("Use Track Folder")
 
-        lyrics_layout.addWidget(QLabel("Download directory"), 4, 0)
-        lyrics_layout.addWidget(self.output_dir_edit, 4, 1)
-        lyrics_layout.addWidget(self.browse_output_btn, 4, 2)
-        lyrics_layout.addWidget(self.clear_output_btn, 4, 3)
+        lyrics_layout.addWidget(QLabel("Download directory"), 2, 0)
+        lyrics_layout.addWidget(self.output_dir_edit, 2, 1)
+        lyrics_layout.addWidget(self.browse_output_btn, 2, 2)
+        lyrics_layout.addWidget(self.clear_output_btn, 2, 3)
 
         self.pattern_edit = QLineEdit()
         self.pattern_edit.setPlaceholderText(DEFAULT_LYRICS_FILE_PATTERN)
-        lyrics_layout.addWidget(QLabel("Filename pattern"), 5, 0)
-        lyrics_layout.addWidget(self.pattern_edit, 5, 1, 1, 3)
+        lyrics_layout.addWidget(QLabel("Filename pattern"), 3, 0)
+        lyrics_layout.addWidget(self.pattern_edit, 3, 1, 1, 3)
 
         self.pattern_preview_label = QLabel("")
         self.pattern_preview_label.setObjectName("SettingsValidationHint")
@@ -201,7 +204,7 @@ class MusicFoldersDialog(QDialog):
         )
         mono_font = QFontDatabase.systemFont(QFontDatabase.SystemFont.FixedFont)
         self.pattern_preview_label.setFont(mono_font)
-        lyrics_layout.addWidget(self.pattern_preview_label, 6, 0, 1, 4)
+        lyrics_layout.addWidget(self.pattern_preview_label, 4, 0, 1, 4)
 
         hint = QLabel(
             "Available placeholders: {filename}, {artist}, {title}, {album}, {track}. "
@@ -209,7 +212,7 @@ class MusicFoldersDialog(QDialog):
             "Leave the pattern empty to use the audio filename."
         )
         hint.setWordWrap(True)
-        lyrics_layout.addWidget(hint, 7, 0, 1, 4)
+        lyrics_layout.addWidget(hint, 5, 0, 1, 4)
         lyrics_tab_layout.addWidget(lyrics_box)
 
         lookup_box = QGroupBox("Lyrics Lookup")
