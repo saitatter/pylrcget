@@ -18,6 +18,7 @@ from db.queries import (
     get_config,
     get_download_history_rows,
     get_publish_history_rows,
+    get_similar_lyrics_track_rows,
     get_track_rows,
     get_track_by_id,
     refresh_track_from_file,
@@ -439,5 +440,40 @@ class TrackRefreshQueryTests(unittest.TestCase):
                 self.assertFalse(cleared.dirty_lyrics_present)
                 self.assertIsNone(cleared.dirty_txt_lyrics)
                 self.assertEqual(cleared.txt_lyrics, "saved plain")
+            finally:
+                db.close()
+
+    def test_similar_lyrics_tracks_rank_album_variants(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db = initialize_database(tmp)
+            try:
+                source_audio = Path(tmp) / "album.flac"
+                single_audio = Path(tmp) / "single.flac"
+                other_audio = Path(tmp) / "other.flac"
+                touch_text(source_audio, "a")
+                touch_text(single_audio, "b")
+                touch_text(other_audio, "c")
+
+                add_tracks(
+                    db,
+                    [
+                        replace(make_fs_track(source_audio, artist="Artist A", album="Album", title="Song"), duration=180.0),
+                        replace(make_fs_track(single_audio, artist="Artist A", album="Single", title="Song"), duration=181.0),
+                        replace(make_fs_track(other_audio, artist="Other", album="Other", title="Different"), duration=240.0),
+                    ],
+                )
+
+                source_id = int(
+                    db.execute(
+                        "SELECT tracks.id FROM tracks JOIN albums ON tracks.album_id = albums.id WHERE albums.name = ?",
+                        ("Album",),
+                    ).fetchone()["id"]
+                )
+
+                matches = get_similar_lyrics_track_rows(db, source_id)
+
+                self.assertEqual(len(matches), 1)
+                self.assertEqual(matches[0]["track"].album_name, "Single")
+                self.assertGreaterEqual(matches[0]["score"], 95)
             finally:
                 db.close()

@@ -5,6 +5,7 @@ import re
 import sqlite3
 import threading
 from datetime import datetime, timezone
+from difflib import SequenceMatcher
 from typing import Sequence
 
 from core.models import FsTrack
@@ -1040,6 +1041,108 @@ def get_duplicate_track_ids(db: sqlite3.Connection) -> set[int]:
         )
     """).fetchall()
     return {int(r["id"]) for r in rows}
+
+
+def get_similar_lyrics_track_rows(
+    db: sqlite3.Connection,
+    source_track_id: int,
+    *,
+    min_score: int = 55,
+) -> list[dict]:
+    """Return tracks that look like alternate releases of the source track.
+
+    Score is weighted toward title and artist, with duration as the tiebreaker.
+    The source track itself is never returned.
+    """
+    source = get_track_by_id(db, int(source_track_id))
+    source_title = prepare_input(source.title)
+    source_artist = prepare_input(source.artist_name)
+    source_duration = float(source.duration or 0.0)
+
+    rows = db.execute(
+        """
+        SELECT
+            tracks.id,
+            tracks.file_path,
+            tracks.file_name,
+            tracks.title,
+            artists.name AS artist_name,
+            tracks.artist_id,
+            albums.name AS album_name,
+            albums.album_artist_name,
+            album_id,
+            duration,
+            track_number,
+            albums.image_path,
+            txt_lyrics,
+            lrc_lyrics,
+            dirty_txt_lyrics,
+            dirty_lrc_lyrics,
+            dirty_lyrics_present,
+            instrumental
+        FROM tracks
+        JOIN albums ON tracks.album_id = albums.id
+        JOIN artists ON tracks.artist_id = artists.id
+        WHERE tracks.id != ?
+        """,
+        (int(source_track_id),),
+    ).fetchall()
+
+    matches: list[dict] = []
+    for row in rows:
+        candidate_title = prepare_input(row["title"] or "")
+        candidate_artist = prepare_input(row["artist_name"] or "")
+        candidate_duration = float(row["duration"] or 0.0)
+
+        title_score = _similarity_percent(source_title, candidate_title)
+        artist_score = _similarity_percent(source_artist, candidate_artist)
+        duration_score = _duration_similarity_percent(source_duration, candidate_duration)
+        score = round(title_score * 0.45 + artist_score * 0.35 + duration_score * 0.20)
+
+        if score < int(min_score):
+            continue
+
+        matches.append(
+            {
+                "track": Track.from_row(row),
+                "score": int(score),
+                "title_score": int(round(title_score)),
+                "artist_score": int(round(artist_score)),
+                "duration_score": int(round(duration_score)),
+                "duration_delta": abs(candidate_duration - source_duration),
+            }
+        )
+
+    return sorted(
+        matches,
+        key=lambda item: (
+            -int(item["score"]),
+            float(item["duration_delta"]),
+            prepare_input(item["track"].album_name),
+            int(item["track"].track_number or 0),
+            prepare_input(item["track"].title),
+        ),
+    )
+
+
+def _similarity_percent(left: str, right: str) -> float:
+    left = prepare_input(left)
+    right = prepare_input(right)
+    if not left or not right:
+        return 0.0
+    if left == right:
+        return 100.0
+    return SequenceMatcher(None, left, right).ratio() * 100.0
+
+
+def _duration_similarity_percent(left: float, right: float) -> float:
+    if left <= 0 or right <= 0:
+        return 0.0
+    diff = abs(float(left) - float(right))
+    if diff <= 1.0:
+        return 100.0
+    tolerance = max(12.0, min(left, right) * 0.08)
+    return max(0.0, 100.0 - (diff / tolerance * 100.0))
 
 
 # -------------------------------

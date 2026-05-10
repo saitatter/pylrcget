@@ -153,6 +153,7 @@ class LyricsEditorWidget(QWidget):
     publishSyncedRequested = Signal()
     publishPlainRequested = Signal()
     saveRequested = Signal(str, str)     # lrc_text, plain_text
+    propagateRequested = Signal(str, str)  # lrc_text, plain_text
     dirtyDraftChanged = Signal(str, str)  # lrc_text, plain_text
     discardDraftRequested = Signal()
     autoSyncRequested = Signal()
@@ -264,6 +265,8 @@ class LyricsEditorWidget(QWidget):
         self.btn_autofix.hide()
         self.btn_save = QPushButton("Save")
         self.btn_save.setToolTip("Save lyrics to the library (Ctrl+S)")
+        self.btn_sync_others = QPushButton("Sync to Others")
+        self.btn_sync_others.setToolTip("Copy the current lyrics to similar tracks")
         self.btn_export_files = QPushButton("Export Files")
         self.btn_export_files.setToolTip("Export .lrc and .txt sidecar files next to the audio file")
 
@@ -276,6 +279,7 @@ class LyricsEditorWidget(QWidget):
         self.btn_add.setEnabled(False)
         self.btn_del.setEnabled(False)
         self.btn_save.setEnabled(False)
+        self.btn_sync_others.setEnabled(False)
         self.btn_export_files.setEnabled(False)
 
         self.btn_snap.clicked.connect(self._snap_selected_line_to_current_time)
@@ -287,6 +291,7 @@ class LyricsEditorWidget(QWidget):
         self.btn_del.clicked.connect(self._delete_selected_line)
         self.btn_autofix.clicked.connect(self._autofix_validation_problems)
         self.btn_save.clicked.connect(self._emit_save)
+        self.btn_sync_others.clicked.connect(self._emit_propagate)
         self.btn_export_files.clicked.connect(self.exportFilesRequested.emit)
 
         toolbar.addWidget(self.btn_snap)
@@ -299,6 +304,7 @@ class LyricsEditorWidget(QWidget):
         toolbar.addWidget(self.btn_del)
         toolbar.addWidget(self.btn_autofix)
         toolbar.addWidget(self.btn_save)
+        toolbar.addWidget(self.btn_sync_others)
         toolbar.addWidget(self.btn_export_files)
 
         self.btn_publish_synced = QPushButton("Publish Synced")
@@ -320,6 +326,7 @@ class LyricsEditorWidget(QWidget):
             self.btn_del,
             self.btn_autofix,
             self.btn_save,
+            self.btn_sync_others,
             self.btn_export_files,
             self.btn_publish_synced,
             self.btn_publish_plain,
@@ -395,6 +402,7 @@ class LyricsEditorWidget(QWidget):
 
         self._default_button_text = {
             self.btn_save: "Save",
+            self.btn_sync_others: "Sync to Others",
             self.btn_export_files: "Export Files",
             self.btn_publish_synced: "Publish Synced",
             self.btn_publish_plain: "Publish Plain",
@@ -568,6 +576,7 @@ class LyricsEditorWidget(QWidget):
         self.btn_autofix.setEnabled(False)
         self.btn_autofix.hide()
         self.btn_save.setEnabled(False)
+        self.btn_sync_others.setEnabled(False)
         self.btn_export_files.setEnabled(False)
         self.btn_switch_mode.hide()
         self.btn_auto_sync.hide()
@@ -606,6 +615,7 @@ class LyricsEditorWidget(QWidget):
         self.btn_shift_selected.setEnabled(False)
         self.btn_shift_all_from_first.setEnabled(False)
         self.btn_export_files.setEnabled(True)
+        self.btn_sync_others.setEnabled(True)
         self.btn_switch_mode.setText("Switch to Synced")
         self.btn_switch_mode.setVisible(True)
         self.btn_auto_sync.setVisible(True)
@@ -754,6 +764,7 @@ class LyricsEditorWidget(QWidget):
         self.shift_spin.setEnabled(has_selection)
         self.btn_shift_selected.setEnabled(has_selection)
         self.btn_export_files.setEnabled(True)
+        self.btn_sync_others.setEnabled(True)
         self.btn_switch_mode.setText("Switch to Plain")
         self.btn_switch_mode.setVisible(True)
         self.btn_auto_sync.setVisible(True)
@@ -816,11 +827,16 @@ class LyricsEditorWidget(QWidget):
 
     def _update_save_enabled(self):
         if self.stack.currentWidget() is self.table:
-            self.btn_save.setEnabled(not self._invalid_rows and not self._validation_problems)
+            can_use_lyrics = not self._invalid_rows and not self._validation_problems
+            self.btn_save.setEnabled(can_use_lyrics)
+            self.btn_sync_others.setEnabled(can_use_lyrics)
         elif self.stack.currentWidget() is self.plain:
-            self.btn_save.setEnabled(not self._validation_problems)
+            can_use_lyrics = not self._validation_problems
+            self.btn_save.setEnabled(can_use_lyrics)
+            self.btn_sync_others.setEnabled(can_use_lyrics)
         else:
             self.btn_save.setEnabled(False)
+            self.btn_sync_others.setEnabled(False)
 
     def _set_validation_message(self, message: str, *, state: str = "idle"):
         self.validation_hint.setText(message)
@@ -1290,8 +1306,26 @@ class LyricsEditorWidget(QWidget):
             self.saveRequested.emit("", txt)
             return
 
+    def _emit_propagate(self):
+        if self.stack.currentWidget() is self.table:
+            if not self._validate_current_lyrics():
+                return
+            lrc, plain = self._current_lyrics_text()
+            self.propagateRequested.emit(lrc, plain)
+            return
+
+        if self.stack.currentWidget() is self.plain:
+            if not self._validate_current_lyrics():
+                return
+            _lrc, txt = self._current_lyrics_text()
+            self.propagateRequested.emit("", txt)
+            return
+
     def set_save_feedback(self, state: str, message: str | None = None) -> None:
         self._set_button_feedback(self.btn_save, state, message)
+
+    def set_sync_others_feedback(self, state: str, message: str | None = None) -> None:
+        self._set_button_feedback(self.btn_sync_others, state, message)
 
     def set_publish_feedback(self, *, is_synced: bool, state: str, message: str | None = None) -> None:
         button = self.btn_publish_synced if is_synced else self.btn_publish_plain
@@ -1325,6 +1359,8 @@ class LyricsEditorWidget(QWidget):
         button.style().polish(button)
         button.update()
         if button is self.btn_save:
+            self._update_save_enabled()
+        elif button is self.btn_sync_others:
             self._update_save_enabled()
         elif button is self.btn_export_files:
             button.setEnabled(self.stack.currentWidget() in {self.table, self.plain})

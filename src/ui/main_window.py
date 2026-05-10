@@ -4,6 +4,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QMainWindow,
     QMessageBox,
+    QDialog,
     QProgressBar,
     QPushButton,
     QSplitter,
@@ -28,6 +29,7 @@ from db.queries import (
     get_config,
     get_directories,
     get_existing_file_paths,
+    get_similar_lyrics_track_rows,
     refresh_track_from_file,
     get_track_by_id,
     mark_tracks_instrumental,
@@ -1446,6 +1448,145 @@ class MainWindow(QMainWindow):
             for view in self._all_lyrics_views():
                 view.set_save_feedback("error", "Save Failed")
 
+    def _on_propagate_lyrics_requested(self, lrc: str, txt: str) -> None:
+        source_track_id = self._editing_track_id
+        if source_track_id is None:
+            notify_user(
+                self.app_state,
+                "Select a track before syncing lyrics to similar tracks.",
+                "warning",
+                show_status=self._show_status_message,
+                status_timeout_ms=3000,
+            )
+            for view in self._all_lyrics_views():
+                view.set_sync_others_feedback("error", "No Track")
+            return
+
+        lrc_text, txt_text = _canonical_lyrics_pair(lrc, txt)
+        if not lrc_text and not txt_text:
+            notify_user(
+                self.app_state,
+                "No lyrics are available to sync from this track.",
+                "warning",
+                show_status=self._show_status_message,
+                status_timeout_ms=3000,
+            )
+            for view in self._all_lyrics_views():
+                view.set_sync_others_feedback("error", "No Lyrics")
+            return
+
+        try:
+            matches = get_similar_lyrics_track_rows(self.app_state.db, int(source_track_id))
+        except sqlite3.Error as exc:
+            log_and_notify(
+                self.app_state,
+                logger,
+                logging.ERROR,
+                exception_message("Failed to find similar tracks", exc),
+                "error",
+                show_status=self._show_status_message,
+                status_timeout_ms=4000,
+            )
+            for view in self._all_lyrics_views():
+                view.set_sync_others_feedback("error", "Search Failed")
+            return
+
+        if not matches:
+            notify_user(
+                self.app_state,
+                "No similar tracks were found for this title, artist, and duration.",
+                "warning",
+                show_status=self._show_status_message,
+                status_timeout_ms=3500,
+            )
+            for view in self._all_lyrics_views():
+                view.set_sync_others_feedback("error", "No Matches")
+            return
+
+        from ui.dialogs.lyrics_propagate_dialog import LyricsPropagateDialog
+
+        dlg = LyricsPropagateDialog(matches, parent=self)
+        if dlg.exec() != QDialog.DialogCode.Accepted:
+            return
+
+        target_ids = dlg.selected_track_ids()
+        if not target_ids:
+            notify_user(
+                self.app_state,
+                "No tracks were checked for syncing.",
+                "warning",
+                show_status=self._show_status_message,
+                status_timeout_ms=3000,
+            )
+            for view in self._all_lyrics_views():
+                view.set_sync_others_feedback("error", "None Checked")
+            return
+
+        for view in self._all_lyrics_views():
+            view.set_sync_others_feedback("loading", "Syncing...")
+
+        try:
+            if self._dirty_lyrics_timer.isActive():
+                self._dirty_lyrics_timer.stop()
+
+            applied_ids = [int(source_track_id), *[int(track_id) for track_id in target_ids]]
+            output_errors: list[str] = []
+            for track_id in applied_ids:
+                track = self._save_lyrics_text_to_track(track_id, lrc_text, txt_text)
+                result = sync_track_outputs_with_result(track, get_config(self.app_state.db))
+                if result.sidecar_error is not None:
+                    output_errors.append(f"{track.title}: {result.sidecar_error}")
+                if result.embed_error is not None:
+                    output_errors.append(f"{track.title}: {result.embed_error}")
+                self._mark_track_lyrics_clean(track)
+                self._update_single_track_lyrics_state(track)
+
+            source_track = get_track_by_id(self.app_state.db, int(source_track_id))
+            self._editing_saved_lyrics = _canonical_lyrics_pair(source_track.lrc_lyrics, source_track.txt_lyrics)
+            self._set_track_lyrics_views(source_track)
+
+            synced_count = len(target_ids)
+            message = f"Lyrics synced to {synced_count} similar track(s)."
+            notify_type = "warning" if output_errors else "success"
+            notify_user(
+                self.app_state,
+                message if not output_errors else f"{message} Some output sync steps failed.",
+                notify_type,
+                show_status=self._show_status_message,
+                status_timeout_ms=4000,
+            )
+            for error in output_errors[:3]:
+                logger.warning("Lyrics propagation output sync issue: %s", error)
+            for view in self._all_lyrics_views():
+                view.set_sync_others_feedback("success", "Synced")
+        except (sqlite3.Error, OSError, ValueError) as exc:
+            log_and_notify(
+                self.app_state,
+                logger,
+                logging.ERROR,
+                exception_message("Failed to sync lyrics to similar tracks", exc),
+                "error",
+                show_status=self._show_status_message,
+                status_timeout_ms=4000,
+            )
+            for view in self._all_lyrics_views():
+                view.set_sync_others_feedback("error", "Sync Failed")
+
+    def _save_lyrics_text_to_track(self, track_id: int, lrc: str, txt: str):
+        if lrc.strip():
+            update_track_synced_lyrics(self.app_state.db, int(track_id), lrc.strip(), (txt or "").strip())
+        elif (txt or "").strip():
+            update_track_plain_lyrics(self.app_state.db, int(track_id), (txt or "").strip())
+        else:
+            update_track_null_lyrics(self.app_state.db, int(track_id))
+        return get_track_by_id(self.app_state.db, int(track_id))
+
+    def _mark_track_lyrics_clean(self, track) -> None:
+        track_id = int(track.id)
+        self.track_list.set_dirty_lyrics_state(track_id, False)
+        self.albums_tab.set_dirty_lyrics_state(track_id, False)
+        self.artists_tab.set_dirty_lyrics_state(track_id, False)
+
     def _on_dirty_lyrics_changed(self, lrc: str, txt: str) -> None:
         if self._loading_lyrics_views:
             return
@@ -1906,6 +2047,7 @@ class MainWindow(QMainWindow):
 
     def _wire_lyrics_view(self, view: LyricsEditorWidget) -> None:
         view.saveRequested.connect(self._on_lyrics_save_requested)
+        view.propagateRequested.connect(self._on_propagate_lyrics_requested)
         view.dirtyDraftChanged.connect(self._on_dirty_lyrics_changed)
         view.discardDraftRequested.connect(self._on_discard_draft_requested)
         view.autoSyncRequested.connect(self._on_auto_sync_requested)

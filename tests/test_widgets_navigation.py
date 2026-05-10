@@ -17,6 +17,7 @@ from ui.controllers.top_bar_controller import TopBarController
 from ui.widgets.hotkey_hints import HotkeyHintManager
 from ui.widgets.lrclib_browser_widget import _BrowserPublishDialog
 from ui.widgets.lyrics_editor_widget import LyricsEditorWidget, TIMESTAMP_MS_ROLE
+from ui.dialogs.lyrics_propagate_dialog import LyricsPropagateDialog
 from ui.widgets.toast import ToastManager
 from ui.main_window import MainWindow
 from ui.player_bar import PLAYER_COVER_SIZE, PlayerBar
@@ -325,7 +326,7 @@ class LyricsPasteBehaviorTests(unittest.TestCase):
     def test_lyrics_quick_actions_have_shortcuts(self):
         widget = LyricsEditorWidget()
         try:
-            widget._set_synced([(1200, "First line"), (3000, "Second line")])
+            widget._set_synced([(1200, "First line"), (3000, "Second line"), (8000, "")])
             widget.table.selectRow(0)
 
             self.assertIn("(Left)", widget.btn_shift_minus.toolTip())
@@ -449,6 +450,58 @@ class LyricsPasteBehaviorTests(unittest.TestCase):
             self.assertEqual(emitted, [])
         finally:
             widget.deleteLater()
+
+    def test_sync_others_button_emits_current_lyrics(self):
+        widget = LyricsEditorWidget()
+        emitted: list[tuple[str, str]] = []
+        widget.propagateRequested.connect(lambda lrc, plain: emitted.append((lrc, plain)))
+        try:
+            widget._set_synced([(1200, "First line"), (3000, "Second line"), (8000, "")])
+
+            self.assertTrue(widget.btn_sync_others.isEnabled())
+            widget._emit_propagate()
+
+            self.assertEqual(len(emitted), 1)
+            self.assertIn("[00:01.20] First line", emitted[0][0])
+            self.assertEqual(emitted[0][1], "First line\nSecond line")
+        finally:
+            widget.deleteLater()
+
+    def test_propagate_dialog_returns_checked_track_ids(self):
+        from db.models import Track
+
+        track = Track(
+            id=42,
+            file_path="song.flac",
+            file_name="song.flac",
+            title="Song",
+            album_name="Single",
+            album_artist_name="Artist A",
+            album_id=2,
+            artist_name="Artist A",
+            artist_id=1,
+            image_path=None,
+            track_number=1,
+            txt_lyrics=None,
+            lrc_lyrics=None,
+            duration=181.0,
+            instrumental=False,
+        )
+        dialog = LyricsPropagateDialog(
+            [
+                {
+                    "track": track,
+                    "score": 96,
+                    "title_score": 100,
+                    "artist_score": 100,
+                    "duration_score": 92,
+                }
+            ]
+        )
+        try:
+            self.assertEqual(dialog.selected_track_ids(), [42])
+        finally:
+            dialog.deleteLater()
 
     def test_browser_publish_lyrics_fields_reject_rich_text_paste(self):
         dialog = _BrowserPublishDialog("https://lrclib.net")
