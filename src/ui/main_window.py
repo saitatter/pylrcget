@@ -161,8 +161,6 @@ class MainWindow(QMainWindow):
 
         # --- Shortcuts ---
         QShortcut(QKeySequence("Space"), self, activated=self._toggle_play_pause)
-        QShortcut(QKeySequence("Return"), self, activated=self._play_selected_or_current)
-        QShortcut(QKeySequence("Enter"), self, activated=self._play_selected_or_current)
         QShortcut(QKeySequence("Ctrl+Right"), self, activated=self.play_next)
         QShortcut(QKeySequence("Ctrl+Left"), self, activated=self.play_prev)
         QShortcut(QKeySequence.StandardKey.Save, self, activated=self._save_active_lyrics)
@@ -471,6 +469,7 @@ class MainWindow(QMainWindow):
 
         # --- Filters wiring ---
         self.top_bar.bind_tab_order(self, self.tabs)
+        self._register_track_play_shortcuts()
         self._register_hotkey_hints()
         self._sync_download_mode_ui()
 
@@ -1684,8 +1683,22 @@ class MainWindow(QMainWindow):
         set_config(self.app_state.db, replace(config, playback_volume=float(self._pending_playback_volume)))
         self._pending_playback_volume = None
 
-    def _play_selected_or_current(self):
-        tid = self.track_list.selected_track_id()
+    def _register_track_play_shortcuts(self) -> None:
+        track_lists = [
+            self.track_list,
+            self.albums_tab.track_list,
+            self.artists_tab.album_browser.track_list,
+        ]
+        for track_list in track_lists:
+            for key in ("Return", "Enter"):
+                shortcut = QShortcut(QKeySequence(key), track_list.table)
+                shortcut.setContext(Qt.ShortcutContext.WidgetWithChildrenShortcut)
+                shortcut.activated.connect(
+                    lambda checked=False, source=track_list: self._play_selected_from_track_list(source)
+                )
+
+    def _play_selected_from_track_list(self, track_list) -> None:
+        tid = track_list.selected_track_id()
         if tid is not None:
             self.on_play_track(tid)
 

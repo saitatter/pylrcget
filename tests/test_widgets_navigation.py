@@ -7,7 +7,7 @@ from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
 from PySide6.QtCore import QEvent, QPoint, QPointF, QRect
-from PySide6.QtGui import QColor, QFont, QFontMetrics, QImage, QMouseEvent, QPainter, QStandardItem, QStandardItemModel
+from PySide6.QtGui import QColor, QFont, QFontMetrics, QImage, QKeyEvent, QMouseEvent, QPainter, QStandardItem, QStandardItemModel
 from PySide6.QtWidgets import QHeaderView, QPushButton, QStyle, QStyleOptionViewItem, QTableView, QWidget
 
 from core.tracklist_models import DownloadState, LyricsState, TrackListRow
@@ -340,6 +340,54 @@ class LyricsPasteBehaviorTests(unittest.TestCase):
             widget._shortcut_shift_plus.activated.emit()
             self.assertEqual(widget.table.item(0, 0).text(), "00:01.30")
             self.assertEqual(widget.table.item(0, 0).data(TIMESTAMP_MS_ROLE), 1300)
+        finally:
+            widget.deleteLater()
+
+    def test_enter_on_synced_timestamp_starts_editing_without_seek(self):
+        widget = LyricsEditorWidget()
+        emitted: list[int] = []
+        widget.seekRequested.connect(emitted.append)
+        try:
+            widget._set_synced([(1200, "First line"), (3000, "Second line")])
+            widget.table.setCurrentCell(0, 0)
+
+            self.assertTrue(widget._handle_synced_table_enter())
+
+            self.assertEqual(emitted, [])
+            self.assertEqual(widget.table.state(), widget.table.State.EditingState)
+        finally:
+            widget.deleteLater()
+
+    def test_enter_on_synced_lyric_replays_from_line_timestamp(self):
+        widget = LyricsEditorWidget()
+        emitted: list[int] = []
+        widget.seekRequested.connect(emitted.append)
+        try:
+            widget._set_synced([(1200, "First line"), (3000, "Second line")])
+            widget.table.setCurrentCell(1, 1)
+
+            self.assertTrue(widget._handle_synced_table_enter())
+
+            self.assertEqual(emitted, [3000])
+        finally:
+            widget.deleteLater()
+
+    def test_keypad_enter_on_synced_lyric_replays_from_line_timestamp(self):
+        widget = LyricsEditorWidget()
+        emitted: list[int] = []
+        widget.seekRequested.connect(emitted.append)
+        try:
+            widget._set_synced([(1200, "First line"), (3000, "Second line")])
+            widget.table.setCurrentCell(1, 1)
+            event = QKeyEvent(
+                QEvent.Type.KeyPress,
+                Qt.Key.Key_Enter,
+                Qt.KeyboardModifier.KeypadModifier,
+            )
+
+            self.assertTrue(widget.eventFilter(widget.table, event))
+
+            self.assertEqual(emitted, [3000])
         finally:
             widget.deleteLater()
 
@@ -737,6 +785,16 @@ class LyricsPasteBehaviorTests(unittest.TestCase):
             self.assertEqual(len(manager._toasts), 1)
         finally:
             host.deleteLater()
+
+    def test_enter_play_handler_uses_the_focused_track_list(self):
+        window = MainWindow.__new__(MainWindow)
+        played: list[int] = []
+        window.on_play_track = lambda track_id: played.append(int(track_id))
+        track_list = SimpleNamespace(selected_track_id=lambda: 42)
+
+        MainWindow._play_selected_from_track_list(window, track_list)
+
+        self.assertEqual(played, [42])
 
     def test_open_track_folder_opens_parent_directory(self):
         app_state = simple_app_state()

@@ -5,7 +5,7 @@ import logging
 import re
 from bisect import bisect_right
 
-from PySide6.QtCore import QRect, QSize, Qt, Signal, QTimer
+from PySide6.QtCore import QEvent, QRect, QSize, Qt, Signal, QTimer
 from PySide6.QtGui import QColor, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QApplication,
@@ -363,6 +363,8 @@ class LyricsEditorWidget(QWidget):
         self.table.setSelectionMode(self.table.SelectionMode.ExtendedSelection)
         self.table.setEditTriggers(self.table.EditTrigger.DoubleClicked | self.table.EditTrigger.EditKeyPressed)
         self.table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.table.installEventFilter(self)
+        self.table.viewport().installEventFilter(self)
         self.table.cellClicked.connect(self._on_table_clicked_seek)
         self.table.itemSelectionChanged.connect(self._on_table_selection_changed)
         self.table.itemChanged.connect(self._on_table_item_changed)
@@ -404,6 +406,17 @@ class LyricsEditorWidget(QWidget):
         shortcut.setContext(Qt.ShortcutContext.WidgetWithChildrenShortcut)
         shortcut.activated.connect(callback)
         return shortcut
+
+    def eventFilter(self, watched, event):
+        if watched in {self.table, self.table.viewport()} and event.type() == QEvent.Type.KeyPress:
+            modifiers = event.modifiers() & ~Qt.KeyboardModifier.KeypadModifier
+            if (
+                event.key() in {Qt.Key.Key_Return, Qt.Key.Key_Enter}
+                and modifiers == Qt.KeyboardModifier.NoModifier
+                and self._handle_synced_table_enter()
+            ):
+                return True
+        return super().eventFilter(watched, event)
 
     # --- public API ---
     def on_player_position(self, ms: int):
@@ -956,6 +969,29 @@ class LyricsEditorWidget(QWidget):
         return True
 
     def _on_table_clicked_seek(self, row: int, col: int):
+        self._seek_to_table_row(row)
+
+    def _handle_synced_table_enter(self) -> bool:
+        if self.stack.currentWidget() is not self.table:
+            return False
+        row = self.table.currentRow()
+        col = self.table.currentColumn()
+        if row < 0 or col < 0:
+            return False
+        if self.table.state() == self.table.State.EditingState:
+            return False
+        if col == 0:
+            item = self.table.item(row, 0)
+            if item is None:
+                return False
+            self.table.editItem(item)
+            return True
+        if col == 1:
+            self._seek_to_table_row(row)
+            return True
+        return False
+
+    def _seek_to_table_row(self, row: int) -> None:
         it_time = self.table.item(row, 0)
         if not it_time:
             return
