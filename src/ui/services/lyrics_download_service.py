@@ -225,7 +225,7 @@ def sync_track_outputs_with_result(
     if config.try_embed_lyrics:
         try:
             notify_cb("Embedding lyrics into the audio file...")
-            embed_lyrics_for_track(track)
+            embed_lyrics_for_track(track, getattr(config, "lyrics_embed_format", "both"))
             embedded = True
         except (OSError, ValueError) as exc:
             embed_error = exc

@@ -15,6 +15,11 @@ def export_lyrics_sidecars(track: Track, config: Config) -> list[str]:
 
     plain = (track.txt_lyrics or "").strip()
     synced = (track.lrc_lyrics or "").strip()
+    plain, synced = _select_lyrics_for_output(
+        plain,
+        synced,
+        getattr(config, "lyrics_sidecar_format", "both"),
+    )
 
     base_path = _resolve_output_base(track, config)
     base_path.parent.mkdir(parents=True, exist_ok=True)
@@ -36,6 +41,19 @@ def export_lyrics_sidecars(track: Track, config: Config) -> list[str]:
         lrc_path.unlink()
 
     return written_paths
+
+
+def _select_lyrics_for_output(plain: str, synced: str, output_format: str) -> tuple[str, str]:
+    mode = (output_format or "both").strip()
+    if mode == "synced_only":
+        return "", synced
+    if mode == "plain_only":
+        return plain, ""
+    if mode == "prefer_synced":
+        if synced:
+            return "", synced
+        return plain, ""
+    return plain, synced
 
 
 def _resolve_output_base(track: Track, config: Config) -> Path:

@@ -105,7 +105,9 @@ class Config:
     download_lyrics_mode: str
     show_line_count: bool
     save_lyrics_sidecars: bool
+    lyrics_sidecar_format: str
     try_embed_lyrics: bool
+    lyrics_embed_format: str
     theme_mode: str
     ui_scale_percent: int
     font_size_mode: str

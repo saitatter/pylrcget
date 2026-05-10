@@ -161,31 +161,36 @@ class MusicFoldersDialog(QDialog):
         self.save_sidecars_chk.setChecked(True)
         lyrics_layout.addWidget(self.save_sidecars_chk, 0, 0, 1, 4)
 
+        self.sidecar_format_combo = QComboBox()
+        self._populate_lyrics_format_combo(self.sidecar_format_combo)
+        lyrics_layout.addWidget(QLabel("File contents"), 1, 0)
+        lyrics_layout.addWidget(self.sidecar_format_combo, 1, 1, 1, 3)
+
         self.download_mode_combo = QComboBox()
         self.download_mode_combo.addItem("Prefer synced, fallback to plain", "prefer_synced")
         self.download_mode_combo.addItem("Synced only", "synced_only")
         self.download_mode_combo.addItem("Plain only", "plain_only")
-        lyrics_layout.addWidget(QLabel("Download mode"), 1, 0)
-        lyrics_layout.addWidget(self.download_mode_combo, 1, 1, 1, 3)
+        lyrics_layout.addWidget(QLabel("Download mode"), 2, 0)
+        lyrics_layout.addWidget(self.download_mode_combo, 2, 1, 1, 3)
         self.download_mode_hint_label = QLabel("")
         self.download_mode_hint_label.setObjectName("SettingsValidationHint")
         self.download_mode_hint_label.setWordWrap(True)
-        lyrics_layout.addWidget(self.download_mode_hint_label, 2, 0, 1, 4)
+        lyrics_layout.addWidget(self.download_mode_hint_label, 3, 0, 1, 4)
 
         self.output_dir_edit = QLineEdit()
         self.output_dir_edit.setPlaceholderText("Leave empty to save next to the audio file")
         self.browse_output_btn = QPushButton("Browse")
         self.clear_output_btn = QPushButton("Use Track Folder")
 
-        lyrics_layout.addWidget(QLabel("Download directory"), 3, 0)
-        lyrics_layout.addWidget(self.output_dir_edit, 3, 1)
-        lyrics_layout.addWidget(self.browse_output_btn, 3, 2)
-        lyrics_layout.addWidget(self.clear_output_btn, 3, 3)
+        lyrics_layout.addWidget(QLabel("Download directory"), 4, 0)
+        lyrics_layout.addWidget(self.output_dir_edit, 4, 1)
+        lyrics_layout.addWidget(self.browse_output_btn, 4, 2)
+        lyrics_layout.addWidget(self.clear_output_btn, 4, 3)
 
         self.pattern_edit = QLineEdit()
         self.pattern_edit.setPlaceholderText(DEFAULT_LYRICS_FILE_PATTERN)
-        lyrics_layout.addWidget(QLabel("Filename pattern"), 4, 0)
-        lyrics_layout.addWidget(self.pattern_edit, 4, 1, 1, 3)
+        lyrics_layout.addWidget(QLabel("Filename pattern"), 5, 0)
+        lyrics_layout.addWidget(self.pattern_edit, 5, 1, 1, 3)
 
         self.pattern_preview_label = QLabel("")
         self.pattern_preview_label.setObjectName("SettingsValidationHint")
@@ -196,15 +201,15 @@ class MusicFoldersDialog(QDialog):
         )
         mono_font = QFontDatabase.systemFont(QFontDatabase.SystemFont.FixedFont)
         self.pattern_preview_label.setFont(mono_font)
-        lyrics_layout.addWidget(self.pattern_preview_label, 5, 0, 1, 4)
+        lyrics_layout.addWidget(self.pattern_preview_label, 6, 0, 1, 4)
 
         hint = QLabel(
             "Available placeholders: {filename}, {artist}, {title}, {album}, {track}. "
-            "Extensions are added automatically as .lrc and .txt. "
+            "Extensions are added automatically based on the selected file contents. "
             "Leave the pattern empty to use the audio filename."
         )
         hint.setWordWrap(True)
-        lyrics_layout.addWidget(hint, 6, 0, 1, 4)
+        lyrics_layout.addWidget(hint, 7, 0, 1, 4)
         lyrics_tab_layout.addWidget(lyrics_box)
 
         lookup_box = QGroupBox("Lyrics Lookup")
@@ -229,16 +234,21 @@ class MusicFoldersDialog(QDialog):
         self.embed_chk.setChecked(True)
         embed_layout.addWidget(self.embed_chk, 0, 0, 1, 2)
 
+        self.embed_format_combo = QComboBox()
+        self._populate_lyrics_format_combo(self.embed_format_combo)
+        embed_layout.addWidget(QLabel("Embedded contents"), 1, 0)
+        embed_layout.addWidget(self.embed_format_combo, 1, 1)
+
         self.reaction_delay_spin = QSpinBox()
         self.reaction_delay_spin.setRange(-2000, 2000)
         self.reaction_delay_spin.setSingleStep(10)
         self.reaction_delay_spin.setSuffix(" ms")
-        embed_layout.addWidget(QLabel("Reaction delay"), 1, 0)
-        embed_layout.addWidget(self.reaction_delay_spin, 1, 1)
+        embed_layout.addWidget(QLabel("Reaction delay"), 2, 0)
+        embed_layout.addWidget(self.reaction_delay_spin, 2, 1)
 
         reaction_hint = QLabel("Negative values stamp earlier. Positive values stamp later.")
         reaction_hint.setWordWrap(True)
-        embed_layout.addWidget(reaction_hint, 2, 0, 1, 2)
+        embed_layout.addWidget(reaction_hint, 3, 0, 1, 2)
         lyrics_tab_layout.addWidget(embed_box)
 
         lrclib_box = QGroupBox("LRCLIB")
@@ -274,8 +284,10 @@ class MusicFoldersDialog(QDialog):
         self.browse_output_btn.clicked.connect(self._browse_output_dir)
         self.clear_output_btn.clicked.connect(lambda: self.output_dir_edit.setText(""))
         self.save_sidecars_chk.toggled.connect(self._update_export_fields_enabled)
+        self.embed_chk.toggled.connect(self._update_embed_fields_enabled)
         self.pattern_edit.textChanged.connect(self._update_pattern_preview)
         self.output_dir_edit.textChanged.connect(self._update_pattern_preview)
+        self.sidecar_format_combo.currentIndexChanged.connect(self._update_pattern_preview)
         self.download_mode_combo.currentIndexChanged.connect(self._update_download_mode_hint)
         self.add_excluded_path_btn.clicked.connect(self._add_excluded_path)
         self.add_excluded_file_btn.clicked.connect(self._add_excluded_file)
@@ -301,12 +313,16 @@ class MusicFoldersDialog(QDialog):
         startup_view_idx = self.startup_view_combo.findData(config.startup_view or "remember_last")
         self.startup_view_combo.setCurrentIndex(max(0, startup_view_idx))
         self.save_sidecars_chk.setChecked(config.save_lyrics_sidecars)
+        sidecar_format_idx = self.sidecar_format_combo.findData(getattr(config, "lyrics_sidecar_format", "both") or "both")
+        self.sidecar_format_combo.setCurrentIndex(max(0, sidecar_format_idx))
         mode_index = self.download_mode_combo.findData(config.download_lyrics_mode or "prefer_synced")
         self.download_mode_combo.setCurrentIndex(max(0, mode_index))
         self.output_dir_edit.setText(config.lyrics_output_dir)
         self.pattern_edit.setText(config.lyrics_file_pattern or "")
         self.lookup_subdir_edit.setText(config.lyrics_lookup_subdir or "")
         self.embed_chk.setChecked(config.try_embed_lyrics)
+        embed_format_idx = self.embed_format_combo.findData(getattr(config, "lyrics_embed_format", "both") or "both")
+        self.embed_format_combo.setCurrentIndex(max(0, embed_format_idx))
         self.reaction_delay_spin.setValue(int(config.reaction_delay_ms or 0))
         lrclib_url = (config.lrclib_instance or "").strip()
         self.lrclib_instance_edit.setText("" if lrclib_url == "https://lrclib.net" else lrclib_url)
@@ -320,6 +336,7 @@ class MusicFoldersDialog(QDialog):
             if os.path.isdir(first_directory):
                 self._last_browse_dir = first_directory
         self._update_export_fields_enabled()
+        self._update_embed_fields_enabled()
         self._update_download_mode_hint()
         self._update_pattern_preview()
         self._validate_regex_patterns()
@@ -489,11 +506,22 @@ class MusicFoldersDialog(QDialog):
 
     def _update_export_fields_enabled(self):
         enabled = self.save_sidecars_chk.isChecked()
+        self.sidecar_format_combo.setEnabled(enabled)
         self.output_dir_edit.setEnabled(enabled)
         self.pattern_edit.setEnabled(enabled)
         self.browse_output_btn.setEnabled(enabled)
         self.clear_output_btn.setEnabled(enabled)
         self._update_pattern_preview()
+
+    def _update_embed_fields_enabled(self):
+        self.embed_format_combo.setEnabled(self.embed_chk.isChecked())
+
+    @staticmethod
+    def _populate_lyrics_format_combo(combo: QComboBox) -> None:
+        combo.addItem("Synced and plain", "both")
+        combo.addItem("Synced only", "synced_only")
+        combo.addItem("Plain only", "plain_only")
+        combo.addItem("Prefer synced, fallback to plain", "prefer_synced")
 
     def _update_download_mode_hint(self) -> None:
         mode = str(self.download_mode_combo.currentData() or "prefer_synced")
@@ -541,9 +569,20 @@ class MusicFoldersDialog(QDialog):
             used_fallback = True
 
         output_dir = self.output_dir_edit.text().strip()
+        suffix = self._lyrics_format_preview_suffix()
         if output_dir:
-            return os.path.join(output_dir, rendered) + " (.lrc / .txt)", used_fallback
-        return rendered + " (.lrc / .txt next to the audio file)", used_fallback
+            return os.path.join(output_dir, rendered) + f" ({suffix})", used_fallback
+        return rendered + f" ({suffix} next to the audio file)", used_fallback
+
+    def _lyrics_format_preview_suffix(self) -> str:
+        mode = str(self.sidecar_format_combo.currentData() or "both")
+        if mode == "synced_only":
+            return ".lrc"
+        if mode == "plain_only":
+            return ".txt"
+        if mode == "prefer_synced":
+            return ".lrc, or .txt if synced lyrics are unavailable"
+        return ".lrc / .txt"
 
     def _update_pattern_preview(self) -> None:
         if not self.save_sidecars_chk.isChecked():
@@ -579,8 +618,10 @@ class MusicFoldersDialog(QDialog):
             show_album_art=bool(self.album_art_combo.currentData()),
             startup_view=str(self.startup_view_combo.currentData() or "remember_last"),
             save_lyrics_sidecars=self.save_sidecars_chk.isChecked(),
+            lyrics_sidecar_format=str(self.sidecar_format_combo.currentData() or "both"),
             download_lyrics_mode=str(self.download_mode_combo.currentData() or "prefer_synced"),
             try_embed_lyrics=self.embed_chk.isChecked(),
+            lyrics_embed_format=str(self.embed_format_combo.currentData() or "both"),
             lyrics_output_dir=self.output_dir_edit.text().strip(),
             lyrics_file_pattern=self.pattern_edit.text().strip(),
             lyrics_lookup_subdir=self._normalized_lookup_subdir(),

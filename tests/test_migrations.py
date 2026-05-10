@@ -35,6 +35,8 @@ class MigrationTests(unittest.TestCase):
                         "startup_view",
                         "playback_speed",
                         "playback_volume",
+                        "lyrics_sidecar_format",
+                        "lyrics_embed_format",
                     }
                     <= config_columns
                 )
@@ -52,7 +54,9 @@ class MigrationTests(unittest.TestCase):
                            ui_scale_percent,
                            font_size_mode,
                            show_album_art,
-                           startup_view
+                           startup_view,
+                           lyrics_sidecar_format,
+                           lyrics_embed_format
                     FROM config_data
                     LIMIT 1
                     """
@@ -64,6 +68,8 @@ class MigrationTests(unittest.TestCase):
                 self.assertEqual(row["font_size_mode"], "normal")
                 self.assertEqual(int(row["show_album_art"]), 1)
                 self.assertEqual(row["startup_view"], "remember_last")
+                self.assertEqual(row["lyrics_sidecar_format"], "both")
+                self.assertEqual(row["lyrics_embed_format"], "both")
             finally:
                 db.close()
 
@@ -132,6 +138,40 @@ class MigrationTests(unittest.TestCase):
                     "SELECT name FROM sqlite_master WHERE type='table' AND name='config_data'"
                 ).fetchone()
                 self.assertIsNone(config)
+            finally:
+                db.close()
+
+    def test_v2_database_upgrades_lyrics_output_format_columns(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db_path = Path(tmp) / "pylrcget.db.sqlite3"
+            db = sqlite3.connect(str(db_path))
+            db.row_factory = sqlite3.Row
+            try:
+                db.execute(
+                    """
+                    CREATE TABLE config_data (
+                        id INTEGER PRIMARY KEY,
+                        download_lyrics_mode TEXT DEFAULT 'prefer_synced',
+                        save_lyrics_sidecars BOOLEAN DEFAULT 1,
+                        try_embed_lyrics BOOLEAN DEFAULT 1
+                    )
+                    """
+                )
+                db.execute("INSERT INTO config_data (id) VALUES (1)")
+                db.execute("PRAGMA user_version=2")
+                db.commit()
+
+                upgrade_database_if_needed(db, 2)
+
+                version = int(db.execute("PRAGMA user_version").fetchone()[0])
+                self.assertEqual(version, CURRENT_DB_VERSION)
+                columns = {row["name"] for row in db.execute("PRAGMA table_info(config_data)").fetchall()}
+                self.assertTrue({"lyrics_sidecar_format", "lyrics_embed_format"} <= columns)
+                row = db.execute(
+                    "SELECT lyrics_sidecar_format, lyrics_embed_format FROM config_data LIMIT 1"
+                ).fetchone()
+                self.assertEqual(row["lyrics_sidecar_format"], "both")
+                self.assertEqual(row["lyrics_embed_format"], "both")
             finally:
                 db.close()
 

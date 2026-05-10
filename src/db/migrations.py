@@ -44,6 +44,7 @@ def upgrade_database_if_needed(db: sqlite3.Connection, existing_version: int) ->
         db.commit()
         return
 
+    current_version = existing_version
     if existing_version < 2:
         logger.info("Upgrade database version %d -> 2...", existing_version)
         # Dirty lyrics draft columns
@@ -73,9 +74,29 @@ def upgrade_database_if_needed(db: sqlite3.Connection, existing_version: int) ->
         db.execute("CREATE INDEX IF NOT EXISTS idx_search_history_searched_at ON search_history(searched_at DESC)")
         db.execute("PRAGMA user_version=2")
         db.commit()
+        current_version = 2
+
+    if current_version < 3:
+        logger.info("Upgrade database version %d -> 3...", current_version)
+        config_table = db.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='config_data'"
+        ).fetchone()
+        if config_table is not None:
+            config_columns = {
+                row["name"] for row in db.execute("PRAGMA table_info(config_data)").fetchall()
+            }
+            if "lyrics_sidecar_format" not in config_columns:
+                db.execute("ALTER TABLE config_data ADD COLUMN lyrics_sidecar_format TEXT DEFAULT 'both'")
+            if "lyrics_embed_format" not in config_columns:
+                db.execute("ALTER TABLE config_data ADD COLUMN lyrics_embed_format TEXT DEFAULT 'both'")
+        db.execute("PRAGMA user_version=3")
+        db.commit()
+        current_version = 3
+
+    if current_version == CURRENT_DB_VERSION:
         return
 
     raise RuntimeError(
-        f"Unsupported database upgrade path: {existing_version} -> {CURRENT_DB_VERSION}. "
+        f"Unsupported database upgrade path: {current_version} -> {CURRENT_DB_VERSION}. "
         "Add an explicit migration step before increasing CURRENT_DB_VERSION."
     )

@@ -43,7 +43,7 @@ def _norm(s: str | None) -> str | None:
     return s or None
 
 
-def embed_lyrics_for_track(track: TrackWithLyrics) -> None:
+def embed_lyrics_for_track(track: TrackWithLyrics, output_format: str = "both") -> None:
     """
     Embed lyrics for a Track object from the DB.
     The object is expected to have:
@@ -54,10 +54,29 @@ def embed_lyrics_for_track(track: TrackWithLyrics) -> None:
     path = track.file_path
     plain = _norm(getattr(track, "txt_lyrics", None))
     synced = _norm(getattr(track, "lrc_lyrics", None))
-    if synced and not plain:
+    output_format = (output_format or "both").strip() or "both"
+    plain, synced = _select_lyrics_for_output(plain, synced, output_format)
+    if output_format == "both" and synced and not plain:
         plain = _norm(plain_text_from_lrc(synced))
 
     embed_lyrics_in_file(path, plain, synced)
+
+
+def _select_lyrics_for_output(
+    plain: str | None,
+    synced: str | None,
+    output_format: str,
+) -> tuple[str | None, str | None]:
+    mode = (output_format or "both").strip()
+    if mode == "synced_only":
+        return None, synced
+    if mode == "plain_only":
+        return plain, None
+    if mode == "prefer_synced":
+        if synced:
+            return None, synced
+        return plain, None
+    return plain, synced
 
 
 def embed_lyrics_in_file(path: str, plain: str | None, synced: str | None) -> None:

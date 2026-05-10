@@ -37,7 +37,10 @@ def missing_lyrics_detail(mode: str | None) -> str:
         )
     if normalized == "synced_only":
         return "If LRCLIB only has plain lyrics for a track, that match is skipped."
-    return "If synced lyrics are unavailable, the app falls back to plain lyrics for that track; only the chosen format is saved."
+    return (
+        "If synced lyrics are unavailable, the app falls back to plain lyrics for that track. "
+        "File export and embed settings decide what gets written out."
+    )
 
 
 def download_missing_tooltip(mode: str | None) -> str:

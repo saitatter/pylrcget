@@ -279,7 +279,9 @@ class TrackRefreshQueryTests(unittest.TestCase):
                     download_lyrics_mode=config.download_lyrics_mode,
                     show_line_count=config.show_line_count,
                     save_lyrics_sidecars=config.save_lyrics_sidecars,
+                    lyrics_sidecar_format="synced_only",
                     try_embed_lyrics=config.try_embed_lyrics,
+                    lyrics_embed_format="plain_only",
                     theme_mode=config.theme_mode,
                     ui_scale_percent=125,
                     font_size_mode="large",
@@ -304,6 +306,8 @@ class TrackRefreshQueryTests(unittest.TestCase):
                 self.assertEqual(reloaded.font_size_mode, "large")
                 self.assertFalse(reloaded.show_album_art)
                 self.assertEqual(reloaded.startup_view, "albums")
+                self.assertEqual(reloaded.lyrics_sidecar_format, "synced_only")
+                self.assertEqual(reloaded.lyrics_embed_format, "plain_only")
             finally:
                 db.close()
 

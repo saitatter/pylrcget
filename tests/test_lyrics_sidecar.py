@@ -16,7 +16,9 @@ def _make_config(output_dir: str, pattern: str) -> Config:
         download_lyrics_mode="prefer_synced",
         show_line_count=True,
         save_lyrics_sidecars=True,
+        lyrics_sidecar_format="both",
         try_embed_lyrics=True,
+        lyrics_embed_format="both",
         theme_mode="auto",
         ui_scale_percent=100,
         font_size_mode="normal",
@@ -144,6 +146,71 @@ class LyricsSidecarExportTests(unittest.TestCase):
                     Path(path).resolve().is_relative_to(out_dir.resolve()),
                     f"Sidecar escaped output dir: {path}",
                 )
+
+    def test_export_synced_only_writes_only_lrc(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            audio = tmp_path / "song.mp3"
+            audio.write_text("audio")
+            audio.with_suffix(".txt").write_text("old plain", encoding="utf-8")
+            config = _make_config("", "{filename}")
+            config = Config(**{**config.__dict__, "lyrics_sidecar_format": "synced_only"})
+            track = _make_track(audio)
+
+            written = export_lyrics_sidecars(track, config)
+
+            self.assertEqual([str(audio.with_suffix(".lrc"))], written)
+            self.assertTrue(audio.with_suffix(".lrc").exists())
+            self.assertFalse(audio.with_suffix(".txt").exists())
+
+    def test_export_plain_only_writes_only_txt(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            audio = tmp_path / "song.mp3"
+            audio.write_text("audio")
+            audio.with_suffix(".lrc").write_text("[00:00.00]old synced", encoding="utf-8")
+            config = _make_config("", "{filename}")
+            config = Config(**{**config.__dict__, "lyrics_sidecar_format": "plain_only"})
+            track = _make_track(audio)
+
+            written = export_lyrics_sidecars(track, config)
+
+            self.assertEqual([str(audio.with_suffix(".txt"))], written)
+            self.assertFalse(audio.with_suffix(".lrc").exists())
+            self.assertTrue(audio.with_suffix(".txt").exists())
+
+    def test_export_prefer_synced_writes_only_lrc_when_synced_exists(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            audio = tmp_path / "song.mp3"
+            audio.write_text("audio")
+            audio.with_suffix(".txt").write_text("old plain", encoding="utf-8")
+            config = _make_config("", "{filename}")
+            config = Config(**{**config.__dict__, "lyrics_sidecar_format": "prefer_synced"})
+            track = _make_track(audio)
+
+            written = export_lyrics_sidecars(track, config)
+
+            self.assertEqual([str(audio.with_suffix(".lrc"))], written)
+            self.assertTrue(audio.with_suffix(".lrc").exists())
+            self.assertFalse(audio.with_suffix(".txt").exists())
+
+    def test_export_prefer_synced_falls_back_to_only_txt_when_lrc_missing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            audio = tmp_path / "song.mp3"
+            audio.write_text("audio")
+            audio.with_suffix(".lrc").write_text("[00:00.00]old synced", encoding="utf-8")
+            config = _make_config("", "{filename}")
+            config = Config(**{**config.__dict__, "lyrics_sidecar_format": "prefer_synced"})
+            track = _make_track(audio)
+
+            plain_track = Track(**{**track.__dict__, "lrc_lyrics": None})
+            plain_written = export_lyrics_sidecars(plain_track, config)
+
+            self.assertEqual([str(audio.with_suffix(".txt"))], plain_written)
+            self.assertFalse(audio.with_suffix(".lrc").exists())
+            self.assertTrue(audio.with_suffix(".txt").exists())
 
 
 if __name__ == "__main__":
