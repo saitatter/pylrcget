@@ -449,17 +449,31 @@ class TrackRefreshQueryTests(unittest.TestCase):
             try:
                 source_audio = Path(tmp) / "album.flac"
                 single_audio = Path(tmp) / "single.flac"
-                other_audio = Path(tmp) / "other.flac"
+                similar_title_audio = Path(tmp) / "similar-title.flac"
+                other_artist_audio = Path(tmp) / "other-artist.flac"
                 touch_text(source_audio, "a")
                 touch_text(single_audio, "b")
-                touch_text(other_audio, "c")
+                touch_text(similar_title_audio, "c")
+                touch_text(other_artist_audio, "d")
 
                 add_tracks(
                     db,
                     [
                         replace(make_fs_track(source_audio, artist="Artist A", album="Album", title="Song"), duration=180.0),
                         replace(make_fs_track(single_audio, artist="Artist A", album="Single", title="Song"), duration=181.0),
-                        replace(make_fs_track(other_audio, artist="Other", album="Other", title="Different"), duration=240.0),
+                        replace(
+                            make_fs_track(
+                                similar_title_audio,
+                                artist="Artist A",
+                                album="Other",
+                                title="Song - Acoustic Version",
+                            ),
+                            duration=180.0,
+                        ),
+                        replace(
+                            make_fs_track(other_artist_audio, artist="Other", album="Other", title="Song"),
+                            duration=180.0,
+                        ),
                     ],
                 )
 

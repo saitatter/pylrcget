@@ -5,7 +5,6 @@ import re
 import sqlite3
 import threading
 from datetime import datetime, timezone
-from difflib import SequenceMatcher
 from typing import Sequence
 
 from core.models import FsTrack
@@ -1051,7 +1050,9 @@ def get_similar_lyrics_track_rows(
 ) -> list[dict]:
     """Return tracks that look like alternate releases of the source track.
 
-    Score is weighted toward title and artist, with duration as the tiebreaker.
+    Title and artist must match exactly after normalization. Score reflects how
+    closely the durations match, so single/EP/full-album variants can differ by
+    a few seconds without admitting unrelated tracks.
     The source track itself is never returned.
     """
     source = get_track_by_id(db, int(source_track_id))
@@ -1094,10 +1095,11 @@ def get_similar_lyrics_track_rows(
         candidate_artist = prepare_input(row["artist_name"] or "")
         candidate_duration = float(row["duration"] or 0.0)
 
-        title_score = _similarity_percent(source_title, candidate_title)
-        artist_score = _similarity_percent(source_artist, candidate_artist)
+        if candidate_title != source_title or candidate_artist != source_artist:
+            continue
+
         duration_score = _duration_similarity_percent(source_duration, candidate_duration)
-        score = round(title_score * 0.45 + artist_score * 0.35 + duration_score * 0.20)
+        score = round(duration_score)
 
         if score < int(min_score):
             continue
@@ -1106,8 +1108,8 @@ def get_similar_lyrics_track_rows(
             {
                 "track": Track.from_row(row),
                 "score": int(score),
-                "title_score": int(round(title_score)),
-                "artist_score": int(round(artist_score)),
+                "title_score": 100,
+                "artist_score": 100,
                 "duration_score": int(round(duration_score)),
                 "duration_delta": abs(candidate_duration - source_duration),
             }
@@ -1123,16 +1125,6 @@ def get_similar_lyrics_track_rows(
             prepare_input(item["track"].title),
         ),
     )
-
-
-def _similarity_percent(left: str, right: str) -> float:
-    left = prepare_input(left)
-    right = prepare_input(right)
-    if not left or not right:
-        return 0.0
-    if left == right:
-        return 100.0
-    return SequenceMatcher(None, left, right).ratio() * 100.0
 
 
 def _duration_similarity_percent(left: float, right: float) -> float:
