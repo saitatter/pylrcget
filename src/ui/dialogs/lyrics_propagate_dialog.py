@@ -6,6 +6,7 @@ from PySide6.QtWidgets import (
     QDialogButtonBox,
     QHeaderView,
     QLabel,
+    QPushButton,
     QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
@@ -18,11 +19,12 @@ TRACK_ID_ROLE = Qt.ItemDataRole.UserRole
 
 
 class LyricsPropagateDialog(QDialog):
-    def __init__(self, matches: list[dict], parent=None) -> None:
+    def __init__(self, matches: list[dict], *, source_lyrics: str = "", parent=None) -> None:
         super().__init__(parent)
         self.setWindowTitle("Sync Lyrics to Similar Tracks")
         self.resize(960, 520)
         self._matches = list(matches)
+        self._source_lyrics = (source_lyrics or "").strip()
 
         layout = QVBoxLayout(self)
         self.summary_label = QLabel(
@@ -31,9 +33,9 @@ class LyricsPropagateDialog(QDialog):
         self.summary_label.setWordWrap(True)
         layout.addWidget(self.summary_label)
 
-        self.table = QTableWidget(0, 8)
+        self.table = QTableWidget(0, 7)
         self.table.setHorizontalHeaderLabels(
-            ["Apply", "Track", "Artist", "Album", "Duration", "Match", "Title", "Artist/Time"]
+            ["Apply", "Track", "Artist", "Album", "Duration", "Match", "Diff"]
         )
         self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
@@ -47,7 +49,6 @@ class LyricsPropagateDialog(QDialog):
         header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(5, QHeaderView.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(6, QHeaderView.ResizeMode.ResizeToContents)
-        header.setSectionResizeMode(7, QHeaderView.ResizeMode.ResizeToContents)
         layout.addWidget(self.table, 1)
 
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
@@ -91,12 +92,31 @@ class LyricsPropagateDialog(QDialog):
             self.table.setItem(row, 3, QTableWidgetItem(track.album_name or ""))
             self.table.setItem(row, 4, QTableWidgetItem(_format_duration(track.duration)))
             self.table.setItem(row, 5, QTableWidgetItem(f"{int(match['score'])}%"))
-            self.table.setItem(row, 6, QTableWidgetItem(f"{int(match['title_score'])}%"))
-            self.table.setItem(
-                row,
-                7,
-                QTableWidgetItem(f"{int(match['artist_score'])}% / {int(match['duration_score'])}%"),
-            )
+            self.table.setCellWidget(row, 6, self._make_diff_button(track))
+
+    def _make_diff_button(self, track: Track) -> QPushButton:
+        button = QPushButton("Diff")
+        target_lyrics = _lyrics_text_for_track(track)
+        button.setEnabled(bool(target_lyrics.strip()))
+        button.setToolTip(
+            "Compare current lyrics with this track's existing lyrics"
+            if target_lyrics.strip()
+            else "This track has no existing lyrics to compare"
+        )
+        button.clicked.connect(lambda _checked=False, t=track: self._show_diff(t))
+        return button
+
+    def _show_diff(self, track: Track) -> None:
+        from ui.dialogs.lyrics_diff_dialog import LyricsDiffDialog
+
+        target_lyrics = _lyrics_text_for_track(track)
+        dlg = LyricsDiffDialog(
+            target_lyrics,
+            self._source_lyrics,
+            title=f"Lyrics Diff - {track.artist_name} - {track.title}",
+            parent=self,
+        )
+        dlg.exec()
 
 
 def _track_label(track: Track) -> str:
@@ -108,3 +128,12 @@ def _format_duration(duration: float | int | None) -> str:
     seconds = max(0, int(round(float(duration or 0))))
     minutes, seconds = divmod(seconds, 60)
     return f"{minutes}:{seconds:02d}"
+
+
+def _lyrics_text_for_track(track: Track) -> str:
+    if track.dirty_lyrics_present:
+        dirty_lrc = (track.dirty_lrc_lyrics or "").strip()
+        dirty_txt = (track.dirty_txt_lyrics or "").strip()
+        if dirty_lrc or dirty_txt:
+            return dirty_lrc or dirty_txt
+    return (track.lrc_lyrics or "").strip() or (track.txt_lyrics or "").strip()

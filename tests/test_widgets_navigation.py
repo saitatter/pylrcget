@@ -482,7 +482,7 @@ class LyricsPasteBehaviorTests(unittest.TestCase):
             artist_id=1,
             image_path=None,
             track_number=1,
-            txt_lyrics=None,
+            txt_lyrics="old lyrics",
             lrc_lyrics=None,
             duration=181.0,
             instrumental=False,
@@ -496,9 +496,16 @@ class LyricsPasteBehaviorTests(unittest.TestCase):
                     "artist_score": 100,
                     "duration_score": 92,
                 }
-            ]
+            ],
+            source_lyrics="new lyrics",
         )
         try:
+            headers = [dialog.table.horizontalHeaderItem(index).text() for index in range(dialog.table.columnCount())]
+            self.assertEqual(headers, ["Apply", "Track", "Artist", "Album", "Duration", "Match", "Diff"])
+            self.assertNotIn("Title", headers)
+            self.assertNotIn("Artist/Time", headers)
+            self.assertIsInstance(dialog.table.cellWidget(0, 6), QPushButton)
+            self.assertTrue(dialog.table.cellWidget(0, 6).isEnabled())
             self.assertEqual(dialog.selected_track_ids(), [42])
         finally:
             dialog.deleteLater()

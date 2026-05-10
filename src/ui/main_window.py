@@ -1505,7 +1505,7 @@ class MainWindow(QMainWindow):
 
         from ui.dialogs.lyrics_propagate_dialog import LyricsPropagateDialog
 
-        dlg = LyricsPropagateDialog(matches, parent=self)
+        dlg = LyricsPropagateDialog(matches, source_lyrics=lrc_text or txt_text, parent=self)
         if dlg.exec() != QDialog.DialogCode.Accepted:
             return
 
