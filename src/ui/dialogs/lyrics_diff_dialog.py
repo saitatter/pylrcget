@@ -68,8 +68,8 @@ class LyricsDiffDialog(QDialog):
         self._populate_diff(saved_text or "", draft_text or "")
 
     def _populate_diff(self, saved: str, draft: str) -> None:
-        saved_lines = saved.splitlines(keepends=True)
-        draft_lines = draft.splitlines(keepends=True)
+        saved_lines = _normalized_diff_lines(saved)
+        draft_lines = _normalized_diff_lines(draft)
 
         sm = difflib.SequenceMatcher(None, saved_lines, draft_lines)
 
@@ -120,3 +120,7 @@ def _make_panel(label, text_edit):
     layout.addWidget(label)
     layout.addWidget(text_edit, 1)
     return w
+
+
+def _normalized_diff_lines(text: str) -> list[str]:
+    return [f"{line.rstrip()}\n" for line in (text or "").splitlines()]

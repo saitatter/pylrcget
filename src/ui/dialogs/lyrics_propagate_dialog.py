@@ -6,7 +6,6 @@ from PySide6.QtWidgets import (
     QDialogButtonBox,
     QHeaderView,
     QLabel,
-    QPushButton,
     QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
@@ -16,6 +15,7 @@ from db.models import Track
 
 
 TRACK_ID_ROLE = Qt.ItemDataRole.UserRole
+TRACK_ROLE = Qt.ItemDataRole.UserRole + 1
 
 
 class LyricsPropagateDialog(QDialog):
@@ -33,14 +33,15 @@ class LyricsPropagateDialog(QDialog):
         self.summary_label.setWordWrap(True)
         layout.addWidget(self.summary_label)
 
-        self.table = QTableWidget(0, 7)
+        self.table = QTableWidget(0, 6)
         self.table.setHorizontalHeaderLabels(
-            ["Apply", "Track", "Artist", "Album", "Duration", "Match", "Diff"]
+            ["Apply", "Track", "Artist", "Album", "Duration", "Match"]
         )
         self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
         self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.table.verticalHeader().setVisible(False)
+        self.table.itemSelectionChanged.connect(self._update_diff_button)
         header = self.table.horizontalHeader()
         header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
@@ -48,16 +49,21 @@ class LyricsPropagateDialog(QDialog):
         header.setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
         header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(5, QHeaderView.ResizeMode.ResizeToContents)
-        header.setSectionResizeMode(6, QHeaderView.ResizeMode.ResizeToContents)
         layout.addWidget(self.table, 1)
 
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        self.diff_button = buttons.addButton("Show Diff", QDialogButtonBox.ButtonRole.ActionRole)
+        self.diff_button.setToolTip("Compare current lyrics with the selected track's existing lyrics")
+        self.diff_button.clicked.connect(self._show_selected_diff)
         buttons.button(QDialogButtonBox.StandardButton.Ok).setText("Sync Checked")
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
 
         self._populate()
+        if self.table.rowCount():
+            self.table.selectRow(0)
+        self._update_diff_button()
 
     def selected_track_ids(self) -> list[int]:
         selected: list[int] = []
@@ -85,6 +91,7 @@ class LyricsPropagateDialog(QDialog):
             )
             apply_item.setCheckState(Qt.CheckState.Checked if int(match["score"]) >= 85 else Qt.CheckState.Unchecked)
             apply_item.setData(TRACK_ID_ROLE, int(track.id))
+            apply_item.setData(TRACK_ROLE, track)
             self.table.setItem(row, 0, apply_item)
 
             self.table.setItem(row, 1, QTableWidgetItem(_track_label(track)))
@@ -92,19 +99,33 @@ class LyricsPropagateDialog(QDialog):
             self.table.setItem(row, 3, QTableWidgetItem(track.album_name or ""))
             self.table.setItem(row, 4, QTableWidgetItem(_format_duration(track.duration)))
             self.table.setItem(row, 5, QTableWidgetItem(f"{int(match['score'])}%"))
-            self.table.setCellWidget(row, 6, self._make_diff_button(track))
 
-    def _make_diff_button(self, track: Track) -> QPushButton:
-        button = QPushButton("Diff")
-        target_lyrics = _lyrics_text_for_track(track)
-        button.setEnabled(bool(target_lyrics.strip()))
-        button.setToolTip(
-            "Compare current lyrics with this track's existing lyrics"
+    def _selected_track(self) -> Track | None:
+        selected = self.table.selectionModel()
+        if selected is None:
+            return None
+        rows = selected.selectedRows()
+        if not rows:
+            return None
+        item = self.table.item(rows[0].row(), 0)
+        track = item.data(TRACK_ROLE) if item is not None else None
+        return track if isinstance(track, Track) else None
+
+    def _update_diff_button(self) -> None:
+        track = self._selected_track()
+        target_lyrics = _lyrics_text_for_track(track) if track is not None else ""
+        self.diff_button.setEnabled(bool(target_lyrics.strip()))
+        self.diff_button.setToolTip(
+            "Compare current lyrics with the selected track's existing lyrics"
             if target_lyrics.strip()
-            else "This track has no existing lyrics to compare"
+            else "The selected track has no existing lyrics to compare"
         )
-        button.clicked.connect(lambda _checked=False, t=track: self._show_diff(t))
-        return button
+
+    def _show_selected_diff(self) -> None:
+        track = self._selected_track()
+        if track is None:
+            return
+        self._show_diff(track)
 
     def _show_diff(self, track: Track) -> None:
         from ui.dialogs.lyrics_diff_dialog import LyricsDiffDialog

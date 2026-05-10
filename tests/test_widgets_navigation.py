@@ -18,6 +18,7 @@ from ui.widgets.hotkey_hints import HotkeyHintManager
 from ui.widgets.lrclib_browser_widget import _BrowserPublishDialog
 from ui.widgets.lyrics_editor_widget import LyricsEditorWidget, TIMESTAMP_MS_ROLE
 from ui.dialogs.lyrics_propagate_dialog import LyricsPropagateDialog
+from ui.dialogs.lyrics_diff_dialog import _normalized_diff_lines
 from ui.widgets.toast import ToastManager
 from ui.main_window import MainWindow
 from ui.player_bar import PLAYER_COVER_SIZE, PlayerBar
@@ -501,14 +502,20 @@ class LyricsPasteBehaviorTests(unittest.TestCase):
         )
         try:
             headers = [dialog.table.horizontalHeaderItem(index).text() for index in range(dialog.table.columnCount())]
-            self.assertEqual(headers, ["Apply", "Track", "Artist", "Album", "Duration", "Match", "Diff"])
+            self.assertEqual(headers, ["Apply", "Track", "Artist", "Album", "Duration", "Match"])
             self.assertNotIn("Title", headers)
             self.assertNotIn("Artist/Time", headers)
-            self.assertIsInstance(dialog.table.cellWidget(0, 6), QPushButton)
-            self.assertTrue(dialog.table.cellWidget(0, 6).isEnabled())
+            self.assertIsInstance(dialog.diff_button, QPushButton)
+            self.assertTrue(dialog.diff_button.isEnabled())
             self.assertEqual(dialog.selected_track_ids(), [42])
         finally:
             dialog.deleteLater()
+
+    def test_lyrics_diff_ignores_trailing_whitespace(self):
+        self.assertEqual(
+            _normalized_diff_lines("[00:01.00] Same line   \n[00:02.00] Next"),
+            _normalized_diff_lines("[00:01.00] Same line\n[00:02.00] Next   "),
+        )
 
     def test_browser_publish_lyrics_fields_reject_rich_text_paste(self):
         dialog = _BrowserPublishDialog("https://lrclib.net")
