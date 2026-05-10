@@ -135,6 +135,7 @@ class TopBarController(QWidget):
 
         actions_row = QHBoxLayout()
         set_layout_spacing(actions_row, spacing=SPACE_2)
+        self._action_icons: dict[QToolButton, str] = {}
 
         self.btn_refresh = self._make_action_button(
             "refresh-cw.svg",
@@ -163,7 +164,7 @@ class TopBarController(QWidget):
 
         self.btn_logs = QToolButton()
         self.btn_logs.setObjectName("TopBarAction")
-        self.btn_logs.setIcon(load_svg_icon("logs.svg", 18))
+        self._set_action_icon(self.btn_logs, "logs.svg")
         self.btn_logs.setToolTip("Logs")
         self.btn_logs.setAccessibleName("Toggle log panel")
         self.btn_logs.setCheckable(True)
@@ -180,7 +181,7 @@ class TopBarController(QWidget):
 
         self.btn_bg_activity = QToolButton()
         self.btn_bg_activity.setObjectName("TopBarAction")
-        self.btn_bg_activity.setIcon(load_svg_icon("download.svg", 18))
+        self._set_action_icon(self.btn_bg_activity, "download.svg")
         self.btn_bg_activity.setToolTip("Background operation in progress — click to view")
         self.btn_bg_activity.setAccessibleName("Show background operation progress")
         self.btn_bg_activity.hide()
@@ -199,11 +200,19 @@ class TopBarController(QWidget):
     def _make_action_button(self, icon_name: str, tooltip: str, accessible_name: str, callback) -> QToolButton:
         button = QToolButton()
         button.setObjectName("TopBarAction")
-        button.setIcon(load_svg_icon(icon_name, 18))
+        self._set_action_icon(button, icon_name)
         button.setToolTip(tooltip)
         button.setAccessibleName(accessible_name)
         button.clicked.connect(callback)
         return button
+
+    def _set_action_icon(self, button: QToolButton, icon_name: str) -> None:
+        self._action_icons[button] = icon_name
+        button.setIcon(load_svg_icon(icon_name, 18))
+
+    def refresh_theme_icons(self) -> None:
+        for button, icon_name in self._action_icons.items():
+            button.setIcon(load_svg_icon(icon_name, 18))
 
     def search_text(self) -> str:
         return self.search_box.text()

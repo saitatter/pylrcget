@@ -77,7 +77,7 @@ def apply_app_theme(
     palette.setColor(QPalette.ColorRole.Dark, QColor(STYLE_TOKENS["color-border-strong"]))
     palette.setColor(QPalette.ColorRole.Shadow, QColor("#000000"))
 
-    disabled_text = QColor(STYLE_TOKENS["color-text-muted"])
+    disabled_text = QColor(STYLE_TOKENS["color-disabled-text"])
     palette.setColor(QPalette.ColorGroup.Disabled, QPalette.ColorRole.Text, disabled_text)
     palette.setColor(QPalette.ColorGroup.Disabled, QPalette.ColorRole.ButtonText, disabled_text)
     palette.setColor(QPalette.ColorGroup.Disabled, QPalette.ColorRole.WindowText, disabled_text)

@@ -41,7 +41,7 @@ class ActionsDelegate(QStyledItemDelegate):
 
     def _update_resources(self) -> None:
         size = int(round(14 * self._ui_scale))
-        self._refresh_icon = load_svg_icon("refresh-cw.svg", size, "#e5e7eb")
+        self._refresh_icon = load_svg_icon("refresh-cw.svg", size, STYLE_TOKENS.get("color-text-soft", "#e5e7eb"))
 
     def _button_rects(self, cell_rect: QRect) -> tuple[QRect, QRect]:
         refresh_w = int(round(28 * self._ui_scale))

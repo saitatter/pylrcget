@@ -85,6 +85,12 @@ QToolButton#TopBarAction:checked {
     color: {{color-accent}};
 }
 
+QToolButton#TopBarAction:disabled {
+    color: {{color-disabled-text}};
+    border-color: transparent;
+    background: transparent;
+}
+
 QWidget#ScanRow {
     background: {{color-bg-app}};
     border-top: 1px solid {{color-border-strong}};
@@ -305,4 +311,10 @@ QToolButton:hover {
 
 QToolButton:pressed {
     background: {{color-bg-pressed}};
+}
+
+QToolButton:disabled {
+    color: {{color-disabled-text}};
+    border-color: {{color-disabled-border}};
+    background: transparent;
 }

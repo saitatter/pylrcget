@@ -89,6 +89,12 @@ QPushButton:disabled, QLineEdit:disabled, QTextEdit:disabled, QComboBox:disabled
     background: {{color-disabled-bg}};
 }
 
+QToolButton:disabled {
+    color: {{color-disabled-text}};
+    border-color: {{color-disabled-border}};
+    background: transparent;
+}
+
 QCheckBox {
     spacing: 8px;
     color: {{color-text}};

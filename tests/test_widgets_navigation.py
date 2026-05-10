@@ -20,6 +20,7 @@ from ui.widgets.lyrics_editor_widget import LyricsEditorWidget, TIMESTAMP_MS_ROL
 from ui.widgets.toast import ToastManager
 from ui.main_window import MainWindow
 from ui.player_bar import PlayerBar
+from ui.theme_tokens import get_theme_tokens
 from tests.test_support import (
     HAS_QT,
     AlbumListWidget,
@@ -347,6 +348,16 @@ class LyricsPasteBehaviorTests(unittest.TestCase):
         self.assertIn("border-radius: 14px;", stylesheet)
         self.assertIn("QToolButton#BtnPrev:hover", stylesheet)
         self.assertIn("QToolButton#BtnNext:hover", stylesheet)
+
+    def test_light_theme_disabled_controls_keep_readable_contrast(self):
+        tokens = get_theme_tokens("LightTheme")
+        self.assertEqual(tokens["color-disabled-text"], "#475569")
+        app_stylesheet = Path("src/ui/qss/app.qss").read_text(encoding="utf-8")
+        main_stylesheet = Path("src/ui/qss/main_window.qss").read_text(encoding="utf-8")
+        player_stylesheet = Path("src/ui/qss/player_bar.qss").read_text(encoding="utf-8")
+        self.assertIn("QToolButton:disabled", app_stylesheet)
+        self.assertIn("QToolButton#TopBarAction:disabled", main_stylesheet)
+        self.assertIn("QToolButton:disabled", player_stylesheet)
 
     def test_hotkey_badge_uses_window_parent_for_small_buttons(self):
         parent = QWidget()

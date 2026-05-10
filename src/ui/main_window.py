@@ -2031,6 +2031,8 @@ class MainWindow(QMainWindow):
             self.artists_tab.set_ui_scale(scale)
 
         self._apply_styles()
+        if hasattr(self, "top_bar"):
+            self.top_bar.refresh_theme_icons()
         if hasattr(self, "player_bar"):
             self.player_bar._apply_styles()
         if hasattr(self, "track_list"):

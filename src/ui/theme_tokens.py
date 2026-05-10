@@ -69,7 +69,7 @@ def _theme(
         "color-overlay-scrim": _rgba("#000000", 0.62 if palette_mode == "dark" else 0.28),
         "color-info-border": accent_alt,
         "color-info-text": accent_alt,
-        "color-disabled-text": "#6b7280" if palette_mode == "dark" else "#9ca3af",
+        "color-disabled-text": "#6b7280" if palette_mode == "dark" else "#475569",
         "color-disabled-bg": bg_pressed,
         "color-disabled-border": border_strong,
         "color-success-bg": "#052e1a",

@@ -267,17 +267,8 @@ class PlayerBar(QWidget):
         self.btn_next.setAutoRaise(False)
         self.btn_next.setFixedSize(28, 28)
 
-        self._icons = {
-            "prev": load_svg_icon("skip-back.svg", 20, "#e5e7eb"),
-            "next": load_svg_icon("skip-forward.svg", 20, "#e5e7eb"),
-            "play": load_svg_icon("play.svg", 28, "#e5e7eb"),
-            "pause": load_svg_icon("pause.svg", 28, "#e5e7eb"),
-            "volume": load_svg_icon("volume-2.svg", 16, "#e5e7eb"),
-            "volume_muted": load_svg_icon("volume-x.svg", 16, "#e5e7eb"),
-        }
-        self.btn_prev.setIcon(self._icons["prev"])
-        self.btn_next.setIcon(self._icons["next"])
-        self.btn_play.setIcon(self._icons["play"])
+        self._icons = {}
+        self._refresh_theme_icons()
         self.btn_prev.setIconSize(QSize(12, 12))
         self.btn_next.setIconSize(QSize(12, 12))
         self.btn_play.setIconSize(QSize(18, 18))
@@ -748,3 +739,20 @@ class PlayerBar(QWidget):
 
     def _apply_styles(self):
         self.setStyleSheet(load_stylesheet("player_bar.qss"))
+        self._refresh_theme_icons()
+
+    def _refresh_theme_icons(self) -> None:
+        icon_color = STYLE_TOKENS.get("color-text-soft", "#e5e7eb")
+        self._icons = {
+            "prev": load_svg_icon("skip-back.svg", 20, icon_color),
+            "next": load_svg_icon("skip-forward.svg", 20, icon_color),
+            "play": load_svg_icon("play.svg", 28, icon_color),
+            "pause": load_svg_icon("pause.svg", 28, icon_color),
+            "volume": load_svg_icon("volume-2.svg", 16, icon_color),
+            "volume_muted": load_svg_icon("volume-x.svg", 16, icon_color),
+        }
+        self.btn_prev.setIcon(self._icons["prev"])
+        self.btn_next.setIcon(self._icons["next"])
+        self.btn_play.setIcon(self._icons["pause" if self._is_playing else "play"])
+        if hasattr(self, "lbl_volume"):
+            self.lbl_volume.setIcon(self._icons["volume_muted" if self._muted else "volume"])

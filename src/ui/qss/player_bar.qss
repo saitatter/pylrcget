@@ -57,6 +57,12 @@ QToolButton:pressed {
     background: {{color-bg-pressed}};
 }
 
+QToolButton:disabled {
+    color: {{color-disabled-text}};
+    border-color: {{color-disabled-border}};
+    background: transparent;
+}
+
 QToolButton#BtnPlay {
     background: {{color-bg-elevated}};
     border: 1px solid {{color-border}};

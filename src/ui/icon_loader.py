@@ -7,6 +7,7 @@ from PySide6.QtGui import QIcon, QPainter, QPixmap
 from PySide6.QtSvg import QSvgRenderer
 
 from ui.style_loader import asset_path
+from ui.theme_tokens import STYLE_TOKENS
 
 
 def load_app_icon() -> QIcon:
@@ -17,7 +18,8 @@ def load_app_icon() -> QIcon:
     return load_svg_icon("audio-lines.svg", 32)
 
 
-def load_svg_icon(name: str, size: int = 20, color: str = "#e5e7eb") -> QIcon:
+def load_svg_icon(name: str, size: int = 20, color: str | None = None) -> QIcon:
+    color = color or STYLE_TOKENS.get("color-text-soft", "#e5e7eb")
     return QIcon(_render_svg_to_pixmap(name, size, color))
 
 
