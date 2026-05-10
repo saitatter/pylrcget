@@ -1,4 +1,55 @@
 # Changelog
+## v1.6.0 (2026-05-10)
+
+### ✨ Features
+* Configure lyrics file and embed output formats ([64b986f](https://github.com/saitatter/pylrcget/commit/64b986f0d8409f4d5c9704a54ee25500c6251630))
+
+### 🐛 Fixes
+* Improve light theme button contrast ([447740e](https://github.com/saitatter/pylrcget/commit/447740e3b4d6ebe5aa0c160c22e6c8d27c806ea3))
+* Reposition hotkey badges after log panel toggle ([61f4bf3](https://github.com/saitatter/pylrcget/commit/61f4bf3361ca88a42eed7ceca12983c3dfe10f5e))
+* Clarify lyrics download settings layout ([71fccb0](https://github.com/saitatter/pylrcget/commit/71fccb0bcdcdcd6ce55b74ee8103d169b029891c))
+* Retry publish requests on network timeouts ([a420d32](https://github.com/saitatter/pylrcget/commit/a420d3224ad33e747978ef0d98c48cf39014b9db))
+
+### 🧰 CI & Build
+* **deps:** Bump the github-actions group with 4 updates ([dc174cc](https://github.com/saitatter/pylrcget/commit/dc174ccbbbf457c1cabbc3e69125c8c09312e2d9))
+  Bumps the github-actions group with 4 updates: [amannn/action-semantic-pull-request](https://github.com/amannn/action-semantic-pull-request), [actions/checkout](https://github.com/actions/checkout), [actions/setup-python](https://github.com/actions/setup-python) and [actions/upload-artifact](https://github.com/actions/upload-artifact).
+  Updates `amannn/action-semantic-pull-request` from 5 to 6
+- [Release notes](https://github.com/amannn/action-semantic-pull-request/releases)
+- [Changelog](https://github.com/amannn/action-semantic-pull-request/blob/main/CHANGELOG.md)
+- [Commits](https://github.com/amannn/action-semantic-pull-request/compare/v5...v6)
+  Updates `actions/checkout` from 4 to 6
+- [Release notes](https://github.com/actions/checkout/releases)
+- [Changelog](https://github.com/actions/checkout/blob/main/CHANGELOG.md)
+- [Commits](https://github.com/actions/checkout/compare/v4...v6)
+  Updates `actions/setup-python` from 5 to 6
+- [Release notes](https://github.com/actions/setup-python/releases)
+- [Commits](https://github.com/actions/setup-python/compare/v5...v6)
+  Updates `actions/upload-artifact` from 4 to 7
+- [Release notes](https://github.com/actions/upload-artifact/releases)
+- [Commits](https://github.com/actions/upload-artifact/compare/v4...v7)
+  ---
+updated-dependencies:
+- dependency-name: amannn/action-semantic-pull-request dependency-version: '6'
+  dependency-type: direct:production
+  update-type: version-update:semver-major
+  dependency-group: github-actions
+  - dependency-name: actions/checkout dependency-version: '6'
+  - dependency-name: actions/setup-python dependency-version: '6'
+  - dependency-name: actions/upload-artifact dependency-version: '7'
+  dependency-group: github-actions ...
+  Signed-off-by: dependabot[bot] <support@github.com>
+  Co-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>
+* Restore release metadata after accidental dependabot release ([c504fcc](https://github.com/saitatter/pylrcget/commit/c504fcc9cc36a324f4c185c841e1fe2d6861cab5))
+* Make release workflow manual ([fcda2ed](https://github.com/saitatter/pylrcget/commit/fcda2ed5592c37e142b28ccb56ead10ba40af00f))
+* Add dependabot updates ([e971215](https://github.com/saitatter/pylrcget/commit/e971215a7fe2216d106edd8478c3ba7ee1c3fbcc))
+
+### 📚 Docs
+* Update feature and release documentation ([3bbf48d](https://github.com/saitatter/pylrcget/commit/3bbf48dc1a855c18b3a6c4f6cf81b8f9055a66bb))
+
+### 🧪 Tests
+* Cover lyrics embedding formats ([be45daa](https://github.com/saitatter/pylrcget/commit/be45daa29977639deef81737ee3d0c5969711e43))
+
+
 ## v1.5.0 (2026-05-06)
 
 ### ✨ Features
