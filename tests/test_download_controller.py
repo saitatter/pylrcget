@@ -402,7 +402,7 @@ class LyricsDownloadControllerTests(unittest.TestCase):
                 with (
                     patch("ui.controllers.lyrics_download_controller.BulkLyricsDownloadWorker", _FakeWorker),
                     patch("ui.controllers.lyrics_download_controller.BatchLyricsMatchDialog", _FakeMatchDialog),
-                    patch("ui.controllers.lyrics_download_controller.QTimer.singleShot"),
+                    patch("ui.controllers.lyrics_download_controller.QTimer.singleShot") as single_shot,
                 ):
                     controller.start_downloads([track_id], mode_override="prefer_synced")
                     worker = _FakeWorker.instances[0]
@@ -420,6 +420,10 @@ class LyricsDownloadControllerTests(unittest.TestCase):
                 self.assertEqual(download_states[track_id], "success")
                 self.assertIn(("Applied lyrics to 1 downloaded track.", "success"), notifications)
                 self.assertEqual(_FakeMatchDialog.instances, [])
+                self.assertTrue(
+                    any(call.args and call.args[0] == 1800 for call in single_shot.call_args_list),
+                    "successful download state should be reset after transient Done feedback",
+                )
             finally:
                 db.close()
 

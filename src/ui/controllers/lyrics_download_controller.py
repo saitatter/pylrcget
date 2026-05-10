@@ -182,18 +182,8 @@ class LyricsDownloadController(QObject):
             if history_entry is not None:
                 self._pending_history_entries.append(history_entry)
 
-        token = self._state_tokens.get(int(track_id), 0) + 1
-        self._state_tokens[int(track_id)] = token
         if not ok:
-            QTimer.singleShot(
-                1800,
-                self,
-                lambda tid=track_id, expected=token, expected_state=state: self._reset_track_download_state_if_unchanged(
-                    tid,
-                    expected,
-                    expected_state,
-                ),
-            )
+            self._schedule_track_download_state_reset(int(track_id), state)
 
     def _on_download_batch_finished(self, ok: bool, msg: str, stats: dict) -> None:
         del ok
@@ -391,6 +381,7 @@ class LyricsDownloadController(QObject):
         worker.deleteLater()
         for track_id in applied_ids:
             self._set_track_download_state(int(track_id), DownloadState.SUCCESS)
+            self._schedule_track_download_state_reset(int(track_id), DownloadState.SUCCESS)
             if self._current_player_track_id() == int(track_id):
                 try:
                     updated = get_track_by_id(self._app_state.db, int(track_id))
@@ -420,6 +411,19 @@ class LyricsDownloadController(QObject):
             "success",
             show_status=self._show_status,
             status_timeout_ms=3500,
+        )
+
+    def _schedule_track_download_state_reset(self, track_id: int, state: DownloadState) -> None:
+        token = self._state_tokens.get(int(track_id), 0) + 1
+        self._state_tokens[int(track_id)] = token
+        QTimer.singleShot(
+            1800,
+            self,
+            lambda tid=track_id, expected=token, expected_state=state: self._reset_track_download_state_if_unchanged(
+                tid,
+                expected,
+                expected_state,
+            ),
         )
 
     def _reset_track_download_state_if_unchanged(
