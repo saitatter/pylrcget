@@ -6,9 +6,10 @@ import re
 from bisect import bisect_right
 
 from PySide6.QtCore import QEvent, QRect, QSize, Qt, Signal, QTimer
-from PySide6.QtGui import QColor, QKeySequence, QShortcut
+from PySide6.QtGui import QColor, QKeySequence, QShortcut, QTextCursor
 from PySide6.QtWidgets import (
     QApplication,
+    QHeaderView,
     QLayout,
     QSizePolicy,
     QWidget, QVBoxLayout, QLabel, QStackedWidget,
@@ -37,6 +38,10 @@ from core.lyrics_validator import (
 TIMESTAMP_MS_ROLE = Qt.ItemDataRole.UserRole
 TIMESTAMP_VALID_ROLE = Qt.ItemDataRole.UserRole + 1
 SHIFT_SPIN_MIN_WIDTH = 96
+LINE_NUMBER_HEADER_WIDTH = 42
+TIME_COLUMN = 0
+TEXT_COLUMN = 1
+LINE_NUMBER_COLUMN = 2
 logger = logging.getLogger(__name__)
 
 
@@ -169,6 +174,7 @@ class LyricsEditorWidget(QWidget):
         self._current_index: int = -1
         self._invalid_rows: set[int] = set()
         self._lint_rows: set[int] = set()
+        self._row_validation_messages: dict[int, list[str]] = {}
         self._validation_problems: list[LyricsValidationProblem] = []
         self._default_button_text: dict[QPushButton, str] = {}
         self._publish_synced_available = False
@@ -198,8 +204,15 @@ class LyricsEditorWidget(QWidget):
         self.title.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
         self.title.setObjectName("LyricsTitle")
         title_row.addWidget(self.title, 1)
+        self.validation_badge = QLabel("")
+        self.validation_badge.setObjectName("LyricsValidationBadge")
+        self.validation_badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.validation_badge.hide()
+        title_row.addWidget(self.validation_badge)
+
         self.dirty_badge = QLabel("")
         self.dirty_badge.setObjectName("LyricsDirtyBadge")
+        self.dirty_badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.dirty_badge.hide()
         title_row.addWidget(self.dirty_badge)
 
@@ -230,6 +243,16 @@ class LyricsEditorWidget(QWidget):
         self.btn_auto_sync.hide()
         self.btn_auto_sync.clicked.connect(self.autoSyncRequested.emit)
         title_row.addWidget(self.btn_auto_sync)
+
+        for title_control in (
+            self.validation_badge,
+            self.dirty_badge,
+            self.btn_discard_draft,
+            self.btn_show_diff,
+            self.btn_switch_mode,
+            self.btn_auto_sync,
+        ):
+            title_control.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
 
         header.addLayout(title_row)
 
@@ -343,6 +366,7 @@ class LyricsEditorWidget(QWidget):
         self.validation_hint = QLabel("")
         self.validation_hint.setObjectName("LyricsValidationHint")
         self.validation_hint.hide()
+        self.validation_hint.installEventFilter(self)
         root.addWidget(self.validation_hint)
 
         # --- stack: msg / plain / synced ---
@@ -363,9 +387,11 @@ class LyricsEditorWidget(QWidget):
         self.stack.addWidget(self.plain)
 
         # Synced editor table
-        self.table = QTableWidget(0, 2)
-        self.table.setHorizontalHeaderLabels(["Time", "Text"])
-        self.table.verticalHeader().setVisible(False)
+        self.table = QTableWidget(0, 3)
+        self.table.setHorizontalHeaderLabels(["Time", "Text", "#"])
+        line_header = self.table.verticalHeader()
+        line_header.setVisible(False)
+        line_header.setSectionResizeMode(QHeaderView.ResizeMode.Fixed)
         self.table.setSelectionBehavior(self.table.SelectionBehavior.SelectRows)
         self.table.setSelectionMode(self.table.SelectionMode.ExtendedSelection)
         self.table.setEditTriggers(self.table.EditTrigger.DoubleClicked | self.table.EditTrigger.EditKeyPressed)
@@ -377,8 +403,12 @@ class LyricsEditorWidget(QWidget):
         self.table.itemChanged.connect(self._on_table_item_changed)
         self.table.customContextMenuRequested.connect(self._show_synced_context_menu)
 
-        self.table.setColumnWidth(0, 95)
-        self.table.horizontalHeader().setStretchLastSection(True)
+        header_view = self.table.horizontalHeader()
+        header_view.setSectionResizeMode(TIME_COLUMN, QHeaderView.ResizeMode.Fixed)
+        header_view.setSectionResizeMode(TEXT_COLUMN, QHeaderView.ResizeMode.Stretch)
+        header_view.setSectionResizeMode(LINE_NUMBER_COLUMN, QHeaderView.ResizeMode.Fixed)
+        self.table.setColumnWidth(TIME_COLUMN, 95)
+        self.table.setColumnWidth(LINE_NUMBER_COLUMN, LINE_NUMBER_HEADER_WIDTH)
 
         self.stack.addWidget(self.table)
 
@@ -418,7 +448,15 @@ class LyricsEditorWidget(QWidget):
         return shortcut
 
     def eventFilter(self, watched, event):
-        if watched in {self.table, self.table.viewport()} and event.type() == QEvent.Type.KeyPress:
+        if watched is self.validation_hint and event.type() == QEvent.Type.MouseButtonRelease:
+            if self._validation_problems:
+                self._jump_to_first_validation_problem()
+                return True
+        if (
+            hasattr(self, "table")
+            and watched in {self.table, self.table.viewport()}
+            and event.type() == QEvent.Type.KeyPress
+        ):
             modifiers = event.modifiers() & ~Qt.KeyboardModifier.KeypadModifier
             if (
                 event.key() in {Qt.Key.Key_Return, Qt.Key.Key_Enter}
@@ -508,16 +546,16 @@ class LyricsEditorWidget(QWidget):
         lrc = (dirty_lrc_lyrics or lrc_lyrics or "").strip()
         txt = (dirty_txt_lyrics or txt_lyrics or "").strip()
 
-        self._publish_synced_available = bool((lrc_lyrics or "").strip()) and not has_dirty_draft
-        self._publish_plain_available = bool((txt_lyrics or "").strip()) and not has_dirty_draft
-        self.btn_publish_synced.setEnabled(self._publish_synced_available)
-        self.btn_publish_plain.setEnabled(self._publish_plain_available)
+        publish_synced_available = bool((lrc_lyrics or "").strip()) and not has_dirty_draft
+        publish_plain_available = bool((txt_lyrics or "").strip()) and not has_dirty_draft
+        self._set_dirty_badge(has_dirty_draft)
 
         # Prefer showing synced editor if we have LRC that parses
         if lrc:
             pairs = parse_lrc(lrc)
             if pairs:
                 self._set_synced(pairs)
+                self._set_publish_available(publish_synced_available, publish_plain_available)
                 # still keep plain editor content synced
                 if txt:
                     self.plain.blockSignals(True)
@@ -528,16 +566,16 @@ class LyricsEditorWidget(QWidget):
                     self.plain.blockSignals(True)
                     self.plain.setPlainText("\n".join([t.rstrip() for _, t in pairs]).rstrip())
                     self.plain.blockSignals(False)
-                self._set_dirty_badge(has_dirty_draft)
                 self._loading_track = False
                 return
 
         # else fall back to plain
         if txt:
             self._set_plain(txt)
-            self._set_dirty_badge(has_dirty_draft)
+            self._set_publish_available(publish_synced_available, publish_plain_available)
         else:
             self._reset_state()
+            self._set_publish_available(False, False)
             self.empty_state.configure(
                 icon_name="audio-lines.svg",
                 title="No lyrics available yet",
@@ -547,7 +585,6 @@ class LyricsEditorWidget(QWidget):
                 tertiary_action_text="Write Lyrics",
             )
             self.stack.setCurrentWidget(self.empty_state)
-            self._set_dirty_badge(False)
         self._loading_track = False
 
     # --- internal helpers ---
@@ -558,13 +595,16 @@ class LyricsEditorWidget(QWidget):
         self._publish_plain_available = False
         self._invalid_rows.clear()
         self._lint_rows.clear()
+        self._row_validation_messages.clear()
         self._validation_problems = []
         self._undo_stack.clear()
         self._redo_stack.clear()
         self.table.blockSignals(True)
         self.table.setRowCount(0)
         self.table.blockSignals(False)
+        self._sync_line_numbers()
         self._set_validation_message("")
+        self._set_validation_badge("")
         self.btn_snap.setEnabled(False)
         self.btn_shift_minus.setEnabled(False)
         self.btn_shift_plus.setEnabled(False)
@@ -578,6 +618,7 @@ class LyricsEditorWidget(QWidget):
         self.btn_save.setEnabled(False)
         self.btn_sync_others.setEnabled(False)
         self.btn_export_files.setEnabled(False)
+        self._update_publish_enabled()
         self.btn_switch_mode.hide()
         self.btn_auto_sync.hide()
 
@@ -587,6 +628,8 @@ class LyricsEditorWidget(QWidget):
         self.dirty_badge.setVisible(bool(visible))
         self.btn_discard_draft.setVisible(bool(visible))
         self.btn_show_diff.setVisible(bool(visible))
+        if hasattr(self, "btn_publish_synced"):
+            self._update_publish_enabled()
 
     def _show_diff(self) -> None:
         from ui.dialogs.lyrics_diff_dialog import LyricsDiffDialog
@@ -696,7 +739,9 @@ class LyricsEditorWidget(QWidget):
             it_text.setFlags(it_text.flags() | Qt.ItemIsEditable)
             self.table.setItem(row, 0, it_time)
             self.table.setItem(row, 1, it_text)
+            self.table.setItem(row, LINE_NUMBER_COLUMN, self._line_number_item(row))
             self._times.append(ms)
+        self._sync_line_numbers()
         self.table.blockSignals(False)
         self._rebuild_times_cache()
         self._validate_current_lyrics()
@@ -749,7 +794,9 @@ class LyricsEditorWidget(QWidget):
 
             self.table.setItem(row, 0, it_time)
             self.table.setItem(row, 1, it_text)
+            self.table.setItem(row, LINE_NUMBER_COLUMN, self._line_number_item(row))
 
+        self._sync_line_numbers()
         self.table.blockSignals(False)
         self._refresh_row_styles()
 
@@ -792,6 +839,8 @@ class LyricsEditorWidget(QWidget):
         current_fg = QColor(STYLE_TOKENS.get("color-accent-alt", "#bae6fd"))
         selected_bg = QColor(STYLE_TOKENS.get("color-bg-control", "#172554"))
         selected_fg = QColor(STYLE_TOKENS.get("color-text-strong", "#dbeafe"))
+        muted_fg = QColor(STYLE_TOKENS.get("color-text-muted", "#94a3b8"))
+        line_number_bg = QColor(STYLE_TOKENS.get("color-bg-control", "#3a3a3a"))
 
         self.table.blockSignals(True)
         for row in range(self.table.rowCount()):
@@ -818,11 +867,16 @@ class LyricsEditorWidget(QWidget):
                 item = self.table.item(row, col)
                 if not item:
                     continue
-                if bg is None:
-                    item.setBackground(Qt.GlobalColor.transparent)
+                if col == LINE_NUMBER_COLUMN:
+                    item.setBackground(line_number_bg)
+                    item.setForeground(invalid_fg if is_invalid else muted_fg)
                 else:
-                    item.setBackground(bg)
-                item.setForeground(fg)
+                    if bg is None:
+                        item.setBackground(Qt.GlobalColor.transparent)
+                    else:
+                        item.setBackground(bg)
+                    item.setForeground(fg)
+                item.setToolTip(self._row_validation_tooltip(row))
         self.table.blockSignals(False)
 
     def _update_save_enabled(self):
@@ -838,13 +892,67 @@ class LyricsEditorWidget(QWidget):
             self.btn_save.setEnabled(False)
             self.btn_sync_others.setEnabled(False)
 
+    def _set_publish_available(self, synced_available: bool, plain_available: bool) -> None:
+        self._publish_synced_available = bool(synced_available)
+        self._publish_plain_available = bool(plain_available)
+        self._update_publish_enabled()
+
+    def _update_publish_enabled(self) -> None:
+        if self.stack.currentWidget() is self.table:
+            can_publish_current = not self._invalid_rows and not self._validation_problems
+        elif self.stack.currentWidget() is self.plain:
+            can_publish_current = not self._validation_problems
+        else:
+            can_publish_current = False
+
+        self.btn_publish_synced.setEnabled(self._publish_synced_available and can_publish_current)
+        self.btn_publish_plain.setEnabled(self._publish_plain_available and can_publish_current)
+        self.btn_publish_synced.setToolTip(
+            self._publish_tooltip(
+                is_synced=True,
+                available=self._publish_synced_available,
+                can_publish_current=can_publish_current,
+            )
+        )
+        self.btn_publish_plain.setToolTip(
+            self._publish_tooltip(
+                is_synced=False,
+                available=self._publish_plain_available,
+                can_publish_current=can_publish_current,
+            )
+        )
+
+    def _publish_tooltip(self, *, is_synced: bool, available: bool, can_publish_current: bool) -> str:
+        if available and can_publish_current:
+            return "Publish synced (LRC) lyrics to LRCLIB" if is_synced else "Publish plain text lyrics to LRCLIB"
+        if not can_publish_current and self._validation_problems:
+            return "Fix validation issues before publishing."
+        if self._has_dirty_draft:
+            return "Save the draft before publishing to LRCLIB."
+        lyric_kind = "synced" if is_synced else "plain"
+        return f"No saved {lyric_kind} lyrics available to publish."
+
     def _set_validation_message(self, message: str, *, state: str = "idle"):
         self.validation_hint.setText(message)
         self.validation_hint.setProperty("validationState", state if message else "")
+        if message and self._validation_problems:
+            self.validation_hint.setCursor(Qt.CursorShape.PointingHandCursor)
+            self.validation_hint.setToolTip("Click to jump to the first validation issue.")
+        else:
+            self.validation_hint.unsetCursor()
+            self.validation_hint.setToolTip("")
         self.validation_hint.style().unpolish(self.validation_hint)
         self.validation_hint.style().polish(self.validation_hint)
         self.validation_hint.update()
         self.validation_hint.setVisible(bool(message))
+
+    def _set_validation_badge(self, text: str, *, state: str = "") -> None:
+        self.validation_badge.setText(text)
+        self.validation_badge.setProperty("validationState", state if text else "")
+        self.validation_badge.style().unpolish(self.validation_badge)
+        self.validation_badge.style().polish(self.validation_badge)
+        self.validation_badge.update()
+        self.validation_badge.setVisible(bool(text))
 
     def _validate_current_lyrics(self, *, show_success: bool = False) -> bool:
         if self.stack.currentWidget() is self.table:
@@ -856,19 +964,104 @@ class LyricsEditorWidget(QWidget):
 
         self._validation_problems = problems
         self._lint_rows = {problem.line - 1 for problem in problems if problem.line > 0}
+        self._row_validation_messages = self._validation_messages_by_row(problems)
         can_autofix = any(problem.fixable for problem in problems)
         self.btn_autofix.setVisible(bool(problems))
         self.btn_autofix.setEnabled(can_autofix)
 
         if problems:
             self._set_validation_message(self._format_validation_message(problems), state="error")
+            issue_word = "issue" if len(problems) == 1 else "issues"
+            self._set_validation_badge(f"{len(problems)} {issue_word}", state="error")
         elif show_success:
             self._set_validation_message("Lyrics validation passed.", state="success")
+            self._set_validation_badge("Valid", state="success")
         else:
             self._set_validation_message("")
+            if self.stack.currentWidget() in {self.table, self.plain}:
+                self._set_validation_badge("Valid", state="success")
+            else:
+                self._set_validation_badge("")
 
         self._update_save_enabled()
+        self._update_publish_enabled()
+        if self.stack.currentWidget() is self.table:
+            self._refresh_row_styles()
         return not problems
+
+    @staticmethod
+    def _validation_messages_by_row(problems: list[LyricsValidationProblem]) -> dict[int, list[str]]:
+        messages: dict[int, list[str]] = {}
+        for problem in problems:
+            if problem.line <= 0:
+                continue
+            messages.setdefault(problem.line - 1, []).append(problem.message)
+        return messages
+
+    def _row_validation_tooltip(self, row: int) -> str:
+        messages = self._row_validation_messages.get(row, [])
+        if not messages:
+            return ""
+        return "\n".join(messages)
+
+    def _jump_to_first_validation_problem(self) -> None:
+        first_problem = next((problem for problem in self._validation_problems if problem.line > 0), None)
+        if first_problem is None:
+            return
+        row = max(0, first_problem.line - 1)
+
+        if self.stack.currentWidget() is self.table:
+            if row >= self.table.rowCount():
+                return
+            column = self._validation_problem_column(first_problem)
+            target = self.table.item(row, column) or self.table.item(row, TEXT_COLUMN)
+            self.table.setFocus()
+            self.table.selectRow(row)
+            self.table.setCurrentCell(row, column)
+            if target is not None:
+                self.table.scrollToItem(target, self.table.ScrollHint.PositionAtCenter)
+            return
+
+        if self.stack.currentWidget() is self.plain:
+            block = self.plain.document().findBlockByNumber(row)
+            if not block.isValid():
+                return
+            cursor = QTextCursor(block)
+            self.plain.setTextCursor(cursor)
+            self.plain.setFocus()
+            self.plain.ensureCursorVisible()
+
+    @staticmethod
+    def _validation_problem_column(problem: LyricsValidationProblem) -> int:
+        message = problem.message.lower()
+        if "timestamp" in message or "monotonically" in message:
+            return TIME_COLUMN
+        return TEXT_COLUMN
+
+    def _line_number_item(self, row: int) -> QTableWidgetItem:
+        item = QTableWidgetItem(str(row + 1))
+        item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        item.setFlags(
+            (item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+            | Qt.ItemFlag.ItemIsEnabled
+            | Qt.ItemFlag.ItemIsSelectable
+        )
+        return item
+
+    def _sync_line_numbers(self) -> None:
+        for row in range(self.table.rowCount()):
+            item = self.table.item(row, LINE_NUMBER_COLUMN)
+            if item is None:
+                item = self._line_number_item(row)
+                self.table.setItem(row, LINE_NUMBER_COLUMN, item)
+            else:
+                item.setText(str(row + 1))
+                item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+                item.setFlags(
+                    (item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+                    | Qt.ItemFlag.ItemIsEnabled
+                    | Qt.ItemFlag.ItemIsSelectable
+                )
 
     def _timestamp_problems(self) -> list[LyricsValidationProblem]:
         return [
@@ -1117,6 +1310,8 @@ class LyricsEditorWidget(QWidget):
 
         self.table.setItem(insert_at, 0, it_time)
         self.table.setItem(insert_at, 1, it_text)
+        self.table.setItem(insert_at, LINE_NUMBER_COLUMN, self._line_number_item(insert_at))
+        self._sync_line_numbers()
         self.table.blockSignals(False)
 
         self._rebuild_times_cache()
@@ -1135,6 +1330,7 @@ class LyricsEditorWidget(QWidget):
         self.table.blockSignals(True)
         for row in reversed(rows):
             self.table.removeRow(row)
+        self._sync_line_numbers()
         self.table.blockSignals(False)
         self._invalid_rows = {
             r for r in range(self.table.rowCount())
@@ -1365,6 +1561,6 @@ class LyricsEditorWidget(QWidget):
         elif button is self.btn_export_files:
             button.setEnabled(self.stack.currentWidget() in {self.table, self.plain})
         elif button is self.btn_publish_synced:
-            button.setEnabled(self._publish_synced_available)
+            self._update_publish_enabled()
         elif button is self.btn_publish_plain:
-            button.setEnabled(self._publish_plain_available)
+            self._update_publish_enabled()

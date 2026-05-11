@@ -16,7 +16,7 @@ from ui.library_routes import albums_detail, artists_detail, tracks_album, track
 from ui.controllers.top_bar_controller import TopBarController
 from ui.widgets.hotkey_hints import HotkeyHintManager
 from ui.widgets.lrclib_browser_widget import _BrowserPublishDialog
-from ui.widgets.lyrics_editor_widget import LyricsEditorWidget, TIMESTAMP_MS_ROLE
+from ui.widgets.lyrics_editor_widget import LINE_NUMBER_COLUMN, LyricsEditorWidget, TIMESTAMP_MS_ROLE
 from ui.dialogs.lyrics_propagate_dialog import HAS_LYRICS_ROLE, LyricsDiffButtonDelegate, LyricsPropagateDialog
 from ui.dialogs.lyrics_diff_dialog import _normalized_diff_lines
 from ui.widgets.toast import ToastManager
@@ -435,6 +435,144 @@ class LyricsPasteBehaviorTests(unittest.TestCase):
             self.assertEqual(len(emitted), 1)
             self.assertIn("[00:08.00]", emitted[0][0])
             self.assertNotIn("First line.", emitted[0][0])
+        finally:
+            widget.deleteLater()
+
+    def test_synced_lyrics_editor_marks_duplicate_timestamps_invalid(self):
+        widget = LyricsEditorWidget()
+        try:
+            widget._set_synced([(1200, "First line"), (1200, "Second line"), (5000, "")])
+
+            self.assertFalse(widget.btn_save.isEnabled())
+            self.assertTrue(widget.btn_autofix.isEnabled())
+            self.assertEqual(widget._lint_rows, {0, 1})
+            self.assertIn("Duplicate timestamp", widget.validation_hint.text())
+            self.assertEqual(widget.validation_badge.text(), "2 issues")
+            self.assertIn("Duplicate timestamp", widget.table.item(0, 0).toolTip())
+            self.assertIn("Duplicate timestamp", widget.table.item(1, 1).toolTip())
+            self.assertEqual(widget.table.item(0, 0).background().color(), QColor("#2a0a0a"))
+            self.assertEqual(widget.table.item(1, 1).background().color(), QColor("#2a0a0a"))
+            self.assertNotEqual(widget.table.item(0, LINE_NUMBER_COLUMN).background().color(), QColor("#2a0a0a"))
+            self.assertEqual(widget.table.item(0, LINE_NUMBER_COLUMN).foreground().color(), QColor("#fee2e2"))
+        finally:
+            widget.deleteLater()
+
+    def test_validation_hint_click_jumps_to_first_issue(self):
+        widget = LyricsEditorWidget()
+        try:
+            widget._set_synced([(3000, "Second line"), (2000, "First line"), (5000, "")])
+            event = QMouseEvent(
+                QEvent.Type.MouseButtonRelease,
+                QPointF(1, 1),
+                QPointF(1, 1),
+                Qt.MouseButton.LeftButton,
+                Qt.MouseButton.LeftButton,
+                Qt.KeyboardModifier.NoModifier,
+            )
+
+            self.assertTrue(widget.eventFilter(widget.validation_hint, event))
+
+            self.assertEqual(widget.table.currentRow(), 1)
+            self.assertEqual(widget.table.currentColumn(), 0)
+        finally:
+            widget.deleteLater()
+
+    def test_synced_duplicate_autofix_separates_timestamps(self):
+        widget = LyricsEditorWidget()
+        try:
+            widget._set_synced([(1200, "First line"), (1200, "Second line"), (5000, "")])
+
+            widget._autofix_validation_problems()
+
+            self.assertTrue(widget.btn_save.isEnabled())
+            self.assertEqual(widget.table.item(0, 0).text(), "00:01.20")
+            self.assertEqual(widget.table.item(1, 0).text(), "00:01.25")
+            self.assertEqual(widget.validation_badge.text(), "Valid")
+        finally:
+            widget.deleteLater()
+
+    def test_publish_buttons_follow_synced_validator_state(self):
+        widget = LyricsEditorWidget()
+        try:
+            widget.set_track_lyrics(
+                "Song",
+                "First line\nSecond line",
+                "[00:01.20] First line\n[00:01.20] Second line\n[00:05.00]",
+                False,
+            )
+
+            self.assertFalse(widget.btn_save.isEnabled())
+            self.assertFalse(widget.btn_publish_synced.isEnabled())
+            self.assertFalse(widget.btn_publish_plain.isEnabled())
+            self.assertEqual(widget.btn_publish_synced.toolTip(), "Fix validation issues before publishing.")
+            self.assertEqual(widget.btn_publish_plain.toolTip(), "Fix validation issues before publishing.")
+
+            widget.set_track_lyrics(
+                "Song",
+                "First line\nSecond line",
+                "[00:01.20] First line\n[00:03.00] Second line\n[00:05.00]",
+                False,
+            )
+
+            self.assertTrue(widget.btn_save.isEnabled())
+            self.assertTrue(widget.btn_publish_synced.isEnabled())
+            self.assertTrue(widget.btn_publish_plain.isEnabled())
+            self.assertEqual(widget.btn_publish_synced.toolTip(), "Publish synced (LRC) lyrics to LRCLIB")
+            self.assertEqual(widget.validation_badge.text(), "Valid")
+        finally:
+            widget.deleteLater()
+
+    def test_publish_buttons_explain_dirty_draft_state(self):
+        widget = LyricsEditorWidget()
+        try:
+            widget.set_track_lyrics(
+                "Song",
+                "Saved line",
+                "[00:01.20] Saved line\n[00:05.00]",
+                False,
+                dirty_txt_lyrics="Draft line",
+                dirty_lrc_lyrics="[00:01.20] Draft line\n[00:05.00]",
+                dirty_lyrics_present=True,
+            )
+
+            self.assertFalse(widget.btn_publish_synced.isEnabled())
+            self.assertFalse(widget.btn_publish_plain.isEnabled())
+            self.assertEqual(widget.btn_publish_synced.toolTip(), "Save the draft before publishing to LRCLIB.")
+            self.assertEqual(widget.btn_publish_plain.toolTip(), "Save the draft before publishing to LRCLIB.")
+        finally:
+            widget.deleteLater()
+
+    def test_publish_plain_button_follows_plain_validator_state(self):
+        widget = LyricsEditorWidget()
+        try:
+            widget.set_track_lyrics("Song", "[00:01.00] Not plain", "", False)
+
+            self.assertFalse(widget.btn_save.isEnabled())
+            self.assertFalse(widget.btn_publish_plain.isEnabled())
+
+            widget.set_track_lyrics("Song", "Plain line", "", False)
+
+            self.assertTrue(widget.btn_save.isEnabled())
+            self.assertTrue(widget.btn_publish_plain.isEnabled())
+        finally:
+            widget.deleteLater()
+
+    def test_synced_lyrics_editor_shows_line_numbers(self):
+        widget = LyricsEditorWidget()
+        try:
+            widget._set_synced([(1200, "First line"), (3000, "Second line")])
+
+            self.assertTrue(widget.table.verticalHeader().isHidden())
+            self.assertEqual(widget.table.horizontalHeaderItem(LINE_NUMBER_COLUMN).text(), "#")
+            self.assertEqual(widget.table.item(0, LINE_NUMBER_COLUMN).text(), "1")
+            self.assertEqual(widget.table.item(1, LINE_NUMBER_COLUMN).text(), "2")
+
+            widget.table.setCurrentCell(0, 1)
+            widget._add_line_before_selection()
+            self.assertEqual(
+                [widget.table.item(row, LINE_NUMBER_COLUMN).text() for row in range(widget.table.rowCount())],
+                ["1", "2", "3"],
+            )
         finally:
             widget.deleteLater()
 

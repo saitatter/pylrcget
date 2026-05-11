@@ -63,12 +63,15 @@ def validate_synced_lyrics(pairs: list[tuple[int, str]]) -> list[LyricsValidatio
     last_non_empty_line: tuple[int, int, str] | None = None
     previous_empty_line: int | None = None
     previous_ms: int | None = None
+    timestamp_lines: dict[int, list[int]] = {}
 
     for index, (ms, text) in enumerate(pairs):
         line_no = index + 1
+        current_ms = int(ms)
         content = (text or "").strip()
+        timestamp_lines.setdefault(current_ms, []).append(line_no)
 
-        if previous_ms is not None and int(ms) < previous_ms:
+        if previous_ms is not None and current_ms < previous_ms:
             problems.append(
                 LyricsValidationProblem(
                     line=line_no,
@@ -76,7 +79,7 @@ def validate_synced_lyrics(pairs: list[tuple[int, str]]) -> list[LyricsValidatio
                     fixable=True,
                 )
             )
-        previous_ms = int(ms)
+        previous_ms = current_ms
 
         if content:
             if (content.endswith(".") and not content.endswith("...")) or content.endswith(","):
@@ -87,7 +90,7 @@ def validate_synced_lyrics(pairs: list[tuple[int, str]]) -> list[LyricsValidatio
                         fixable=True,
                     )
                 )
-            last_non_empty_line = (line_no, int(ms), content)
+            last_non_empty_line = (line_no, current_ms, content)
             previous_empty_line = None
         else:
             if previous_empty_line is not None:
@@ -111,11 +114,24 @@ def validate_synced_lyrics(pairs: list[tuple[int, str]]) -> list[LyricsValidatio
                 )
             )
 
+    for duplicate_lines in timestamp_lines.values():
+        if len(duplicate_lines) < 2:
+            continue
+        for line_no in duplicate_lines:
+            problems.append(
+                LyricsValidationProblem(
+                    line=line_no,
+                    message="Duplicate timestamp; each synced line needs a unique timestamp.",
+                    fixable=True,
+                )
+            )
+
     return problems
 
 
 def autofix_synced_lyrics(pairs: list[tuple[int, str]]) -> list[tuple[int, str]]:
     fixed: list[tuple[int, str]] = []
+    previous_ms: int | None = None
     for ms, text in sorted(((int(ms), text or "") for ms, text in pairs), key=lambda item: item[0]):
         content = text.rstrip()
         stripped = content.rstrip()
@@ -123,7 +139,9 @@ def autofix_synced_lyrics(pairs: list[tuple[int, str]]) -> list[tuple[int, str]]
             stripped = stripped[:-1].rstrip()
         if not stripped and fixed and not fixed[-1][1].strip():
             continue
-        fixed.append((ms, stripped))
+        fixed_ms = ms if previous_ms is None else max(ms, previous_ms + 50)
+        fixed.append((fixed_ms, stripped))
+        previous_ms = fixed_ms
 
     while fixed and not fixed[-1][1].strip():
         fixed.pop()
