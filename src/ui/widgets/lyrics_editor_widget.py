@@ -366,7 +366,6 @@ class LyricsEditorWidget(QWidget):
         self.validation_hint = QLabel("")
         self.validation_hint.setObjectName("LyricsValidationHint")
         self.validation_hint.hide()
-        self.validation_hint.installEventFilter(self)
         root.addWidget(self.validation_hint)
 
         # --- stack: msg / plain / synced ---
@@ -398,6 +397,7 @@ class LyricsEditorWidget(QWidget):
         self.table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.table.installEventFilter(self)
         self.table.viewport().installEventFilter(self)
+        self.validation_hint.installEventFilter(self)
         self.table.cellClicked.connect(self._on_table_clicked_seek)
         self.table.itemSelectionChanged.connect(self._on_table_selection_changed)
         self.table.itemChanged.connect(self._on_table_item_changed)
@@ -452,11 +452,7 @@ class LyricsEditorWidget(QWidget):
             if self._validation_problems:
                 self._jump_to_first_validation_problem()
                 return True
-        if (
-            hasattr(self, "table")
-            and watched in {self.table, self.table.viewport()}
-            and event.type() == QEvent.Type.KeyPress
-        ):
+        if watched in {self.table, self.table.viewport()} and event.type() == QEvent.Type.KeyPress:
             modifiers = event.modifiers() & ~Qt.KeyboardModifier.KeypadModifier
             if (
                 event.key() in {Qt.Key.Key_Return, Qt.Key.Key_Enter}
@@ -628,8 +624,7 @@ class LyricsEditorWidget(QWidget):
         self.dirty_badge.setVisible(bool(visible))
         self.btn_discard_draft.setVisible(bool(visible))
         self.btn_show_diff.setVisible(bool(visible))
-        if hasattr(self, "btn_publish_synced"):
-            self._update_publish_enabled()
+        self._update_publish_enabled()
 
     def _show_diff(self) -> None:
         from ui.dialogs.lyrics_diff_dialog import LyricsDiffDialog
@@ -905,8 +900,11 @@ class LyricsEditorWidget(QWidget):
         else:
             can_publish_current = False
 
-        self.btn_publish_synced.setEnabled(self._publish_synced_available and can_publish_current)
-        self.btn_publish_plain.setEnabled(self._publish_plain_available and can_publish_current)
+        synced_enabled = self._publish_synced_available and can_publish_current and not self._has_dirty_draft
+        plain_enabled = self._publish_plain_available and can_publish_current and not self._has_dirty_draft
+
+        self.btn_publish_synced.setEnabled(synced_enabled)
+        self.btn_publish_plain.setEnabled(plain_enabled)
         self.btn_publish_synced.setToolTip(
             self._publish_tooltip(
                 is_synced=True,
@@ -923,12 +921,12 @@ class LyricsEditorWidget(QWidget):
         )
 
     def _publish_tooltip(self, *, is_synced: bool, available: bool, can_publish_current: bool) -> str:
-        if available and can_publish_current:
-            return "Publish synced (LRC) lyrics to LRCLIB" if is_synced else "Publish plain text lyrics to LRCLIB"
         if not can_publish_current and self._validation_problems:
             return "Fix validation issues before publishing."
         if self._has_dirty_draft:
             return "Save the draft before publishing to LRCLIB."
+        if available and can_publish_current:
+            return "Publish synced (LRC) lyrics to LRCLIB" if is_synced else "Publish plain text lyrics to LRCLIB"
         lyric_kind = "synced" if is_synced else "plain"
         return f"No saved {lyric_kind} lyrics available to publish."
 
@@ -1040,12 +1038,7 @@ class LyricsEditorWidget(QWidget):
 
     def _line_number_item(self, row: int) -> QTableWidgetItem:
         item = QTableWidgetItem(str(row + 1))
-        item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-        item.setFlags(
-            (item.flags() & ~Qt.ItemFlag.ItemIsEditable)
-            | Qt.ItemFlag.ItemIsEnabled
-            | Qt.ItemFlag.ItemIsSelectable
-        )
+        self._apply_line_number_style(item)
         return item
 
     def _sync_line_numbers(self) -> None:
@@ -1056,12 +1049,16 @@ class LyricsEditorWidget(QWidget):
                 self.table.setItem(row, LINE_NUMBER_COLUMN, item)
             else:
                 item.setText(str(row + 1))
-                item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-                item.setFlags(
-                    (item.flags() & ~Qt.ItemFlag.ItemIsEditable)
-                    | Qt.ItemFlag.ItemIsEnabled
-                    | Qt.ItemFlag.ItemIsSelectable
-                )
+                self._apply_line_number_style(item)
+
+    @staticmethod
+    def _apply_line_number_style(item: QTableWidgetItem) -> None:
+        item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        item.setFlags(
+            (item.flags() & ~Qt.ItemFlag.ItemIsEditable)
+            | Qt.ItemFlag.ItemIsEnabled
+            | Qt.ItemFlag.ItemIsSelectable
+        )
 
     def _timestamp_problems(self) -> list[LyricsValidationProblem]:
         return [

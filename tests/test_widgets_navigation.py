@@ -542,6 +542,29 @@ class LyricsPasteBehaviorTests(unittest.TestCase):
         finally:
             widget.deleteLater()
 
+    def test_publish_buttons_disable_when_saved_lyrics_become_dirty(self):
+        widget = LyricsEditorWidget()
+        try:
+            widget.set_track_lyrics(
+                "Song",
+                "Saved line",
+                "[00:01.20] Saved line\n[00:05.00]",
+                False,
+            )
+
+            self.assertTrue(widget.btn_publish_synced.isEnabled())
+            self.assertTrue(widget.btn_publish_plain.isEnabled())
+
+            widget.table.item(0, 1).setText("Changed line")
+
+            self.assertTrue(widget._has_dirty_draft)
+            self.assertFalse(widget.btn_publish_synced.isEnabled())
+            self.assertFalse(widget.btn_publish_plain.isEnabled())
+            self.assertEqual(widget.btn_publish_synced.toolTip(), "Save the draft before publishing to LRCLIB.")
+            self.assertEqual(widget.btn_publish_plain.toolTip(), "Save the draft before publishing to LRCLIB.")
+        finally:
+            widget.deleteLater()
+
     def test_publish_plain_button_follows_plain_validator_state(self):
         widget = LyricsEditorWidget()
         try:
