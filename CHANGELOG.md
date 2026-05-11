@@ -1,4 +1,16 @@
 # Changelog
+## v1.9.0 (2026-05-11)
+
+### ✨ Features
+* Improve lyrics editor validation ux ([15b2895](https://github.com/saitatter/pylrcget/commit/15b28952855318dfbb54ceb1f031f50d68199ce7))
+  Improve synced lyrics validation and editor UX.
+  - Detect duplicate timestamps and make them autofixable
+- Add row-level validation tooltips and click-to-jump validation hints
+- Add right-side line numbers and a validation status badge
+- Disable publish actions for invalid lyrics or unsaved drafts
+- Normalize compact header button and badge styling
+
+
 ## v1.8.0 (2026-05-10)
 
 ### ✨ Features
