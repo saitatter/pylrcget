@@ -3,38 +3,79 @@ QLabel#LyricsTitle {
     font-size: {{font-size-lg}};
 }
 
+QLabel#LyricsDirtyBadge,
+QLabel#LyricsValidationBadge {
+    min-height: 28px;
+    max-height: 28px;
+    padding: 0 10px;
+    border-radius: {{radius-sm}};
+    font-size: {{font-size-xs}};
+    font-weight: 800;
+}
+
+QPushButton#LyricsDiscardDraft,
+QPushButton#LyricsShowDiff,
+QPushButton#LyricsSwitchMode,
+QPushButton#LyricsAutoSync {
+    min-height: 28px;
+    max-height: 28px;
+    min-width: 44px;
+    padding: 0 10px;
+    border-radius: {{radius-sm}};
+    font-size: {{font-size-xs}};
+    font-weight: 650;
+}
+
 QLabel#LyricsDirtyBadge {
     background: {{color-warning-bg}};
     color: {{color-warning-text}};
     border: 1px solid {{color-warning-border}};
-    border-radius: {{radius-pill}};
-    padding: 3px 8px;
-    font-size: {{font-size-xs}};
-    font-weight: 800;
+}
+
+QLabel#LyricsValidationBadge {
+    background: {{color-validation-bg}};
+    color: {{color-text}};
+    border: 1px solid {{color-validation-border}};
+}
+
+QLabel#LyricsValidationBadge[validationState="error"] {
+    background: {{color-error-bg}};
+    color: {{color-error-text}};
+    border-color: {{color-error-border}};
+}
+
+QLabel#LyricsValidationBadge[validationState="success"] {
+    background: {{color-success-bg}};
+    color: {{color-success-text}};
+    border-color: {{color-success-border}};
 }
 
 QPushButton#LyricsDiscardDraft {
     background: transparent;
     color: {{color-warning-text}};
     border: 1px solid {{color-warning-border}};
-    border-radius: {{radius-pill}};
-    padding: 3px 8px;
-    font-size: {{font-size-xs}};
-    font-weight: 600;
 }
 
 QPushButton#LyricsDiscardDraft:hover {
     background: {{color-warning-bg}};
 }
 
+QPushButton#LyricsShowDiff {
+    background: transparent;
+    color: {{color-accent}};
+    border: 1px solid {{color-border}};
+}
+
+QPushButton#LyricsShowDiff:hover {
+    background: {{color-bg-elevated}};
+    border-color: {{color-accent}};
+    color: {{color-text}};
+}
+
 QPushButton#LyricsSwitchMode {
     background: transparent;
-    color: {{color-text-secondary}};
+    color: {{color-text-muted}};
     border: 1px solid {{color-border}};
-    border-radius: {{radius-pill}};
-    padding: 3px 8px;
-    font-size: {{font-size-xs}};
-    font-weight: 600;
 }
 
 QPushButton#LyricsSwitchMode:hover {
@@ -47,10 +88,6 @@ QPushButton#LyricsAutoSync {
     background: transparent;
     color: {{color-accent}};
     border: 1px solid {{color-accent}};
-    border-radius: {{radius-pill}};
-    padding: 3px 8px;
-    font-size: {{font-size-xs}};
-    font-weight: 600;
 }
 
 QPushButton#LyricsAutoSync:hover {

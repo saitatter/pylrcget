@@ -32,9 +32,26 @@ def test_synced_validator_checks_punctuation_order_and_end_marker():
     assert "mark the end" in problems[2].message
 
 
+def test_synced_validator_rejects_duplicate_timestamps_on_all_matching_lines():
+    problems = validate_synced_lyrics([(1200, "First"), (1200, "Second"), (3000, "")])
+
+    duplicate_problems = [problem for problem in problems if "Duplicate timestamp" in problem.message]
+    assert [problem.line for problem in duplicate_problems] == [1, 2]
+    assert all(problem.fixable for problem in duplicate_problems)
+
+
 def test_synced_autofix_sorts_strips_punctuation_and_adds_end_marker():
     assert autofix_synced_lyrics([(3000, "Second."), (2000, "First,")]) == [
         (2000, "First"),
         (3000, "Second"),
         (8000, ""),
+    ]
+
+
+def test_synced_autofix_separates_duplicate_timestamps():
+    assert autofix_synced_lyrics([(1200, "First"), (1200, "Second"), (1210, "Third"), (5000, "")]) == [
+        (1200, "First"),
+        (1250, "Second"),
+        (1300, "Third"),
+        (6300, ""),
     ]
