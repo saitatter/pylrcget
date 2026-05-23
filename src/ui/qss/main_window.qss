@@ -227,11 +227,39 @@ QLabel#SelectionActionsLabel {
     padding: 0 6px;
 }
 
-QPushButton#SelectionActionButton {
+QWidget#SelectionActionGroup,
+QWidget#SelectionActionMenuGroup {
+    background: transparent;
+}
+
+QWidget#SelectionActionSeparator {
+    background: {{color-border}};
+    margin: 0 4px;
+}
+
+QPushButton#SelectionActionButton,
+QToolButton#SelectionActionButton {
     min-height: 28px;
     padding: 4px 9px;
     font-size: {{font-size-xs}};
     font-weight: 600;
+}
+
+QToolButton#SelectionActionMenuButton {
+    min-height: 28px;
+    padding: 4px 10px;
+    font-size: {{font-size-xs}};
+    font-weight: 700;
+    background: {{color-bg-control}};
+}
+
+QToolButton#SelectionActionMenuButton:hover {
+    background: {{color-bg-elevated}};
+}
+
+QToolButton#SelectionActionMenuButton::menu-indicator {
+    image: none;
+    width: 0px;
 }
 
 QLabel#ScanLabel {

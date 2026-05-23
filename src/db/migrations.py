@@ -93,6 +93,23 @@ def upgrade_database_if_needed(db: sqlite3.Connection, existing_version: int) ->
         db.commit()
         current_version = 3
 
+    if current_version < 4:
+        logger.info("Upgrade database version %d -> 4...", current_version)
+        config_table = db.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='config_data'"
+        ).fetchone()
+        if config_table is not None:
+            config_columns = {
+                row["name"] for row in db.execute("PRAGMA table_info(config_data)").fetchall()
+            }
+            if "hotkey_bindings_json" not in config_columns:
+                db.execute("ALTER TABLE config_data ADD COLUMN hotkey_bindings_json TEXT DEFAULT ''")
+            if "ui_state_json" not in config_columns:
+                db.execute("ALTER TABLE config_data ADD COLUMN ui_state_json TEXT DEFAULT ''")
+        db.execute("PRAGMA user_version=4")
+        db.commit()
+        current_version = 4
+
     if current_version == CURRENT_DB_VERSION:
         return
 

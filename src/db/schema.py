@@ -36,7 +36,9 @@ CREATE TABLE config_data (
     reaction_delay_ms INTEGER DEFAULT 0,
     playback_speed REAL DEFAULT 1.0,
     playback_volume REAL DEFAULT 0.7,
-    last_library_route TEXT DEFAULT ''
+    last_library_route TEXT DEFAULT '',
+    hotkey_bindings_json TEXT DEFAULT '',
+    ui_state_json TEXT DEFAULT ''
 );
 
 CREATE TABLE artists (
@@ -156,7 +158,9 @@ INSERT INTO config_data (
     reaction_delay_ms,
     playback_speed,
     playback_volume,
-    last_library_route
+    last_library_route,
+    hotkey_bindings_json,
+    ui_state_json
 ) VALUES (
     0,
     0,
@@ -181,6 +185,8 @@ INSERT INTO config_data (
     0,
     1.0,
     0.7,
+    '',
+    '',
     ''
 );
 """

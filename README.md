@@ -144,9 +144,11 @@ File export and embedded lyric format are controlled separately in Settings. For
 
 PyLrcGet can generate synced lyrics locally using **OpenAI Whisper** for transcription and **Demucs** for vocal separation. Everything runs on your machine — no API keys or internet connection required (after initial model download).
 
+The feature lives inside the track lyrics editor. Select a track, open the lyrics pane, and use **Auto Sync**. If the track has no lyrics yet, the empty lyrics state also exposes an **Auto Sync** action.
+
 ### How it works
 
-1. **Demucs** isolates the vocal track from the audio (optional — falls back to full mix if it fails)
+1. **Demucs** isolates the vocal track from the audio (optional — falls back to the full mix if it is unavailable or fails)
 2. **Whisper** transcribes the vocals with word-level timestamps
 3. If plain lyrics are already present, they are aligned to the detected timestamps; otherwise Whisper's transcription is used directly
 4. The result is placed in the synced lyrics editor as an unsaved draft
@@ -168,6 +170,8 @@ pip install pylrcget[ai]
 > **Note:** AI dependencies add ~2 GB to the install (mostly PyTorch). The `base` Whisper model (~140 MB) is downloaded automatically on first use. GPU acceleration (CUDA) is used when available, otherwise CPU.
 
 > **Note:** AI dependencies are **not** bundled in binary releases. Users of standalone executables must install Python and the AI packages separately.
+
+> **Tip for packaged `.exe` users:** install the AI packages into the same Python environment you use to launch PyLrcGet, then restart the app. The packaged app does not grow a separate AI screen; the AI entrypoint is the **Auto Sync** action in the lyrics editor.
 
 ---
 

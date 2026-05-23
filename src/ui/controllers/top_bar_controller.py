@@ -19,6 +19,14 @@ from ui.services.download_modes import download_missing_tooltip
 
 
 class TopBarController(QWidget):
+    _DEFAULT_FILTERS = {
+        "synced": True,
+        "plain": True,
+        "instrumental": False,
+        "none": True,
+        "unsaved": False,
+    }
+
     def __init__(
         self,
         *,
@@ -214,8 +222,17 @@ class TopBarController(QWidget):
         for button, icon_name in self._action_icons.items():
             button.setIcon(load_svg_icon(icon_name, 18))
 
+    def apply_current_palette(self) -> None:
+        self.refresh_theme_icons()
+        self.update()
+
     def search_text(self) -> str:
         return self.search_box.text()
+
+    def set_search_text(self, text: str) -> None:
+        self.search_box.blockSignals(True)
+        self.search_box.setText(text or "")
+        self.search_box.blockSignals(False)
 
     def filter_values(self) -> dict[str, bool]:
         return {
@@ -226,25 +243,45 @@ class TopBarController(QWidget):
             "unsaved": self.chk_unsaved.isChecked(),
         }
 
-    def reset_track_filters(self) -> None:
-        self.search_box.blockSignals(True)
-        self.search_box.setText("")
-        self.search_box.blockSignals(False)
-        for checkbox, checked in (
-            (self.chk_synced, True),
-            (self.chk_plain, True),
-            (self.chk_instr, False),
-            (self.chk_none, True),
-            (self.chk_unsaved, False),
+    @classmethod
+    def default_filter_values(cls) -> dict[str, bool]:
+        return dict(cls._DEFAULT_FILTERS)
+
+    @staticmethod
+    def _coerce_bool(value, default: bool) -> bool:
+        if value is None:
+            return bool(default)
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, (int, float)):
+            return bool(value)
+        text = str(value).strip().lower()
+        if text in {"1", "true", "yes", "on"}:
+            return True
+        if text in {"0", "false", "no", "off"}:
+            return False
+        return bool(default)
+
+    def set_filter_values(self, values: dict[str, object]) -> None:
+        merged = self.default_filter_values()
+        merged.update(values or {})
+        for checkbox, key in (
+            (self.chk_synced, "synced"),
+            (self.chk_plain, "plain"),
+            (self.chk_instr, "instrumental"),
+            (self.chk_none, "none"),
+            (self.chk_unsaved, "unsaved"),
         ):
             checkbox.blockSignals(True)
-            checkbox.setChecked(checked)
+            checkbox.setChecked(self._coerce_bool(merged.get(key), self._DEFAULT_FILTERS[key]))
             checkbox.blockSignals(False)
 
+    def reset_track_filters(self) -> None:
+        self.set_search_text("")
+        self.set_filter_values(self.default_filter_values())
+
     def clear_library_search(self) -> None:
-        self.search_box.blockSignals(True)
-        self.search_box.setText("")
-        self.search_box.blockSignals(False)
+        self.set_search_text("")
 
     def set_actions_label(self, text: str) -> None:
         self.actions_label.setText(text)

@@ -123,3 +123,5 @@ class Config:
     playback_speed: float
     playback_volume: float
     last_library_route: str
+    hotkey_bindings_json: str = ""
+    ui_state_json: str = ""

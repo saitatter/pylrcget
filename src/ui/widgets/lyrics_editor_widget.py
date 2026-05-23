@@ -5,12 +5,11 @@ import logging
 import re
 from bisect import bisect_right
 
-from PySide6.QtCore import QEvent, QRect, QSize, Qt, Signal, QTimer
+from PySide6.QtCore import QEvent, Qt, Signal, QTimer
 from PySide6.QtGui import QColor, QKeySequence, QShortcut, QTextCursor
 from PySide6.QtWidgets import (
     QApplication,
     QHeaderView,
-    QLayout,
     QSizePolicy,
     QWidget, QVBoxLayout, QLabel, QStackedWidget,
     QTextEdit, QTableWidget, QTableWidgetItem,
@@ -20,6 +19,7 @@ from PySide6.QtWidgets import (
 from ui.spacing import SPACE_2, SPACE_3, set_layout_spacing
 from ui.style_loader import load_stylesheet
 from ui.widgets.empty_state_widget import EmptyStateWidget
+from ui.widgets.lyrics_editor_parts import FlowLayout, hotkeys as lyrics_editor_hotkeys
 from core.utils import (
     LRC_TS_RE as _TS_RE,
     _ts_to_ms,
@@ -34,6 +34,7 @@ from core.lyrics_validator import (
     validate_plain_lyrics,
     validate_synced_lyrics,
 )
+from ui.hotkeys import HOTKEY_SPECS, effective_hotkey_text, lyrics_hotkey_defaults, normalize_hotkey_text
 
 TIMESTAMP_MS_ROLE = Qt.ItemDataRole.UserRole
 TIMESTAMP_VALID_ROLE = Qt.ItemDataRole.UserRole + 1
@@ -45,99 +46,22 @@ LINE_NUMBER_COLUMN = 2
 logger = logging.getLogger(__name__)
 
 
-class FlowLayout(QLayout):
-    def __init__(self, parent=None, *, spacing: int = SPACE_2, justify_rows: bool = True):
-        super().__init__(parent)
-        self._items = []
-        self._justify_rows = bool(justify_rows)
-        self.setContentsMargins(0, 0, 0, 0)
-        self.setSpacing(spacing)
-
-    def addItem(self, item):
-        self._items.append(item)
-
-    def count(self) -> int:
-        return len(self._items)
-
-    def itemAt(self, index: int):
-        if 0 <= index < len(self._items):
-            return self._items[index]
-        return None
-
-    def takeAt(self, index: int):
-        if 0 <= index < len(self._items):
-            return self._items.pop(index)
-        return None
-
-    def expandingDirections(self):
-        return Qt.Orientation(0)
-
+class _HeightForWidthWidget(QWidget):
     def hasHeightForWidth(self) -> bool:
-        return True
+        layout = self.layout()
+        return bool(layout is not None and layout.hasHeightForWidth())
 
     def heightForWidth(self, width: int) -> int:
-        return self._do_layout(QRect(0, 0, width, 0), test_only=True)
+        layout = self.layout()
+        if layout is None:
+            return super().heightForWidth(width)
+        return layout.totalHeightForWidth(width)
 
-    def setGeometry(self, rect: QRect) -> None:
-        super().setGeometry(rect)
-        self._do_layout(rect, test_only=False)
-
-    def sizeHint(self) -> QSize:
-        return self.minimumSize()
-
-    def minimumSize(self) -> QSize:
-        size = QSize()
-        for item in self._items:
-            size = size.expandedTo(item.minimumSize())
-        margins = self.contentsMargins()
-        size += QSize(margins.left() + margins.right(), margins.top() + margins.bottom())
-        return size
-
-    def _do_layout(self, rect: QRect, *, test_only: bool) -> int:
-        margins = self.contentsMargins()
-        effective = rect.adjusted(margins.left(), margins.top(), -margins.right(), -margins.bottom())
-        y = effective.y()
-        spacing = self.spacing()
-        rows = []
-        row = []
-        row_width = 0
-        row_height = 0
-
-        for item in self._items:
-            widget = item.widget()
-            if widget is not None and not widget.isVisible():
-                continue
-            item_size = item.sizeHint()
-            next_width = row_width + (spacing if row else 0) + item_size.width()
-            if row and next_width > effective.width():
-                rows.append((row, row_width, row_height))
-                row = []
-                row_width = 0
-                row_height = 0
-                next_width = item_size.width()
-            row.append((item, item_size))
-            row_width = next_width
-            row_height = max(row_height, item_size.height())
-
-        if row:
-            rows.append((row, row_width, row_height))
-
-        for row_items, row_width, row_height in rows:
-            x = effective.x()
-            extra = max(0, effective.width() - row_width)
-            extra_each = extra // len(row_items) if self._justify_rows and row_items and not test_only else 0
-            extra_remainder = extra % len(row_items) if self._justify_rows and row_items and not test_only else 0
-            for index, (item, item_size) in enumerate(row_items):
-                item_width = item_size.width() + extra_each + (1 if index < extra_remainder else 0)
-                item_height = item_size.height()
-                if not test_only:
-                    item.setGeometry(QRect(x, y, item_width, item_height))
-                x += item_width + spacing
-            y += row_height + spacing
-
-        if rows:
-            y -= spacing
-        return y - rect.y() + margins.bottom()
+    def minimumSizeHint(self):
+        layout = self.layout()
+        if layout is None:
+            return super().minimumSizeHint()
+        return layout.minimumSize()
 
 
 class LyricsEditorWidget(QWidget):
@@ -169,6 +93,7 @@ class LyricsEditorWidget(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
 
+        self._ui_scale: float = 1.0
         self._current_pos_ms: int = 0
         self._times: list[int] = []
         self._current_index: int = -1
@@ -194,7 +119,9 @@ class LyricsEditorWidget(QWidget):
         set_layout_spacing(root, margins=SPACE_3, spacing=SPACE_2)
 
         # --- header ---
-        header = QVBoxLayout()
+        self.header_widget = _HeightForWidthWidget()
+        self.header_widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+        header = QVBoxLayout(self.header_widget)
         set_layout_spacing(header, spacing=SPACE_2)
 
         title_row = QHBoxLayout()
@@ -239,7 +166,7 @@ class LyricsEditorWidget(QWidget):
 
         self.btn_auto_sync = QPushButton("Auto Sync")
         self.btn_auto_sync.setObjectName("LyricsAutoSync")
-        self.btn_auto_sync.setToolTip("Automatically synchronize lyrics using AI (requires torch, demucs, openai-whisper)")
+        self.btn_auto_sync.setToolTip("Automatically synchronize lyrics using AI (requires torch and openai-whisper; Demucs is optional)")
         self.btn_auto_sync.hide()
         self.btn_auto_sync.clicked.connect(self.autoSyncRequested.emit)
         title_row.addWidget(self.btn_auto_sync)
@@ -258,8 +185,9 @@ class LyricsEditorWidget(QWidget):
 
         toolbar = FlowLayout(spacing=SPACE_2)
 
+        self._lyrics_hotkeys = lyrics_hotkey_defaults()
+
         self.btn_snap = QPushButton("Snap")
-        self.btn_snap.setToolTip("Set the selected line's timestamp to the current playback position (Ctrl+Enter)")
         self.btn_shift_minus = QPushButton("-0.1s")
         self.btn_shift_minus.setToolTip("Shift selected lines 100ms earlier (Left)")
         self.btn_shift_plus = QPushButton("+0.1s")
@@ -275,9 +203,7 @@ class LyricsEditorWidget(QWidget):
         self.shift_spin.setButtonSymbols(QDoubleSpinBox.ButtonSymbols.NoButtons)
         self.shift_spin.setMinimumWidth(SHIFT_SPIN_MIN_WIDTH)
         self.btn_shift_selected = QPushButton("Shift Selected")
-        self.btn_shift_selected.setToolTip("Shift selected lines by the custom amount (Shift+Enter)")
         self.btn_shift_all_from_first = QPushButton("Shift All from First")
-        self.btn_shift_all_from_first.setToolTip("Align all lines so the first line matches the current playback position (Ctrl+Shift+Enter)")
         self.btn_add = QPushButton("+ Line")
         self.btn_add.setToolTip("Insert a new line after the current selection (Ctrl+N or Insert)")
         self.btn_del = QPushButton("Delete")
@@ -361,7 +287,7 @@ class LyricsEditorWidget(QWidget):
 
         header.addLayout(toolbar)
 
-        root.addLayout(header)
+        root.addWidget(self.header_widget)
 
         self.validation_hint = QLabel("")
         self.validation_hint.setObjectName("LyricsValidationHint")
@@ -376,6 +302,7 @@ class LyricsEditorWidget(QWidget):
         self.empty_state.actionTriggered.connect(self.downloadRequested.emit)
         self.empty_state.secondaryActionTriggered.connect(self.searchRequested.emit)
         self.empty_state.tertiaryActionTriggered.connect(self._start_writing_lyrics)
+        self.empty_state.quaternaryActionTriggered.connect(self._start_ai_sync_from_empty_state)
         self.stack.addWidget(self.empty_state)
 
         # Plain editor (editable if you want)
@@ -417,18 +344,20 @@ class LyricsEditorWidget(QWidget):
         self._shortcut_undo.activated.connect(self._undo)
         self._shortcut_redo = QShortcut(QKeySequence.StandardKey.Redo, self)
         self._shortcut_redo.activated.connect(self._redo)
-        self._shortcut_snap = self._make_shortcut("Ctrl+Return", self._snap_selected_line_to_current_time)
-        self._shortcut_snap_enter = self._make_shortcut("Ctrl+Enter", self._snap_selected_line_to_current_time)
         self._shortcut_shift_minus = self._make_shortcut("Left", lambda: self._shift_selected_lines(-100))
         self._shortcut_shift_plus = self._make_shortcut("Right", lambda: self._shift_selected_lines(100))
-        self._shortcut_shift_selected = self._make_shortcut("Shift+Return", self._shift_selected_lines_by_custom_amount)
-        self._shortcut_shift_selected_enter = self._make_shortcut("Shift+Enter", self._shift_selected_lines_by_custom_amount)
-        self._shortcut_shift_all = self._make_shortcut("Ctrl+Shift+Return", self._shift_all_lines_from_first_delta)
-        self._shortcut_shift_all_enter = self._make_shortcut("Ctrl+Shift+Enter", self._shift_all_lines_from_first_delta)
         self._shortcut_add_line = self._make_shortcut("Insert", self._add_line_after_selection)
         self._shortcut_add_line_new = self._make_shortcut("Ctrl+N", self._add_line_after_selection)
         self._shortcut_add_line_before = self._make_shortcut("Ctrl+Shift+N", self._add_line_before_selection)
         self._shortcut_delete_line = self._make_shortcut("Delete", self._delete_selected_line)
+
+        self._shortcut_snap: QShortcut | None = None
+        self._shortcut_snap_enter: QShortcut | None = None
+        self._shortcut_shift_selected: QShortcut | None = None
+        self._shortcut_shift_selected_enter: QShortcut | None = None
+        self._shortcut_shift_all: QShortcut | None = None
+        self._shortcut_shift_all_enter: QShortcut | None = None
+        self.set_hotkey_bindings(self._lyrics_hotkeys)
 
         self._default_button_text = {
             self.btn_save: "Save",
@@ -439,13 +368,55 @@ class LyricsEditorWidget(QWidget):
         }
 
         self._apply_styles()
+        self._sync_header_height()
         self.show_none("Choose a track to review or edit its lyrics.")
 
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._sync_header_height()
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        self._sync_header_height()
+
+    def refresh_layout(self) -> None:
+        self._sync_header_height()
+        layout = self.layout()
+        if layout is not None:
+            layout.invalidate()
+            layout.activate()
+        self.updateGeometry()
+        self.update()
+
     def _make_shortcut(self, key: str, callback) -> QShortcut:
-        shortcut = QShortcut(QKeySequence(key), self.table)
-        shortcut.setContext(Qt.ShortcutContext.WidgetWithChildrenShortcut)
-        shortcut.activated.connect(callback)
-        return shortcut
+        return lyrics_editor_hotkeys.make_shortcut(self, key, callback)
+
+    @property
+    def lyrics_hotkeys(self) -> dict[str, str]:
+        return {
+            action: effective_hotkey_text(binding, HOTKEY_SPECS[action])
+            for action, binding in self._lyrics_hotkeys.items()
+        }
+
+    def set_ui_scale(self, scale: float) -> None:
+        self._ui_scale = max(0.85, min(1.5, float(scale or 1.0)))
+        self.shift_spin.setMinimumWidth(int(round(SHIFT_SPIN_MIN_WIDTH * self._ui_scale)))
+        self.table.setColumnWidth(TIME_COLUMN, int(round(95 * self._ui_scale)))
+        self.table.setColumnWidth(LINE_NUMBER_COLUMN, int(round(LINE_NUMBER_HEADER_WIDTH * self._ui_scale)))
+        self.table.verticalHeader().setDefaultSectionSize(int(round(30 * self._ui_scale)))
+
+    def set_hotkey_bindings(self, bindings: dict[str, dict[str, object]] | None) -> None:
+        lyrics_editor_hotkeys.set_hotkey_bindings(self, bindings)
+
+    def _replace_action_shortcuts(self, primary_attr: str, secondary_attr: str, key: str, callback) -> None:
+        lyrics_editor_hotkeys.replace_action_shortcuts(self, primary_attr, secondary_attr, key, callback)
+
+    def _replace_shortcut(self, attr_name: str, key: str | None, callback) -> None:
+        lyrics_editor_hotkeys.replace_shortcut(self, attr_name, key, callback)
+
+    @staticmethod
+    def _shortcut_variants(key: str) -> tuple[str, str | None]:
+        return lyrics_editor_hotkeys.shortcut_variants(key)
 
     def eventFilter(self, watched, event):
         if watched is self.validation_hint and event.type() == QEvent.Type.MouseButtonRelease:
@@ -496,6 +467,19 @@ class LyricsEditorWidget(QWidget):
         if hasattr(self, "empty_state") and self.empty_state:
             self.empty_state._apply_styles()
 
+    def _sync_header_height(self) -> None:
+        header_layout = self.header_widget.layout()
+        if header_layout is None:
+            return
+        width = self.header_widget.width()
+        if width <= 0:
+            return
+        required_height = header_layout.totalHeightForWidth(width)
+        if required_height <= 0:
+            return
+        self.header_widget.setFixedHeight(required_height)
+        self.header_widget.updateGeometry()
+
     def show_none(self, message: str):
         self._reset_state()
         self._set_dirty_badge(False)
@@ -506,6 +490,7 @@ class LyricsEditorWidget(QWidget):
             action_text=None,
         )
         self.stack.setCurrentWidget(self.empty_state)
+        self._sync_header_height()
 
     def set_track_lyrics(
         self,
@@ -575,12 +560,14 @@ class LyricsEditorWidget(QWidget):
             self.empty_state.configure(
                 icon_name="audio-lines.svg",
                 title="No lyrics available yet",
-                body="Download lyrics from LRCLIB to start editing, or search manually.",
+                body="Download lyrics from LRCLIB, write them manually, or start an AI auto-sync draft from the local audio file.",
                 action_text="Download Lyrics",
                 secondary_action_text="Search LRCLIB",
                 tertiary_action_text="Write Lyrics",
+                quaternary_action_text="Auto Sync",
             )
             self.stack.setCurrentWidget(self.empty_state)
+        self._sync_header_height()
         self._loading_track = False
 
     # --- internal helpers ---
@@ -624,6 +611,7 @@ class LyricsEditorWidget(QWidget):
         self.dirty_badge.setVisible(bool(visible))
         self.btn_discard_draft.setVisible(bool(visible))
         self.btn_show_diff.setVisible(bool(visible))
+        self._sync_header_height()
         self._update_publish_enabled()
 
     def _show_diff(self) -> None:
@@ -663,6 +651,11 @@ class LyricsEditorWidget(QWidget):
         """Switch to an empty plain editor so the user can write lyrics from scratch."""
         self._set_plain("")
         self.plain.setFocus()
+
+    def _start_ai_sync_from_empty_state(self):
+        """Expose AI sync from the empty state while keeping the regular editor visible."""
+        self._start_writing_lyrics()
+        self.autoSyncRequested.emit()
 
     def _toggle_editor_mode(self):
         """Switch between synced (table) and plain text editing modes."""

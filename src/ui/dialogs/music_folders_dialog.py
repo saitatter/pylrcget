@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
+import json
 import os
 import re
 
@@ -18,18 +19,22 @@ from PySide6.QtWidgets import (
     QListWidget,
     QMessageBox,
     QPushButton,
+    QKeySequenceEdit,
+    QScrollArea,
     QSpinBox,
     QTabWidget,
     QTextEdit,
     QVBoxLayout,
     QWidget,
 )
-from PySide6.QtGui import QFontDatabase
+from PySide6.QtGui import QFontDatabase, QKeySequence
 
 from core.lyrics_sidecar import DEFAULT_LYRICS_FILE_PATTERN
 from db.database import get_config, get_directories, set_config, set_directories
 from db.models import Config
 from library.scan_library import preview_audio_path_exclusions
+from ui.ai_sync_settings import AI_SYNC_DEVICE_OPTIONS, AI_SYNC_MODEL_OPTIONS, load_ai_sync_settings, merge_ai_sync_settings
+from ui.hotkeys import HOTKEY_SPECS, find_duplicate_hotkeys, parse_hotkey_bindings, serialize_hotkey_bindings
 from ui.services.download_modes import missing_lyrics_detail, missing_lyrics_summary
 from ui.theme_tokens import get_available_themes
 
@@ -38,7 +43,7 @@ class MusicFoldersDialog(QDialog):
     def __init__(self, app_state, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Settings")
-        self.resize(700, 700)
+        self.resize(760, 760)
         self.app_state = app_state
         self._last_browse_dir = os.path.expanduser("~")
         self.directories_changed = False
@@ -53,9 +58,33 @@ class MusicFoldersDialog(QDialog):
 
         lyrics_tab = QWidget()
         lyrics_tab_layout = QVBoxLayout(lyrics_tab)
+        self.lyrics_sections_tabs = QTabWidget()
+        lyrics_tab_layout.addWidget(self.lyrics_sections_tabs)
+
+        lyrics_download_tab = QWidget()
+        lyrics_download_layout = QVBoxLayout(lyrics_download_tab)
+
+        lyrics_files_tab = QWidget()
+        lyrics_files_layout = QVBoxLayout(lyrics_files_tab)
+
+        lyrics_embed_tab = QWidget()
+        lyrics_embed_layout = QVBoxLayout(lyrics_embed_tab)
+
+        ai_sync_tab = QWidget()
+        ai_sync_tab_layout = QVBoxLayout(ai_sync_tab)
 
         appearance_tab = QWidget()
         appearance_layout_root = QVBoxLayout(appearance_tab)
+
+        shortcuts_tab = QWidget()
+        shortcuts_tab_layout = QVBoxLayout(shortcuts_tab)
+        self.shortcuts_scroll = QScrollArea()
+        self.shortcuts_scroll.setWidgetResizable(True)
+        self.shortcuts_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        shortcuts_content = QWidget()
+        shortcuts_layout_root = QVBoxLayout(shortcuts_content)
+        shortcuts_tab_layout.addWidget(self.shortcuts_scroll)
+        self.shortcuts_scroll.setWidget(shortcuts_content)
 
         folders_box = QGroupBox("Music Folders")
         folders_layout = QVBoxLayout(folders_box)
@@ -80,6 +109,7 @@ class MusicFoldersDialog(QDialog):
             "D:\\Music\\Podcasts\n"
             "D:\\Music\\Temporary"
         )
+        self._set_text_edit_visible_rows(self.excluded_paths_edit, 5)
         self.add_excluded_path_btn = QPushButton("Add Excluded Path")
         self.add_excluded_file_btn = QPushButton("Add Excluded File")
         self.remove_excluded_path_btn = QPushButton("Remove Selected Lines")
@@ -92,6 +122,7 @@ class MusicFoldersDialog(QDialog):
             "sample|demo\n"
             "\\.(cue|log)$"
         )
+        self._set_text_edit_visible_rows(self.excluded_patterns_edit, 5)
 
         scan_layout.addWidget(QLabel("Excluded paths"), 0, 0)
         scan_layout.addWidget(self.excluded_paths_edit, 1, 0)
@@ -104,6 +135,8 @@ class MusicFoldersDialog(QDialog):
         scan_layout.addLayout(excluded_paths_btn_row, 2, 0)
         scan_layout.addWidget(QLabel("Excluded regex patterns"), 0, 1)
         scan_layout.addWidget(self.excluded_patterns_edit, 1, 1)
+        scan_layout.setColumnStretch(0, 3)
+        scan_layout.setColumnStretch(1, 1)
         self.regex_validation_label = QLabel("")
         self.regex_validation_label.setObjectName("SettingsValidationHint")
         self.regex_validation_label.setVisible(False)
@@ -154,6 +187,33 @@ class MusicFoldersDialog(QDialog):
         appearance_layout_root.addWidget(appearance_box)
         appearance_layout_root.addStretch(1)
 
+        self.shortcut_edits: dict[str, QKeySequenceEdit] = {}
+        self.shortcut_enabled_checks: dict[str, QCheckBox] = {}
+
+        global_shortcuts_box = QGroupBox("App Shortcuts")
+        global_shortcuts_layout = QGridLayout(global_shortcuts_box)
+        self._build_shortcut_controls(global_shortcuts_layout, group="global", columns=2)
+
+        shortcuts_box = QGroupBox("Lyrics Sync Shortcuts")
+        shortcuts_layout = QGridLayout(shortcuts_box)
+        self._build_shortcut_controls(shortcuts_layout, group="lyrics")
+
+        self.shortcuts_reset_btn = QPushButton("Reset All Defaults")
+        self.shortcuts_reset_btn.setMaximumWidth(180)
+        shortcuts_layout_root.addWidget(global_shortcuts_box)
+        shortcuts_layout_root.addWidget(shortcuts_box)
+        shortcuts_actions_layout = QHBoxLayout()
+        shortcuts_actions_layout.addStretch(1)
+        shortcuts_actions_layout.addWidget(self.shortcuts_reset_btn)
+        shortcuts_layout_root.addLayout(shortcuts_actions_layout)
+        shortcuts_hint = QLabel(
+            "Disable any shortcut explicitly, or leave it enabled and assign a custom key combination. "
+            "Hover shortcut labels to see the action details and default keys. Changes apply immediately after saving."
+        )
+        shortcuts_hint.setWordWrap(True)
+        shortcuts_layout_root.addWidget(shortcuts_hint)
+        shortcuts_layout_root.addStretch(1)
+
         download_box = QGroupBox("Lyrics Download")
         download_layout = QGridLayout(download_box)
         self.download_mode_combo = QComboBox()
@@ -166,7 +226,7 @@ class MusicFoldersDialog(QDialog):
         self.download_mode_hint_label.setObjectName("SettingsValidationHint")
         self.download_mode_hint_label.setWordWrap(True)
         download_layout.addWidget(self.download_mode_hint_label, 1, 0, 1, 4)
-        lyrics_tab_layout.addWidget(download_box)
+        lyrics_download_layout.addWidget(download_box)
 
         lyrics_box = QGroupBox("Lyrics Export")
         lyrics_layout = QGridLayout(lyrics_box)
@@ -213,7 +273,7 @@ class MusicFoldersDialog(QDialog):
         )
         hint.setWordWrap(True)
         lyrics_layout.addWidget(hint, 5, 0, 1, 4)
-        lyrics_tab_layout.addWidget(lyrics_box)
+        lyrics_files_layout.addWidget(lyrics_box)
 
         lookup_box = QGroupBox("Lyrics Lookup")
         lookup_layout = QGridLayout(lookup_box)
@@ -229,7 +289,7 @@ class MusicFoldersDialog(QDialog):
         )
         lookup_hint.setWordWrap(True)
         lookup_layout.addWidget(lookup_hint, 1, 0, 1, 4)
-        lyrics_tab_layout.addWidget(lookup_box)
+        lyrics_files_layout.addWidget(lookup_box)
 
         embed_box = QGroupBox("Audio File")
         embed_layout = QGridLayout(embed_box)
@@ -252,7 +312,31 @@ class MusicFoldersDialog(QDialog):
         reaction_hint = QLabel("Negative values stamp earlier. Positive values stamp later.")
         reaction_hint.setWordWrap(True)
         embed_layout.addWidget(reaction_hint, 3, 0, 1, 2)
-        lyrics_tab_layout.addWidget(embed_box)
+        lyrics_embed_layout.addWidget(embed_box)
+
+        ai_sync_box = QGroupBox("AI Auto-Sync")
+        ai_sync_layout = QGridLayout(ai_sync_box)
+        self.ai_whisper_model_combo = QComboBox()
+        for label, value in AI_SYNC_MODEL_OPTIONS:
+            self.ai_whisper_model_combo.addItem(label, value)
+        self.ai_device_combo = QComboBox()
+        for label, value in AI_SYNC_DEVICE_OPTIONS:
+            self.ai_device_combo.addItem(label, value)
+        self.ai_use_demucs_chk = QCheckBox("Use vocal separation when Demucs is available")
+        self.ai_use_demucs_chk.setChecked(True)
+        ai_sync_layout.addWidget(QLabel("Whisper model"), 0, 0)
+        ai_sync_layout.addWidget(self.ai_whisper_model_combo, 0, 1)
+        ai_sync_layout.addWidget(QLabel("Execution device"), 1, 0)
+        ai_sync_layout.addWidget(self.ai_device_combo, 1, 1)
+        ai_sync_layout.addWidget(self.ai_use_demucs_chk, 2, 0, 1, 2)
+        ai_sync_hint = QLabel(
+            "These options control local AI auto-sync only. The feature still works without Demucs, using the full audio mix. "
+            "Changes apply to the next Auto Sync run."
+        )
+        ai_sync_hint.setWordWrap(True)
+        ai_sync_layout.addWidget(ai_sync_hint, 3, 0, 1, 2)
+        ai_sync_tab_layout.addWidget(ai_sync_box)
+        ai_sync_tab_layout.addStretch(1)
 
         lrclib_box = QGroupBox("LRCLIB")
         lrclib_layout = QGridLayout(lrclib_box)
@@ -268,13 +352,22 @@ class MusicFoldersDialog(QDialog):
         )
         lrclib_hint.setWordWrap(True)
         lrclib_layout.addWidget(lrclib_hint, 1, 0, 1, 3)
-        lyrics_tab_layout.addWidget(lrclib_box)
+        lyrics_download_layout.addWidget(lrclib_box)
 
+        lyrics_download_layout.addStretch(1)
+        lyrics_files_layout.addStretch(1)
+        lyrics_embed_layout.addStretch(1)
+
+        self.lyrics_sections_tabs.addTab(lyrics_download_tab, "Download")
+        self.lyrics_sections_tabs.addTab(lyrics_files_tab, "Files")
+        self.lyrics_sections_tabs.addTab(lyrics_embed_tab, "Embed")
         lyrics_tab_layout.addStretch(1)
 
         self.tabs.addTab(library_tab, "Library")
         self.tabs.addTab(lyrics_tab, "Lyrics")
+        self.tabs.addTab(ai_sync_tab, "AI Sync")
         self.tabs.addTab(appearance_tab, "Appearance")
+        self.tabs.addTab(shortcuts_tab, "Shortcuts")
 
         self.save_btn = QPushButton("Save")
         layout.addWidget(self.save_btn)
@@ -298,6 +391,7 @@ class MusicFoldersDialog(QDialog):
         self.test_exclusions_btn.clicked.connect(self._test_exclusions)
         self.excluded_patterns_edit.textChanged.connect(self._validate_regex_patterns)
         self.lrclib_reset_btn.clicked.connect(lambda: self.lrclib_instance_edit.setText(""))
+        self.shortcuts_reset_btn.clicked.connect(self._reset_hotkeys_to_defaults)
 
     def _load(self):
         self.list_widget.clear()
@@ -327,10 +421,20 @@ class MusicFoldersDialog(QDialog):
         embed_format_idx = self.embed_format_combo.findData(getattr(config, "lyrics_embed_format", "both") or "both")
         self.embed_format_combo.setCurrentIndex(max(0, embed_format_idx))
         self.reaction_delay_spin.setValue(int(config.reaction_delay_ms or 0))
+        ai_settings = load_ai_sync_settings(getattr(config, "ui_state_json", ""))
+        ai_model_idx = self.ai_whisper_model_combo.findData(str(ai_settings.get("whisper_model") or "base"))
+        self.ai_whisper_model_combo.setCurrentIndex(max(0, ai_model_idx))
+        ai_device_idx = self.ai_device_combo.findData(str(ai_settings.get("device") or "auto"))
+        self.ai_device_combo.setCurrentIndex(max(0, ai_device_idx))
+        self.ai_use_demucs_chk.setChecked(bool(ai_settings.get("use_demucs", True)))
         lrclib_url = (config.lrclib_instance or "").strip()
         self.lrclib_instance_edit.setText("" if lrclib_url == "https://lrclib.net" else lrclib_url)
         self.excluded_paths_edit.setPlainText(config.scan_excluded_paths)
         self.excluded_patterns_edit.setPlainText(config.scan_excluded_patterns)
+        for action, binding in parse_hotkey_bindings(config.hotkey_bindings_json).items():
+            self.shortcut_enabled_checks[action].setChecked(bool(binding.get("enabled", True)))
+            self.shortcut_edits[action].setEnabled(bool(binding.get("enabled", True)))
+            self.shortcut_edits[action].setKeySequence(QKeySequence(str(binding.get("key", HOTKEY_SPECS[action].default))))
         directories = get_directories(self.app_state.db)
         if config.lyrics_output_dir and os.path.isdir(config.lyrics_output_dir):
             self._last_browse_dir = config.lyrics_output_dir
@@ -519,6 +623,69 @@ class MusicFoldersDialog(QDialog):
     def _update_embed_fields_enabled(self):
         self.embed_format_combo.setEnabled(self.embed_chk.isChecked())
 
+    def _set_text_edit_visible_rows(self, edit: QTextEdit, rows: int) -> None:
+        line_height = edit.fontMetrics().lineSpacing()
+        frame_height = edit.frameWidth() * 2
+        document_margin = int(edit.document().documentMargin() * 2)
+        extra_padding = 12
+        edit.setFixedHeight(max(38, line_height * rows + frame_height + document_margin + extra_padding))
+
+    def _build_shortcut_controls(self, layout: QGridLayout, *, group: str, columns: int = 1) -> None:
+        actions = [(action, spec) for action, spec in HOTKEY_SPECS.items() if spec.group == group]
+        rows_per_column = max(1, (len(actions) + columns - 1) // columns)
+        for index, (action, spec) in enumerate(actions):
+            column = index // rows_per_column
+            row = index % rows_per_column
+            base_column = column * 3
+            enabled_chk = QCheckBox("Enabled")
+            enabled_chk.setChecked(True)
+            edit = QKeySequenceEdit()
+            enabled_chk.toggled.connect(edit.setEnabled)
+            tooltip = f"{spec.description}. Default: {spec.default}."
+            label = QLabel(spec.label)
+            label.setToolTip(tooltip)
+            edit.setToolTip(tooltip)
+            enabled_chk.setToolTip(tooltip)
+            layout.addWidget(label, row, base_column)
+            layout.addWidget(edit, row, base_column + 1)
+            layout.addWidget(enabled_chk, row, base_column + 2)
+            self.shortcut_enabled_checks[action] = enabled_chk
+            self.shortcut_edits[action] = edit
+
+        for column in range(columns):
+            layout.setColumnStretch(column * 3 + 1, 1)
+
+    def _reset_hotkeys_to_defaults(self) -> None:
+        for action, spec in HOTKEY_SPECS.items():
+            self.shortcut_enabled_checks[action].setChecked(True)
+            self.shortcut_edits[action].setKeySequence(QKeySequence(spec.default))
+
+    def _current_hotkey_bindings(self) -> dict[str, dict[str, object]]:
+        return {
+            action: {
+                "enabled": self.shortcut_enabled_checks[action].isChecked(),
+                "key": edit.keySequence().toString(QKeySequence.SequenceFormat.PortableText),
+            }
+            for action, edit in self.shortcut_edits.items()
+        }
+
+    def _validate_hotkey_bindings(self, bindings: dict[str, dict[str, object]]) -> str | None:
+        missing_labels = [
+            spec.label
+            for action, spec in HOTKEY_SPECS.items()
+            if bindings.get(action, {}).get("enabled", True) and not str(bindings.get(action, {}).get("key", "")).strip()
+        ]
+        if missing_labels:
+            return f"Shortcut missing for: {', '.join(missing_labels)}"
+
+        duplicates = find_duplicate_hotkeys(bindings)
+        if duplicates:
+            first_action, second_action, key = duplicates[0]
+            first_label = HOTKEY_SPECS[first_action].label
+            second_label = HOTKEY_SPECS[second_action].label
+            return f"{first_label} and {second_label} both use {key}. Choose distinct shortcuts."
+        return None
+
     @staticmethod
     def _populate_lyrics_format_combo(combo: QComboBox) -> None:
         combo.addItem("Synced and plain", "both")
@@ -611,8 +778,21 @@ class MusicFoldersDialog(QDialog):
     def save(self):
         previous_folders = get_directories(self.app_state.db)
         folders = [self.list_widget.item(i).text() for i in range(self.list_widget.count())]
+        hotkey_bindings = self._current_hotkey_bindings()
+        hotkey_error = self._validate_hotkey_bindings(hotkey_bindings)
+        if hotkey_error:
+            QMessageBox.warning(self, "Invalid shortcuts", hotkey_error)
+            return
 
         config = get_config(self.app_state.db)
+        ai_state_json = merge_ai_sync_settings(
+            getattr(config, "ui_state_json", ""),
+            {
+                "whisper_model": str(self.ai_whisper_model_combo.currentData() or "base"),
+                "device": str(self.ai_device_combo.currentData() or "auto"),
+                "use_demucs": self.ai_use_demucs_chk.isChecked(),
+            },
+        )
         new_config = replace(
             config,
             theme_mode=str(self.theme_combo.currentData() or "auto"),
@@ -632,6 +812,8 @@ class MusicFoldersDialog(QDialog):
             scan_excluded_patterns=self.excluded_patterns_edit.toPlainText().strip(),
             reaction_delay_ms=int(self.reaction_delay_spin.value()),
             lrclib_instance=self.lrclib_instance_edit.text().strip() or "https://lrclib.net",
+            hotkey_bindings_json=serialize_hotkey_bindings(hotkey_bindings),
+            ui_state_json=ai_state_json,
         )
 
         set_directories(self.app_state.db, folders)

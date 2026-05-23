@@ -25,6 +25,16 @@ class HotkeyHintManager(QObject):
         return self._visible
 
     def register(self, widget: QWidget, key: str) -> None:
+        for hint in self._hints:
+            if hint.widget is widget:
+                hint.key = key
+                if not key:
+                    hint.badge.hide()
+                    return
+                self._position_badge(hint)
+                hint.badge.setVisible(self._visible and hint.widget.isVisible())
+                hint.badge.raise_()
+                return
         if not key:
             return
         badge_parent = widget.window() if widget.window() is not None else widget
