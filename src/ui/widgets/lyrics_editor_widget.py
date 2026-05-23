@@ -34,6 +34,7 @@ from core.lyrics_validator import (
     validate_plain_lyrics,
     validate_synced_lyrics,
 )
+from ui.hotkeys import HOTKEY_SPECS, effective_hotkey_text, lyrics_hotkey_defaults, normalize_hotkey_text
 
 TIMESTAMP_MS_ROLE = Qt.ItemDataRole.UserRole
 TIMESTAMP_VALID_ROLE = Qt.ItemDataRole.UserRole + 1
@@ -258,8 +259,9 @@ class LyricsEditorWidget(QWidget):
 
         toolbar = FlowLayout(spacing=SPACE_2)
 
+        self._lyrics_hotkeys = lyrics_hotkey_defaults()
+
         self.btn_snap = QPushButton("Snap")
-        self.btn_snap.setToolTip("Set the selected line's timestamp to the current playback position (Ctrl+Enter)")
         self.btn_shift_minus = QPushButton("-0.1s")
         self.btn_shift_minus.setToolTip("Shift selected lines 100ms earlier (Left)")
         self.btn_shift_plus = QPushButton("+0.1s")
@@ -275,9 +277,7 @@ class LyricsEditorWidget(QWidget):
         self.shift_spin.setButtonSymbols(QDoubleSpinBox.ButtonSymbols.NoButtons)
         self.shift_spin.setMinimumWidth(SHIFT_SPIN_MIN_WIDTH)
         self.btn_shift_selected = QPushButton("Shift Selected")
-        self.btn_shift_selected.setToolTip("Shift selected lines by the custom amount (Shift+Enter)")
         self.btn_shift_all_from_first = QPushButton("Shift All from First")
-        self.btn_shift_all_from_first.setToolTip("Align all lines so the first line matches the current playback position (Ctrl+Shift+Enter)")
         self.btn_add = QPushButton("+ Line")
         self.btn_add.setToolTip("Insert a new line after the current selection (Ctrl+N or Insert)")
         self.btn_del = QPushButton("Delete")
@@ -417,18 +417,20 @@ class LyricsEditorWidget(QWidget):
         self._shortcut_undo.activated.connect(self._undo)
         self._shortcut_redo = QShortcut(QKeySequence.StandardKey.Redo, self)
         self._shortcut_redo.activated.connect(self._redo)
-        self._shortcut_snap = self._make_shortcut("Ctrl+Return", self._snap_selected_line_to_current_time)
-        self._shortcut_snap_enter = self._make_shortcut("Ctrl+Enter", self._snap_selected_line_to_current_time)
         self._shortcut_shift_minus = self._make_shortcut("Left", lambda: self._shift_selected_lines(-100))
         self._shortcut_shift_plus = self._make_shortcut("Right", lambda: self._shift_selected_lines(100))
-        self._shortcut_shift_selected = self._make_shortcut("Shift+Return", self._shift_selected_lines_by_custom_amount)
-        self._shortcut_shift_selected_enter = self._make_shortcut("Shift+Enter", self._shift_selected_lines_by_custom_amount)
-        self._shortcut_shift_all = self._make_shortcut("Ctrl+Shift+Return", self._shift_all_lines_from_first_delta)
-        self._shortcut_shift_all_enter = self._make_shortcut("Ctrl+Shift+Enter", self._shift_all_lines_from_first_delta)
         self._shortcut_add_line = self._make_shortcut("Insert", self._add_line_after_selection)
         self._shortcut_add_line_new = self._make_shortcut("Ctrl+N", self._add_line_after_selection)
         self._shortcut_add_line_before = self._make_shortcut("Ctrl+Shift+N", self._add_line_before_selection)
         self._shortcut_delete_line = self._make_shortcut("Delete", self._delete_selected_line)
+
+        self._shortcut_snap: QShortcut | None = None
+        self._shortcut_snap_enter: QShortcut | None = None
+        self._shortcut_shift_selected: QShortcut | None = None
+        self._shortcut_shift_selected_enter: QShortcut | None = None
+        self._shortcut_shift_all: QShortcut | None = None
+        self._shortcut_shift_all_enter: QShortcut | None = None
+        self.set_hotkey_bindings(self._lyrics_hotkeys)
 
         self._default_button_text = {
             self.btn_save: "Save",
@@ -446,6 +448,80 @@ class LyricsEditorWidget(QWidget):
         shortcut.setContext(Qt.ShortcutContext.WidgetWithChildrenShortcut)
         shortcut.activated.connect(callback)
         return shortcut
+
+    @property
+    def lyrics_hotkeys(self) -> dict[str, str]:
+        return {
+            action: effective_hotkey_text(binding, HOTKEY_SPECS[action])
+            for action, binding in self._lyrics_hotkeys.items()
+        }
+
+    def set_hotkey_bindings(self, bindings: dict[str, dict[str, object]] | None) -> None:
+        normalized = lyrics_hotkey_defaults()
+        for action, binding in normalized.items():
+            incoming = (bindings or {}).get(action, {})
+            if not isinstance(incoming, dict):
+                incoming = {"enabled": True, "key": str(incoming)}
+            normalized[action] = {
+                "enabled": bool(incoming.get("enabled", binding["enabled"])),
+                "key": normalize_hotkey_text(str(incoming.get("key", binding["key"])) or "", str(binding["key"])),
+            }
+        self._lyrics_hotkeys = normalized
+        snap_key = effective_hotkey_text(normalized["snap"], HOTKEY_SPECS["snap"])
+        shift_selected_key = effective_hotkey_text(normalized["shift_selected"], HOTKEY_SPECS["shift_selected"])
+        shift_all_key = effective_hotkey_text(normalized["shift_all_from_first"], HOTKEY_SPECS["shift_all_from_first"])
+        self._replace_action_shortcuts(
+            "_shortcut_snap",
+            "_shortcut_snap_enter",
+            snap_key,
+            self._snap_selected_line_to_current_time,
+        )
+        self._replace_action_shortcuts(
+            "_shortcut_shift_selected",
+            "_shortcut_shift_selected_enter",
+            shift_selected_key,
+            self._shift_selected_lines_by_custom_amount,
+        )
+        self._replace_action_shortcuts(
+            "_shortcut_shift_all",
+            "_shortcut_shift_all_enter",
+            shift_all_key,
+            self._shift_all_lines_from_first_delta,
+        )
+        self.btn_snap.setToolTip(
+            "Set the selected line's timestamp to the current playback position "
+            f"({snap_key or 'Disabled'})"
+        )
+        self.btn_shift_selected.setToolTip(
+            f"Shift selected lines by the custom amount ({shift_selected_key or 'Disabled'})"
+        )
+        self.btn_shift_all_from_first.setToolTip(
+            "Align all lines so the first line matches the current playback position "
+            f"({shift_all_key or 'Disabled'})"
+        )
+
+    def _replace_action_shortcuts(self, primary_attr: str, secondary_attr: str, key: str, callback) -> None:
+        primary, secondary = self._shortcut_variants(key)
+        self._replace_shortcut(primary_attr, primary, callback)
+        self._replace_shortcut(secondary_attr, secondary, callback)
+
+    def _replace_shortcut(self, attr_name: str, key: str | None, callback) -> None:
+        existing = getattr(self, attr_name, None)
+        if existing is not None:
+            existing.deleteLater()
+        if key:
+            setattr(self, attr_name, self._make_shortcut(key, callback))
+            return
+        setattr(self, attr_name, None)
+
+    @staticmethod
+    def _shortcut_variants(key: str) -> tuple[str, str | None]:
+        normalized = normalize_hotkey_text(key)
+        if "Enter" in normalized and "Return" not in normalized:
+            return normalized.replace("Enter", "Return"), normalized
+        if "Return" in normalized and "Enter" not in normalized:
+            return normalized, normalized.replace("Return", "Enter")
+        return normalized, None
 
     def eventFilter(self, watched, event):
         if watched is self.validation_hint and event.type() == QEvent.Type.MouseButtonRelease:

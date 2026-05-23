@@ -18,18 +18,20 @@ from PySide6.QtWidgets import (
     QListWidget,
     QMessageBox,
     QPushButton,
+    QKeySequenceEdit,
     QSpinBox,
     QTabWidget,
     QTextEdit,
     QVBoxLayout,
     QWidget,
 )
-from PySide6.QtGui import QFontDatabase
+from PySide6.QtGui import QFontDatabase, QKeySequence
 
 from core.lyrics_sidecar import DEFAULT_LYRICS_FILE_PATTERN
 from db.database import get_config, get_directories, set_config, set_directories
 from db.models import Config
 from library.scan_library import preview_audio_path_exclusions
+from ui.hotkeys import HOTKEY_SPECS, find_duplicate_hotkeys, parse_hotkey_bindings, serialize_hotkey_bindings
 from ui.services.download_modes import missing_lyrics_detail, missing_lyrics_summary
 from ui.theme_tokens import get_available_themes
 
@@ -38,7 +40,7 @@ class MusicFoldersDialog(QDialog):
     def __init__(self, app_state, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Settings")
-        self.resize(700, 700)
+        self.resize(760, 760)
         self.app_state = app_state
         self._last_browse_dir = os.path.expanduser("~")
         self.directories_changed = False
@@ -56,6 +58,9 @@ class MusicFoldersDialog(QDialog):
 
         appearance_tab = QWidget()
         appearance_layout_root = QVBoxLayout(appearance_tab)
+
+        shortcuts_tab = QWidget()
+        shortcuts_layout_root = QVBoxLayout(shortcuts_tab)
 
         folders_box = QGroupBox("Music Folders")
         folders_layout = QVBoxLayout(folders_box)
@@ -153,6 +158,29 @@ class MusicFoldersDialog(QDialog):
         appearance_layout.addWidget(startup_hint, 5, 0, 1, 2)
         appearance_layout_root.addWidget(appearance_box)
         appearance_layout_root.addStretch(1)
+
+        self.shortcut_edits: dict[str, QKeySequenceEdit] = {}
+        self.shortcut_enabled_checks: dict[str, QCheckBox] = {}
+
+        global_shortcuts_box = QGroupBox("App Shortcuts")
+        global_shortcuts_layout = QGridLayout(global_shortcuts_box)
+        self._build_shortcut_controls(global_shortcuts_layout, group="global")
+
+        shortcuts_box = QGroupBox("Lyrics Sync Shortcuts")
+        shortcuts_layout = QGridLayout(shortcuts_box)
+        self._build_shortcut_controls(shortcuts_layout, group="lyrics")
+
+        self.shortcuts_reset_btn = QPushButton("Reset All Defaults")
+        shortcuts_layout_root.addWidget(global_shortcuts_box)
+        shortcuts_layout_root.addWidget(shortcuts_box)
+        shortcuts_layout_root.addWidget(self.shortcuts_reset_btn)
+        shortcuts_hint = QLabel(
+            "Disable any shortcut explicitly, or leave it enabled and assign a custom key combination. "
+            "Changes apply immediately after saving."
+        )
+        shortcuts_hint.setWordWrap(True)
+        shortcuts_layout_root.addWidget(shortcuts_hint)
+        shortcuts_layout_root.addStretch(1)
 
         download_box = QGroupBox("Lyrics Download")
         download_layout = QGridLayout(download_box)
@@ -275,6 +303,7 @@ class MusicFoldersDialog(QDialog):
         self.tabs.addTab(library_tab, "Library")
         self.tabs.addTab(lyrics_tab, "Lyrics")
         self.tabs.addTab(appearance_tab, "Appearance")
+        self.tabs.addTab(shortcuts_tab, "Shortcuts")
 
         self.save_btn = QPushButton("Save")
         layout.addWidget(self.save_btn)
@@ -298,6 +327,7 @@ class MusicFoldersDialog(QDialog):
         self.test_exclusions_btn.clicked.connect(self._test_exclusions)
         self.excluded_patterns_edit.textChanged.connect(self._validate_regex_patterns)
         self.lrclib_reset_btn.clicked.connect(lambda: self.lrclib_instance_edit.setText(""))
+        self.shortcuts_reset_btn.clicked.connect(self._reset_hotkeys_to_defaults)
 
     def _load(self):
         self.list_widget.clear()
@@ -331,6 +361,10 @@ class MusicFoldersDialog(QDialog):
         self.lrclib_instance_edit.setText("" if lrclib_url == "https://lrclib.net" else lrclib_url)
         self.excluded_paths_edit.setPlainText(config.scan_excluded_paths)
         self.excluded_patterns_edit.setPlainText(config.scan_excluded_patterns)
+        for action, binding in parse_hotkey_bindings(config.hotkey_bindings_json).items():
+            self.shortcut_enabled_checks[action].setChecked(bool(binding.get("enabled", True)))
+            self.shortcut_edits[action].setEnabled(bool(binding.get("enabled", True)))
+            self.shortcut_edits[action].setKeySequence(QKeySequence(str(binding.get("key", HOTKEY_SPECS[action].default))))
         directories = get_directories(self.app_state.db)
         if config.lyrics_output_dir and os.path.isdir(config.lyrics_output_dir):
             self._last_browse_dir = config.lyrics_output_dir
@@ -519,6 +553,53 @@ class MusicFoldersDialog(QDialog):
     def _update_embed_fields_enabled(self):
         self.embed_format_combo.setEnabled(self.embed_chk.isChecked())
 
+    def _build_shortcut_controls(self, layout: QGridLayout, *, group: str) -> None:
+        actions = [(action, spec) for action, spec in HOTKEY_SPECS.items() if spec.group == group]
+        for row, (action, spec) in enumerate(actions):
+            enabled_chk = QCheckBox("Enabled")
+            enabled_chk.setChecked(True)
+            edit = QKeySequenceEdit()
+            enabled_chk.toggled.connect(edit.setEnabled)
+            layout.addWidget(QLabel(spec.label), row * 2, 0)
+            layout.addWidget(enabled_chk, row * 2, 1)
+            layout.addWidget(edit, row * 2, 2)
+            description = QLabel(f"{spec.description}. Default: {spec.default}.")
+            description.setWordWrap(True)
+            layout.addWidget(description, row * 2 + 1, 0, 1, 3)
+            self.shortcut_enabled_checks[action] = enabled_chk
+            self.shortcut_edits[action] = edit
+
+    def _reset_hotkeys_to_defaults(self) -> None:
+        for action, spec in HOTKEY_SPECS.items():
+            self.shortcut_enabled_checks[action].setChecked(True)
+            self.shortcut_edits[action].setKeySequence(QKeySequence(spec.default))
+
+    def _current_hotkey_bindings(self) -> dict[str, dict[str, object]]:
+        return {
+            action: {
+                "enabled": self.shortcut_enabled_checks[action].isChecked(),
+                "key": edit.keySequence().toString(QKeySequence.SequenceFormat.PortableText),
+            }
+            for action, edit in self.shortcut_edits.items()
+        }
+
+    def _validate_hotkey_bindings(self, bindings: dict[str, dict[str, object]]) -> str | None:
+        missing_labels = [
+            spec.label
+            for action, spec in HOTKEY_SPECS.items()
+            if bindings.get(action, {}).get("enabled", True) and not str(bindings.get(action, {}).get("key", "")).strip()
+        ]
+        if missing_labels:
+            return f"Shortcut missing for: {', '.join(missing_labels)}"
+
+        duplicates = find_duplicate_hotkeys(bindings)
+        if duplicates:
+            first_action, second_action, key = duplicates[0]
+            first_label = HOTKEY_SPECS[first_action].label
+            second_label = HOTKEY_SPECS[second_action].label
+            return f"{first_label} and {second_label} both use {key}. Choose distinct shortcuts."
+        return None
+
     @staticmethod
     def _populate_lyrics_format_combo(combo: QComboBox) -> None:
         combo.addItem("Synced and plain", "both")
@@ -611,6 +692,11 @@ class MusicFoldersDialog(QDialog):
     def save(self):
         previous_folders = get_directories(self.app_state.db)
         folders = [self.list_widget.item(i).text() for i in range(self.list_widget.count())]
+        hotkey_bindings = self._current_hotkey_bindings()
+        hotkey_error = self._validate_hotkey_bindings(hotkey_bindings)
+        if hotkey_error:
+            QMessageBox.warning(self, "Invalid shortcuts", hotkey_error)
+            return
 
         config = get_config(self.app_state.db)
         new_config = replace(
@@ -632,6 +718,7 @@ class MusicFoldersDialog(QDialog):
             scan_excluded_patterns=self.excluded_patterns_edit.toPlainText().strip(),
             reaction_delay_ms=int(self.reaction_delay_spin.value()),
             lrclib_instance=self.lrclib_instance_edit.text().strip() or "https://lrclib.net",
+            hotkey_bindings_json=serialize_hotkey_bindings(hotkey_bindings),
         )
 
         set_directories(self.app_state.db, folders)

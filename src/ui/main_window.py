@@ -7,13 +7,15 @@ from PySide6.QtWidgets import (
     QDialog,
     QProgressBar,
     QPushButton,
+    QSizePolicy,
     QSplitter,
     QTabWidget,
     QVBoxLayout,
     QWidget,
 )
-from PySide6.QtCore import Qt, QByteArray, QSettings, QTimer
+from PySide6.QtCore import Qt, QByteArray, QTimer
 from PySide6.QtGui import QCloseEvent, QShortcut, QKeySequence
+import json
 import logging
 import os
 import sqlite3
@@ -48,6 +50,7 @@ from ui.controllers.lyrics_download_controller import LyricsDownloadController
 from ui.controllers.navigation_controller import NavigationController
 from ui.controllers.publish_history_controller import PublishHistoryController
 from ui.controllers.top_bar_controller import TopBarController
+from ui.hotkeys import HOTKEY_SPECS, effective_hotkey_text, parse_hotkey_bindings
 from ui.widgets.track_list_widget import TrackListWidget
 from ui.dialogs.music_folders_dialog import MusicFoldersDialog
 from ui.dialogs.about_dialog import AboutDialog
@@ -156,19 +159,19 @@ class MainWindow(QMainWindow):
         self._search_apply_timer.setSingleShot(True)
         self._search_apply_timer.setInterval(SEARCH_DEBOUNCE_MS)
         self._search_apply_timer.timeout.connect(self._apply_library_search)
+        self._global_shortcuts: dict[str, QShortcut | None] = {
+            "play_pause": None,
+            "play_next": None,
+            "play_previous": None,
+            "save_lyrics": None,
+            "focus_search": None,
+            "clear_search": None,
+            "toggle_hotkey_hints": None,
+        }
         # --- Player signals ---
         if self.app_state.player:
             self.app_state.player.trackChanged.connect(self._on_player_track_changed)
             self.app_state.player.statusChanged.connect(self._on_player_status_changed)
-
-        # --- Shortcuts ---
-        QShortcut(QKeySequence("Space"), self, activated=self._toggle_play_pause)
-        QShortcut(QKeySequence("Ctrl+Right"), self, activated=self.play_next)
-        QShortcut(QKeySequence("Ctrl+Left"), self, activated=self.play_prev)
-        QShortcut(QKeySequence.StandardKey.Save, self, activated=self._save_active_lyrics)
-        QShortcut(QKeySequence.StandardKey.Find, self, activated=self._focus_search)
-        QShortcut(QKeySequence("Escape"), self, activated=self._clear_search)
-        QShortcut(QKeySequence("Ctrl+/"), self, activated=self._toggle_hotkey_hints)
 
         self.central_widget = QWidget()
         self.setCentralWidget(self.central_widget)
@@ -226,7 +229,11 @@ class MainWindow(QMainWindow):
         self.track_pane = QWidget()
         track_pane_layout = QVBoxLayout(self.track_pane)
         set_layout_spacing(track_pane_layout, margins=0, spacing=SPACE_2)
-        self._create_selection_actions_bar()
+        (
+            self.selection_actions_bar,
+            self.selection_actions_label,
+            self.selection_action_buttons,
+        ) = self._create_selection_actions_bar()
 
         self.track_list = TrackListWidget(self.app_state, show_bulk_context_actions=False)
         track_pane_layout.addWidget(self.selection_actions_bar)
@@ -252,6 +259,12 @@ class MainWindow(QMainWindow):
         self.albums_page = QWidget()
         albums_layout = QVBoxLayout(self.albums_page)
         set_layout_spacing(albums_layout, margins=0, spacing=SPACE_2)
+        (
+            self.albums_selection_actions_bar,
+            self.albums_selection_actions_label,
+            self.albums_selection_action_buttons,
+        ) = self._create_selection_actions_bar()
+        albums_layout.addWidget(self.albums_selection_actions_bar)
         self.albums_splitter = QSplitter(Qt.Orientation.Horizontal)
         self.albums_splitter.addWidget(self.albums_tab)
         self.albums_lyrics_view = LyricsEditorWidget()
@@ -270,6 +283,12 @@ class MainWindow(QMainWindow):
         self.artists_page = QWidget()
         artists_layout = QVBoxLayout(self.artists_page)
         set_layout_spacing(artists_layout, margins=0, spacing=SPACE_2)
+        (
+            self.artists_selection_actions_bar,
+            self.artists_selection_actions_label,
+            self.artists_selection_action_buttons,
+        ) = self._create_selection_actions_bar()
+        artists_layout.addWidget(self.artists_selection_actions_bar)
         self.artists_splitter = QSplitter(Qt.Orientation.Horizontal)
         self.artists_splitter.addWidget(self.artists_tab)
         self.artists_lyrics_view = LyricsEditorWidget()
@@ -472,13 +491,18 @@ class MainWindow(QMainWindow):
         # --- Filters wiring ---
         self.top_bar.bind_tab_order(self, self.tabs)
         self._register_track_play_shortcuts()
-        self._register_hotkey_hints()
+        self._apply_hotkey_preferences(get_config(self.app_state.db))
         self._sync_download_mode_ui()
 
         # --- Selection counter ---
         self._selection_label = QLabel("")
         self.track_list.table.selectionModel().selectionChanged.connect(self._update_selection_counter)
         self.track_list.table.selectionModel().selectionChanged.connect(self._update_selection_actions_bar)
+        self.albums_tab.track_list.table.selectionModel().selectionChanged.connect(self._update_selection_actions_bar)
+        self.artists_tab.album_browser.track_list.table.selectionModel().selectionChanged.connect(self._update_selection_actions_bar)
+        self.albums_tab.stack.currentChanged.connect(self._update_selection_actions_bar)
+        self.artists_tab.stack.currentChanged.connect(self._update_selection_actions_bar)
+        self.artists_tab.album_browser.stack.currentChanged.connect(self._update_selection_actions_bar)
         self.tabs.currentChanged.connect(self._update_selection_actions_bar)
 
         # initial load
@@ -494,17 +518,19 @@ class MainWindow(QMainWindow):
         # Restore persisted window state (geometry, splitter sizes, tab index)
         self._restore_window_state()
 
-    def _create_selection_actions_bar(self) -> None:
-        self.selection_actions_bar = QWidget()
-        self.selection_actions_bar.setObjectName("SelectionActionsBar")
-        layout = QHBoxLayout(self.selection_actions_bar)
+    def _create_selection_actions_bar(self):
+        bar = QWidget()
+        bar.setObjectName("SelectionActionsBar")
+        bar.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
+        layout = QHBoxLayout(bar)
         set_layout_spacing(layout, margins=(SPACE_2, 0, SPACE_2, 0), spacing=SPACE_1)
+        layout.setAlignment(Qt.AlignmentFlag.AlignVCenter)
 
-        self.selection_actions_label = QLabel("No selection")
-        self.selection_actions_label.setObjectName("SelectionActionsLabel")
-        layout.addWidget(self.selection_actions_label)
+        label = QLabel("No selection")
+        label.setObjectName("SelectionActionsLabel")
+        layout.addWidget(label)
 
-        self.selection_action_buttons: list[QPushButton] = []
+        buttons: list[QPushButton] = []
 
         def add_button(text: str, tooltip: str, handler) -> QPushButton:
             button = QPushButton(text)
@@ -512,7 +538,7 @@ class MainWindow(QMainWindow):
             button.setToolTip(tooltip)
             button.clicked.connect(handler)
             layout.addWidget(button)
-            self.selection_action_buttons.append(button)
+            buttons.append(button)
             return button
 
         add_button(
@@ -556,11 +582,32 @@ class MainWindow(QMainWindow):
             lambda: self._publish_selected_tracks(False),
         )
         layout.addStretch(1)
+        bar.setMaximumHeight(44)
+        bar.hide()
+        return bar, label, buttons
+
+    def _selection_bar_targets(self):
+        return [
+            (self.selection_actions_bar, self.selection_actions_label, self.selection_action_buttons, self.track_list),
+            (
+                self.albums_selection_actions_bar,
+                self.albums_selection_actions_label,
+                self.albums_selection_action_buttons,
+                self.albums_tab.track_list,
+            ),
+            (
+                self.artists_selection_actions_bar,
+                self.artists_selection_actions_label,
+                self.artists_selection_action_buttons,
+                self.artists_tab.album_browser.track_list,
+            ),
+        ]
 
     def _selected_track_ids_for_toolbar(self) -> list[int]:
-        if not hasattr(self, "track_list"):
+        track_list = self._active_track_list_widget() if hasattr(self, "track_list") else None
+        if track_list is None:
             return []
-        return self.track_list.selected_track_ids()
+        return track_list.selected_track_ids()
 
     def _download_selected_tracks(self, mode: str) -> None:
         track_ids = self._selected_track_ids_for_toolbar()
@@ -591,17 +638,18 @@ class MainWindow(QMainWindow):
         if not hasattr(self, "selection_actions_bar"):
             return
 
-        show_toolbar = self.tabs.currentWidget() is self.tracks_tab
-        self.selection_actions_bar.setVisible(show_toolbar)
-        if not show_toolbar:
-            return
-
         count = len(self._selected_track_ids_for_toolbar())
         has_selection = count > 0
         label = f"Selected tracks: {count}" if has_selection else "Selected tracks: none"
-        self.selection_actions_label.setText(label)
-        for button in self.selection_action_buttons:
-            button.setEnabled(has_selection)
+        active_track_list = self._active_track_list_widget()
+        for bar, bar_label, buttons, track_list in self._selection_bar_targets():
+            is_active = track_list is active_track_list
+            bar.setVisible(is_active)
+            if not is_active:
+                continue
+            bar_label.setText(label)
+            for button in buttons:
+                button.setEnabled(has_selection)
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
@@ -868,16 +916,23 @@ class MainWindow(QMainWindow):
     # ------------------ filters ------------------
     def _apply_track_filters(self):
         filters = self.top_bar.filter_values()
-        self.track_list.setSearchValue(self.top_bar.search_text())
-        self.track_list.setFilters(
-            synced=filters["synced"],
-            plain=filters["plain"],
-            instrumental=filters["instrumental"],
-            none_=filters["none"],
-            unsaved=filters.get("unsaved", False),
-        )
-        if self.app_state.player and self.app_state.player.track:
-            self.track_list.set_now_playing(self.app_state.player.track.track_id)
+        search_text = self.top_bar.search_text()
+        track_lists = [
+            self.track_list,
+            self.albums_tab.track_list,
+            self.artists_tab.album_browser.track_list,
+        ]
+        for track_list in track_lists:
+            track_list.setSearchValue(search_text)
+            track_list.setFilters(
+                synced=filters["synced"],
+                plain=filters["plain"],
+                instrumental=filters["instrumental"],
+                none_=filters["none"],
+                unsaved=filters.get("unsaved", False),
+            )
+            if self.app_state.player and self.app_state.player.track:
+                track_list.set_now_playing(self.app_state.player.track.track_id)
         self._update_search_feedback()
 
     def _schedule_library_search(self):
@@ -899,6 +954,7 @@ class MainWindow(QMainWindow):
         if dlg.exec():
             updated_config = get_config(self.app_state.db)
             self._apply_appearance_preferences(updated_config)
+            self._apply_hotkey_preferences(updated_config)
             self._sync_download_mode_ui()
             self.lrclib_browser_tab.set_lrclib_url(
                 self._normalize_lrclib_base(updated_config.lrclib_instance)
@@ -1380,6 +1436,18 @@ class MainWindow(QMainWindow):
         elif current is self.artists_page:
             route = self.navigation.current_route
             self.artists_tab.apply_route(route if route.tab == "artists" else LibraryRoute(tab="artists", mode="root"))
+
+    def _active_track_list_widget(self):
+        current = self.tabs.currentWidget()
+        if current is self.tracks_tab:
+            return self.track_list
+        if current is self.albums_page and self.albums_tab.stack.currentWidget() is self.albums_tab.track_list:
+            return self.albums_tab.track_list
+        if current is self.artists_page and self.artists_tab.stack.currentWidget() is self.artists_tab.album_browser:
+            album_browser = self.artists_tab.album_browser
+            if album_browser.stack.currentWidget() is album_browser.track_list:
+                return album_browser.track_list
+        return None
 
     @staticmethod
     def _lyrics_state_from_track(track) -> LyricsState:
@@ -2028,22 +2096,61 @@ class MainWindow(QMainWindow):
             FEEDBACK_RESET_MS,
         )
 
-    def _register_hotkey_hints(self) -> None:
-        self.hotkey_hints.register(self.top_bar.search_box, "Ctrl+F")
-        self.hotkey_hints.register(self.top_bar.btn_hotkeys, "Ctrl+/")
+    def _apply_hotkey_preferences(self, config) -> None:
+        bindings = parse_hotkey_bindings(getattr(config, "hotkey_bindings_json", ""))
+        self._apply_global_shortcuts(bindings)
+        lyrics_hotkeys = {
+            action: binding for action, binding in bindings.items() if HOTKEY_SPECS[action].group == "lyrics"
+        }
+        for view in self._all_lyrics_views():
+            view.set_hotkey_bindings(lyrics_hotkeys)
+        self._register_hotkey_hints(bindings)
+        if getattr(self, "hotkey_hints", None):
+            self.hotkey_hints.refresh_positions()
+
+    def _apply_global_shortcuts(self, bindings: dict[str, dict[str, object]]) -> None:
+        handlers = {
+            "play_pause": self._toggle_play_pause,
+            "play_next": self.play_next,
+            "play_previous": self.play_prev,
+            "save_lyrics": self._save_active_lyrics,
+            "focus_search": self._focus_search,
+            "clear_search": self._clear_search,
+            "toggle_hotkey_hints": self._toggle_hotkey_hints,
+        }
+        for action, callback in handlers.items():
+            self._replace_global_shortcut(action, effective_hotkey_text(bindings.get(action), HOTKEY_SPECS[action]), callback)
+
+    def _replace_global_shortcut(self, action: str, key: str, callback) -> None:
+        if not hasattr(self, "_global_shortcuts"):
+            self._global_shortcuts = {}
+        existing = self._global_shortcuts.get(action)
+        if existing is not None:
+            existing.deleteLater()
+            self._global_shortcuts[action] = None
+        if not key:
+            return
+        shortcut = QShortcut(QKeySequence(key), self)
+        shortcut.activated.connect(callback)
+        self._global_shortcuts[action] = shortcut
+
+    def _register_hotkey_hints(self, bindings: dict[str, dict[str, object]] | None = None) -> None:
+        bindings = bindings or parse_hotkey_bindings(get_config(self.app_state.db).hotkey_bindings_json)
+        self.hotkey_hints.register(self.top_bar.search_box, effective_hotkey_text(bindings.get("focus_search"), HOTKEY_SPECS["focus_search"]))
+        self.hotkey_hints.register(self.top_bar.btn_hotkeys, effective_hotkey_text(bindings.get("toggle_hotkey_hints"), HOTKEY_SPECS["toggle_hotkey_hints"]))
         self.hotkey_hints.register(self.track_list.table, "Enter")
         for view in self._all_lyrics_views():
-            self.hotkey_hints.register(view.btn_snap, "Ctrl+Enter")
+            self.hotkey_hints.register(view.btn_snap, effective_hotkey_text(bindings.get("snap"), HOTKEY_SPECS["snap"]))
             self.hotkey_hints.register(view.btn_shift_minus, "Left")
             self.hotkey_hints.register(view.btn_shift_plus, "Right")
-            self.hotkey_hints.register(view.btn_shift_selected, "Shift+Enter")
-            self.hotkey_hints.register(view.btn_shift_all_from_first, "Ctrl+Shift+Enter")
+            self.hotkey_hints.register(view.btn_shift_selected, effective_hotkey_text(bindings.get("shift_selected"), HOTKEY_SPECS["shift_selected"]))
+            self.hotkey_hints.register(view.btn_shift_all_from_first, effective_hotkey_text(bindings.get("shift_all_from_first"), HOTKEY_SPECS["shift_all_from_first"]))
             self.hotkey_hints.register(view.btn_add, "Ctrl+N")
             self.hotkey_hints.register(view.btn_del, "Delete")
-            self.hotkey_hints.register(view.btn_save, "Ctrl+S")
-        self.hotkey_hints.register(self.player_bar.btn_prev, "Ctrl+Left")
-        self.hotkey_hints.register(self.player_bar.btn_play, "Space")
-        self.hotkey_hints.register(self.player_bar.btn_next, "Ctrl+Right")
+            self.hotkey_hints.register(view.btn_save, effective_hotkey_text(bindings.get("save_lyrics"), HOTKEY_SPECS["save_lyrics"]))
+        self.hotkey_hints.register(self.player_bar.btn_prev, effective_hotkey_text(bindings.get("play_previous"), HOTKEY_SPECS["play_previous"]))
+        self.hotkey_hints.register(self.player_bar.btn_play, effective_hotkey_text(bindings.get("play_pause"), HOTKEY_SPECS["play_pause"]))
+        self.hotkey_hints.register(self.player_bar.btn_next, effective_hotkey_text(bindings.get("play_next"), HOTKEY_SPECS["play_next"]))
 
     def _wire_lyrics_view(self, view: LyricsEditorWidget) -> None:
         view.saveRequested.connect(self._on_lyrics_save_requested)
@@ -2110,37 +2217,56 @@ class MainWindow(QMainWindow):
         if hasattr(self, "player_bar"):
             self.player_bar.set_compact_mode(width < 980)
 
-    # --- Window state persistence ---
-    def _get_settings(self) -> QSettings:
-        return QSettings("PyLrcGet", "PyLrcGet")
-
     def _save_window_state(self):
-        s = self._get_settings()
-        s.setValue("window/geometry", self.saveGeometry())
+        self._persist_window_state_payload(self._build_window_state_payload())
+
+    def _build_window_state_payload(self) -> dict[str, object]:
+        state: dict[str, object] = {
+            "geometry": bytes(self.saveGeometry().toBase64()).decode("ascii"),
+            "tab_index": self.tabs.currentIndex(),
+        }
         if hasattr(self, "content_splitter"):
-            s.setValue("window/tracks_splitter", self.content_splitter.sizes())
+            state["tracks_splitter"] = self.content_splitter.sizes()
         if hasattr(self, "albums_splitter"):
-            s.setValue("window/albums_splitter", self.albums_splitter.sizes())
+            state["albums_splitter"] = self.albums_splitter.sizes()
         if hasattr(self, "artists_splitter"):
-            s.setValue("window/artists_splitter", self.artists_splitter.sizes())
-        s.setValue("window/tab_index", self.tabs.currentIndex())
+            state["artists_splitter"] = self.artists_splitter.sizes()
+        if hasattr(self, "top_bar"):
+            state["search_text"] = self.top_bar.search_text()
+            state["filters"] = {key: bool(value) for key, value in self.top_bar.filter_values().items()}
+        return state
+
+    def _persist_window_state_payload(self, state: dict[str, object]) -> None:
+        config = get_config(self.app_state.db)
+        set_config(self.app_state.db, replace(config, ui_state_json=json.dumps(state, ensure_ascii=True, separators=(",", ":"))))
 
     def _restore_window_state(self):
-        s = self._get_settings()
+        state = self._load_window_state_payload()
 
-        geometry = s.value("window/geometry")
-        if geometry is not None:
-            self.restoreGeometry(geometry)
+        geometry = state.get("geometry")
+        if isinstance(geometry, str) and geometry:
+            restored = QByteArray.fromBase64(geometry.encode("ascii"))
+            if not restored.isEmpty():
+                self.restoreGeometry(restored)
+
+        search_text = state.get("search_text")
+        if search_text is not None:
+            self.top_bar.set_search_text(str(search_text))
+
+        restored_filters = state.get("filters") if isinstance(state.get("filters"), dict) else {}
+        if restored_filters or search_text is not None:
+            self.top_bar.set_filter_values(restored_filters)
+            self._apply_track_filters()
 
         for attr, key in [
-            ("content_splitter", "window/tracks_splitter"),
-            ("albums_splitter", "window/albums_splitter"),
-            ("artists_splitter", "window/artists_splitter"),
+            ("content_splitter", "tracks_splitter"),
+            ("albums_splitter", "albums_splitter"),
+            ("artists_splitter", "artists_splitter"),
         ]:
             splitter = getattr(self, attr, None)
             if splitter is None:
                 continue
-            saved = s.value(key)
+            saved = state.get(key)
             if saved is not None:
                 try:
                     sizes = [int(v) for v in saved]
@@ -2149,7 +2275,7 @@ class MainWindow(QMainWindow):
                 except (TypeError, ValueError):
                     pass
 
-        tab_index = s.value("window/tab_index")
+        tab_index = state.get("tab_index")
         if tab_index is not None:
             try:
                 idx = int(tab_index)
@@ -2157,6 +2283,14 @@ class MainWindow(QMainWindow):
                     self.tabs.setCurrentIndex(idx)
             except (TypeError, ValueError):
                 pass
+
+    def _load_window_state_payload(self) -> dict[str, object]:
+        config = get_config(self.app_state.db)
+        try:
+            state = json.loads(config.ui_state_json or "{}")
+        except (TypeError, ValueError, json.JSONDecodeError):
+            state = {}
+        return state if isinstance(state, dict) else {}
 
     def _apply_styles(self):
         self.setStyleSheet(load_stylesheet("main_window.qss"))
@@ -2319,14 +2453,19 @@ class MainWindow(QMainWindow):
         if not self._confirm_bulk("Instrumental", "Mark selected tracks as instrumental?", len(track_ids)):
             return
 
-        # Preserve selection across refresh
         selected_before = set(track_ids)
+        active_track_list = self._active_track_list_widget()
+        instrumental_filter_enabled = self.top_bar.filter_values()["instrumental"]
 
         try:
             mark_tracks_instrumental(self.app_state.db, track_ids)
-            self._show_status_message(f"Marked {len(track_ids)} track(s) as instrumental.", 3000)
-            self._apply_track_filters()
-            self.track_list.restore_selection(selected_before)
+            self._refresh_visible_library_view_after_downloads()
+            if active_track_list is not None:
+                active_track_list.restore_selection(selected_before)
+            message = f"Marked {len(track_ids)} track(s) as instrumental."
+            if not instrumental_filter_enabled:
+                message += " Enable the Instrumental filter to show them."
+            self._show_status_message(message, 5000 if not instrumental_filter_enabled else 3000)
         except sqlite3.Error as e:
             log_and_notify(
                 self.app_state,
@@ -2350,12 +2489,14 @@ class MainWindow(QMainWindow):
             return
 
         selected_before = set(track_ids)
+        active_track_list = self._active_track_list_widget()
 
         try:
             unmark_tracks_instrumental(self.app_state.db, track_ids)
             self._show_status_message(f"Unmarked {len(track_ids)} track(s).", 3000)
-            self._apply_track_filters()
-            self.track_list.restore_selection(selected_before)
+            self._refresh_visible_library_view_after_downloads()
+            if active_track_list is not None:
+                active_track_list.restore_selection(selected_before)
         except sqlite3.Error as e:
             log_and_notify(
                 self.app_state,

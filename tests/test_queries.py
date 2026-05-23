@@ -335,6 +335,8 @@ class TrackRefreshQueryTests(unittest.TestCase):
                     playback_speed=config.playback_speed,
                     playback_volume=config.playback_volume,
                     last_library_route=config.last_library_route,
+                    hotkey_bindings_json='{"snap":{"enabled":true,"key":"Tab"}}',
+                    ui_state_json='{"tab_index":2}',
                 )
 
                 set_config(db, updated)
@@ -346,6 +348,8 @@ class TrackRefreshQueryTests(unittest.TestCase):
                 self.assertEqual(reloaded.startup_view, "albums")
                 self.assertEqual(reloaded.lyrics_sidecar_format, "synced_only")
                 self.assertEqual(reloaded.lyrics_embed_format, "plain_only")
+                self.assertEqual(reloaded.hotkey_bindings_json, '{"snap":{"enabled":true,"key":"Tab"}}')
+                self.assertEqual(reloaded.ui_state_json, '{"tab_index":2}')
             finally:
                 db.close()
 

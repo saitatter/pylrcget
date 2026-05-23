@@ -26,6 +26,7 @@ from ui.library_routes import LibraryRoute, albums_detail, artists_detail
 from ui.widgets.empty_state_widget import EmptyStateWidget
 from ui.models.track_table_model import TrackTableModel
 from ui.delegates.actions_delegate import ActionsDelegate
+from ui.delegates.lyrics_status_delegate import LyricsStatusDelegate
 from ui.delegates.track_info_delegate import TrackInfoDelegate
 from ui.spacing import set_layout_spacing
 from ui.style_loader import load_stylesheet
@@ -154,6 +155,9 @@ class TrackListWidget(QWidget):
         self.track_info.artistClicked.connect(self._emit_artist_navigation)
         self.track_info.albumClicked.connect(self._emit_album_navigation)
         self.table.setItemDelegateForColumn(1, self.track_info)
+
+        self.lyrics_status = LyricsStatusDelegate(self.table)
+        self.table.setItemDelegateForColumn(3, self.lyrics_status)
 
         # Double click -> play
         self.table.doubleClicked.connect(self._on_double_click)

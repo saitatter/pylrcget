@@ -8,7 +8,7 @@ from PySide6.QtCore import QObject, QTimer, Qt
 from PySide6.QtWidgets import QLabel, QLayout, QTabWidget, QToolButton, QWidget
 
 from db.queries import get_album_by_id, get_artist_by_id, get_config, set_config
-from ui.library_routes import LibraryRoute, deserialize_route, route_breadcrumbs, serialize_route, tracks_all
+from ui.library_routes import LibraryRoute, albums_all, artists_all, deserialize_route, route_breadcrumbs, serialize_route, tracks_all
 
 
 ApplyRouteCallback = Callable[[LibraryRoute], None]
@@ -44,6 +44,11 @@ class NavigationController(QObject):
         self._nav_history: list[LibraryRoute] = []
         self._nav_index: int = -1
         self._current_route = tracks_all()
+        self._tab_routes: dict[str, LibraryRoute] = {
+            "tracks": tracks_all(),
+            "albums": albums_all(),
+            "artists": artists_all(),
+        }
         self._artist_label_cache: dict[int, str] = {}
         self._album_label_cache: dict[int, str] = {}
         self._nav_apply_in_progress = False
@@ -64,6 +69,7 @@ class NavigationController(QObject):
     def navigate_to(self, route: LibraryRoute, *, record_history: bool = True) -> None:
         route = self._hydrate_route(route)
         self._current_route = route
+        self._tab_routes[route.tab] = route
         self._nav_apply_in_progress = True
         try:
             self._tab_sync_suppressed = True
@@ -102,11 +108,11 @@ class NavigationController(QObject):
             return
         current = self._tabs.widget(idx)
         if current is self._tracks_tab:
-            self.navigate_to(tracks_all())
+            self.navigate_to(self._tab_routes.get("tracks", tracks_all()), record_history=False)
         elif current is self._albums_page:
-            self.navigate_to(LibraryRoute(tab="albums", mode="root"))
+            self.navigate_to(self._tab_routes.get("albums", albums_all()), record_history=False)
         elif current is self._artists_page:
-            self.navigate_to(LibraryRoute(tab="artists", mode="root"))
+            self.navigate_to(self._tab_routes.get("artists", artists_all()), record_history=False)
 
     def _set_current_tab_for_route(self, route: LibraryRoute) -> None:
         if route.tab == "tracks":

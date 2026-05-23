@@ -81,7 +81,9 @@ def get_config(db: sqlite3.Connection) -> Config:
                reaction_delay_ms,
                playback_speed,
                playback_volume,
-               last_library_route
+               last_library_route,
+               hotkey_bindings_json,
+               ui_state_json
         FROM config_data
         LIMIT 1
     """).fetchone()
@@ -110,6 +112,8 @@ def get_config(db: sqlite3.Connection) -> Config:
         playback_speed=float(row["playback_speed"] or 1.0),
         playback_volume=float(row["playback_volume"] if row["playback_volume"] is not None else 0.7),
         last_library_route=row["last_library_route"] or "",
+        hotkey_bindings_json=row["hotkey_bindings_json"] or "",
+        ui_state_json=row["ui_state_json"] or "",
     )
     with _config_cache_lock:
         _config_cache = config
@@ -142,7 +146,9 @@ def set_config(db: sqlite3.Connection, config: Config) -> None:
             reaction_delay_ms = ?,
             playback_speed = ?,
             playback_volume = ?,
-            last_library_route = ?
+            last_library_route = ?,
+            hotkey_bindings_json = ?,
+            ui_state_json = ?
         WHERE id = 1
     """, (
         config.skip_tracks_with_synced_lyrics,
@@ -168,6 +174,8 @@ def set_config(db: sqlite3.Connection, config: Config) -> None:
         config.playback_speed,
         config.playback_volume,
         config.last_library_route,
+        config.hotkey_bindings_json,
+        config.ui_state_json,
     ))
     db.commit()
     with _config_cache_lock:
