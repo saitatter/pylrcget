@@ -25,6 +25,32 @@ class LyricsEditorWidgetTests(unittest.TestCase):
         finally:
             widget.deleteLater()
 
+    def test_empty_lyrics_actions_wrap_in_narrow_layouts(self):
+        widget = LyricsEditorWidget()
+        try:
+            widget.resize(420, 520)
+            widget.show()
+            self.app.processEvents()
+
+            widget.set_track_lyrics("Song", "", "", False)
+            self.app.processEvents()
+
+            buttons = [
+                widget.empty_state.action,
+                widget.empty_state.secondary_action,
+                widget.empty_state.tertiary_action,
+                widget.empty_state.quaternary_action,
+            ]
+            visible_buttons = [button for button in buttons if button.isVisible()]
+            self.assertEqual(len(visible_buttons), 4)
+
+            y_positions = {button.geometry().y() for button in visible_buttons}
+
+            self.assertGreater(len(y_positions), 1)
+        finally:
+            widget.hide()
+            widget.deleteLater()
+
     def test_empty_lyrics_auto_sync_action_opens_editor_and_emits_request(self):
         widget = LyricsEditorWidget()
         emitted: list[bool] = []
