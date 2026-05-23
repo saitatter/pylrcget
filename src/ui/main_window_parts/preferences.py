@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from dataclasses import replace
 
-from PySide6.QtCore import QByteArray, Qt
+from PySide6.QtCore import QByteArray, QRect, Qt
 from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import QApplication
 
@@ -11,6 +11,8 @@ from db.queries import get_config, set_config
 from ui.app_theme import apply_app_theme
 from ui.hotkeys import HOTKEY_SPECS, effective_hotkey_text, parse_hotkey_bindings
 from ui.style_loader import load_stylesheet
+
+RESPONSIVE_LAYOUT_BREAKPOINT = 980
 
 
 def focus_search(window) -> None:
@@ -132,7 +134,7 @@ def update_responsive_layout(window) -> None:
     window.top_bar.update_responsive_layout(width)
 
     if hasattr(window, "content_splitter"):
-        if width < 980:
+        if width < RESPONSIVE_LAYOUT_BREAKPOINT:
             if window.content_splitter.orientation() != Qt.Orientation.Vertical:
                 window.content_splitter.setOrientation(Qt.Orientation.Vertical)
                 window.content_splitter.setSizes([int(window.height() * 0.54), int(window.height() * 0.46)])
@@ -145,7 +147,7 @@ def update_responsive_layout(window) -> None:
         splitter = getattr(window, splitter_name, None)
         if splitter is None:
             continue
-        if width < 980:
+        if width < RESPONSIVE_LAYOUT_BREAKPOINT:
             if splitter.orientation() != Qt.Orientation.Vertical:
                 splitter.setOrientation(Qt.Orientation.Vertical)
                 splitter.setSizes([int(window.height() * 0.54), int(window.height() * 0.46)])
@@ -155,7 +157,7 @@ def update_responsive_layout(window) -> None:
                 splitter.setSizes([int(width * 0.58), int(width * 0.42)])
 
     if hasattr(window, "player_bar"):
-        window.player_bar.set_compact_mode(width < 980)
+        window.player_bar.set_compact_mode(width < RESPONSIVE_LAYOUT_BREAKPOINT)
 
 
 def save_window_state(window) -> None:
@@ -187,6 +189,44 @@ def persist_window_state_payload(window, state: dict[str, object]) -> None:
     )
 
 
+def _window_geometry_is_reasonable(window, rect: QRect, available: QRect | None) -> bool:
+    min_width = max(window.minimumWidth(), window.minimumSizeHint().width(), RESPONSIVE_LAYOUT_BREAKPOINT)
+    min_height = max(window.minimumHeight(), window.minimumSizeHint().height())
+    if rect.width() < min_width or rect.height() < min_height:
+        return False
+    if available is None:
+        return True
+    return rect.width() <= available.width() and rect.height() <= available.height()
+
+
+def _screen_available_geometry(window) -> QRect | None:
+    screen = window.screen() if hasattr(window, "screen") else None
+    if screen is None:
+        screen = QApplication.primaryScreen()
+    return screen.availableGeometry() if screen is not None else None
+
+
+def _sanitize_restored_window_geometry(window, fallback_geometry: QRect) -> None:
+    if window.isMaximized() or window.isFullScreen():
+        return
+
+    available = _screen_available_geometry(window)
+    current = window.geometry()
+    if not _window_geometry_is_reasonable(window, current, available):
+        window.setGeometry(fallback_geometry)
+        current = window.geometry()
+
+    if available is None:
+        return
+
+    max_x = available.x() + max(0, available.width() - current.width())
+    max_y = available.y() + max(0, available.height() - current.height())
+    target_x = min(max(current.x(), available.x()), max_x)
+    target_y = min(max(current.y(), available.y()), max_y)
+    if target_x != current.x() or target_y != current.y():
+        window.move(target_x, target_y)
+
+
 def restore_window_state(window) -> None:
     state = window._load_window_state_payload()
 
@@ -194,7 +234,9 @@ def restore_window_state(window) -> None:
     if isinstance(geometry, str) and geometry:
         restored = QByteArray.fromBase64(geometry.encode("ascii"))
         if not restored.isEmpty():
+            fallback_geometry = QRect(window.geometry())
             window.restoreGeometry(restored)
+            _sanitize_restored_window_geometry(window, fallback_geometry)
 
     search_text = state.get("search_text")
     if search_text is not None:

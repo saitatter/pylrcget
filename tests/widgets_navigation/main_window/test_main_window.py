@@ -237,6 +237,121 @@ class MainWindowInstrumentalTests(unittest.TestCase):
         )
         window._apply_track_filters.assert_called_once_with()
 
+    def test_restore_window_state_falls_back_from_too_small_saved_geometry(self):
+        class DummyWindow:
+            def __init__(self):
+                self._geometry = QRect(40, 50, 900, 600)
+                self._load_window_state_payload = MagicMock(
+                    return_value={
+                        "geometry": bytes(QByteArray(b"restored").toBase64()).decode("ascii"),
+                    }
+                )
+                self.top_bar = SimpleNamespace(
+                    set_search_text=MagicMock(),
+                    set_filter_values=MagicMock(),
+                )
+                self._apply_track_filters = MagicMock()
+                self.tabs = SimpleNamespace(count=lambda: 5, setCurrentIndex=MagicMock())
+
+            def geometry(self):
+                return QRect(self._geometry)
+
+            def setGeometry(self, rect):
+                self._geometry = QRect(rect)
+
+            def move(self, x, y):
+                self._geometry.moveTo(x, y)
+
+            def restoreGeometry(self, _payload):
+                self._geometry = QRect(20, 30, 420, 320)
+                return True
+
+            def minimumWidth(self):
+                return 0
+
+            def minimumHeight(self):
+                return 0
+
+            def minimumSizeHint(self):
+                return SimpleNamespace(width=lambda: 820, height=lambda: 560)
+
+            def isMaximized(self):
+                return False
+
+            def isFullScreen(self):
+                return False
+
+            def screen(self):
+                return None
+
+        window = DummyWindow()
+
+        with patch("ui.main_window_parts.preferences.QApplication.primaryScreen") as primary_screen:
+            primary_screen.return_value = SimpleNamespace(availableGeometry=lambda: QRect(0, 0, 1600, 900))
+
+            MainWindow._restore_window_state(window)
+
+        self.assertEqual(window.geometry(), QRect(40, 50, 900, 600))
+        window.top_bar.set_search_text.assert_not_called()
+        window.top_bar.set_filter_values.assert_not_called()
+        window._apply_track_filters.assert_not_called()
+
+    def test_restore_window_state_falls_back_from_narrow_compact_startup_geometry(self):
+        class DummyWindow:
+            def __init__(self):
+                self._geometry = QRect(40, 50, 1200, 760)
+                self._load_window_state_payload = MagicMock(
+                    return_value={
+                        "geometry": bytes(QByteArray(b"restored").toBase64()).decode("ascii"),
+                    }
+                )
+                self.top_bar = SimpleNamespace(
+                    set_search_text=MagicMock(),
+                    set_filter_values=MagicMock(),
+                )
+                self._apply_track_filters = MagicMock()
+                self.tabs = SimpleNamespace(count=lambda: 5, setCurrentIndex=MagicMock())
+
+            def geometry(self):
+                return QRect(self._geometry)
+
+            def setGeometry(self, rect):
+                self._geometry = QRect(rect)
+
+            def move(self, x, y):
+                self._geometry.moveTo(x, y)
+
+            def restoreGeometry(self, _payload):
+                self._geometry = QRect(20, 30, 930, 760)
+                return True
+
+            def minimumWidth(self):
+                return 0
+
+            def minimumHeight(self):
+                return 0
+
+            def minimumSizeHint(self):
+                return SimpleNamespace(width=lambda: 820, height=lambda: 560)
+
+            def isMaximized(self):
+                return False
+
+            def isFullScreen(self):
+                return False
+
+            def screen(self):
+                return None
+
+        window = DummyWindow()
+
+        with patch("ui.main_window_parts.preferences.QApplication.primaryScreen") as primary_screen:
+            primary_screen.return_value = SimpleNamespace(availableGeometry=lambda: QRect(0, 0, 1600, 900))
+
+            MainWindow._restore_window_state(window)
+
+        self.assertEqual(window.geometry(), QRect(40, 50, 1200, 760))
+
     def test_apply_hotkey_preferences_updates_lyrics_views_and_hints(self):
         window = MainWindow.__new__(MainWindow)
         lyrics_view = SimpleNamespace(
