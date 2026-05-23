@@ -379,6 +379,15 @@ class LyricsEditorWidget(QWidget):
         super().showEvent(event)
         self._sync_header_height()
 
+    def refresh_layout(self) -> None:
+        self._sync_header_height()
+        layout = self.layout()
+        if layout is not None:
+            layout.invalidate()
+            layout.activate()
+        self.updateGeometry()
+        self.update()
+
     def _make_shortcut(self, key: str, callback) -> QShortcut:
         return lyrics_editor_hotkeys.make_shortcut(self, key, callback)
 

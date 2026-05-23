@@ -498,6 +498,7 @@ class MainWindow(QMainWindow):
         self.artists_tab.stack.currentChanged.connect(self._update_selection_actions_bar)
         self.artists_tab.album_browser.stack.currentChanged.connect(self._update_selection_actions_bar)
         self.tabs.currentChanged.connect(self._update_selection_actions_bar)
+        self.tabs.currentChanged.connect(self._refresh_active_lyrics_view_layout)
 
         # initial load
         self._apply_track_filters()
@@ -505,6 +506,7 @@ class MainWindow(QMainWindow):
         self._update_responsive_layout()
         self._apply_startup_view()
         self._update_selection_actions_bar()
+        self._refresh_active_lyrics_view_layout()
         QTimer.singleShot(0, self._maybe_show_first_run_onboarding)
 
         self._apply_styles()
@@ -1717,17 +1719,28 @@ class MainWindow(QMainWindow):
 
     def _save_active_lyrics(self):
         """Ctrl+S: trigger save on the currently visible lyrics editor."""
-        current = self.tabs.currentWidget()
-        if current is self.tracks_tab:
-            view = self.lyrics_view
-        elif current is self.albums_page:
-            view = self.albums_lyrics_view
-        elif current is self.artists_page:
-            view = self.artists_lyrics_view
-        else:
+        view = self._active_lyrics_view()
+        if view is None:
             return
         if view.btn_save.isEnabled():
             view._emit_save()
+
+    def _active_lyrics_view(self) -> LyricsEditorWidget | None:
+        current = self.tabs.currentWidget()
+        if current is self.tracks_tab:
+            return self.lyrics_view
+        if current is self.albums_page:
+            return self.albums_lyrics_view
+        if current is self.artists_page:
+            return self.artists_lyrics_view
+        return None
+
+    def _refresh_active_lyrics_view_layout(self, *_args) -> None:
+        view = self._active_lyrics_view()
+        if view is None:
+            return
+        view.refresh_layout()
+        QTimer.singleShot(0, view.refresh_layout)
 
     def _focus_search(self):
         """Ctrl+F: focus the search box."""
