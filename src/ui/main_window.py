@@ -519,6 +519,24 @@ class MainWindow(QMainWindow):
         label.setObjectName("SelectionActionsLabel")
         layout.addWidget(label)
 
+        plain_actions = QWidget(bar)
+        plain_actions.setObjectName("SelectionActionGroup")
+        plain_layout = QHBoxLayout(plain_actions)
+        set_layout_spacing(plain_layout, margins=0, spacing=SPACE_1)
+        layout.addWidget(plain_actions)
+
+        separator = QWidget(bar)
+        separator.setObjectName("SelectionActionSeparator")
+        separator.setFixedWidth(1)
+        separator.setFixedHeight(20)
+        layout.addWidget(separator)
+
+        menu_actions = QWidget(bar)
+        menu_actions.setObjectName("SelectionActionMenuGroup")
+        menu_layout = QHBoxLayout(menu_actions)
+        set_layout_spacing(menu_layout, margins=0, spacing=SPACE_1)
+        layout.addWidget(menu_actions)
+
         buttons: list[QWidget] = []
 
         def add_button(text: str, tooltip: str, handler) -> QPushButton:
@@ -526,17 +544,16 @@ class MainWindow(QMainWindow):
             button.setObjectName("SelectionActionButton")
             button.setToolTip(tooltip)
             button.clicked.connect(handler)
-            layout.addWidget(button)
+            plain_layout.addWidget(button)
             buttons.append(button)
             return button
 
-        def add_menu_button(text: str, tooltip: str, primary_handler, menu_items: list[tuple[str, object]]) -> QToolButton:
+        def add_menu_button(text: str, tooltip: str, menu_items: list[tuple[str, object]]) -> QToolButton:
             button = QToolButton()
-            button.setObjectName("SelectionActionButton")
-            button.setText(text)
+            button.setObjectName("SelectionActionMenuButton")
+            button.setText(f"{text} v")
             button.setToolTip(tooltip)
-            button.setPopupMode(QToolButton.ToolButtonPopupMode.MenuButtonPopup)
-            button.clicked.connect(primary_handler)
+            button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
 
             menu = QMenu(button)
             for item_text, item_handler in menu_items:
@@ -544,7 +561,7 @@ class MainWindow(QMainWindow):
                 action.triggered.connect(item_handler)
             button.setMenu(menu)
 
-            layout.addWidget(button)
+            menu_layout.addWidget(button)
             buttons.append(button)
             return button
 
@@ -556,17 +573,20 @@ class MainWindow(QMainWindow):
         add_menu_button(
             "Download",
             "Download lyrics for the selected tracks using the global download mode.",
-            lambda: self._download_selected_tracks("use_global"),
             [
                 ("Use current mode", lambda: self._download_selected_tracks("use_global")),
                 ("Synced only", lambda: self._download_selected_tracks("synced_only")),
                 ("Plain only", lambda: self._download_selected_tracks("plain_only")),
             ],
         )
+        add_button(
+            "Export",
+            "Export lyrics files for the selected tracks using the current sidecar settings.",
+            self._export_selected_tracks,
+        )
         add_menu_button(
             "Instrumental",
             "Mark or unmark the selected tracks as instrumental.",
-            self._mark_selected_tracks_instrumental,
             [
                 ("Mark instrumental", self._mark_selected_tracks_instrumental),
                 ("Unmark instrumental", self._unmark_selected_tracks_instrumental),
@@ -575,7 +595,6 @@ class MainWindow(QMainWindow):
         add_menu_button(
             "Publish",
             "Publish lyrics from the selected tracks to LRCLIB.",
-            lambda: self._publish_selected_tracks(True),
             [
                 ("Publish synced", lambda: self._publish_selected_tracks(True)),
                 ("Publish plain", lambda: self._publish_selected_tracks(False)),
@@ -618,6 +637,83 @@ class MainWindow(QMainWindow):
         track_ids = self._selected_track_ids_for_toolbar()
         if track_ids:
             self.on_refresh_tracks(track_ids)
+
+    def _export_selected_tracks(self) -> None:
+        track_ids = self._selected_track_ids_for_toolbar()
+        if not track_ids:
+            return
+
+        for view in self._all_lyrics_views():
+            view.set_export_feedback("loading", "Exporting...")
+
+        try:
+            export_config = replace(get_config(self.app_state.db), save_lyrics_sidecars=True)
+            exported_count = 0
+            skipped_count = 0
+            output_errors: list[str] = []
+            first_output_dir: str | None = None
+
+            for track_id in track_ids:
+                track = get_track_by_id(self.app_state.db, int(track_id))
+                if track is None or not (track.lrc_lyrics or track.txt_lyrics):
+                    skipped_count += 1
+                    continue
+
+                result = sync_track_outputs_with_result(track, export_config)
+                if result.sidecar_error is not None:
+                    output_errors.append(f"{track.title}: {result.sidecar_error}")
+                    continue
+                if not result.sidecar_paths:
+                    skipped_count += 1
+                    continue
+
+                exported_count += 1
+                if first_output_dir is None:
+                    first_output_dir = os.path.dirname(result.sidecar_paths[0]) or os.path.dirname(track.file_path)
+
+            if exported_count == 0:
+                notify_user(
+                    self.app_state,
+                    "No lyrics files were generated for the selected tracks.",
+                    "warning",
+                    show_status=self._show_status_message,
+                    status_timeout_ms=3000,
+                )
+                for view in self._all_lyrics_views():
+                    view.set_export_feedback("error", "Nothing Exported")
+                return
+
+            notify_type = "warning" if output_errors or skipped_count else "success"
+            summary = f"Lyrics files generated for {exported_count} track(s)."
+            if skipped_count:
+                summary = f"{summary} {skipped_count} skipped."
+            if output_errors:
+                summary = f"{summary} Some exports failed."
+            notify_user(
+                self.app_state,
+                summary,
+                notify_type,
+                show_status=self._show_status_message,
+                status_timeout_ms=3000,
+            )
+            if first_output_dir:
+                self._show_status_message(f"Lyrics files exported to {first_output_dir}", 3000)
+            for error in output_errors[:3]:
+                logger.warning("Lyrics export issue: %s", error)
+            for view in self._all_lyrics_views():
+                view.set_export_feedback("success", "Exported")
+        except (sqlite3.Error, OSError, ValueError) as exc:
+            log_and_notify(
+                self.app_state,
+                logger,
+                logging.ERROR,
+                exception_message("Failed to export lyrics files", exc),
+                "error",
+                show_status=self._show_status_message,
+                status_timeout_ms=4000,
+            )
+            for view in self._all_lyrics_views():
+                view.set_export_feedback("error", "Export Failed")
 
     def _mark_selected_tracks_instrumental(self) -> None:
         track_ids = self._selected_track_ids_for_toolbar()

@@ -160,7 +160,7 @@ class MainWindowInstrumentalTests(unittest.TestCase):
         bar, _label, buttons = MainWindow._create_selection_actions_bar(window)
 
         try:
-            self.assertEqual([button.text() for button in buttons], ["Refresh", "Download", "Instrumental", "Publish"])
+            self.assertEqual([button.text() for button in buttons], ["Refresh", "Download v", "Export", "Instrumental v", "Publish v"])
             self.assertIsInstance(buttons[1], QToolButton)
             self.assertIsNotNone(buttons[1].menu())
             self.assertEqual([action.text() for action in buttons[1].menu().actions()], ["Use current mode", "Synced only", "Plain only"])

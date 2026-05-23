@@ -186,6 +186,8 @@ class TrackListWidgetTests(unittest.TestCase):
                 focused_row=focused_row,
             )
 
+            self.assertIsNone(actions["download"])
+            self.assertIsNone(actions["export"])
             self.assertIsNone(actions["refresh_selected"])
             self.assertIsNone(actions["download_selected"])
             self.assertIsNone(actions["download_synced"])
