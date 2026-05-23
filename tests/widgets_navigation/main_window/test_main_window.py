@@ -174,6 +174,12 @@ class MainWindowInstrumentalTests(unittest.TestCase):
         window.saveGeometry = MagicMock(return_value=QByteArray(b"geo"))
         window.geometry = lambda: QRect(40, 50, 1200, 760)
         window.isMaximized = lambda: False
+        window._build_library_splitter_state = MagicMock(
+            return_value={"orientation": "horizontal", "sizes": [690, 480]}
+        )
+        window.content_splitter = SimpleNamespace(sizes=lambda: [690, 480])
+        window.albums_splitter = SimpleNamespace(sizes=lambda: [690, 480])
+        window.artists_splitter = SimpleNamespace(sizes=lambda: [690, 480])
         window.tabs = SimpleNamespace(currentIndex=lambda: 2)
         window.top_bar = SimpleNamespace(
             search_text=lambda: "chapter ii",
@@ -201,6 +207,10 @@ class MainWindowInstrumentalTests(unittest.TestCase):
             {"x": 40, "y": 50, "width": 1200, "height": 760},
         )
         self.assertFalse(saved_payload["is_maximized"])
+        self.assertEqual(
+            saved_payload["library_splitter"],
+            {"orientation": "horizontal", "sizes": [690, 480]},
+        )
 
     def test_restore_window_state_restores_filter_checkboxes(self):
         window = MainWindow.__new__(MainWindow)
@@ -238,6 +248,7 @@ class MainWindowInstrumentalTests(unittest.TestCase):
         window.isMaximized = lambda: False
         window.isFullScreen = lambda: False
         window.screen = lambda: None
+        window._restore_library_splitter_state = MagicMock()
 
         MainWindow._restore_window_state(window)
 
@@ -252,6 +263,7 @@ class MainWindowInstrumentalTests(unittest.TestCase):
             }
         )
         window._apply_track_filters.assert_called_once_with()
+        window._restore_library_splitter_state.assert_called_once_with(window._load_window_state_payload.return_value)
 
     def test_restore_window_state_falls_back_from_too_small_saved_geometry(self):
         class DummyWindow:
@@ -359,6 +371,79 @@ class MainWindowInstrumentalTests(unittest.TestCase):
             MainWindow._restore_window_state(window)
 
         self.assertEqual(window.geometry(), QRect(40, 50, 1200, 760))
+
+    def test_sync_library_splitters_from_active_splitter(self):
+        class DummySplitter:
+            def __init__(self, sizes, orientation):
+                self._sizes = list(sizes)
+                self._orientation = orientation
+
+            def sizes(self):
+                return list(self._sizes)
+
+            def setSizes(self, sizes):
+                self._sizes = [int(value) for value in sizes]
+
+            def orientation(self):
+                return self._orientation
+
+            def setOrientation(self, orientation):
+                self._orientation = orientation
+
+        window = MainWindow.__new__(MainWindow)
+        window.content_splitter = DummySplitter([690, 480], Qt.Orientation.Horizontal)
+        window.albums_splitter = DummySplitter([300, 200], Qt.Orientation.Horizontal)
+        window.artists_splitter = DummySplitter([100, 100], Qt.Orientation.Vertical)
+        window._syncing_library_splitters = False
+
+        MainWindow._sync_library_splitters_from(window, window.content_splitter)
+
+        self.assertEqual(window.albums_splitter.orientation(), Qt.Orientation.Horizontal)
+        self.assertEqual(window.artists_splitter.orientation(), Qt.Orientation.Horizontal)
+        self.assertEqual(window.albums_splitter.sizes(), [295, 205])
+        self.assertEqual(window.artists_splitter.sizes(), [118, 82])
+
+    def test_restore_library_splitter_state_prefers_shared_payload(self):
+        class DummySplitter:
+            def __init__(self, sizes, orientation):
+                self._sizes = list(sizes)
+                self._orientation = orientation
+
+            def sizes(self):
+                return list(self._sizes)
+
+            def setSizes(self, sizes):
+                self._sizes = [int(value) for value in sizes]
+
+            def orientation(self):
+                return self._orientation
+
+            def setOrientation(self, orientation):
+                self._orientation = orientation
+
+        window = MainWindow.__new__(MainWindow)
+        window.content_splitter = DummySplitter([600, 400], Qt.Orientation.Horizontal)
+        window.albums_splitter = DummySplitter([300, 200], Qt.Orientation.Horizontal)
+        window.artists_splitter = DummySplitter([300, 200], Qt.Orientation.Horizontal)
+        window._syncing_library_splitters = False
+
+        MainWindow._restore_library_splitter_state(
+            window,
+            {
+                "library_splitter": {
+                    "orientation": "vertical",
+                    "sizes": [500, 300],
+                },
+                "tracks_splitter": [100, 900],
+            },
+        )
+
+        self.assertEqual(window.content_splitter.orientation(), Qt.Orientation.Vertical)
+        self.assertEqual(window.albums_splitter.orientation(), Qt.Orientation.Vertical)
+        self.assertEqual(window.artists_splitter.orientation(), Qt.Orientation.Vertical)
+        self.assertEqual(window.content_splitter.sizes(), [500, 300])
+        self.assertEqual(window.albums_splitter.sizes(), [312, 188])
+        self.assertEqual(window.artists_splitter.sizes(), [312, 188])
 
     def test_apply_hotkey_preferences_updates_lyrics_views_and_hints(self):
         window = MainWindow.__new__(MainWindow)

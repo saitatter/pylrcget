@@ -288,6 +288,8 @@ class MainWindow(QMainWindow):
         self.artists_tab.setMinimumWidth(LIBRARY_PANE_MIN_WIDTH)
         self.artists_lyrics_view.setMinimumWidth(LYRICS_PANE_MIN_WIDTH)
         artists_layout.addWidget(self.artists_splitter)
+        self._syncing_library_splitters = False
+        self._connect_library_splitter_sync()
 
         self.mylrclib_tab = MyLrclibWidget(self.app_state)
 
@@ -1763,6 +1765,111 @@ class MainWindow(QMainWindow):
 
     def _all_lyrics_views(self) -> list[LyricsEditorWidget]:
         return [self.lyrics_view, self.albums_lyrics_view, self.artists_lyrics_view]
+
+    def _all_library_splitters(self) -> list[QSplitter]:
+        return [self.content_splitter, self.albums_splitter, self.artists_splitter]
+
+    def _connect_library_splitter_sync(self) -> None:
+        for splitter in self._all_library_splitters():
+            splitter.splitterMoved.connect(
+                lambda _pos, _index, current=splitter: self._sync_library_splitters_from(current)
+            )
+
+    @staticmethod
+    def _splitter_orientation_name(orientation: Qt.Orientation) -> str:
+        return "vertical" if orientation == Qt.Orientation.Vertical else "horizontal"
+
+    @staticmethod
+    def _parse_splitter_orientation(value) -> Qt.Orientation:
+        if str(value).lower() == "vertical":
+            return Qt.Orientation.Vertical
+        return Qt.Orientation.Horizontal
+
+    def _scaled_splitter_sizes(self, splitter: QSplitter, source_sizes: list[int]) -> list[int]:
+        source_total = max(1, sum(max(0, int(value)) for value in source_sizes))
+        target_total = sum(max(0, int(value)) for value in splitter.sizes())
+        if target_total <= 0:
+            target_total = source_total
+        first = max(1, int(round(target_total * max(0, int(source_sizes[0])) / source_total)))
+        second = max(1, target_total - first)
+        return [first, second]
+
+    def _build_library_splitter_state(self) -> dict[str, object]:
+        sizes = [int(value) for value in self.content_splitter.sizes()]
+        return {
+            "orientation": self._splitter_orientation_name(self.content_splitter.orientation()),
+            "sizes": sizes,
+        }
+
+    def _apply_library_splitter_state(self, orientation: Qt.Orientation, sizes: list[int]) -> None:
+        if len(sizes) != 2 or not all(int(value) > 0 for value in sizes):
+            return
+        self._syncing_library_splitters = True
+        try:
+            for splitter in self._all_library_splitters():
+                if splitter.orientation() != orientation:
+                    splitter.setOrientation(orientation)
+                if splitter is self.content_splitter:
+                    splitter.setSizes([int(value) for value in sizes])
+                else:
+                    splitter.setSizes(self._scaled_splitter_sizes(splitter, sizes))
+        finally:
+            self._syncing_library_splitters = False
+
+    def _restore_library_splitter_state(self, state: dict[str, object]) -> None:
+        shared = state.get("library_splitter") if isinstance(state.get("library_splitter"), dict) else None
+        sizes: list[int] | None = None
+        orientation = Qt.Orientation.Horizontal
+        if shared is not None:
+            raw_sizes = shared.get("sizes")
+            if isinstance(raw_sizes, list):
+                try:
+                    parsed = [int(value) for value in raw_sizes]
+                except (TypeError, ValueError):
+                    parsed = []
+                if len(parsed) == 2 and all(value > 0 for value in parsed):
+                    sizes = parsed
+                    orientation = self._parse_splitter_orientation(shared.get("orientation"))
+
+        if sizes is None:
+            for key, splitter in [
+                ("tracks_splitter", self.content_splitter),
+                ("albums_splitter", self.albums_splitter),
+                ("artists_splitter", self.artists_splitter),
+            ]:
+                raw_sizes = state.get(key)
+                if not isinstance(raw_sizes, list):
+                    continue
+                try:
+                    parsed = [int(value) for value in raw_sizes]
+                except (TypeError, ValueError):
+                    continue
+                if len(parsed) == 2 and all(value > 0 for value in parsed):
+                    sizes = parsed
+                    orientation = splitter.orientation()
+                    break
+
+        if sizes is not None:
+            self._apply_library_splitter_state(orientation, sizes)
+
+    def _sync_library_splitters_from(self, source: QSplitter) -> None:
+        if self._syncing_library_splitters:
+            return
+        if source not in self._all_library_splitters():
+            return
+        sizes = [int(value) for value in source.sizes()]
+        if len(sizes) != 2 or not all(value > 0 for value in sizes):
+            return
+        self._syncing_library_splitters = True
+        try:
+            for splitter in self._all_library_splitters():
+                if splitter is source:
+                    continue
+                if splitter.orientation() != source.orientation():
+                    splitter.setOrientation(source.orientation())
+                splitter.setSizes(self._scaled_splitter_sizes(splitter, sizes))
+        finally:
+            self._syncing_library_splitters = False
 
     def _set_track_lyrics_views(self, track) -> None:
         track = self._normalize_dirty_lyrics_state(track)

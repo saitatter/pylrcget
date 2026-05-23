@@ -177,6 +177,8 @@ def build_window_state_payload(window) -> dict[str, object]:
         "is_maximized": bool(window.isMaximized()),
         "tab_index": window.tabs.currentIndex(),
     }
+    if hasattr(window, "_build_library_splitter_state"):
+        state["library_splitter"] = window._build_library_splitter_state()
     if hasattr(window, "content_splitter"):
         state["tracks_splitter"] = window.content_splitter.sizes()
     if hasattr(window, "albums_splitter"):
@@ -280,22 +282,8 @@ def restore_window_state(window) -> None:
         window.top_bar.set_filter_values(restored_filters)
         window._apply_track_filters()
 
-    for attr, key in [
-        ("content_splitter", "tracks_splitter"),
-        ("albums_splitter", "albums_splitter"),
-        ("artists_splitter", "artists_splitter"),
-    ]:
-        splitter = getattr(window, attr, None)
-        if splitter is None:
-            continue
-        saved = state.get(key)
-        if saved is not None:
-            try:
-                sizes = [int(value) for value in saved]
-                if len(sizes) == 2 and all(value > 0 for value in sizes):
-                    splitter.setSizes(sizes)
-            except (TypeError, ValueError):
-                pass
+    if hasattr(window, "_restore_library_splitter_state"):
+        window._restore_library_splitter_state(state)
 
     tab_index = state.get("tab_index")
     if tab_index is not None:
