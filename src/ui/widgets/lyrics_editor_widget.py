@@ -46,6 +46,24 @@ LINE_NUMBER_COLUMN = 2
 logger = logging.getLogger(__name__)
 
 
+class _HeightForWidthWidget(QWidget):
+    def hasHeightForWidth(self) -> bool:
+        layout = self.layout()
+        return bool(layout is not None and layout.hasHeightForWidth())
+
+    def heightForWidth(self, width: int) -> int:
+        layout = self.layout()
+        if layout is None:
+            return super().heightForWidth(width)
+        return layout.totalHeightForWidth(width)
+
+    def minimumSizeHint(self):
+        layout = self.layout()
+        if layout is None:
+            return super().minimumSizeHint()
+        return layout.minimumSize()
+
+
 class LyricsEditorWidget(QWidget):
     """
     Right-side lyrics panel:
@@ -101,7 +119,7 @@ class LyricsEditorWidget(QWidget):
         set_layout_spacing(root, margins=SPACE_3, spacing=SPACE_2)
 
         # --- header ---
-        self.header_widget = QWidget()
+        self.header_widget = _HeightForWidthWidget()
         self.header_widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         header = QVBoxLayout(self.header_widget)
         set_layout_spacing(header, spacing=SPACE_2)
@@ -350,7 +368,16 @@ class LyricsEditorWidget(QWidget):
         }
 
         self._apply_styles()
+        self._sync_header_height()
         self.show_none("Choose a track to review or edit its lyrics.")
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._sync_header_height()
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        self._sync_header_height()
 
     def _make_shortcut(self, key: str, callback) -> QShortcut:
         return lyrics_editor_hotkeys.make_shortcut(self, key, callback)
@@ -431,6 +458,19 @@ class LyricsEditorWidget(QWidget):
         if hasattr(self, "empty_state") and self.empty_state:
             self.empty_state._apply_styles()
 
+    def _sync_header_height(self) -> None:
+        header_layout = self.header_widget.layout()
+        if header_layout is None:
+            return
+        width = self.header_widget.width()
+        if width <= 0:
+            return
+        required_height = header_layout.totalHeightForWidth(width)
+        if required_height <= 0:
+            return
+        self.header_widget.setFixedHeight(required_height)
+        self.header_widget.updateGeometry()
+
     def show_none(self, message: str):
         self._reset_state()
         self._set_dirty_badge(False)
@@ -441,6 +481,7 @@ class LyricsEditorWidget(QWidget):
             action_text=None,
         )
         self.stack.setCurrentWidget(self.empty_state)
+        self._sync_header_height()
 
     def set_track_lyrics(
         self,
@@ -517,6 +558,7 @@ class LyricsEditorWidget(QWidget):
                 quaternary_action_text="Auto Sync",
             )
             self.stack.setCurrentWidget(self.empty_state)
+        self._sync_header_height()
         self._loading_track = False
 
     # --- internal helpers ---
@@ -560,6 +602,7 @@ class LyricsEditorWidget(QWidget):
         self.dirty_badge.setVisible(bool(visible))
         self.btn_discard_draft.setVisible(bool(visible))
         self.btn_show_diff.setVisible(bool(visible))
+        self._sync_header_height()
         self._update_publish_enabled()
 
     def _show_diff(self) -> None:
