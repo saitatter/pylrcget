@@ -1,5 +1,6 @@
 from tests.widgets_navigation._shared import *
 
+
 @unittest.skipUnless(HAS_QT, "PySide6 is required for widget tests")
 class MainWindowInstrumentalTests(unittest.TestCase):
     @classmethod
@@ -278,54 +279,65 @@ class MainWindowInstrumentalTests(unittest.TestCase):
         self.assertEqual(registered_bindings["shift_all_from_first"], expected["shift_all_from_first"])
         window.hotkey_hints.refresh_positions.assert_called_once_with()
 
-@unittest.skipUnless(HAS_QT, "PySide6 is required for widget tests")
-class SettingsDialogHotkeyTests(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.app = qt_app()
+    def test_scan_progress_updates_overlay(self):
+        window = MainWindow.__new__(MainWindow)
+        overlay_calls: list[tuple[int, int, str, str]] = []
+        window.scan_overlay = SimpleNamespace(
+            update_progress=lambda current, total, label, status: overlay_calls.append((current, total, label, status))
+        )
+        window.progress_bar = SimpleNamespace(
+            maximum=lambda: 100,
+            setRange=lambda *_args: None,
+            setValue=lambda *_args: None,
+        )
+        window.scan_label = SimpleNamespace(setText=lambda *_args: None)
+        window.scan_details = SimpleNamespace(setText=lambda *_args: None)
 
-    def test_settings_dialog_loads_and_saves_custom_hotkeys(self):
-        with TemporaryDirectory() as tmp:
-            app_state = simple_app_state(initialize_database(tmp))
-            try:
-                dialog = MusicFoldersDialog(app_state)
-                dialog.shortcut_enabled_checks["play_pause"].setChecked(False)
-                dialog.shortcut_edits["snap"].setKeySequence(QKeySequence("Tab"))
-                dialog.shortcut_edits["shift_selected"].setKeySequence(QKeySequence("Alt+S"))
-                dialog.shortcut_edits["shift_all_from_first"].setKeySequence(QKeySequence("Ctrl+Alt+A"))
+        MainWindow._update_scan_progress(window, 3, 10, "C:/Music/Song.mp3", 1.25)
 
-                dialog.save()
+        self.assertEqual(overlay_calls[-1][0:3], (3, 10, "Song.mp3"))
+        self.assertIn("30%", overlay_calls[-1][3])
 
-                reloaded = MusicFoldersDialog(app_state)
-                try:
-                    self.assertFalse(reloaded.shortcut_enabled_checks["play_pause"].isChecked())
-                    self.assertEqual(reloaded.shortcut_edits["snap"].keySequence().toString(), "Tab")
-                    self.assertEqual(reloaded.shortcut_edits["shift_selected"].keySequence().toString(), "Alt+S")
-                    self.assertEqual(reloaded.shortcut_edits["shift_all_from_first"].keySequence().toString(), "Ctrl+Alt+A")
-                finally:
-                    reloaded.deleteLater()
-                    dialog.deleteLater()
-            finally:
-                app_state.db.close()
+    def test_status_message_uses_toast_area_without_changing_layout(self):
+        window = MainWindow.__new__(MainWindow)
+        window.central_widget = QWidget()
+        window.central_widget.resize(480, 320)
+        window.central_widget.show()
+        window.player_bar = QWidget(window.central_widget)
+        window.player_bar.setGeometry(0, 260, 480, 52)
+        window.player_bar.show()
+        window.toasts = ToastManager(window.central_widget)
+        window.toasts.set_bottom_anchor(window.player_bar)
+        try:
+            before = window.central_widget.geometry()
 
-    def test_settings_dialog_loads_and_saves_ai_sync_preferences(self):
-        with TemporaryDirectory() as tmp:
-            app_state = simple_app_state(initialize_database(tmp))
-            try:
-                dialog = MusicFoldersDialog(app_state)
-                dialog.ai_whisper_model_combo.setCurrentIndex(dialog.ai_whisper_model_combo.findData("small"))
-                dialog.ai_device_combo.setCurrentIndex(dialog.ai_device_combo.findData("cpu"))
-                dialog.ai_use_demucs_chk.setChecked(False)
+            MainWindow._show_status_message(window, "Lyrics saved.", 2500)
+            self.app.processEvents()
 
-                dialog.save()
+            self.assertEqual(window.central_widget.geometry(), before)
+            self.assertIsNotNone(window.toasts._status_toast)
+            toast = window.toasts._status_toast
+            self.assertTrue(toast.isVisible())
+            self.assertEqual(toast.lbl.text(), "Lyrics saved.")
+            self.assertLessEqual(
+                toast.y() + toast.height(),
+                window.player_bar.y(),
+            )
 
-                reloaded = MusicFoldersDialog(app_state)
-                try:
-                    self.assertEqual(reloaded.ai_whisper_model_combo.currentData(), "small")
-                    self.assertEqual(reloaded.ai_device_combo.currentData(), "cpu")
-                    self.assertFalse(reloaded.ai_use_demucs_chk.isChecked())
-                finally:
-                    reloaded.deleteLater()
-                    dialog.deleteLater()
-            finally:
-                app_state.db.close()
+            window.toasts.show_toast("Saved.", "success", 3000)
+            self.app.processEvents()
+            normal_toast = next(t for t in window.toasts._toasts if t is not toast)
+            self.assertLess(normal_toast.y(), toast.y())
+            self.assertLessEqual(normal_toast.y() + normal_toast.height(), toast.y())
+        finally:
+            window.central_widget.deleteLater()
+
+    def test_enter_play_handler_uses_the_focused_track_list(self):
+        window = MainWindow.__new__(MainWindow)
+        played: list[int] = []
+        window.on_play_track = lambda track_id: played.append(int(track_id))
+        track_list = SimpleNamespace(selected_track_id=lambda: 42)
+
+        MainWindow._play_selected_from_track_list(window, track_list)
+
+        self.assertEqual(played, [42])

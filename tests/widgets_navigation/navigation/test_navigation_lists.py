@@ -1,5 +1,6 @@
 from tests.widgets_navigation._shared import *
 
+
 @unittest.skipUnless(HAS_QT, "PySide6 is required for widget tests")
 class NavigationBucketTests(unittest.TestCase):
     @classmethod
@@ -57,6 +58,7 @@ class NavigationBucketTests(unittest.TestCase):
         finally:
             widget.deleteLater()
             app_state.db.close()
+
 
 @unittest.skipUnless(HAS_QT, "PySide6 is required for widget tests")
 class PaginationWidgetTests(unittest.TestCase):
