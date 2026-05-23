@@ -15,7 +15,6 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, QByteArray, QTimer
 from PySide6.QtGui import QCloseEvent, QShortcut, QKeySequence
-import json
 import logging
 import os
 import sqlite3
@@ -45,7 +44,6 @@ from db.queries import (
     update_track_synced_lyrics,
 )
 from library.scan_library import AUDIO_EXTS, new_fs_track_from_path
-from ui.workers.library_scanner import LibraryScanner
 from ui.controllers.lyrics_download_controller import LyricsDownloadController
 from ui.controllers.navigation_controller import NavigationController
 from ui.controllers.publish_history_controller import PublishHistoryController
@@ -57,7 +55,7 @@ from ui.dialogs.about_dialog import AboutDialog
 from ui.icon_loader import load_app_icon
 from ui.player_bar import PlayerBar
 from ui.widgets.lyrics_editor_widget import LyricsEditorWidget
-from core.utils import parse_lrc, ms_to_ts as _ms_to_ts
+from core.utils import parse_lrc
 from ui.dialogs.first_run_dialog import FirstRunDialog
 from player.player import NowPlaying, Player
 from ui.services.lyrics_download_service import sync_track_outputs_with_result
@@ -74,6 +72,7 @@ from ui.widgets.my_lrclib_widget import MyLrclibWidget
 from ui.widgets.lrclib_browser_widget import LrclibBrowserWidget
 from ui.widgets.download_progress_overlay import DownloadProgressOverlay
 from ui.widgets.hotkey_hints import HotkeyHintManager
+from ui.main_window_parts import canonical_lyrics_pair, library_actions, library_filters, lyrics_actions, preferences
 from ui.constants import (
     DIRTY_LYRICS_FLUSH_MS,
     FEEDBACK_RESET_MS,
@@ -85,25 +84,6 @@ from ui.constants import (
 )
 
 logger = logging.getLogger(__name__)
-
-
-def _canonical_lyrics_pair(lrc: str | None, txt: str | None) -> tuple[str, str]:
-    lrc_text = (lrc or "").strip()
-    txt_text = (txt or "").strip()
-    if not lrc_text:
-        return "", txt_text
-
-    pairs = parse_lrc(lrc_text)
-    if not pairs:
-        return lrc_text, txt_text
-
-    pairs.sort(key=lambda item: item[0])
-    canonical_lrc = "\n".join(
-        f"[{_ms_to_ts(ms)}] {text.strip()}" if text.strip() else f"[{_ms_to_ts(ms)}]"
-        for ms, text in pairs
-    ).strip()
-    canonical_txt = txt_text or "\n".join(text.rstrip() for _ms, text in pairs).rstrip()
-    return canonical_lrc, canonical_txt
 
 
 class MainWindow(QMainWindow):
@@ -825,7 +805,7 @@ class MainWindow(QMainWindow):
                     status_timeout_ms=4000,
                 )
                 return
-            lrc, plain = _canonical_lyrics_pair(text, "")
+            lrc, plain = canonical_lyrics_pair(text, "")
         else:
             lrc, plain = "", text
 
@@ -915,38 +895,13 @@ class MainWindow(QMainWindow):
 
     # ------------------ filters ------------------
     def _apply_track_filters(self):
-        filters = self.top_bar.filter_values()
-        search_text = self.top_bar.search_text()
-        track_lists = [
-            self.track_list,
-            self.albums_tab.track_list,
-            self.artists_tab.album_browser.track_list,
-        ]
-        for track_list in track_lists:
-            track_list.setSearchValue(search_text)
-            track_list.setFilters(
-                synced=filters["synced"],
-                plain=filters["plain"],
-                instrumental=filters["instrumental"],
-                none_=filters["none"],
-                unsaved=filters.get("unsaved", False),
-            )
-            if self.app_state.player and self.app_state.player.track:
-                track_list.set_now_playing(self.app_state.player.track.track_id)
-        self._update_search_feedback()
+        library_filters.apply_track_filters(self)
 
     def _schedule_library_search(self):
-        self._search_apply_timer.start()
+        library_filters.schedule_library_search(self)
 
     def _apply_library_search(self):
-        current = self.tabs.currentWidget()
-        text = self.top_bar.search_text()
-        if current is self.tracks_tab:
-            self._apply_track_filters()
-        elif current is self.albums_page:
-            self.albums_tab.setSearchValue(text)
-        elif current is self.artists_page:
-            self.artists_tab.setSearchValue(text)
+        library_filters.apply_library_search(self)
 
     # ------------------ modals ------------------
     def open_config_modal(self):
@@ -987,77 +942,10 @@ class MainWindow(QMainWindow):
 
     # ------------------ scanning ------------------
     def refresh_library(self):
-        if self.scanner is not None and self.scanner.isRunning():
-            return
-        directories = get_directories(self.app_state.db)
-        if not directories:
-            notify_user(
-                self.app_state,
-                "Add at least one music folder before starting a library scan.",
-                "warning",
-                show_status=self._show_status_message,
-                status_timeout_ms=3000,
-            )
-            self.top_bar.set_button_feedback(self.top_bar.btn_refresh, "error")
-            QTimer.singleShot(FEEDBACK_RESET_MS, self._reset_refresh_feedback)
-            return
-
-        logger.info("Starting library scan across %d folder(s).", len(directories))
-
-        self.scan_row.setVisible(False)
-        self.top_bar.set_actions_label("Scanning Library")
-        self.top_bar.set_button_feedback(self.top_bar.btn_refresh, "loading")
-        self.scan_overlay.start_batch(f"{len(directories)} folder(s)", 0)
-        self.scan_overlay.update_progress(0, 0, "Library scan", "Counting tracks in selected folders...")
-        self.btn_cancel_scan.setEnabled(True)
-
-        config = get_config(self.app_state.db)
-        self.scanner = LibraryScanner(
-            self.app_state.db_path,
-            directories,
-            excluded_paths=config.scan_excluded_paths,
-            excluded_patterns=config.scan_excluded_patterns,
-            lyrics_lookup_subdir=config.lyrics_lookup_subdir,
-            lyrics_file_pattern=config.lyrics_file_pattern,
-        )
-        self.scanner.progress_signal.connect(self._update_scan_progress)
-        self.scanner.finished_signal.connect(self._scan_finished)
-        self.scanner.start()
-        self.top_bar.btn_refresh.setEnabled(False)
-        self._show_status_message("Scanning library...")
+        library_actions.refresh_library(self)
 
     def _update_scan_progress(self, scanned: int, total: int, current_path: str, elapsed_s: float):
-        total = max(int(total), 0)
-        scanned = max(int(scanned), 0)
-        current_name = os.path.basename(current_path) if current_path else ""
-        elapsed_s = max(0.0, float(elapsed_s or 0.0))
-
-        if total <= 0:
-            # unknown total -> show indeterminate animation
-            self.progress_bar.setRange(0, 0)
-            self.scan_label.setText("Scanning…")
-            self.scan_details.setText("Counting tracks in selected folders…")
-            self.scan_overlay.update_progress(0, 0, "Library scan", "Counting tracks in selected folders...")
-            return
-
-        # determinate
-        if self.progress_bar.maximum() == 0:
-            self.progress_bar.setRange(0, 100)
-
-        percent = int((scanned / total) * 100)
-        percent = max(0, min(100, percent))
-
-        self.progress_bar.setValue(percent)
-        self.scan_label.setText(f"Scanning… {scanned}/{total} ({percent}%)")
-        self.scan_details.setText(
-            f"Current file: {current_name or 'Preparing next file…'}  •  Elapsed: {elapsed_s:.1f}s"
-        )
-        self.scan_overlay.update_progress(
-            scanned,
-            total,
-            current_name or "Library scan",
-            f"{scanned}/{total} ({percent}%)  •  Elapsed: {elapsed_s:.1f}s",
-        )
+        library_actions.update_scan_progress(self, scanned, total, current_path, elapsed_s)
 
     def _on_notify(self, n):
         # n is core.state.Notify
@@ -1091,63 +979,10 @@ class MainWindow(QMainWindow):
         )
 
     def _scan_finished(self, ok: bool, msg: str):
-        # hide progress strip
-        self.progress_bar.setRange(0, 100)  # reset from indeterminate if needed
-        self.progress_bar.setValue(0)
-        self.scan_row.setVisible(False)
-        self.btn_cancel_scan.setEnabled(False)
-        self.scan_overlay.finish_batch(msg or ("Library scan finished." if ok else "Library scan failed."), cancelled=not ok and "cancel" in (msg or "").lower())
-        self.scan_overlay.queue_auto_close(5000)
-
-        if ok:
-            self._apply_track_filters()
-            self.scan_overlay.append_result("Library scan", msg or "Library scan finished successfully.", True)
-            notify_user(
-                self.app_state,
-                msg or "Library scan finished successfully.",
-                "success",
-                show_status=self._show_status_message,
-                status_timeout_ms=4000,
-            )
-            self.top_bar.set_button_feedback(self.top_bar.btn_refresh, "success")
-            logger.info("Library scan finished successfully: %s", msg or "ok")
-        else:
-            if "cancel" in (msg or "").lower():
-                self.scan_overlay.append_result("Library scan", msg or "Library scan cancelled.", False)
-                notify_user(
-                    self.app_state,
-                    msg,
-                    "warning",
-                    show_status=self._show_status_message,
-                    status_timeout_ms=4000,
-                )
-                self.top_bar.set_button_feedback(self.top_bar.btn_refresh, "idle")
-                logger.warning("Library scan cancelled: %s", msg)
-            else:
-                self.scan_overlay.append_result("Library scan", msg or "Library scan failed.", False)
-                log_and_notify(
-                    self.app_state,
-                    logger,
-                    logging.ERROR,
-                    f"Library scanning failed: {msg}",
-                    "error",
-                    show_status=self._show_status_message,
-                    status_timeout_ms=4000,
-                )
-                self.top_bar.set_button_feedback(self.top_bar.btn_refresh, "error")
-
-        self.top_bar.btn_refresh.setEnabled(True)
-        QTimer.singleShot(FEEDBACK_RESET_MS, self._reset_refresh_feedback)
-        self.scanner = None
+        library_actions.scan_finished(self, ok, msg)
 
     def _cancel_scan(self):
-        if not hasattr(self, "scanner") or self.scanner is None:
-            return
-        self.btn_cancel_scan.setEnabled(False)
-        self.scan_details.setText("Cancelling scan after the current batch…")
-        self.scan_overlay.update_progress(-1, 0, "Library scan", "Cancelling scan after the current batch...")
-        logger.info("Cancellation requested for library scan.")
-        self.scanner.requestInterruption()
+        library_actions.cancel_scan(self)
 
     def _toggle_logs_panel(self, checked: bool) -> None:
         self.log_panel.setVisible(bool(checked))
@@ -1197,18 +1032,18 @@ class MainWindow(QMainWindow):
         except (sqlite3.Error, KeyError):
             return
         self._editing_track_id = int(track_id)
-        self._editing_saved_lyrics = _canonical_lyrics_pair(track.lrc_lyrics, track.txt_lyrics)
+        self._editing_saved_lyrics = canonical_lyrics_pair(track.lrc_lyrics, track.txt_lyrics)
         self._set_track_lyrics_views(track)
 
     def _normalize_dirty_lyrics_state(self, track):
         if not bool(getattr(track, "dirty_lyrics_present", False)):
             return track
 
-        dirty_lrc, dirty_txt = _canonical_lyrics_pair(
+        dirty_lrc, dirty_txt = canonical_lyrics_pair(
             getattr(track, "dirty_lrc_lyrics", None),
             getattr(track, "dirty_txt_lyrics", None),
         )
-        saved_lrc, saved_txt = _canonical_lyrics_pair(
+        saved_lrc, saved_txt = canonical_lyrics_pair(
             getattr(track, "lrc_lyrics", None),
             getattr(track, "txt_lyrics", None),
         )
@@ -1343,21 +1178,19 @@ class MainWindow(QMainWindow):
 
     # ------------------ lyrics download & save ------------------
     def on_download_lyrics(self, track_id: int):
-        self.downloads.start_downloads([int(track_id)], mode_override="use_global")
+        library_actions.on_download_lyrics(self, track_id)
 
     def _on_bulk_download_requested(self, track_ids: list[int], mode: str) -> None:
-        self.downloads.start_downloads(track_ids, mode_override=mode)
+        library_actions.on_bulk_download_requested(self, track_ids, mode)
 
     def _download_missing_lyrics(self) -> None:
-        self.downloads.download_missing()
+        library_actions.download_missing_lyrics(self)
 
     def _set_track_download_state_all(self, track_id: int, state: str) -> None:
-        self.track_list.set_download_state(int(track_id), state)
-        self.albums_tab.set_download_state(int(track_id), state)
-        self.artists_tab.set_download_state(int(track_id), state)
+        library_actions.set_track_download_state_all(self, track_id, state)
 
     def _get_primary_track_download_state(self, track_id: int) -> str:
-        return self.track_list.get_download_state(int(track_id))
+        return library_actions.get_primary_track_download_state(self, track_id)
 
     def _show_status_message(self, message: str, timeout_ms: int | None = None) -> None:
         message = str(message or "").strip()
@@ -1451,255 +1284,32 @@ class MainWindow(QMainWindow):
 
     @staticmethod
     def _lyrics_state_from_track(track) -> LyricsState:
-        if track.instrumental or track.lrc_lyrics == "[au: instrumental]":
-            return LyricsState.INSTRUMENTAL
-        if track.lrc_lyrics:
-            return LyricsState.SYNCED
-        if track.txt_lyrics:
-            return LyricsState.PLAIN
-        return LyricsState.NONE
+        return lyrics_actions.lyrics_state_from_track(track)
 
     def _update_single_track_lyrics_state(self, track) -> None:
-        state = self._lyrics_state_from_track(track)
-        tid = int(track.id)
-        self.track_list.update_track_lyrics_state(tid, state)
-        self.albums_tab.update_track_lyrics_state(tid, state)
-        self.artists_tab.update_track_lyrics_state(tid, state)
+        lyrics_actions.update_single_track_lyrics_state(self, track)
 
 
     def _on_lyrics_save_requested(self, lrc: str, txt: str):
-        track_id = self._editing_track_id
-        if track_id is None:
-            notify_user(
-                self.app_state,
-                "Select a track first.",
-                "warning",
-                show_status=self._show_status_message,
-                status_timeout_ms=3000,
-            )
-            for view in self._all_lyrics_views():
-                view.set_save_feedback("error", "No Track")
-            return
-
-        for view in self._all_lyrics_views():
-            view.set_save_feedback("loading", "Saving...")
-        try:
-            if lrc.strip():
-                update_track_synced_lyrics(self.app_state.db, track_id, lrc.strip(), (txt or "").strip())
-            elif (txt or "").strip():
-                update_track_plain_lyrics(self.app_state.db, track_id, (txt or "").strip())
-            else:
-                update_track_null_lyrics(self.app_state.db, track_id)
-
-            track = get_track_by_id(self.app_state.db, track_id)
-            self._editing_saved_lyrics = _canonical_lyrics_pair(track.lrc_lyrics, track.txt_lyrics)
-            self._sync_track_lyrics_outputs(track)
-            self._set_track_lyrics_views(track)
-            self.track_list.set_dirty_lyrics_state(int(track_id), False)
-            self.albums_tab.set_dirty_lyrics_state(int(track_id), False)
-            self.artists_tab.set_dirty_lyrics_state(int(track_id), False)
-            self._update_single_track_lyrics_state(track)
-            self._show_status_message("Lyrics saved.", 2500)
-            self.toasts.show_toast("Lyrics saved.", "success")
-            for view in self._all_lyrics_views():
-                view.set_save_feedback("success", "Saved")
-        except (sqlite3.Error, OSError, ValueError) as exc:
-            log_and_notify(
-                self.app_state,
-                logger,
-                logging.ERROR,
-                exception_message("Failed to save lyrics", exc),
-                "error",
-                show_status=self._show_status_message,
-                status_timeout_ms=4000,
-            )
-            for view in self._all_lyrics_views():
-                view.set_save_feedback("error", "Save Failed")
+        lyrics_actions.on_lyrics_save_requested(self, lrc, txt)
 
     def _on_propagate_lyrics_requested(self, lrc: str, txt: str) -> None:
-        source_track_id = self._editing_track_id
-        if source_track_id is None:
-            notify_user(
-                self.app_state,
-                "Select a track before syncing lyrics to similar tracks.",
-                "warning",
-                show_status=self._show_status_message,
-                status_timeout_ms=3000,
-            )
-            for view in self._all_lyrics_views():
-                view.set_sync_others_feedback("error", "No Track")
-            return
-
-        lrc_text, txt_text = _canonical_lyrics_pair(lrc, txt)
-        if not lrc_text and not txt_text:
-            notify_user(
-                self.app_state,
-                "No lyrics are available to sync from this track.",
-                "warning",
-                show_status=self._show_status_message,
-                status_timeout_ms=3000,
-            )
-            for view in self._all_lyrics_views():
-                view.set_sync_others_feedback("error", "No Lyrics")
-            return
-
-        try:
-            matches = get_similar_lyrics_track_rows(self.app_state.db, int(source_track_id))
-        except sqlite3.Error as exc:
-            log_and_notify(
-                self.app_state,
-                logger,
-                logging.ERROR,
-                exception_message("Failed to find similar tracks", exc),
-                "error",
-                show_status=self._show_status_message,
-                status_timeout_ms=4000,
-            )
-            for view in self._all_lyrics_views():
-                view.set_sync_others_feedback("error", "Search Failed")
-            return
-
-        if not matches:
-            notify_user(
-                self.app_state,
-                "No similar tracks were found for this title, artist, and duration.",
-                "warning",
-                show_status=self._show_status_message,
-                status_timeout_ms=3500,
-            )
-            for view in self._all_lyrics_views():
-                view.set_sync_others_feedback("error", "No Matches")
-            return
-
-        from ui.dialogs.lyrics_propagate_dialog import LyricsPropagateDialog
-
-        dlg = LyricsPropagateDialog(matches, source_lyrics=lrc_text or txt_text, parent=self)
-        if dlg.exec() != QDialog.DialogCode.Accepted:
-            return
-
-        target_ids = dlg.selected_track_ids()
-        if not target_ids:
-            notify_user(
-                self.app_state,
-                "No tracks were checked for syncing.",
-                "warning",
-                show_status=self._show_status_message,
-                status_timeout_ms=3000,
-            )
-            for view in self._all_lyrics_views():
-                view.set_sync_others_feedback("error", "None Checked")
-            return
-
-        for view in self._all_lyrics_views():
-            view.set_sync_others_feedback("loading", "Syncing...")
-
-        try:
-            if self._dirty_lyrics_timer.isActive():
-                self._dirty_lyrics_timer.stop()
-
-            applied_ids = [int(source_track_id), *[int(track_id) for track_id in target_ids]]
-            output_errors: list[str] = []
-            for track_id in applied_ids:
-                track = self._save_lyrics_text_to_track(track_id, lrc_text, txt_text)
-                result = sync_track_outputs_with_result(track, get_config(self.app_state.db))
-                if result.sidecar_error is not None:
-                    output_errors.append(f"{track.title}: {result.sidecar_error}")
-                if result.embed_error is not None:
-                    output_errors.append(f"{track.title}: {result.embed_error}")
-                self._mark_track_lyrics_clean(track)
-                self._update_single_track_lyrics_state(track)
-
-            source_track = get_track_by_id(self.app_state.db, int(source_track_id))
-            self._editing_saved_lyrics = _canonical_lyrics_pair(source_track.lrc_lyrics, source_track.txt_lyrics)
-            self._set_track_lyrics_views(source_track)
-
-            synced_count = len(target_ids)
-            message = f"Lyrics synced to {synced_count} similar track(s)."
-            notify_type = "warning" if output_errors else "success"
-            notify_user(
-                self.app_state,
-                message if not output_errors else f"{message} Some output sync steps failed.",
-                notify_type,
-                show_status=self._show_status_message,
-                status_timeout_ms=4000,
-            )
-            for error in output_errors[:3]:
-                logger.warning("Lyrics propagation output sync issue: %s", error)
-            for view in self._all_lyrics_views():
-                view.set_sync_others_feedback("success", "Synced")
-        except (sqlite3.Error, OSError, ValueError) as exc:
-            log_and_notify(
-                self.app_state,
-                logger,
-                logging.ERROR,
-                exception_message("Failed to sync lyrics to similar tracks", exc),
-                "error",
-                show_status=self._show_status_message,
-                status_timeout_ms=4000,
-            )
-            for view in self._all_lyrics_views():
-                view.set_sync_others_feedback("error", "Sync Failed")
+        lyrics_actions.on_propagate_lyrics_requested(self, lrc, txt)
 
     def _save_lyrics_text_to_track(self, track_id: int, lrc: str, txt: str):
-        if lrc.strip():
-            update_track_synced_lyrics(self.app_state.db, int(track_id), lrc.strip(), (txt or "").strip())
-        elif (txt or "").strip():
-            update_track_plain_lyrics(self.app_state.db, int(track_id), (txt or "").strip())
-        else:
-            update_track_null_lyrics(self.app_state.db, int(track_id))
-        return get_track_by_id(self.app_state.db, int(track_id))
+        return lyrics_actions.save_lyrics_text_to_track(self, track_id, lrc, txt)
 
     def _mark_track_lyrics_clean(self, track) -> None:
-        track_id = int(track.id)
-        self.track_list.set_dirty_lyrics_state(track_id, False)
-        self.albums_tab.set_dirty_lyrics_state(track_id, False)
-        self.artists_tab.set_dirty_lyrics_state(track_id, False)
+        lyrics_actions.mark_track_lyrics_clean(self, track)
 
     def _on_dirty_lyrics_changed(self, lrc: str, txt: str) -> None:
-        if self._loading_lyrics_views:
-            return
-        if self._editing_track_id is None:
-            return
-        self._pending_dirty_lrc = lrc
-        self._pending_dirty_txt = txt
-        self._dirty_lyrics_timer.start()
+        lyrics_actions.on_dirty_lyrics_changed(self, lrc, txt)
 
     def _flush_dirty_lyrics(self) -> None:
-        track_id = self._editing_track_id
-        if track_id is None:
-            return
-        lrc = self._pending_dirty_lrc
-        txt = self._pending_dirty_txt
-        try:
-            draft_lrc, draft_txt = _canonical_lyrics_pair(lrc, txt)
-            saved_lrc, saved_txt = self._editing_saved_lyrics
-            has_dirty = (draft_lrc, draft_txt) != (saved_lrc, saved_txt)
-            if has_dirty:
-                update_track_dirty_lyrics(self.app_state.db, int(track_id), draft_lrc, draft_txt)
-            else:
-                clear_track_dirty_lyrics(self.app_state.db, int(track_id))
-            self.track_list.set_dirty_lyrics_state(int(track_id), has_dirty)
-            self.albums_tab.set_dirty_lyrics_state(int(track_id), has_dirty)
-            self.artists_tab.set_dirty_lyrics_state(int(track_id), has_dirty)
-            for view in self._all_lyrics_views():
-                view._set_dirty_badge(has_dirty)
-        except sqlite3.Error as exc:
-            logger.warning("Failed to save dirty lyrics draft for track %s: %s", track_id, exc)
+        lyrics_actions.flush_dirty_lyrics(self)
 
     def _on_discard_draft_requested(self) -> None:
-        track_id = self._editing_track_id
-        if track_id is None:
-            return
-        try:
-            clear_track_dirty_lyrics(self.app_state.db, int(track_id))
-            track = get_track_by_id(self.app_state.db, int(track_id))
-            self._set_track_lyrics_views(track)
-            self.track_list.set_dirty_lyrics_state(int(track_id), False)
-            self.albums_tab.set_dirty_lyrics_state(int(track_id), False)
-            self.artists_tab.set_dirty_lyrics_state(int(track_id), False)
-            self._show_status_message("Draft discarded.", 2500)
-        except sqlite3.Error as exc:
-            logger.warning("Failed to discard dirty lyrics draft for track %s: %s", track_id, exc)
+        lyrics_actions.on_discard_draft_requested(self)
 
     def _on_auto_sync_requested(self) -> None:
         from ui.workers.ai_sync_worker import _check_ai_sync_available, AiSyncWorker
@@ -1927,140 +1537,16 @@ class MainWindow(QMainWindow):
             self.artists_tab.setSearchValue("")
 
     def _download_current_track_lyrics(self):
-        track_id = self._editing_track_id
-        if track_id is None:
-            notify_user(
-                self.app_state,
-                "Select a track before downloading lyrics.",
-                "warning",
-                show_status=self._show_status_message,
-                status_timeout_ms=3000,
-            )
-            return
-        self.on_download_lyrics(int(track_id))
+        lyrics_actions.download_current_track_lyrics(self)
 
     def _search_current_track_lyrics(self):
-        track_id = self._editing_track_id
-        if track_id is None:
-            notify_user(
-                self.app_state,
-                "Select a track before searching lyrics.",
-                "warning",
-                show_status=self._show_status_message,
-                status_timeout_ms=3000,
-            )
-            return
-
-        track = get_track_by_id(self.app_state.db, int(track_id))
-        artist = track.artist_name or ""
-        title = track.title or ""
-        album = track.album_name or ""
-
-        config = get_config(self.app_state.db)
-        lrclib_url = self._normalize_lrclib_base(config.lrclib_instance)
-
-        from ui.dialogs.search_lyrics_dialog import SearchLyricsDialog
-
-        dlg = SearchLyricsDialog(
-            lrclib_url,
-            db=self.app_state.db,
-            initial_artist=artist,
-            initial_title=title,
-            initial_album=album,
-            parent=self,
-        )
-
-        def _on_lyrics_selected(plain: str, synced: str):
-            s_text, p_text = synced.strip(), plain.strip()
-            if s_text:
-                if not p_text:
-                    from core.utils import plain_text_from_lrc
-                    p_text = plain_text_from_lrc(s_text)
-                update_track_synced_lyrics(self.app_state.db, track_id, s_text, p_text)
-            elif p_text:
-                update_track_plain_lyrics(self.app_state.db, track_id, p_text)
-            if not s_text and not p_text:
-                return
-
-            track = get_track_by_id(self.app_state.db, track_id)
-            self._sync_track_lyrics_outputs(track)
-            self._set_track_lyrics_views(track)
-            self._show_status_message("Lyrics applied from search.", 3000)
-
-        dlg.lyricsSelected.connect(_on_lyrics_selected)
-        dlg.exec()
+        lyrics_actions.search_current_track_lyrics(self)
 
     def _export_current_track_sidecars(self):
-        track_id = self._editing_track_id
-        if track_id is None:
-            notify_user(
-                self.app_state,
-                "Select or start a track before exporting lyrics files.",
-                "warning",
-                show_status=self._show_status_message,
-                status_timeout_ms=3000,
-            )
-            for view in self._all_lyrics_views():
-                view.set_export_feedback("error", "No Track")
-            return
-        self._export_track_sidecars(int(track_id))
+        lyrics_actions.export_current_track_sidecars(self)
 
     def _export_track_sidecars(self, track_id: int):
-        for view in self._all_lyrics_views():
-            view.set_export_feedback("loading", "Exporting...")
-        try:
-            track = get_track_by_id(self.app_state.db, int(track_id))
-            if not (track.lrc_lyrics or track.txt_lyrics):
-                notify_user(
-                    self.app_state,
-                    "No lyrics are available to export for this track.",
-                    "warning",
-                    show_status=self._show_status_message,
-                    status_timeout_ms=3000,
-                )
-                for view in self._all_lyrics_views():
-                    view.set_export_feedback("error", "No Lyrics")
-                return
-
-            config = get_config(self.app_state.db)
-            export_config = replace(config, save_lyrics_sidecars=True)
-            result = sync_track_outputs_with_result(track, export_config)
-            written_paths = list(result.sidecar_paths)
-            if not written_paths:
-                notify_user(
-                    self.app_state,
-                    "No lyrics files were generated for this track.",
-                    "warning",
-                    show_status=self._show_status_message,
-                    status_timeout_ms=3000,
-                )
-                for view in self._all_lyrics_views():
-                    view.set_export_feedback("error", "Nothing Exported")
-                return
-
-            output_dir = os.path.dirname(written_paths[0]) or os.path.dirname(track.file_path)
-            notify_user(
-                self.app_state,
-                "Lyrics files generated successfully.",
-                "success",
-                show_status=self._show_status_message,
-                status_timeout_ms=3000,
-            )
-            self._show_status_message(f"Lyrics files exported to {output_dir}", 3000)
-            for view in self._all_lyrics_views():
-                view.set_export_feedback("success", "Exported")
-        except (sqlite3.Error, OSError, ValueError) as exc:
-            log_and_notify(
-                self.app_state,
-                logger,
-                logging.ERROR,
-                exception_message("Failed to export lyrics files", exc),
-                "error",
-                show_status=self._show_status_message,
-                status_timeout_ms=4000,
-            )
-            for view in self._all_lyrics_views():
-                view.set_export_feedback("error", "Export Failed")
+        lyrics_actions.export_track_sidecars(self, track_id)
 
     def _save_active_lyrics(self):
         """Ctrl+S: trigger save on the currently visible lyrics editor."""
@@ -2078,79 +1564,26 @@ class MainWindow(QMainWindow):
 
     def _focus_search(self):
         """Ctrl+F: focus the search box."""
-        self.top_bar.search_box.setFocus()
-        self.top_bar.search_box.selectAll()
+        preferences.focus_search(self)
 
     def _clear_search(self):
         """Escape: clear the search box and return focus to the track list."""
-        if self.top_bar.search_box.hasFocus():
-            self.top_bar.search_box.clear()
-            self.top_bar.search_box.clearFocus()
+        preferences.clear_search(self)
 
     def _toggle_hotkey_hints(self) -> None:
-        visible = self.hotkey_hints.toggle()
-        if hasattr(self, "top_bar"):
-            self.top_bar.btn_hotkeys.setChecked(visible)
-        self._show_status_message(
-            "Keyboard shortcut hints shown." if visible else "Keyboard shortcut hints hidden.",
-            FEEDBACK_RESET_MS,
-        )
+        preferences.toggle_hotkey_hints(self, FEEDBACK_RESET_MS)
 
     def _apply_hotkey_preferences(self, config) -> None:
-        bindings = parse_hotkey_bindings(getattr(config, "hotkey_bindings_json", ""))
-        self._apply_global_shortcuts(bindings)
-        lyrics_hotkeys = {
-            action: binding for action, binding in bindings.items() if HOTKEY_SPECS[action].group == "lyrics"
-        }
-        for view in self._all_lyrics_views():
-            view.set_hotkey_bindings(lyrics_hotkeys)
-        self._register_hotkey_hints(bindings)
-        if getattr(self, "hotkey_hints", None):
-            self.hotkey_hints.refresh_positions()
+        preferences.apply_hotkey_preferences(self, config)
 
     def _apply_global_shortcuts(self, bindings: dict[str, dict[str, object]]) -> None:
-        handlers = {
-            "play_pause": self._toggle_play_pause,
-            "play_next": self.play_next,
-            "play_previous": self.play_prev,
-            "save_lyrics": self._save_active_lyrics,
-            "focus_search": self._focus_search,
-            "clear_search": self._clear_search,
-            "toggle_hotkey_hints": self._toggle_hotkey_hints,
-        }
-        for action, callback in handlers.items():
-            self._replace_global_shortcut(action, effective_hotkey_text(bindings.get(action), HOTKEY_SPECS[action]), callback)
+        preferences.apply_global_shortcuts(self, bindings)
 
     def _replace_global_shortcut(self, action: str, key: str, callback) -> None:
-        if not hasattr(self, "_global_shortcuts"):
-            self._global_shortcuts = {}
-        existing = self._global_shortcuts.get(action)
-        if existing is not None:
-            existing.deleteLater()
-            self._global_shortcuts[action] = None
-        if not key:
-            return
-        shortcut = QShortcut(QKeySequence(key), self)
-        shortcut.activated.connect(callback)
-        self._global_shortcuts[action] = shortcut
+        preferences.replace_global_shortcut(self, action, key, callback)
 
     def _register_hotkey_hints(self, bindings: dict[str, dict[str, object]] | None = None) -> None:
-        bindings = bindings or parse_hotkey_bindings(get_config(self.app_state.db).hotkey_bindings_json)
-        self.hotkey_hints.register(self.top_bar.search_box, effective_hotkey_text(bindings.get("focus_search"), HOTKEY_SPECS["focus_search"]))
-        self.hotkey_hints.register(self.top_bar.btn_hotkeys, effective_hotkey_text(bindings.get("toggle_hotkey_hints"), HOTKEY_SPECS["toggle_hotkey_hints"]))
-        self.hotkey_hints.register(self.track_list.table, "Enter")
-        for view in self._all_lyrics_views():
-            self.hotkey_hints.register(view.btn_snap, effective_hotkey_text(bindings.get("snap"), HOTKEY_SPECS["snap"]))
-            self.hotkey_hints.register(view.btn_shift_minus, "Left")
-            self.hotkey_hints.register(view.btn_shift_plus, "Right")
-            self.hotkey_hints.register(view.btn_shift_selected, effective_hotkey_text(bindings.get("shift_selected"), HOTKEY_SPECS["shift_selected"]))
-            self.hotkey_hints.register(view.btn_shift_all_from_first, effective_hotkey_text(bindings.get("shift_all_from_first"), HOTKEY_SPECS["shift_all_from_first"]))
-            self.hotkey_hints.register(view.btn_add, "Ctrl+N")
-            self.hotkey_hints.register(view.btn_del, "Delete")
-            self.hotkey_hints.register(view.btn_save, effective_hotkey_text(bindings.get("save_lyrics"), HOTKEY_SPECS["save_lyrics"]))
-        self.hotkey_hints.register(self.player_bar.btn_prev, effective_hotkey_text(bindings.get("play_previous"), HOTKEY_SPECS["play_previous"]))
-        self.hotkey_hints.register(self.player_bar.btn_play, effective_hotkey_text(bindings.get("play_pause"), HOTKEY_SPECS["play_pause"]))
-        self.hotkey_hints.register(self.player_bar.btn_next, effective_hotkey_text(bindings.get("play_next"), HOTKEY_SPECS["play_next"]))
+        preferences.register_hotkey_hints(self, bindings)
 
     def _wire_lyrics_view(self, view: LyricsEditorWidget) -> None:
         view.saveRequested.connect(self._on_lyrics_save_requested)
@@ -2185,156 +1618,45 @@ class MainWindow(QMainWindow):
             self._loading_lyrics_views = False
 
     def _reset_refresh_feedback(self):
-        self.top_bar.reset_refresh_feedback(self._refresh_default_label)
+        preferences.reset_refresh_feedback(self)
 
     def _update_responsive_layout(self):
-        width = max(0, self.width())
-        self.top_bar.update_responsive_layout(width)
-
-        if hasattr(self, "content_splitter"):
-            if width < 980:
-                if self.content_splitter.orientation() != Qt.Orientation.Vertical:
-                    self.content_splitter.setOrientation(Qt.Orientation.Vertical)
-                    self.content_splitter.setSizes([int(self.height() * 0.54), int(self.height() * 0.46)])
-            else:
-                if self.content_splitter.orientation() != Qt.Orientation.Horizontal:
-                    self.content_splitter.setOrientation(Qt.Orientation.Horizontal)
-                    self.content_splitter.setSizes([int(width * 0.58), int(width * 0.42)])
-
-        for splitter_name in ("albums_splitter", "artists_splitter"):
-            splitter = getattr(self, splitter_name, None)
-            if splitter is None:
-                continue
-            if width < 980:
-                if splitter.orientation() != Qt.Orientation.Vertical:
-                    splitter.setOrientation(Qt.Orientation.Vertical)
-                    splitter.setSizes([int(self.height() * 0.54), int(self.height() * 0.46)])
-            else:
-                if splitter.orientation() != Qt.Orientation.Horizontal:
-                    splitter.setOrientation(Qt.Orientation.Horizontal)
-                    splitter.setSizes([int(width * 0.58), int(width * 0.42)])
-
-        if hasattr(self, "player_bar"):
-            self.player_bar.set_compact_mode(width < 980)
+        preferences.update_responsive_layout(self)
 
     def _save_window_state(self):
-        self._persist_window_state_payload(self._build_window_state_payload())
+        preferences.save_window_state(self)
 
     def _build_window_state_payload(self) -> dict[str, object]:
-        state: dict[str, object] = {
-            "geometry": bytes(self.saveGeometry().toBase64()).decode("ascii"),
-            "tab_index": self.tabs.currentIndex(),
-        }
-        if hasattr(self, "content_splitter"):
-            state["tracks_splitter"] = self.content_splitter.sizes()
-        if hasattr(self, "albums_splitter"):
-            state["albums_splitter"] = self.albums_splitter.sizes()
-        if hasattr(self, "artists_splitter"):
-            state["artists_splitter"] = self.artists_splitter.sizes()
-        if hasattr(self, "top_bar"):
-            state["search_text"] = self.top_bar.search_text()
-            state["filters"] = {key: bool(value) for key, value in self.top_bar.filter_values().items()}
-        return state
+        return preferences.build_window_state_payload(self)
 
     def _persist_window_state_payload(self, state: dict[str, object]) -> None:
-        config = get_config(self.app_state.db)
-        set_config(self.app_state.db, replace(config, ui_state_json=json.dumps(state, ensure_ascii=True, separators=(",", ":"))))
+        preferences.persist_window_state_payload(self, state)
 
     def _restore_window_state(self):
-        state = self._load_window_state_payload()
-
-        geometry = state.get("geometry")
-        if isinstance(geometry, str) and geometry:
-            restored = QByteArray.fromBase64(geometry.encode("ascii"))
-            if not restored.isEmpty():
-                self.restoreGeometry(restored)
-
-        search_text = state.get("search_text")
-        if search_text is not None:
-            self.top_bar.set_search_text(str(search_text))
-
-        restored_filters = state.get("filters") if isinstance(state.get("filters"), dict) else {}
-        if restored_filters or search_text is not None:
-            self.top_bar.set_filter_values(restored_filters)
-            self._apply_track_filters()
-
-        for attr, key in [
-            ("content_splitter", "tracks_splitter"),
-            ("albums_splitter", "albums_splitter"),
-            ("artists_splitter", "artists_splitter"),
-        ]:
-            splitter = getattr(self, attr, None)
-            if splitter is None:
-                continue
-            saved = state.get(key)
-            if saved is not None:
-                try:
-                    sizes = [int(v) for v in saved]
-                    if len(sizes) == 2 and all(v > 0 for v in sizes):
-                        splitter.setSizes(sizes)
-                except (TypeError, ValueError):
-                    pass
-
-        tab_index = state.get("tab_index")
-        if tab_index is not None:
-            try:
-                idx = int(tab_index)
-                if 0 <= idx < self.tabs.count():
-                    self.tabs.setCurrentIndex(idx)
-            except (TypeError, ValueError):
-                pass
+        preferences.restore_window_state(self)
 
     def _load_window_state_payload(self) -> dict[str, object]:
-        config = get_config(self.app_state.db)
-        try:
-            state = json.loads(config.ui_state_json or "{}")
-        except (TypeError, ValueError, json.JSONDecodeError):
-            state = {}
-        return state if isinstance(state, dict) else {}
+        return preferences.load_window_state_payload(self)
 
     def _apply_styles(self):
-        self.setStyleSheet(load_stylesheet("main_window.qss"))
+        preferences.apply_styles(self)
 
     def _appearance_scale(self, ui_scale_percent: int) -> float:
-        return max(0.85, min(1.5, float(int(ui_scale_percent or 100)) / 100.0))
+        return preferences.appearance_scale(ui_scale_percent)
 
     def _apply_appearance_preferences(self, config) -> None:
-        app = QApplication.instance()
-        if app is not None:
-            apply_app_theme(
-                app,
-                config.theme_mode,
-                ui_scale_percent=config.ui_scale_percent,
-                font_size_mode=config.font_size_mode,
-            )
-
-        scale = self._appearance_scale(config.ui_scale_percent)
-        if hasattr(self, "player_bar"):
-            self.player_bar.set_show_album_art(bool(config.show_album_art))
-            self.player_bar.set_ui_scale(scale)
+        preferences.apply_appearance_preferences(self, config)
         if hasattr(self, "track_list"):
-            self.track_list.set_ui_scale(scale)
+            self.track_list.set_show_lyrics_column(bool(config.show_line_count))
+            self.track_list.set_show_duration_column(True)
+            self.track_list.apply_current_palette()
         if hasattr(self, "albums_tab"):
-            self.albums_tab.set_ui_scale(scale)
+            self.albums_tab.apply_current_palette()
         if hasattr(self, "artists_tab"):
-            self.artists_tab.set_ui_scale(scale)
-
+            self.artists_tab.apply_current_palette()
         self._apply_styles()
         if hasattr(self, "top_bar"):
-            self.top_bar.refresh_theme_icons()
-        if hasattr(self, "player_bar"):
-            self.player_bar._apply_styles()
-        if hasattr(self, "track_list"):
-            self.track_list._apply_styles()
-            self.track_list.empty_state._apply_styles()
-        if hasattr(self, "albums_tab"):
-            self.albums_tab._apply_styles()
-        if hasattr(self, "artists_tab"):
-            self.artists_tab._apply_styles()
-        if hasattr(self, "mylrclib_tab"):
-            self.mylrclib_tab._apply_styles()
-        if hasattr(self, "lyrics_view"):
-            self.lyrics_view._apply_styles()
+            self.top_bar.apply_current_palette()
         if hasattr(self, "albums_lyrics_view"):
             self.albums_lyrics_view._apply_styles()
         if hasattr(self, "artists_lyrics_view"):
@@ -2433,80 +1755,14 @@ class MainWindow(QMainWindow):
             self.navigate_to(route)
     
     def _confirm_bulk(self, title: str, text: str, count: int) -> bool:
-        # Confirm only when selection is "large"
-        if count < 10:
-            return True
-        res = QMessageBox.question(
-            self,
-            title,
-            f"{text}\n\nSelected: {count}",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
-        )
-        return res == QMessageBox.StandardButton.Yes
+        return library_actions.confirm_bulk(self, title, text, count)
 
 
     def _on_mark_instrumental(self, track_ids: list[int]):
-        track_ids = [int(x) for x in track_ids if x is not None]
-        if not track_ids:
-            return
-
-        if not self._confirm_bulk("Instrumental", "Mark selected tracks as instrumental?", len(track_ids)):
-            return
-
-        selected_before = set(track_ids)
-        active_track_list = self._active_track_list_widget()
-        instrumental_filter_enabled = self.top_bar.filter_values()["instrumental"]
-
-        try:
-            mark_tracks_instrumental(self.app_state.db, track_ids)
-            self._refresh_visible_library_view_after_downloads()
-            if active_track_list is not None:
-                active_track_list.restore_selection(selected_before)
-            message = f"Marked {len(track_ids)} track(s) as instrumental."
-            if not instrumental_filter_enabled:
-                message += " Enable the Instrumental filter to show them."
-            self._show_status_message(message, 5000 if not instrumental_filter_enabled else 3000)
-        except sqlite3.Error as e:
-            log_and_notify(
-                self.app_state,
-                logger,
-                logging.ERROR,
-                exception_message("Failed to mark tracks as instrumental", e),
-                "error",
-                show_status=self._show_status_message,
-                status_timeout_ms=4000,
-            )
-            return
-
-        self._publish_instrumental_to_lrclib(track_ids)
+        library_actions.on_mark_instrumental(self, track_ids, mark_tracks=mark_tracks_instrumental)
 
     def _on_unmark_instrumental(self, track_ids: list[int]):
-        track_ids = [int(x) for x in track_ids if x is not None]
-        if not track_ids:
-            return
-
-        if not self._confirm_bulk("Instrumental", "Unmark instrumental for selected tracks?", len(track_ids)):
-            return
-
-        selected_before = set(track_ids)
-        active_track_list = self._active_track_list_widget()
-
-        try:
-            unmark_tracks_instrumental(self.app_state.db, track_ids)
-            self._show_status_message(f"Unmarked {len(track_ids)} track(s).", 3000)
-            self._refresh_visible_library_view_after_downloads()
-            if active_track_list is not None:
-                active_track_list.restore_selection(selected_before)
-        except sqlite3.Error as e:
-            log_and_notify(
-                self.app_state,
-                logger,
-                logging.ERROR,
-                exception_message("Failed to update tracks", e),
-                "error",
-                show_status=self._show_status_message,
-                status_timeout_ms=4000,
-            )
+        library_actions.on_unmark_instrumental(self, track_ids, unmark_tracks=unmark_tracks_instrumental)
 
     def _cancel_bulk_publish(self) -> None:
         worker = getattr(self.publish_history, "_bulk_worker", None)
@@ -2530,40 +1786,4 @@ class MainWindow(QMainWindow):
             self.scan_overlay.reopen()
 
     def _publish_instrumental_to_lrclib(self, track_ids: list[int]) -> None:
-        from PySide6.QtWidgets import QMessageBox
-
-        reply = QMessageBox.question(
-            self,
-            "Publish Instrumental",
-            f"Also mark {len(track_ids)} track(s) as instrumental on LRCLIB?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No,
-        )
-        if reply != QMessageBox.StandardButton.Yes:
-            return
-
-        from ui.workers.bulk_publish_instrumental_worker import BulkPublishInstrumentalWorker
-
-        config = get_config(self.app_state.db)
-        lrclib_url = self._normalize_lrclib_base(config.lrclib_instance)
-
-        self._instrumental_worker = BulkPublishInstrumentalWorker(
-            db_path=self.app_state.db_path,
-            track_ids=track_ids,
-            lrclib_instance=lrclib_url,
-            parent=self,
-        )
-
-        def _on_finished(ok: bool, summary: str, stats: dict):
-            self._instrumental_worker = None
-            notify_user(
-                self.app_state,
-                summary,
-                "success" if ok else "warning",
-                show_status=self._show_status_message,
-                status_timeout_ms=5000,
-            )
-
-        self._instrumental_worker.finished.connect(_on_finished)
-        self._show_status_message(f"Publishing instrumental status for {len(track_ids)} track(s)...", 3000)
-        self._instrumental_worker.start()
+        library_actions.publish_instrumental_to_lrclib(self, track_ids)

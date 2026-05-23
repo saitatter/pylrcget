@@ -5,12 +5,11 @@ import logging
 import re
 from bisect import bisect_right
 
-from PySide6.QtCore import QEvent, QRect, QSize, Qt, Signal, QTimer
+from PySide6.QtCore import QEvent, Qt, Signal, QTimer
 from PySide6.QtGui import QColor, QKeySequence, QShortcut, QTextCursor
 from PySide6.QtWidgets import (
     QApplication,
     QHeaderView,
-    QLayout,
     QSizePolicy,
     QWidget, QVBoxLayout, QLabel, QStackedWidget,
     QTextEdit, QTableWidget, QTableWidgetItem,
@@ -20,6 +19,7 @@ from PySide6.QtWidgets import (
 from ui.spacing import SPACE_2, SPACE_3, set_layout_spacing
 from ui.style_loader import load_stylesheet
 from ui.widgets.empty_state_widget import EmptyStateWidget
+from ui.widgets.lyrics_editor_parts import FlowLayout, hotkeys as lyrics_editor_hotkeys
 from core.utils import (
     LRC_TS_RE as _TS_RE,
     _ts_to_ms,
@@ -44,101 +44,6 @@ TIME_COLUMN = 0
 TEXT_COLUMN = 1
 LINE_NUMBER_COLUMN = 2
 logger = logging.getLogger(__name__)
-
-
-class FlowLayout(QLayout):
-    def __init__(self, parent=None, *, spacing: int = SPACE_2, justify_rows: bool = True):
-        super().__init__(parent)
-        self._items = []
-        self._justify_rows = bool(justify_rows)
-        self.setContentsMargins(0, 0, 0, 0)
-        self.setSpacing(spacing)
-
-    def addItem(self, item):
-        self._items.append(item)
-
-    def count(self) -> int:
-        return len(self._items)
-
-    def itemAt(self, index: int):
-        if 0 <= index < len(self._items):
-            return self._items[index]
-        return None
-
-    def takeAt(self, index: int):
-        if 0 <= index < len(self._items):
-            return self._items.pop(index)
-        return None
-
-    def expandingDirections(self):
-        return Qt.Orientation(0)
-
-    def hasHeightForWidth(self) -> bool:
-        return True
-
-    def heightForWidth(self, width: int) -> int:
-        return self._do_layout(QRect(0, 0, width, 0), test_only=True)
-
-    def setGeometry(self, rect: QRect) -> None:
-        super().setGeometry(rect)
-        self._do_layout(rect, test_only=False)
-
-    def sizeHint(self) -> QSize:
-        return self.minimumSize()
-
-    def minimumSize(self) -> QSize:
-        size = QSize()
-        for item in self._items:
-            size = size.expandedTo(item.minimumSize())
-        margins = self.contentsMargins()
-        size += QSize(margins.left() + margins.right(), margins.top() + margins.bottom())
-        return size
-
-    def _do_layout(self, rect: QRect, *, test_only: bool) -> int:
-        margins = self.contentsMargins()
-        effective = rect.adjusted(margins.left(), margins.top(), -margins.right(), -margins.bottom())
-        y = effective.y()
-        spacing = self.spacing()
-        rows = []
-        row = []
-        row_width = 0
-        row_height = 0
-
-        for item in self._items:
-            widget = item.widget()
-            if widget is not None and not widget.isVisible():
-                continue
-            item_size = item.sizeHint()
-            next_width = row_width + (spacing if row else 0) + item_size.width()
-            if row and next_width > effective.width():
-                rows.append((row, row_width, row_height))
-                row = []
-                row_width = 0
-                row_height = 0
-                next_width = item_size.width()
-            row.append((item, item_size))
-            row_width = next_width
-            row_height = max(row_height, item_size.height())
-
-        if row:
-            rows.append((row, row_width, row_height))
-
-        for row_items, row_width, row_height in rows:
-            x = effective.x()
-            extra = max(0, effective.width() - row_width)
-            extra_each = extra // len(row_items) if self._justify_rows and row_items and not test_only else 0
-            extra_remainder = extra % len(row_items) if self._justify_rows and row_items and not test_only else 0
-            for index, (item, item_size) in enumerate(row_items):
-                item_width = item_size.width() + extra_each + (1 if index < extra_remainder else 0)
-                item_height = item_size.height()
-                if not test_only:
-                    item.setGeometry(QRect(x, y, item_width, item_height))
-                x += item_width + spacing
-            y += row_height + spacing
-
-        if rows:
-            y -= spacing
-        return y - rect.y() + margins.bottom()
 
 
 class LyricsEditorWidget(QWidget):
@@ -444,10 +349,7 @@ class LyricsEditorWidget(QWidget):
         self.show_none("Choose a track to review or edit its lyrics.")
 
     def _make_shortcut(self, key: str, callback) -> QShortcut:
-        shortcut = QShortcut(QKeySequence(key), self.table)
-        shortcut.setContext(Qt.ShortcutContext.WidgetWithChildrenShortcut)
-        shortcut.activated.connect(callback)
-        return shortcut
+        return lyrics_editor_hotkeys.make_shortcut(self, key, callback)
 
     @property
     def lyrics_hotkeys(self) -> dict[str, str]:
@@ -457,71 +359,17 @@ class LyricsEditorWidget(QWidget):
         }
 
     def set_hotkey_bindings(self, bindings: dict[str, dict[str, object]] | None) -> None:
-        normalized = lyrics_hotkey_defaults()
-        for action, binding in normalized.items():
-            incoming = (bindings or {}).get(action, {})
-            if not isinstance(incoming, dict):
-                incoming = {"enabled": True, "key": str(incoming)}
-            normalized[action] = {
-                "enabled": bool(incoming.get("enabled", binding["enabled"])),
-                "key": normalize_hotkey_text(str(incoming.get("key", binding["key"])) or "", str(binding["key"])),
-            }
-        self._lyrics_hotkeys = normalized
-        snap_key = effective_hotkey_text(normalized["snap"], HOTKEY_SPECS["snap"])
-        shift_selected_key = effective_hotkey_text(normalized["shift_selected"], HOTKEY_SPECS["shift_selected"])
-        shift_all_key = effective_hotkey_text(normalized["shift_all_from_first"], HOTKEY_SPECS["shift_all_from_first"])
-        self._replace_action_shortcuts(
-            "_shortcut_snap",
-            "_shortcut_snap_enter",
-            snap_key,
-            self._snap_selected_line_to_current_time,
-        )
-        self._replace_action_shortcuts(
-            "_shortcut_shift_selected",
-            "_shortcut_shift_selected_enter",
-            shift_selected_key,
-            self._shift_selected_lines_by_custom_amount,
-        )
-        self._replace_action_shortcuts(
-            "_shortcut_shift_all",
-            "_shortcut_shift_all_enter",
-            shift_all_key,
-            self._shift_all_lines_from_first_delta,
-        )
-        self.btn_snap.setToolTip(
-            "Set the selected line's timestamp to the current playback position "
-            f"({snap_key or 'Disabled'})"
-        )
-        self.btn_shift_selected.setToolTip(
-            f"Shift selected lines by the custom amount ({shift_selected_key or 'Disabled'})"
-        )
-        self.btn_shift_all_from_first.setToolTip(
-            "Align all lines so the first line matches the current playback position "
-            f"({shift_all_key or 'Disabled'})"
-        )
+        lyrics_editor_hotkeys.set_hotkey_bindings(self, bindings)
 
     def _replace_action_shortcuts(self, primary_attr: str, secondary_attr: str, key: str, callback) -> None:
-        primary, secondary = self._shortcut_variants(key)
-        self._replace_shortcut(primary_attr, primary, callback)
-        self._replace_shortcut(secondary_attr, secondary, callback)
+        lyrics_editor_hotkeys.replace_action_shortcuts(self, primary_attr, secondary_attr, key, callback)
 
     def _replace_shortcut(self, attr_name: str, key: str | None, callback) -> None:
-        existing = getattr(self, attr_name, None)
-        if existing is not None:
-            existing.deleteLater()
-        if key:
-            setattr(self, attr_name, self._make_shortcut(key, callback))
-            return
-        setattr(self, attr_name, None)
+        lyrics_editor_hotkeys.replace_shortcut(self, attr_name, key, callback)
 
     @staticmethod
     def _shortcut_variants(key: str) -> tuple[str, str | None]:
-        normalized = normalize_hotkey_text(key)
-        if "Enter" in normalized and "Return" not in normalized:
-            return normalized.replace("Enter", "Return"), normalized
-        if "Return" in normalized and "Enter" not in normalized:
-            return normalized, normalized.replace("Return", "Enter")
-        return normalized, None
+        return lyrics_editor_hotkeys.shortcut_variants(key)
 
     def eventFilter(self, watched, event):
         if watched is self.validation_hint and event.type() == QEvent.Type.MouseButtonRelease:
