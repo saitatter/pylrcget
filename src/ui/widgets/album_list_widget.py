@@ -151,6 +151,11 @@ class AlbumListWidget(QWidget):
         self.table.verticalHeader().setDefaultSectionSize(int(round(30 * self._ui_scale)))
         self.track_list.set_ui_scale(self._ui_scale)
 
+    def apply_current_palette(self) -> None:
+        self.table.viewport().update()
+        self.table.update()
+        self.track_list.apply_current_palette()
+
     def setActive(self, active: bool):
         self._active = active
         self.setVisible(active)

@@ -188,6 +188,16 @@ class TrackListWidget(QWidget):
         if hasattr(self.actions, "set_ui_scale"):
             self.actions.set_ui_scale(self._ui_scale)
 
+    def set_show_duration_column(self, show: bool) -> None:
+        self.table.setColumnHidden(2, not bool(show))
+
+    def set_show_lyrics_column(self, show: bool) -> None:
+        self.table.setColumnHidden(3, not bool(show))
+
+    def apply_current_palette(self) -> None:
+        self.table.viewport().update()
+        self.table.update()
+
     def _apply_column_widths(self) -> None:
         self.table.setColumnWidth(0, int(round(TRACK_NUMBER_COLUMN_WIDTH * self._ui_scale)))
         self.table.setColumnWidth(2, int(round(TRACK_DURATION_COLUMN_WIDTH * self._ui_scale)))

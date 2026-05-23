@@ -18,7 +18,11 @@ QLabel#EmptyStateBody {
     line-height: 1.4;
 }
 
-QPushButton#EmptyStateAction {
+QPushButton#EmptyStateAction,
+QPushButton#EmptyStateSecondaryAction,
+QPushButton#EmptyStateTertiaryAction,
+QPushButton#EmptyStateQuaternaryAction {
     margin-top: 8px;
     min-width: 140px;
+    min-height: 40px;
 }

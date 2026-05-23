@@ -75,6 +75,7 @@ class LyricsEditorWidget(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
 
+        self._ui_scale: float = 1.0
         self._current_pos_ms: int = 0
         self._times: list[int] = []
         self._current_index: int = -1
@@ -358,6 +359,13 @@ class LyricsEditorWidget(QWidget):
             action: effective_hotkey_text(binding, HOTKEY_SPECS[action])
             for action, binding in self._lyrics_hotkeys.items()
         }
+
+    def set_ui_scale(self, scale: float) -> None:
+        self._ui_scale = max(0.85, min(1.5, float(scale or 1.0)))
+        self.shift_spin.setMinimumWidth(int(round(SHIFT_SPIN_MIN_WIDTH * self._ui_scale)))
+        self.table.setColumnWidth(TIME_COLUMN, int(round(95 * self._ui_scale)))
+        self.table.setColumnWidth(LINE_NUMBER_COLUMN, int(round(LINE_NUMBER_HEADER_WIDTH * self._ui_scale)))
+        self.table.verticalHeader().setDefaultSectionSize(int(round(30 * self._ui_scale)))
 
     def set_hotkey_bindings(self, bindings: dict[str, dict[str, object]] | None) -> None:
         lyrics_editor_hotkeys.set_hotkey_bindings(self, bindings)

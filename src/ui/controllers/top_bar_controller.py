@@ -222,6 +222,10 @@ class TopBarController(QWidget):
         for button, icon_name in self._action_icons.items():
             button.setIcon(load_svg_icon(icon_name, 18))
 
+    def apply_current_palette(self) -> None:
+        self.refresh_theme_icons()
+        self.update()
+
     def search_text(self) -> str:
         return self.search_box.text()
 
