@@ -1,4 +1,34 @@
 # Changelog
+## v1.10.0 (2026-05-23)
+
+### ✨ Features
+* Streamline settings and selection actions ([bfaf60c](https://github.com/saitatter/pylrcget/commit/bfaf60cf0e5a52a1176e0b15bdb558b8ec89ddc5))
+* Improve ai auto-sync workflow ([17b0d34](https://github.com/saitatter/pylrcget/commit/17b0d34c4d1c6de98fe21b5330dabb7ae95203cf))
+* Persist ui state and customizable shortcuts ([ae4945b](https://github.com/saitatter/pylrcget/commit/ae4945b7653e5230d14721b59d9b34f7fab40f3f))
+
+### 🐛 Fixes
+* Refresh lyrics layout on tab change ([419133f](https://github.com/saitatter/pylrcget/commit/419133f018d63b9c5c662655af4e392d6d29d643))
+* Prevent clipped lyrics toolbar on tab switch ([881f2ce](https://github.com/saitatter/pylrcget/commit/881f2ce83a117756b77d9819c5a311c54ef26b08))
+* Sync library splitter sizes ([773bc79](https://github.com/saitatter/pylrcget/commit/773bc79781551e83654e799d48ea469a073d9970))
+* Normalize startup window sizing ([ef44bdf](https://github.com/saitatter/pylrcget/commit/ef44bdfb03ab778104b93213bd9a67ef371ce406))
+* Stabilize startup window defaults ([d47331c](https://github.com/saitatter/pylrcget/commit/d47331c86a1dc5901ccdffe16c60586039c04529))
+* Avoid narrow startup window restore ([c8cf5e7](https://github.com/saitatter/pylrcget/commit/c8cf5e7f49393ead246bcf9a9e75306d2ffab1ac))
+* Avoid clipping wrapped lyrics toolbar ([7c6793b](https://github.com/saitatter/pylrcget/commit/7c6793b087a143204ca45c83adf70d78f791c18a))
+* Wrap empty state actions ([98b7d70](https://github.com/saitatter/pylrcget/commit/98b7d70d2a5fa73827a9872acca8437f1b838749))
+* Simplify selection action menus ([2c2665a](https://github.com/saitatter/pylrcget/commit/2c2665a55ec7aa2b19a56f3b66b28dd2b9c959ee))
+* Restore startup appearance hooks ([03f65f3](https://github.com/saitatter/pylrcget/commit/03f65f39fe4c5d94e494324778f06304a75d1eda))
+
+### ♻️ Refactors
+* Modularize query and main window helpers ([abcff41](https://github.com/saitatter/pylrcget/commit/abcff41be860ea96c2505a2deb5b1f723fe86634))
+
+### 🧰 CI & Build
+* Run tests with pytest ([cdd3744](https://github.com/saitatter/pylrcget/commit/cdd37444b6c98fb70392db6098940fabb7b71b31))
+
+### 🧪 Tests
+* Organize top-level test suites ([2e1a770](https://github.com/saitatter/pylrcget/commit/2e1a770d8e3c9985971f55b14db94a513b695e39))
+* Reorganize widget navigation suites ([e506877](https://github.com/saitatter/pylrcget/commit/e5068773295a9a3ae1c2016e0ab8d114538a1ac5))
+
+
 ## v1.9.0 (2026-05-11)
 
 ### ✨ Features
