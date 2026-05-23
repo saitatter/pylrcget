@@ -56,7 +56,12 @@ def get_app_data_dir() -> str:
     app = QApplication.instance()
     if app is not None and not app.applicationName():
         app.setApplicationName("PyLrcGet")
-    base = QStandardPaths.writableLocation(QStandardPaths.AppDataLocation)
+    app_data_root = QStandardPaths.writableLocation(QStandardPaths.AppDataLocation)
+    app_data_path = Path(app_data_root)
+    if app_data_path.name.casefold() != "pylrcget":
+        base = str(app_data_path.parent / "PyLrcGet")
+    else:
+        base = str(app_data_path)
 
     _migrate_old_nested_app_data(base)
     os.makedirs(base, exist_ok=True)

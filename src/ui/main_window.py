@@ -88,6 +88,9 @@ from ui.constants import (
 
 logger = logging.getLogger(__name__)
 
+DEFAULT_WINDOW_WIDTH = 1200
+DEFAULT_WINDOW_HEIGHT = 760
+
 
 class MainWindow(QMainWindow):
     @staticmethod
@@ -108,7 +111,7 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.setWindowTitle("PyLrcGet")
         self.setWindowIcon(load_app_icon())
-        self.resize(900, 600)
+        self.resize(DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT)
         self.setAcceptDrops(True)
         self.app_state = app_state
 
