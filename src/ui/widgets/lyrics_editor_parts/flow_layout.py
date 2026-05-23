@@ -39,6 +39,9 @@ class FlowLayout(QLayout):
     def heightForWidth(self, width: int) -> int:
         return self._do_layout(QRect(0, 0, width, 0), test_only=True)
 
+    def minimumHeightForWidth(self, width: int) -> int:
+        return self.heightForWidth(width)
+
     def setGeometry(self, rect: QRect) -> None:
         super().setGeometry(rect)
         self._do_layout(rect, test_only=False)

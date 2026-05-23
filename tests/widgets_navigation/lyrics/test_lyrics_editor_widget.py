@@ -51,6 +51,42 @@ class LyricsEditorWidgetTests(unittest.TestCase):
             widget.hide()
             widget.deleteLater()
 
+    def test_no_selection_toolbar_buttons_remain_fully_visible_in_narrow_layouts(self):
+        widget = LyricsEditorWidget()
+        try:
+            widget.resize(520, 360)
+            widget.show()
+            self.app.processEvents()
+
+            widget.show_none("Choose a track to review or edit its lyrics.")
+            self.app.processEvents()
+
+            toolbar_buttons = [
+                widget.btn_snap,
+                widget.btn_shift_minus,
+                widget.btn_shift_plus,
+                widget.btn_shift_selected,
+                widget.btn_shift_all_from_first,
+                widget.btn_add,
+                widget.btn_del,
+                widget.btn_save,
+                widget.btn_sync_others,
+                widget.btn_export_files,
+                widget.btn_publish_synced,
+                widget.btn_publish_plain,
+            ]
+
+            visible_buttons = [button for button in toolbar_buttons if button.isVisible()]
+            self.assertTrue(visible_buttons)
+            self.assertTrue(all(button.geometry().top() >= 0 for button in visible_buttons))
+            self.assertLessEqual(
+                max(button.geometry().bottom() for button in visible_buttons),
+                widget.stack.geometry().top() - 1,
+            )
+        finally:
+            widget.hide()
+            widget.deleteLater()
+
     def test_empty_lyrics_auto_sync_action_opens_editor_and_emits_request(self):
         widget = LyricsEditorWidget()
         emitted: list[bool] = []

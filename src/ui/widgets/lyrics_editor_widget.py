@@ -101,7 +101,9 @@ class LyricsEditorWidget(QWidget):
         set_layout_spacing(root, margins=SPACE_3, spacing=SPACE_2)
 
         # --- header ---
-        header = QVBoxLayout()
+        self.header_widget = QWidget()
+        self.header_widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        header = QVBoxLayout(self.header_widget)
         set_layout_spacing(header, spacing=SPACE_2)
 
         title_row = QHBoxLayout()
@@ -267,7 +269,7 @@ class LyricsEditorWidget(QWidget):
 
         header.addLayout(toolbar)
 
-        root.addLayout(header)
+        root.addWidget(self.header_widget)
 
         self.validation_hint = QLabel("")
         self.validation_hint.setObjectName("LyricsValidationHint")
