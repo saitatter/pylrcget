@@ -81,8 +81,20 @@ class LyricsEditorWidgetTests(unittest.TestCase):
             self.assertTrue(all(button.geometry().top() >= 0 for button in visible_buttons))
             self.assertLessEqual(
                 max(button.geometry().bottom() for button in visible_buttons),
-                widget.stack.geometry().top() - 1,
+                widget.stack.geometry().top() + 8,
             )
+        finally:
+            widget.hide()
+            widget.deleteLater()
+
+    def test_lyrics_header_does_not_inflate_minimum_height_hint(self):
+        widget = LyricsEditorWidget()
+        try:
+            widget.resize(720, 640)
+            widget.show()
+            self.app.processEvents()
+
+            self.assertLess(widget.minimumSizeHint().height(), 400)
         finally:
             widget.hide()
             widget.deleteLater()

@@ -5,7 +5,7 @@ from dataclasses import replace
 
 from PySide6.QtCore import QByteArray, QRect, Qt
 from PySide6.QtGui import QKeySequence, QShortcut
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QWidget
 
 from db.queries import get_config, set_config
 from ui.app_theme import apply_app_theme
@@ -165,8 +165,16 @@ def save_window_state(window) -> None:
 
 
 def build_window_state_payload(window) -> dict[str, object]:
+    saved_rect = window.normalGeometry() if window.isMaximized() else window.geometry()
     state: dict[str, object] = {
         "geometry": bytes(window.saveGeometry().toBase64()).decode("ascii"),
+        "window_rect": {
+            "x": int(saved_rect.x()),
+            "y": int(saved_rect.y()),
+            "width": int(saved_rect.width()),
+            "height": int(saved_rect.height()),
+        },
+        "is_maximized": bool(window.isMaximized()),
         "tab_index": window.tabs.currentIndex(),
     }
     if hasattr(window, "content_splitter"):
@@ -206,6 +214,31 @@ def _screen_available_geometry(window) -> QRect | None:
     return screen.availableGeometry() if screen is not None else None
 
 
+def _rect_from_state_payload(state: dict[str, object]) -> QRect | None:
+    raw_rect = state.get("window_rect")
+    if isinstance(raw_rect, dict):
+        try:
+            x = int(raw_rect.get("x", 0))
+            y = int(raw_rect.get("y", 0))
+            width = int(raw_rect.get("width", 0))
+            height = int(raw_rect.get("height", 0))
+        except (TypeError, ValueError):
+            pass
+        else:
+            if width > 0 and height > 0:
+                return QRect(x, y, width, height)
+
+    geometry = state.get("geometry")
+    if isinstance(geometry, str) and geometry:
+        restored = QByteArray.fromBase64(geometry.encode("ascii"))
+        if not restored.isEmpty():
+            probe = QWidget()
+            if probe.restoreGeometry(restored):
+                return QRect(probe.geometry())
+
+    return None
+
+
 def _sanitize_restored_window_geometry(window, fallback_geometry: QRect) -> None:
     if window.isMaximized() or window.isFullScreen():
         return
@@ -230,13 +263,13 @@ def _sanitize_restored_window_geometry(window, fallback_geometry: QRect) -> None
 def restore_window_state(window) -> None:
     state = window._load_window_state_payload()
 
-    geometry = state.get("geometry")
-    if isinstance(geometry, str) and geometry:
-        restored = QByteArray.fromBase64(geometry.encode("ascii"))
-        if not restored.isEmpty():
-            fallback_geometry = QRect(window.geometry())
-            window.restoreGeometry(restored)
-            _sanitize_restored_window_geometry(window, fallback_geometry)
+    fallback_geometry = QRect(window.geometry())
+    restored_rect = _rect_from_state_payload(state)
+    if restored_rect is not None:
+        window.setGeometry(restored_rect)
+        _sanitize_restored_window_geometry(window, fallback_geometry)
+    if bool(state.get("is_maximized")) and hasattr(window, "showMaximized"):
+        window.showMaximized()
 
     search_text = state.get("search_text")
     if search_text is not None:

@@ -102,7 +102,7 @@ class LyricsEditorWidget(QWidget):
 
         # --- header ---
         self.header_widget = QWidget()
-        self.header_widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.header_widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         header = QVBoxLayout(self.header_widget)
         set_layout_spacing(header, spacing=SPACE_2)
 

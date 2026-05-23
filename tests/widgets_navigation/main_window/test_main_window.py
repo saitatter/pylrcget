@@ -172,6 +172,8 @@ class MainWindowInstrumentalTests(unittest.TestCase):
         saved_payload = {}
         window._persist_window_state_payload = lambda payload: saved_payload.update(payload)
         window.saveGeometry = MagicMock(return_value=QByteArray(b"geo"))
+        window.geometry = lambda: QRect(40, 50, 1200, 760)
+        window.isMaximized = lambda: False
         window.tabs = SimpleNamespace(currentIndex=lambda: 2)
         window.top_bar = SimpleNamespace(
             search_text=lambda: "chapter ii",
@@ -194,6 +196,11 @@ class MainWindowInstrumentalTests(unittest.TestCase):
         self.assertEqual(saved_payload["filters"]["unsaved"], True)
         self.assertEqual(saved_payload["tab_index"], 2)
         self.assertTrue(isinstance(saved_payload["geometry"], str) and saved_payload["geometry"])
+        self.assertEqual(
+            saved_payload["window_rect"],
+            {"x": 40, "y": 50, "width": 1200, "height": 760},
+        )
+        self.assertFalse(saved_payload["is_maximized"])
 
     def test_restore_window_state_restores_filter_checkboxes(self):
         window = MainWindow.__new__(MainWindow)
@@ -222,6 +229,15 @@ class MainWindowInstrumentalTests(unittest.TestCase):
         )
         window._apply_track_filters = MagicMock()
         window.tabs = SimpleNamespace(count=lambda: 5, setCurrentIndex=MagicMock())
+        window.geometry = lambda: QRect(40, 50, 1200, 760)
+        window.setGeometry = MagicMock()
+        window.move = MagicMock()
+        window.minimumWidth = lambda: 0
+        window.minimumHeight = lambda: 0
+        window.minimumSizeHint = lambda: SimpleNamespace(width=lambda: 820, height=lambda: 560)
+        window.isMaximized = lambda: False
+        window.isFullScreen = lambda: False
+        window.screen = lambda: None
 
         MainWindow._restore_window_state(window)
 
@@ -243,7 +259,7 @@ class MainWindowInstrumentalTests(unittest.TestCase):
                 self._geometry = QRect(40, 50, 900, 600)
                 self._load_window_state_payload = MagicMock(
                     return_value={
-                        "geometry": bytes(QByteArray(b"restored").toBase64()).decode("ascii"),
+                        "window_rect": {"x": 20, "y": 30, "width": 420, "height": 320},
                     }
                 )
                 self.top_bar = SimpleNamespace(
@@ -261,10 +277,6 @@ class MainWindowInstrumentalTests(unittest.TestCase):
 
             def move(self, x, y):
                 self._geometry.moveTo(x, y)
-
-            def restoreGeometry(self, _payload):
-                self._geometry = QRect(20, 30, 420, 320)
-                return True
 
             def minimumWidth(self):
                 return 0
@@ -302,7 +314,7 @@ class MainWindowInstrumentalTests(unittest.TestCase):
                 self._geometry = QRect(40, 50, 1200, 760)
                 self._load_window_state_payload = MagicMock(
                     return_value={
-                        "geometry": bytes(QByteArray(b"restored").toBase64()).decode("ascii"),
+                        "window_rect": {"x": 20, "y": 30, "width": 930, "height": 760},
                     }
                 )
                 self.top_bar = SimpleNamespace(
@@ -320,10 +332,6 @@ class MainWindowInstrumentalTests(unittest.TestCase):
 
             def move(self, x, y):
                 self._geometry.moveTo(x, y)
-
-            def restoreGeometry(self, _payload):
-                self._geometry = QRect(20, 30, 930, 760)
-                return True
 
             def minimumWidth(self):
                 return 0
