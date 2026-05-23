@@ -12,6 +12,7 @@ class EmptyStateWidget(QWidget):
     actionTriggered = Signal()
     secondaryActionTriggered = Signal()
     tertiaryActionTriggered = Signal()
+    quaternaryActionTriggered = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -51,12 +52,18 @@ class EmptyStateWidget(QWidget):
         self.tertiary_action.clicked.connect(self.tertiaryActionTriggered.emit)
         self.tertiary_action.hide()
 
+        self.quaternary_action = QPushButton()
+        self.quaternary_action.setObjectName("EmptyStateQuaternaryAction")
+        self.quaternary_action.clicked.connect(self.quaternaryActionTriggered.emit)
+        self.quaternary_action.hide()
+
         self._btn_row = QHBoxLayout()
         self._btn_row.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._btn_row.setSpacing(SPACE_2)
         self._btn_row.addWidget(self.action)
         self._btn_row.addWidget(self.secondary_action)
         self._btn_row.addWidget(self.tertiary_action)
+        self._btn_row.addWidget(self.quaternary_action)
 
         layout.addWidget(self.icon)
         layout.addWidget(self.title)
@@ -74,6 +81,7 @@ class EmptyStateWidget(QWidget):
         action_text: str | None = None,
         secondary_action_text: str | None = None,
         tertiary_action_text: str | None = None,
+        quaternary_action_text: str | None = None,
     ) -> None:
         self.icon.setPixmap(load_svg_pixmap(icon_name, 56))
         self.title.setText(title)
@@ -96,6 +104,12 @@ class EmptyStateWidget(QWidget):
             self.tertiary_action.show()
         else:
             self.tertiary_action.hide()
+
+        if quaternary_action_text:
+            self.quaternary_action.setText(quaternary_action_text)
+            self.quaternary_action.show()
+        else:
+            self.quaternary_action.hide()
 
     def _apply_styles(self):
         self.setStyleSheet(load_stylesheet("empty_state.qss"))

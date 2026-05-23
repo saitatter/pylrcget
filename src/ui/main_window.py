@@ -48,6 +48,7 @@ from ui.controllers.lyrics_download_controller import LyricsDownloadController
 from ui.controllers.navigation_controller import NavigationController
 from ui.controllers.publish_history_controller import PublishHistoryController
 from ui.controllers.top_bar_controller import TopBarController
+from ui.ai_sync_settings import load_ai_sync_settings
 from ui.hotkeys import HOTKEY_SPECS, effective_hotkey_text, parse_hotkey_bindings
 from ui.widgets.track_list_widget import TrackListWidget
 from ui.dialogs.music_folders_dialog import MusicFoldersDialog
@@ -335,6 +336,8 @@ class MainWindow(QMainWindow):
         self.publish_overlay.sync_to_parent()
         self.scan_overlay = DownloadProgressOverlay(self.central_widget, verb="Scan")
         self.scan_overlay.sync_to_parent()
+        self.ai_sync_overlay = DownloadProgressOverlay(self.central_widget, verb="AI Sync")
+        self.ai_sync_overlay.sync_to_parent()
         self.publish_history = PublishHistoryController(
             self.app_state,
             normalize_lrclib_base=self._normalize_lrclib_base,
@@ -347,17 +350,21 @@ class MainWindow(QMainWindow):
         )
         self.publish_overlay.cancelRequested.connect(self._cancel_bulk_publish)
         self.scan_overlay.cancelRequested.connect(self._cancel_scan)
+        self.ai_sync_overlay.cancelRequested.connect(self._cancel_ai_sync)
 
         # Background activity button — shows when an overlay is minimized
         self.download_overlay.activeChanged.connect(self._update_bg_activity_button)
         self.publish_overlay.activeChanged.connect(self._update_bg_activity_button)
         self.scan_overlay.activeChanged.connect(self._update_bg_activity_button)
+        self.ai_sync_overlay.activeChanged.connect(self._update_bg_activity_button)
         self.download_overlay.minimized.connect(self._update_bg_activity_button)
         self.publish_overlay.minimized.connect(self._update_bg_activity_button)
         self.scan_overlay.minimized.connect(self._update_bg_activity_button)
+        self.ai_sync_overlay.minimized.connect(self._update_bg_activity_button)
         self.download_overlay.dismissed.connect(self._update_bg_activity_button)
         self.publish_overlay.dismissed.connect(self._update_bg_activity_button)
         self.scan_overlay.dismissed.connect(self._update_bg_activity_button)
+        self.ai_sync_overlay.dismissed.connect(self._update_bg_activity_button)
         self.top_bar.btn_bg_activity.clicked.connect(self._reopen_bg_overlay)
 
         self.lyrics_view.publishSyncedRequested.connect(self.publish_history.publish_synced)
@@ -640,6 +647,8 @@ class MainWindow(QMainWindow):
             self.publish_overlay.sync_to_parent()
         if hasattr(self, "scan_overlay"):
             self.scan_overlay.sync_to_parent()
+        if hasattr(self, "ai_sync_overlay"):
+            self.ai_sync_overlay.sync_to_parent()
         if hasattr(self, "toasts"):
             self.toasts.sync_to_parent()
 
@@ -1347,6 +1356,7 @@ class MainWindow(QMainWindow):
             return
 
         track = get_track_by_id(self.app_state.db, int(track_id))
+        ai_sync_settings = load_ai_sync_settings(get_config(self.app_state.db).ui_state_json)
         audio_path = self._track_playback_path(track)
         if not os.path.isfile(audio_path):
             notify_user(
@@ -1369,11 +1379,19 @@ class MainWindow(QMainWindow):
             view.btn_auto_sync.setEnabled(False)
             view.btn_auto_sync.setText("Syncing...")
 
+        self.ai_sync_overlay.start_batch("Current track", 4)
+        self.ai_sync_overlay.update_progress(0, 4, "AI Auto-Sync", "Preparing local AI sync...")
         self._show_status_message("AI sync starting...")
         sync_track_id = int(track_id)
 
-        worker = AiSyncWorker(audio_path, plain_lyrics)
-        worker.progress.connect(lambda msg: self._show_status_message(msg))
+        worker = AiSyncWorker(
+            audio_path,
+            plain_lyrics,
+            whisper_model=str(ai_sync_settings.get("whisper_model") or "base"),
+            device=str(ai_sync_settings.get("device") or "auto"),
+            use_vocal_separation=bool(ai_sync_settings.get("use_demucs", True)),
+        )
+        worker.progress.connect(self._on_ai_sync_progress)
         worker.finished.connect(lambda ok, msg, lrc: self._on_auto_sync_finished(ok, msg, lrc, sync_track_id))
         self._ai_sync_worker = worker
         worker.start()
@@ -1382,6 +1400,16 @@ class MainWindow(QMainWindow):
         for view in self._all_lyrics_views():
             view.btn_auto_sync.setEnabled(True)
             view.btn_auto_sync.setText("Auto Sync")
+
+        overlay = getattr(self, "ai_sync_overlay", None)
+        if overlay is not None:
+            overlay.append_result("AI Auto-Sync", msg, ok)
+            overlay.finish_batch(
+                "AI sync cancelled." if msg == "Cancelled." else msg,
+                cancelled=(msg == "Cancelled."),
+            )
+            overlay.queue_auto_close(2200)
+        self._ai_sync_worker = None
 
         if not ok:
             notify_user(
@@ -1422,6 +1450,31 @@ class MainWindow(QMainWindow):
             )
 
     # ------------------ helpers ------------------
+    def _on_ai_sync_progress(self, message: str) -> None:
+        self._show_status_message(message)
+        overlay = getattr(self, "ai_sync_overlay", None)
+        if overlay is None:
+            return
+        lowered = (message or "").strip().lower()
+        step = 0
+        if "demucs" in lowered or "vocal separation" in lowered:
+            step = 1
+        elif "whisper model" in lowered:
+            step = 2
+        elif "transcribing" in lowered:
+            step = 3
+        elif "building lrc" in lowered:
+            step = 4
+        overlay.update_progress(step, 4, "AI Auto-Sync", message)
+
+    def _cancel_ai_sync(self) -> None:
+        worker = getattr(self, "_ai_sync_worker", None)
+        if worker is not None and worker.isRunning():
+            worker.requestInterruption()
+            overlay = getattr(self, "ai_sync_overlay", None)
+            if overlay is not None:
+                overlay.update_progress(-1, 4, "AI Auto-Sync", "Cancelling now...")
+
     def _normalize_lrclib_base(self, url: str) -> str:
         u = (url or "").strip().rstrip("/")
         if not u:
@@ -1771,19 +1824,30 @@ class MainWindow(QMainWindow):
 
     def _update_bg_activity_button(self, *_args) -> None:
         """Show the background-activity button when any overlay is active but hidden."""
-        dl_bg = self.download_overlay.is_active and not self.download_overlay.isVisible()
-        pub_bg = self.publish_overlay.is_active and not self.publish_overlay.isVisible()
-        scan_bg = self.scan_overlay.is_active and not self.scan_overlay.isVisible()
-        self.top_bar.btn_bg_activity.setVisible(dl_bg or pub_bg or scan_bg)
+        overlays = [
+            getattr(self, "download_overlay", None),
+            getattr(self, "publish_overlay", None),
+            getattr(self, "scan_overlay", None),
+            getattr(self, "ai_sync_overlay", None),
+        ]
+        has_background_activity = any(
+            overlay is not None and overlay.is_active and not overlay.isVisible()
+            for overlay in overlays
+        )
+        self.top_bar.btn_bg_activity.setVisible(has_background_activity)
 
     def _reopen_bg_overlay(self) -> None:
         """Re-show whichever overlay is running in the background."""
-        if self.download_overlay.is_active:
-            self.download_overlay.reopen()
-        elif self.publish_overlay.is_active:
-            self.publish_overlay.reopen()
-        elif self.scan_overlay.is_active:
-            self.scan_overlay.reopen()
+        overlays = [
+            getattr(self, "download_overlay", None),
+            getattr(self, "publish_overlay", None),
+            getattr(self, "scan_overlay", None),
+            getattr(self, "ai_sync_overlay", None),
+        ]
+        for overlay in overlays:
+            if overlay is not None and overlay.is_active:
+                overlay.reopen()
+                break
 
     def _publish_instrumental_to_lrclib(self, track_ids: list[int]) -> None:
         library_actions.publish_instrumental_to_lrclib(self, track_ids)

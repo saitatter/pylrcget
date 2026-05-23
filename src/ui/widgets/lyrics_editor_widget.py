@@ -145,7 +145,7 @@ class LyricsEditorWidget(QWidget):
 
         self.btn_auto_sync = QPushButton("Auto Sync")
         self.btn_auto_sync.setObjectName("LyricsAutoSync")
-        self.btn_auto_sync.setToolTip("Automatically synchronize lyrics using AI (requires torch, demucs, openai-whisper)")
+        self.btn_auto_sync.setToolTip("Automatically synchronize lyrics using AI (requires torch and openai-whisper; Demucs is optional)")
         self.btn_auto_sync.hide()
         self.btn_auto_sync.clicked.connect(self.autoSyncRequested.emit)
         title_row.addWidget(self.btn_auto_sync)
@@ -281,6 +281,7 @@ class LyricsEditorWidget(QWidget):
         self.empty_state.actionTriggered.connect(self.downloadRequested.emit)
         self.empty_state.secondaryActionTriggered.connect(self.searchRequested.emit)
         self.empty_state.tertiaryActionTriggered.connect(self._start_writing_lyrics)
+        self.empty_state.quaternaryActionTriggered.connect(self._start_ai_sync_from_empty_state)
         self.stack.addWidget(self.empty_state)
 
         # Plain editor (editable if you want)
@@ -499,10 +500,11 @@ class LyricsEditorWidget(QWidget):
             self.empty_state.configure(
                 icon_name="audio-lines.svg",
                 title="No lyrics available yet",
-                body="Download lyrics from LRCLIB to start editing, or search manually.",
+                body="Download lyrics from LRCLIB, write them manually, or start an AI auto-sync draft from the local audio file.",
                 action_text="Download Lyrics",
                 secondary_action_text="Search LRCLIB",
                 tertiary_action_text="Write Lyrics",
+                quaternary_action_text="Auto Sync",
             )
             self.stack.setCurrentWidget(self.empty_state)
         self._loading_track = False
@@ -587,6 +589,11 @@ class LyricsEditorWidget(QWidget):
         """Switch to an empty plain editor so the user can write lyrics from scratch."""
         self._set_plain("")
         self.plain.setFocus()
+
+    def _start_ai_sync_from_empty_state(self):
+        """Expose AI sync from the empty state while keeping the regular editor visible."""
+        self._start_writing_lyrics()
+        self.autoSyncRequested.emit()
 
     def _toggle_editor_mode(self):
         """Switch between synced (table) and plain text editing modes."""

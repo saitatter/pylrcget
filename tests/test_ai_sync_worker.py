@@ -1,9 +1,13 @@
 """Tests for AI sync worker helper functions (no torch/whisper required)."""
 from __future__ import annotations
 
+import builtins
+
+import pytest
+
 from tests import test_support as _test_support  # noqa: F401
 
-from ui.workers.ai_sync_worker import _format_ts, _build_lrc_from_segments
+from ui.workers.ai_sync_worker import _format_ts, _build_lrc_from_segments, _check_ai_sync_available
 
 
 def test_format_ts_zero():
@@ -46,3 +50,21 @@ def test_build_lrc_skips_empty_text():
     lines = result.strip().split("\n")
     assert len(lines) == 1
     assert "Real line" in lines[0]
+
+
+def test_ai_sync_availability_does_not_require_demucs(monkeypatch):
+    real_import = builtins.__import__
+
+    def fake_import(name, globals=None, locals=None, fromlist=(), level=0):
+        if name in {"torch", "torchaudio", "soundfile", "whisper"}:
+            return object()
+        if name == "demucs":
+            raise ImportError("demucs missing")
+        return real_import(name, globals, locals, fromlist, level)
+
+    monkeypatch.setattr(builtins, "__import__", fake_import)
+
+    ok, msg = _check_ai_sync_available()
+
+    assert ok is True
+    assert msg == ""

@@ -1,10 +1,10 @@
 """
 AI-powered lyrics synchronization worker.
 
-Pipeline: Demucs (vocal separation) → Whisper (transcription + word timestamps) → LRC generation.
+Pipeline: optional Demucs vocal separation → Whisper transcription → LRC generation.
 
-Requires optional dependencies: torch, demucs, openai-whisper
-These are NOT bundled with the app — users must install them separately.
+Requires optional dependencies: torch, torchaudio, soundfile, openai-whisper.
+Demucs is optional and the worker falls back to the full mix when it is unavailable.
 """
 from __future__ import annotations
 
@@ -18,6 +18,14 @@ from PySide6.QtCore import QThread, Signal
 logger = logging.getLogger(__name__)
 
 
+def _module_available(module: str) -> bool:
+    try:
+        __import__(module)
+    except ImportError:
+        return False
+    return True
+
+
 def _check_ai_sync_available() -> tuple[bool, str]:
     """Check whether the required AI sync dependencies are installed."""
     missing: list[str] = []
@@ -25,13 +33,10 @@ def _check_ai_sync_available() -> tuple[bool, str]:
         ("torch", "torch"),
         ("torchaudio", "torchaudio"),
         ("soundfile", "soundfile"),
-        ("demucs", "demucs"),
         ("whisper", "openai-whisper"),
     ]
     for module, package in deps:
-        try:
-            __import__(module)
-        except ImportError:
+        if not _module_available(module):
             missing.append(package)
     if missing:
         return False, (
@@ -163,6 +168,7 @@ class AiSyncWorker(QThread):
         *,
         whisper_model: str = "base",
         device: str = "auto",
+        use_vocal_separation: bool = True,
         parent=None,
     ):
         super().__init__(parent)
@@ -170,6 +176,7 @@ class AiSyncWorker(QThread):
         self.plain_lyrics = (plain_lyrics or "").strip()
         self.whisper_model = whisper_model or "base"
         self._device = device
+        self._use_vocal_separation = bool(use_vocal_separation)
 
     def _resolve_device(self) -> str:
         import torch
@@ -194,8 +201,13 @@ class AiSyncWorker(QThread):
 
             device = self._resolve_device()
 
-            self.progress.emit("Separating vocals with Demucs...")
-            vocals_path = self._separate_vocals(device)
+            if self._use_vocal_separation and _module_available("demucs"):
+                self.progress.emit("Separating vocals with Demucs...")
+                vocals_path = self._separate_vocals(device)
+            elif self._use_vocal_separation:
+                self.progress.emit("Demucs is not installed, using the full audio mix...")
+            else:
+                self.progress.emit("Vocal separation disabled, using the full audio mix...")
             if self.isInterruptionRequested():
                 self.finished.emit(False, "Cancelled.", "")
                 return

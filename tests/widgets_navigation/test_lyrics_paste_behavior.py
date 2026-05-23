@@ -13,6 +13,32 @@ class LyricsPasteBehaviorTests(unittest.TestCase):
         finally:
             widget.deleteLater()
 
+    def test_empty_lyrics_state_exposes_auto_sync_action(self):
+        widget = LyricsEditorWidget()
+        try:
+            widget.set_track_lyrics("Song", "", "", False)
+
+            self.assertIs(widget.stack.currentWidget(), widget.empty_state)
+            self.assertFalse(widget.empty_state.quaternary_action.isHidden())
+            self.assertEqual(widget.empty_state.quaternary_action.text(), "Auto Sync")
+        finally:
+            widget.deleteLater()
+
+    def test_empty_lyrics_auto_sync_action_opens_editor_and_emits_request(self):
+        widget = LyricsEditorWidget()
+        emitted: list[bool] = []
+        widget.autoSyncRequested.connect(lambda: emitted.append(True))
+        try:
+            widget.set_track_lyrics("Song", "", "", False)
+
+            widget.empty_state.quaternary_action.click()
+
+            self.assertEqual(emitted, [True])
+            self.assertIs(widget.stack.currentWidget(), widget.plain)
+            self.assertFalse(widget.btn_auto_sync.isHidden())
+        finally:
+            widget.deleteLater()
+
     def test_switch_to_synced_parses_pasted_lrc(self):
         widget = LyricsEditorWidget()
         try:

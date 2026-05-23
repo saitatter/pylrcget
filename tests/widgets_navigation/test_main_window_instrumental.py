@@ -307,3 +307,25 @@ class SettingsDialogHotkeyTests(unittest.TestCase):
                     dialog.deleteLater()
             finally:
                 app_state.db.close()
+
+    def test_settings_dialog_loads_and_saves_ai_sync_preferences(self):
+        with TemporaryDirectory() as tmp:
+            app_state = simple_app_state(initialize_database(tmp))
+            try:
+                dialog = MusicFoldersDialog(app_state)
+                dialog.ai_whisper_model_combo.setCurrentIndex(dialog.ai_whisper_model_combo.findData("small"))
+                dialog.ai_device_combo.setCurrentIndex(dialog.ai_device_combo.findData("cpu"))
+                dialog.ai_use_demucs_chk.setChecked(False)
+
+                dialog.save()
+
+                reloaded = MusicFoldersDialog(app_state)
+                try:
+                    self.assertEqual(reloaded.ai_whisper_model_combo.currentData(), "small")
+                    self.assertEqual(reloaded.ai_device_combo.currentData(), "cpu")
+                    self.assertFalse(reloaded.ai_use_demucs_chk.isChecked())
+                finally:
+                    reloaded.deleteLater()
+                    dialog.deleteLater()
+            finally:
+                app_state.db.close()

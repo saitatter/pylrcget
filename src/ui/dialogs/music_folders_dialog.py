@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
+import json
 import os
 import re
 
@@ -31,6 +32,7 @@ from core.lyrics_sidecar import DEFAULT_LYRICS_FILE_PATTERN
 from db.database import get_config, get_directories, set_config, set_directories
 from db.models import Config
 from library.scan_library import preview_audio_path_exclusions
+from ui.ai_sync_settings import AI_SYNC_DEVICE_OPTIONS, AI_SYNC_MODEL_OPTIONS, load_ai_sync_settings, merge_ai_sync_settings
 from ui.hotkeys import HOTKEY_SPECS, find_duplicate_hotkeys, parse_hotkey_bindings, serialize_hotkey_bindings
 from ui.services.download_modes import missing_lyrics_detail, missing_lyrics_summary
 from ui.theme_tokens import get_available_themes
@@ -282,6 +284,29 @@ class MusicFoldersDialog(QDialog):
         embed_layout.addWidget(reaction_hint, 3, 0, 1, 2)
         lyrics_tab_layout.addWidget(embed_box)
 
+        ai_sync_box = QGroupBox("AI Auto-Sync")
+        ai_sync_layout = QGridLayout(ai_sync_box)
+        self.ai_whisper_model_combo = QComboBox()
+        for label, value in AI_SYNC_MODEL_OPTIONS:
+            self.ai_whisper_model_combo.addItem(label, value)
+        self.ai_device_combo = QComboBox()
+        for label, value in AI_SYNC_DEVICE_OPTIONS:
+            self.ai_device_combo.addItem(label, value)
+        self.ai_use_demucs_chk = QCheckBox("Use vocal separation when Demucs is available")
+        self.ai_use_demucs_chk.setChecked(True)
+        ai_sync_layout.addWidget(QLabel("Whisper model"), 0, 0)
+        ai_sync_layout.addWidget(self.ai_whisper_model_combo, 0, 1)
+        ai_sync_layout.addWidget(QLabel("Execution device"), 1, 0)
+        ai_sync_layout.addWidget(self.ai_device_combo, 1, 1)
+        ai_sync_layout.addWidget(self.ai_use_demucs_chk, 2, 0, 1, 2)
+        ai_sync_hint = QLabel(
+            "These options control local AI auto-sync only. The feature still works without Demucs, using the full audio mix. "
+            "Changes apply to the next Auto Sync run."
+        )
+        ai_sync_hint.setWordWrap(True)
+        ai_sync_layout.addWidget(ai_sync_hint, 3, 0, 1, 2)
+        lyrics_tab_layout.addWidget(ai_sync_box)
+
         lrclib_box = QGroupBox("LRCLIB")
         lrclib_layout = QGridLayout(lrclib_box)
         self.lrclib_instance_edit = QLineEdit()
@@ -357,6 +382,12 @@ class MusicFoldersDialog(QDialog):
         embed_format_idx = self.embed_format_combo.findData(getattr(config, "lyrics_embed_format", "both") or "both")
         self.embed_format_combo.setCurrentIndex(max(0, embed_format_idx))
         self.reaction_delay_spin.setValue(int(config.reaction_delay_ms or 0))
+        ai_settings = load_ai_sync_settings(getattr(config, "ui_state_json", ""))
+        ai_model_idx = self.ai_whisper_model_combo.findData(str(ai_settings.get("whisper_model") or "base"))
+        self.ai_whisper_model_combo.setCurrentIndex(max(0, ai_model_idx))
+        ai_device_idx = self.ai_device_combo.findData(str(ai_settings.get("device") or "auto"))
+        self.ai_device_combo.setCurrentIndex(max(0, ai_device_idx))
+        self.ai_use_demucs_chk.setChecked(bool(ai_settings.get("use_demucs", True)))
         lrclib_url = (config.lrclib_instance or "").strip()
         self.lrclib_instance_edit.setText("" if lrclib_url == "https://lrclib.net" else lrclib_url)
         self.excluded_paths_edit.setPlainText(config.scan_excluded_paths)
@@ -699,6 +730,14 @@ class MusicFoldersDialog(QDialog):
             return
 
         config = get_config(self.app_state.db)
+        ai_state_json = merge_ai_sync_settings(
+            getattr(config, "ui_state_json", ""),
+            {
+                "whisper_model": str(self.ai_whisper_model_combo.currentData() or "base"),
+                "device": str(self.ai_device_combo.currentData() or "auto"),
+                "use_demucs": self.ai_use_demucs_chk.isChecked(),
+            },
+        )
         new_config = replace(
             config,
             theme_mode=str(self.theme_combo.currentData() or "auto"),
@@ -719,6 +758,7 @@ class MusicFoldersDialog(QDialog):
             reaction_delay_ms=int(self.reaction_delay_spin.value()),
             lrclib_instance=self.lrclib_instance_edit.text().strip() or "https://lrclib.net",
             hotkey_bindings_json=serialize_hotkey_bindings(hotkey_bindings),
+            ui_state_json=ai_state_json,
         )
 
         set_directories(self.app_state.db, folders)
