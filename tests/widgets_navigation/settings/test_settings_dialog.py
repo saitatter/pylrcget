@@ -1,4 +1,6 @@
 from tests.widgets_navigation._shared import *
+from PySide6.QtWidgets import QGroupBox
+from ui.hotkeys import HOTKEY_SPECS
 
 
 @unittest.skipUnless(HAS_QT, "PySide6 is required for widget tests")
@@ -40,6 +42,47 @@ class SettingsDialogTests(unittest.TestCase):
                     tab_labels = [dialog.tabs.tabText(index) for index in range(dialog.tabs.count())]
                     self.assertIn("AI Sync", tab_labels)
                     self.assertGreater(tab_labels.index("AI Sync"), tab_labels.index("Lyrics"))
+                finally:
+                    dialog.deleteLater()
+            finally:
+                app_state.db.close()
+
+    def test_settings_dialog_uses_compact_scrollable_shortcuts_tab(self):
+        with TemporaryDirectory() as tmp:
+            app_state = simple_app_state(initialize_database(tmp))
+            try:
+                dialog = MusicFoldersDialog(app_state)
+                try:
+                    self.assertTrue(dialog.shortcuts_scroll.widgetResizable())
+                    global_box = next(box for box in dialog.findChildren(QGroupBox) if box.title() == "App Shortcuts")
+                    global_shortcut_count = sum(1 for spec in HOTKEY_SPECS.values() if spec.group == "global")
+                    self.assertLess(global_box.layout().rowCount(), global_shortcut_count)
+                finally:
+                    dialog.deleteLater()
+            finally:
+                app_state.db.close()
+
+    def test_settings_dialog_splits_lyrics_settings_into_sub_tabs(self):
+        with TemporaryDirectory() as tmp:
+            app_state = simple_app_state(initialize_database(tmp))
+            try:
+                dialog = MusicFoldersDialog(app_state)
+                try:
+                    labels = [dialog.lyrics_sections_tabs.tabText(index) for index in range(dialog.lyrics_sections_tabs.count())]
+                    self.assertEqual(labels, ["Download", "Files", "Embed"])
+                finally:
+                    dialog.deleteLater()
+            finally:
+                app_state.db.close()
+
+    def test_settings_dialog_uses_compact_library_scan_editors(self):
+        with TemporaryDirectory() as tmp:
+            app_state = simple_app_state(initialize_database(tmp))
+            try:
+                dialog = MusicFoldersDialog(app_state)
+                try:
+                    self.assertLessEqual(dialog.excluded_paths_edit.maximumHeight(), 140)
+                    self.assertLessEqual(dialog.excluded_patterns_edit.maximumHeight(), 140)
                 finally:
                     dialog.deleteLater()
             finally:

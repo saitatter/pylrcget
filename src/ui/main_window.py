@@ -2,6 +2,7 @@ from PySide6.QtWidgets import (
     QApplication,
     QHBoxLayout,
     QLabel,
+    QMenu,
     QMainWindow,
     QMessageBox,
     QDialog,
@@ -10,6 +11,7 @@ from PySide6.QtWidgets import (
     QSizePolicy,
     QSplitter,
     QTabWidget,
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
@@ -517,7 +519,7 @@ class MainWindow(QMainWindow):
         label.setObjectName("SelectionActionsLabel")
         layout.addWidget(label)
 
-        buttons: list[QPushButton] = []
+        buttons: list[QWidget] = []
 
         def add_button(text: str, tooltip: str, handler) -> QPushButton:
             button = QPushButton(text)
@@ -528,45 +530,56 @@ class MainWindow(QMainWindow):
             buttons.append(button)
             return button
 
+        def add_menu_button(text: str, tooltip: str, primary_handler, menu_items: list[tuple[str, object]]) -> QToolButton:
+            button = QToolButton()
+            button.setObjectName("SelectionActionButton")
+            button.setText(text)
+            button.setToolTip(tooltip)
+            button.setPopupMode(QToolButton.ToolButtonPopupMode.MenuButtonPopup)
+            button.clicked.connect(primary_handler)
+
+            menu = QMenu(button)
+            for item_text, item_handler in menu_items:
+                action = menu.addAction(item_text)
+                action.triggered.connect(item_handler)
+            button.setMenu(menu)
+
+            layout.addWidget(button)
+            buttons.append(button)
+            return button
+
         add_button(
-            "Refresh selected",
+            "Refresh",
             "Refresh the selected tracks from their source files on disk.",
             self._refresh_selected_tracks,
         )
-        add_button(
-            "Download: current mode",
+        add_menu_button(
+            "Download",
             "Download lyrics for the selected tracks using the global download mode.",
             lambda: self._download_selected_tracks("use_global"),
+            [
+                ("Use current mode", lambda: self._download_selected_tracks("use_global")),
+                ("Synced only", lambda: self._download_selected_tracks("synced_only")),
+                ("Plain only", lambda: self._download_selected_tracks("plain_only")),
+            ],
         )
-        add_button(
-            "Download synced",
-            "Download only synced lyrics for the selected tracks.",
-            lambda: self._download_selected_tracks("synced_only"),
-        )
-        add_button(
-            "Download plain",
-            "Download only plain lyrics for the selected tracks.",
-            lambda: self._download_selected_tracks("plain_only"),
-        )
-        add_button(
-            "Mark instrumental",
-            "Mark the selected tracks as instrumental and clear their lyrics.",
+        add_menu_button(
+            "Instrumental",
+            "Mark or unmark the selected tracks as instrumental.",
             self._mark_selected_tracks_instrumental,
+            [
+                ("Mark instrumental", self._mark_selected_tracks_instrumental),
+                ("Unmark instrumental", self._unmark_selected_tracks_instrumental),
+            ],
         )
-        add_button(
-            "Unmark instrumental",
-            "Remove the instrumental flag from the selected tracks.",
-            self._unmark_selected_tracks_instrumental,
-        )
-        add_button(
-            "Publish synced",
-            "Publish synced lyrics from the selected tracks to LRCLIB.",
+        add_menu_button(
+            "Publish",
+            "Publish lyrics from the selected tracks to LRCLIB.",
             lambda: self._publish_selected_tracks(True),
-        )
-        add_button(
-            "Publish plain",
-            "Publish plain lyrics from the selected tracks to LRCLIB.",
-            lambda: self._publish_selected_tracks(False),
+            [
+                ("Publish synced", lambda: self._publish_selected_tracks(True)),
+                ("Publish plain", lambda: self._publish_selected_tracks(False)),
+            ],
         )
         layout.addStretch(1)
         bar.setMaximumHeight(44)

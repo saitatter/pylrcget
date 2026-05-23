@@ -1,4 +1,5 @@
 from tests.widgets_navigation._shared import *
+from PySide6.QtWidgets import QToolButton
 
 
 @unittest.skipUnless(HAS_QT, "PySide6 is required for widget tests")
@@ -150,6 +151,19 @@ class MainWindowInstrumentalTests(unittest.TestCase):
         try:
             self.assertEqual(bar.sizePolicy().verticalPolicy(), QSizePolicy.Policy.Fixed)
             self.assertEqual(bar.maximumHeight(), 44)
+        finally:
+            bar.deleteLater()
+
+    def test_create_selection_actions_bar_uses_compact_action_set(self):
+        window = MainWindow.__new__(MainWindow)
+
+        bar, _label, buttons = MainWindow._create_selection_actions_bar(window)
+
+        try:
+            self.assertEqual([button.text() for button in buttons], ["Refresh", "Download", "Instrumental", "Publish"])
+            self.assertIsInstance(buttons[1], QToolButton)
+            self.assertIsNotNone(buttons[1].menu())
+            self.assertEqual([action.text() for action in buttons[1].menu().actions()], ["Use current mode", "Synced only", "Plain only"])
         finally:
             bar.deleteLater()
 

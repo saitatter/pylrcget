@@ -375,97 +375,127 @@ class TrackListWidget(QWidget):
         menu.setObjectName("TrackContextMenu")
         current_track_id = self.model.track_id_at(idx.row())
         has_focused_track = current_track_id is not None
-
-        def add_section(title: str, detail: str = ""):
-            action = QWidgetAction(menu)
-            header = QWidget(menu)
-            header.setObjectName("ContextMenuSection")
-            header_layout = QVBoxLayout(header)
-            set_layout_spacing(header_layout, margins=(10, 6, 10, 4), spacing=1)
-            title_label = QLabel(title.upper())
-            title_label.setObjectName("ContextMenuSectionTitle")
-            header_layout.addWidget(title_label)
-            if detail:
-                detail_label = QLabel(detail)
-                detail_label.setObjectName("ContextMenuSectionDetail")
-                header_layout.addWidget(detail_label)
-            action.setDefaultWidget(header)
-            menu.addAction(action)
-            return action
-
-        count = len(selected_ids)
-        count_text = f"{count} track selected" if count == 1 else f"{count} tracks selected"
-        add_section("Selection", count_text)
-        act_refresh_selected = menu.addAction(f"Refresh selected from disk ({count})")
-        act_play = menu.addAction("Play now")
-        act_play.setEnabled(has_focused_track)
-
-        menu.addSeparator()
-        add_section("Focused Track")
-        act_open_folder = menu.addAction("Open containing folder")
-        act_dl = menu.addAction("Download lyrics")
-        act_export = menu.addAction("Export lyrics files")
-        act_open_folder.setEnabled(has_focused_track)
-        act_dl.setEnabled(has_focused_track)
-        act_export.setEnabled(has_focused_track)
-
-        count_suffix = f"({len(selected_ids)})"
-        if self._show_bulk_context_actions:
-            menu.addSeparator()
-            add_section("Download Selection")
-            act_dl_selected = menu.addAction(f"Use current mode {count_suffix}")
-            act_dl_synced = menu.addAction(f"Synced only {count_suffix}")
-            act_dl_plain = menu.addAction(f"Plain only {count_suffix}")
-
-            menu.addSeparator()
-            add_section("Lyrics State")
-            act_instr = menu.addAction(f"Mark as instrumental {count_suffix}")
-            act_uninstr = menu.addAction(f"Unmark instrumental {count_suffix}")
-
-            menu.addSeparator()
-            add_section("Publish Selection")
-            act_pub_synced = menu.addAction(f"Publish synced {count_suffix}")
-            act_pub_plain = menu.addAction(f"Publish plain {count_suffix}")
-        else:
-            act_dl_selected = None
-            act_dl_synced = None
-            act_dl_plain = None
-            act_instr = None
-            act_uninstr = None
-            act_pub_synced = None
-            act_pub_plain = None
+        focused_row = self.model.index(idx.row(), 0).data(Qt.ItemDataRole.UserRole) if idx.isValid() else None
+        focused_artist_id = getattr(focused_row, "artist_id", None)
+        focused_album_id = getattr(focused_row, "album_id", None)
+        actions = self._build_track_context_menu(
+            menu,
+            selected_ids=selected_ids,
+            current_track_id=current_track_id,
+            focused_row=focused_row,
+        )
 
         chosen = menu.exec(self.table.viewport().mapToGlobal(pos))
         if chosen is None:
             self._suppress_next_table_left_click()
             return
-        if chosen == act_play:
+        self._handle_track_context_menu_choice(
+            chosen,
+            actions,
+            selected_ids=selected_ids,
+            current_track_id=current_track_id,
+            focused_artist_id=focused_artist_id,
+            focused_album_id=focused_album_id,
+        )
+
+    @staticmethod
+    def _add_context_section(menu: QMenu, title: str, detail: str = ""):
+        action = QWidgetAction(menu)
+        header = QWidget(menu)
+        header.setObjectName("ContextMenuSection")
+        header_layout = QVBoxLayout(header)
+        set_layout_spacing(header_layout, margins=(10, 6, 10, 4), spacing=1)
+        title_label = QLabel(title.upper())
+        title_label.setObjectName("ContextMenuSectionTitle")
+        header_layout.addWidget(title_label)
+        if detail:
+            detail_label = QLabel(detail)
+            detail_label.setObjectName("ContextMenuSectionDetail")
+            header_layout.addWidget(detail_label)
+        action.setDefaultWidget(header)
+        menu.addAction(action)
+        return action
+
+    def _build_track_context_menu(self, menu: QMenu, *, selected_ids: list[int], current_track_id: int | None, focused_row) -> dict[str, object]:
+        has_focused_track = current_track_id is not None
+        focused_artist_id = getattr(focused_row, "artist_id", None)
+        focused_album_id = getattr(focused_row, "album_id", None)
+
+        actions: dict[str, object] = {
+            "play": menu.addAction("Play now"),
+        }
+        actions["play"].setEnabled(has_focused_track)
+
+        menu.addSeparator()
+        self._add_context_section(menu, "Focused Track")
+        actions["open_folder"] = menu.addAction("Open containing folder")
+        actions["open_artist"] = menu.addAction("Open artist")
+        actions["open_album"] = menu.addAction("Open album")
+        actions["download"] = menu.addAction("Download lyrics")
+        actions["export"] = menu.addAction("Export lyrics files")
+        actions["open_folder"].setEnabled(has_focused_track)
+        actions["open_artist"].setEnabled(focused_artist_id is not None)
+        actions["open_album"].setEnabled(focused_album_id is not None)
+        actions["download"].setEnabled(has_focused_track)
+        actions["export"].setEnabled(has_focused_track)
+
+        actions.update(
+            {
+                "refresh_selected": None,
+                "download_selected": None,
+                "download_synced": None,
+                "download_plain": None,
+                "mark_instrumental": None,
+                "unmark_instrumental": None,
+                "publish_synced": None,
+                "publish_plain": None,
+            }
+        )
+        return actions
+
+    def _handle_track_context_menu_choice(
+        self,
+        chosen,
+        actions: dict[str, object],
+        *,
+        selected_ids: list[int],
+        current_track_id: int | None,
+        focused_artist_id: int | None,
+        focused_album_id: int | None,
+    ) -> None:
+        if chosen == actions.get("play"):
             if current_track_id is not None:
                 self.playTrack.emit(int(current_track_id))
-        elif chosen == act_refresh_selected:
+        elif chosen == actions.get("refresh_selected"):
             self.bulkRefreshRequested.emit(selected_ids)
-        elif chosen == act_open_folder:
+        elif chosen == actions.get("open_folder"):
             if current_track_id is not None:
                 self._open_track_folder(int(current_track_id))
-        elif chosen == act_dl:
+        elif chosen == actions.get("open_artist"):
+            if focused_artist_id is not None:
+                self._emit_artist_navigation(int(focused_artist_id))
+        elif chosen == actions.get("open_album"):
+            if focused_album_id is not None:
+                self._emit_album_navigation(int(focused_album_id))
+        elif chosen == actions.get("download"):
             if current_track_id is not None:
                 self.downloadLyrics.emit(int(current_track_id))
-        elif chosen == act_export:
+        elif chosen == actions.get("export"):
             if current_track_id is not None:
                 self.exportLyricsFiles.emit(int(current_track_id))
-        elif chosen == act_dl_selected:
+        elif chosen == actions.get("download_selected"):
             self.bulkDownloadRequested.emit(selected_ids, "use_global")
-        elif chosen == act_dl_synced:
+        elif chosen == actions.get("download_synced"):
             self.bulkDownloadRequested.emit(selected_ids, "synced_only")
-        elif chosen == act_dl_plain:
+        elif chosen == actions.get("download_plain"):
             self.bulkDownloadRequested.emit(selected_ids, "plain_only")
-        elif chosen == act_instr:
+        elif chosen == actions.get("mark_instrumental"):
             self.markInstrumental.emit(selected_ids)
-        elif chosen == act_uninstr:
+        elif chosen == actions.get("unmark_instrumental"):
             self.unmarkInstrumental.emit(selected_ids)
-        elif chosen == act_pub_synced:
+        elif chosen == actions.get("publish_synced"):
             self.bulkPublishRequested.emit(selected_ids, True)
-        elif chosen == act_pub_plain:
+        elif chosen == actions.get("publish_plain"):
             self.bulkPublishRequested.emit(selected_ids, False)
 
     def eventFilter(self, watched, event):

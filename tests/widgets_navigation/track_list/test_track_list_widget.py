@@ -163,6 +163,41 @@ class TrackListWidgetTests(unittest.TestCase):
             widget.deleteLater()
             app_state.db.close()
 
+    def test_context_menu_omits_bulk_actions_duplicated_in_selection_bar(self):
+        app_state = simple_app_state()
+        widget = TrackListWidget(app_state)
+        try:
+            focused_row = TrackListRow(
+                track_id=1,
+                title="Song",
+                artist="Radiohead",
+                artist_id=7,
+                album="Kid A",
+                album_id=11,
+                track_number=1,
+                duration_s=120,
+                lyrics_state=LyricsState.SYNCED,
+            )
+            menu = QMenu(widget)
+            actions = widget._build_track_context_menu(
+                menu,
+                selected_ids=[1],
+                current_track_id=1,
+                focused_row=focused_row,
+            )
+
+            self.assertIsNone(actions["refresh_selected"])
+            self.assertIsNone(actions["download_selected"])
+            self.assertIsNone(actions["download_synced"])
+            self.assertIsNone(actions["download_plain"])
+            self.assertIsNone(actions["mark_instrumental"])
+            self.assertIsNone(actions["unmark_instrumental"])
+            self.assertIsNone(actions["publish_synced"])
+            self.assertIsNone(actions["publish_plain"])
+        finally:
+            widget.deleteLater()
+            app_state.db.close()
+
     def test_track_table_keeps_lyrics_status_column_visible(self):
         app_state = simple_app_state()
         widget = TrackListWidget(app_state)

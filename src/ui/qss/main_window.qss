@@ -227,7 +227,8 @@ QLabel#SelectionActionsLabel {
     padding: 0 6px;
 }
 
-QPushButton#SelectionActionButton {
+QPushButton#SelectionActionButton,
+QToolButton#SelectionActionButton {
     min-height: 28px;
     padding: 4px 9px;
     font-size: {{font-size-xs}};

@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QKeySequenceEdit,
+    QScrollArea,
     QSpinBox,
     QTabWidget,
     QTextEdit,
@@ -57,12 +58,33 @@ class MusicFoldersDialog(QDialog):
 
         lyrics_tab = QWidget()
         lyrics_tab_layout = QVBoxLayout(lyrics_tab)
+        self.lyrics_sections_tabs = QTabWidget()
+        lyrics_tab_layout.addWidget(self.lyrics_sections_tabs)
+
+        lyrics_download_tab = QWidget()
+        lyrics_download_layout = QVBoxLayout(lyrics_download_tab)
+
+        lyrics_files_tab = QWidget()
+        lyrics_files_layout = QVBoxLayout(lyrics_files_tab)
+
+        lyrics_embed_tab = QWidget()
+        lyrics_embed_layout = QVBoxLayout(lyrics_embed_tab)
+
+        ai_sync_tab = QWidget()
+        ai_sync_tab_layout = QVBoxLayout(ai_sync_tab)
 
         appearance_tab = QWidget()
         appearance_layout_root = QVBoxLayout(appearance_tab)
 
         shortcuts_tab = QWidget()
-        shortcuts_layout_root = QVBoxLayout(shortcuts_tab)
+        shortcuts_tab_layout = QVBoxLayout(shortcuts_tab)
+        self.shortcuts_scroll = QScrollArea()
+        self.shortcuts_scroll.setWidgetResizable(True)
+        self.shortcuts_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        shortcuts_content = QWidget()
+        shortcuts_layout_root = QVBoxLayout(shortcuts_content)
+        shortcuts_tab_layout.addWidget(self.shortcuts_scroll)
+        self.shortcuts_scroll.setWidget(shortcuts_content)
 
         folders_box = QGroupBox("Music Folders")
         folders_layout = QVBoxLayout(folders_box)
@@ -87,6 +109,7 @@ class MusicFoldersDialog(QDialog):
             "D:\\Music\\Podcasts\n"
             "D:\\Music\\Temporary"
         )
+        self._set_text_edit_visible_rows(self.excluded_paths_edit, 5)
         self.add_excluded_path_btn = QPushButton("Add Excluded Path")
         self.add_excluded_file_btn = QPushButton("Add Excluded File")
         self.remove_excluded_path_btn = QPushButton("Remove Selected Lines")
@@ -99,6 +122,7 @@ class MusicFoldersDialog(QDialog):
             "sample|demo\n"
             "\\.(cue|log)$"
         )
+        self._set_text_edit_visible_rows(self.excluded_patterns_edit, 5)
 
         scan_layout.addWidget(QLabel("Excluded paths"), 0, 0)
         scan_layout.addWidget(self.excluded_paths_edit, 1, 0)
@@ -111,6 +135,8 @@ class MusicFoldersDialog(QDialog):
         scan_layout.addLayout(excluded_paths_btn_row, 2, 0)
         scan_layout.addWidget(QLabel("Excluded regex patterns"), 0, 1)
         scan_layout.addWidget(self.excluded_patterns_edit, 1, 1)
+        scan_layout.setColumnStretch(0, 3)
+        scan_layout.setColumnStretch(1, 1)
         self.regex_validation_label = QLabel("")
         self.regex_validation_label.setObjectName("SettingsValidationHint")
         self.regex_validation_label.setVisible(False)
@@ -166,19 +192,23 @@ class MusicFoldersDialog(QDialog):
 
         global_shortcuts_box = QGroupBox("App Shortcuts")
         global_shortcuts_layout = QGridLayout(global_shortcuts_box)
-        self._build_shortcut_controls(global_shortcuts_layout, group="global")
+        self._build_shortcut_controls(global_shortcuts_layout, group="global", columns=2)
 
         shortcuts_box = QGroupBox("Lyrics Sync Shortcuts")
         shortcuts_layout = QGridLayout(shortcuts_box)
         self._build_shortcut_controls(shortcuts_layout, group="lyrics")
 
         self.shortcuts_reset_btn = QPushButton("Reset All Defaults")
+        self.shortcuts_reset_btn.setMaximumWidth(180)
         shortcuts_layout_root.addWidget(global_shortcuts_box)
         shortcuts_layout_root.addWidget(shortcuts_box)
-        shortcuts_layout_root.addWidget(self.shortcuts_reset_btn)
+        shortcuts_actions_layout = QHBoxLayout()
+        shortcuts_actions_layout.addStretch(1)
+        shortcuts_actions_layout.addWidget(self.shortcuts_reset_btn)
+        shortcuts_layout_root.addLayout(shortcuts_actions_layout)
         shortcuts_hint = QLabel(
             "Disable any shortcut explicitly, or leave it enabled and assign a custom key combination. "
-            "Changes apply immediately after saving."
+            "Hover shortcut labels to see the action details and default keys. Changes apply immediately after saving."
         )
         shortcuts_hint.setWordWrap(True)
         shortcuts_layout_root.addWidget(shortcuts_hint)
@@ -196,7 +226,7 @@ class MusicFoldersDialog(QDialog):
         self.download_mode_hint_label.setObjectName("SettingsValidationHint")
         self.download_mode_hint_label.setWordWrap(True)
         download_layout.addWidget(self.download_mode_hint_label, 1, 0, 1, 4)
-        lyrics_tab_layout.addWidget(download_box)
+        lyrics_download_layout.addWidget(download_box)
 
         lyrics_box = QGroupBox("Lyrics Export")
         lyrics_layout = QGridLayout(lyrics_box)
@@ -243,7 +273,7 @@ class MusicFoldersDialog(QDialog):
         )
         hint.setWordWrap(True)
         lyrics_layout.addWidget(hint, 5, 0, 1, 4)
-        lyrics_tab_layout.addWidget(lyrics_box)
+        lyrics_files_layout.addWidget(lyrics_box)
 
         lookup_box = QGroupBox("Lyrics Lookup")
         lookup_layout = QGridLayout(lookup_box)
@@ -259,7 +289,7 @@ class MusicFoldersDialog(QDialog):
         )
         lookup_hint.setWordWrap(True)
         lookup_layout.addWidget(lookup_hint, 1, 0, 1, 4)
-        lyrics_tab_layout.addWidget(lookup_box)
+        lyrics_files_layout.addWidget(lookup_box)
 
         embed_box = QGroupBox("Audio File")
         embed_layout = QGridLayout(embed_box)
@@ -282,7 +312,7 @@ class MusicFoldersDialog(QDialog):
         reaction_hint = QLabel("Negative values stamp earlier. Positive values stamp later.")
         reaction_hint.setWordWrap(True)
         embed_layout.addWidget(reaction_hint, 3, 0, 1, 2)
-        lyrics_tab_layout.addWidget(embed_box)
+        lyrics_embed_layout.addWidget(embed_box)
 
         ai_sync_box = QGroupBox("AI Auto-Sync")
         ai_sync_layout = QGridLayout(ai_sync_box)
@@ -305,7 +335,8 @@ class MusicFoldersDialog(QDialog):
         )
         ai_sync_hint.setWordWrap(True)
         ai_sync_layout.addWidget(ai_sync_hint, 3, 0, 1, 2)
-        lyrics_tab_layout.addWidget(ai_sync_box)
+        ai_sync_tab_layout.addWidget(ai_sync_box)
+        ai_sync_tab_layout.addStretch(1)
 
         lrclib_box = QGroupBox("LRCLIB")
         lrclib_layout = QGridLayout(lrclib_box)
@@ -321,12 +352,20 @@ class MusicFoldersDialog(QDialog):
         )
         lrclib_hint.setWordWrap(True)
         lrclib_layout.addWidget(lrclib_hint, 1, 0, 1, 3)
-        lyrics_tab_layout.addWidget(lrclib_box)
+        lyrics_download_layout.addWidget(lrclib_box)
 
+        lyrics_download_layout.addStretch(1)
+        lyrics_files_layout.addStretch(1)
+        lyrics_embed_layout.addStretch(1)
+
+        self.lyrics_sections_tabs.addTab(lyrics_download_tab, "Download")
+        self.lyrics_sections_tabs.addTab(lyrics_files_tab, "Files")
+        self.lyrics_sections_tabs.addTab(lyrics_embed_tab, "Embed")
         lyrics_tab_layout.addStretch(1)
 
         self.tabs.addTab(library_tab, "Library")
         self.tabs.addTab(lyrics_tab, "Lyrics")
+        self.tabs.addTab(ai_sync_tab, "AI Sync")
         self.tabs.addTab(appearance_tab, "Appearance")
         self.tabs.addTab(shortcuts_tab, "Shortcuts")
 
@@ -584,21 +623,37 @@ class MusicFoldersDialog(QDialog):
     def _update_embed_fields_enabled(self):
         self.embed_format_combo.setEnabled(self.embed_chk.isChecked())
 
-    def _build_shortcut_controls(self, layout: QGridLayout, *, group: str) -> None:
+    def _set_text_edit_visible_rows(self, edit: QTextEdit, rows: int) -> None:
+        line_height = edit.fontMetrics().lineSpacing()
+        frame_height = edit.frameWidth() * 2
+        document_margin = int(edit.document().documentMargin() * 2)
+        extra_padding = 12
+        edit.setFixedHeight(max(38, line_height * rows + frame_height + document_margin + extra_padding))
+
+    def _build_shortcut_controls(self, layout: QGridLayout, *, group: str, columns: int = 1) -> None:
         actions = [(action, spec) for action, spec in HOTKEY_SPECS.items() if spec.group == group]
-        for row, (action, spec) in enumerate(actions):
+        rows_per_column = max(1, (len(actions) + columns - 1) // columns)
+        for index, (action, spec) in enumerate(actions):
+            column = index // rows_per_column
+            row = index % rows_per_column
+            base_column = column * 3
             enabled_chk = QCheckBox("Enabled")
             enabled_chk.setChecked(True)
             edit = QKeySequenceEdit()
             enabled_chk.toggled.connect(edit.setEnabled)
-            layout.addWidget(QLabel(spec.label), row * 2, 0)
-            layout.addWidget(enabled_chk, row * 2, 1)
-            layout.addWidget(edit, row * 2, 2)
-            description = QLabel(f"{spec.description}. Default: {spec.default}.")
-            description.setWordWrap(True)
-            layout.addWidget(description, row * 2 + 1, 0, 1, 3)
+            tooltip = f"{spec.description}. Default: {spec.default}."
+            label = QLabel(spec.label)
+            label.setToolTip(tooltip)
+            edit.setToolTip(tooltip)
+            enabled_chk.setToolTip(tooltip)
+            layout.addWidget(label, row, base_column)
+            layout.addWidget(edit, row, base_column + 1)
+            layout.addWidget(enabled_chk, row, base_column + 2)
             self.shortcut_enabled_checks[action] = enabled_chk
             self.shortcut_edits[action] = edit
+
+        for column in range(columns):
+            layout.setColumnStretch(column * 3 + 1, 1)
 
     def _reset_hotkeys_to_defaults(self) -> None:
         for action, spec in HOTKEY_SPECS.items():
