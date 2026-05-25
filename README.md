@@ -278,3 +278,11 @@ MIT © saitatter
 
 - Original idea and LRCLIB ecosystem: **tranxuanthang / LRCGET**
 - This project is an independent desktop reimplementation, not a fork of the original codebase
+
+---
+
+## Support
+
+If PyLrcGet is useful to you, you can support ongoing development on Ko-fi:
+
+[![Support me on Ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/saitatter)
