@@ -967,7 +967,16 @@ class MainWindow(QMainWindow):
         # Cancel running workers before shutdown
         if self._ai_sync_worker is not None and self._ai_sync_worker.isRunning():
             self._ai_sync_worker.requestInterruption()
-            self._ai_sync_worker.wait(5000)
+            if not self._ai_sync_worker.wait(5000):
+                notify_user(
+                    self.app_state,
+                    "AI sync is still shutting down. Please try closing again in a moment.",
+                    "warning",
+                    show_status=self._show_status_message,
+                    status_timeout_ms=4000,
+                )
+                event.ignore()
+                return
         self.downloads.cancel()
         if self.scanner is not None and self.scanner.isRunning():
             self.scanner.requestInterruption()
@@ -1508,7 +1517,8 @@ class MainWindow(QMainWindow):
             use_vocal_separation=bool(ai_sync_settings.get("use_demucs", True)),
         )
         worker.progress.connect(self._on_ai_sync_progress)
-        worker.finished.connect(lambda ok, msg, lrc: self._on_auto_sync_finished(ok, msg, lrc, sync_track_id))
+        worker.completed.connect(lambda ok, msg, lrc: self._on_auto_sync_finished(ok, msg, lrc, sync_track_id))
+        worker.finished.connect(lambda: self._on_ai_sync_thread_finished(worker))
         self._ai_sync_worker = worker
         worker.start()
 
@@ -1525,7 +1535,6 @@ class MainWindow(QMainWindow):
                 cancelled=(msg == "Cancelled."),
             )
             overlay.queue_auto_close(2200)
-        self._ai_sync_worker = None
 
         if not ok:
             notify_user(
@@ -1564,6 +1573,10 @@ class MainWindow(QMainWindow):
                 show_status=self._show_status_message,
                 status_timeout_ms=4000,
             )
+
+    def _on_ai_sync_thread_finished(self, worker) -> None:
+        if self._ai_sync_worker is worker:
+            self._ai_sync_worker = None
 
     # ------------------ helpers ------------------
     def _on_ai_sync_progress(self, message: str) -> None:

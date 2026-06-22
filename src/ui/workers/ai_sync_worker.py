@@ -40,9 +40,11 @@ def _check_ai_sync_available() -> tuple[bool, str]:
             missing.append(package)
     if missing:
         return False, (
-            f"Missing dependencies: {', '.join(missing)}.\n\n"
-            "Install them with:\n"
-            f"  pip install {' '.join(missing)}"
+            f"Missing AI dependencies: {', '.join(missing)}.\n\n"
+            "If you run PyLrcGet from source, install them in that environment:\n"
+            "  pip install .[ai]\n\n"
+            "If you use the packaged .exe, install these packages in the app's bundled Python "
+            "(installing into system Python is not enough)."
         )
     return True, ""
 
@@ -159,7 +161,7 @@ class AiSyncWorker(QThread):
     """
 
     progress = Signal(str)  # status message
-    finished = Signal(bool, str, str)  # ok, message, lrc_text
+    completed = Signal(bool, str, str)  # ok, message, lrc_text
 
     def __init__(
         self,
@@ -193,7 +195,7 @@ class AiSyncWorker(QThread):
         try:
             ok, msg = _check_ai_sync_available()
             if not ok:
-                self.finished.emit(False, msg, "")
+                self.completed.emit(False, msg, "")
                 return
 
             import torch
@@ -209,7 +211,7 @@ class AiSyncWorker(QThread):
             else:
                 self.progress.emit("Vocal separation disabled, using the full audio mix...")
             if self.isInterruptionRequested():
-                self.finished.emit(False, "Cancelled.", "")
+                self.completed.emit(False, "Cancelled.", "")
                 return
 
             audio_input = vocals_path or self.audio_path
@@ -220,7 +222,7 @@ class AiSyncWorker(QThread):
                 device=device,
             )
             if self.isInterruptionRequested():
-                self.finished.emit(False, "Cancelled.", "")
+                self.completed.emit(False, "Cancelled.", "")
                 return
 
             self.progress.emit("Transcribing audio...")
@@ -241,14 +243,14 @@ class AiSyncWorker(QThread):
                 lrc = _build_lrc_from_segments(segments)
 
             if not lrc.strip():
-                self.finished.emit(False, "Could not generate synced lyrics — no speech detected.", "")
+                self.completed.emit(False, "Could not generate synced lyrics — no speech detected.", "")
                 return
 
-            self.finished.emit(True, "Lyrics synchronized successfully.", lrc)
+            self.completed.emit(True, "Lyrics synchronized successfully.", lrc)
 
         except Exception as exc:
             logger.error("AI sync failed: %s", exc, exc_info=True)
-            self.finished.emit(False, f"AI sync failed: {exc}", "")
+            self.completed.emit(False, f"AI sync failed: {exc}", "")
         finally:
             if vocals_path and os.path.isfile(vocals_path):
                 try:
