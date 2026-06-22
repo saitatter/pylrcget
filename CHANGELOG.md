@@ -1,4 +1,35 @@
 # Changelog
+## v1.10.1 (2026-06-22)
+
+### 🐛 Fixes
+* **ai-sync:** Harden worker shutdown and dependency guidance ([142d2ba](https://github.com/saitatter/pylrcget/commit/142d2ba7945664fce5dbb5aaa17df7bc3d911cc8))
+  Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+* **lrclib:** Send instrumental flag on publish ([46e6b70](https://github.com/saitatter/pylrcget/commit/46e6b706cb97f21cb3b43de7019ea984305fcd42))
+  Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+* **settings:** Persist empty lyrics filename pattern ([47221c1](https://github.com/saitatter/pylrcget/commit/47221c1b17a20c0144a333db229cf430c7194ec0))
+  Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+
+### 🧰 CI & Build
+* **deps:** Bump actions/checkout in the github-actions group ([d366e8f](https://github.com/saitatter/pylrcget/commit/d366e8f966436bd1ca65d8832e387547d59b294a))
+  Bumps the github-actions group with 1 update: [actions/checkout](https://github.com/actions/checkout).
+  Updates `actions/checkout` from 6 to 7
+- [Release notes](https://github.com/actions/checkout/releases)
+- [Changelog](https://github.com/actions/checkout/blob/main/CHANGELOG.md)
+- [Commits](https://github.com/actions/checkout/compare/v6...v7)
+  ---
+updated-dependencies:
+- dependency-name: actions/checkout dependency-version: '7'
+  dependency-type: direct:production
+  update-type: version-update:semver-major
+  dependency-group: github-actions ...
+  Signed-off-by: dependabot[bot] <support@github.com>
+* Add copilot instructions ([b5adcab](https://github.com/saitatter/pylrcget/commit/b5adcab3e195ab82cbe3c7591fbd7e6949713b36))
+
+### 📚 Docs
+* Add ko-fi support badge ([0ff0c5f](https://github.com/saitatter/pylrcget/commit/0ff0c5f4f6ac7df668677205e2369a589bb064d0))
+* Add ko-fi support footer ([6ec470c](https://github.com/saitatter/pylrcget/commit/6ec470c31344d06f09f5ffa2367618fb56899ded))
+
+
 ## v1.10.0 (2026-05-23)
 
 ### ✨ Features
