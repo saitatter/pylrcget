@@ -97,6 +97,7 @@ class BulkPublishInstrumentalWorker(QThread):
                     duration=duration_s,
                     plain_lyrics=None,
                     synced_lyrics=None,
+                    instrumental=True,
                 )
                 return
             except _RETRYABLE_PUBLISH_ERRORS as exc:

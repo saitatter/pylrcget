@@ -179,3 +179,23 @@ class TestLrcLibAPI:
         api = self._make_api(session)
         lyr = api.get_lyrics_by_id(5)
         assert lyr.id == 5
+
+    def test_publish_lyrics_sends_instrumental_flag_when_provided(self):
+        session = MagicMock()
+        session.request.return_value = _mock_response(200, ok=True, body={})
+        api = self._make_api(session)
+
+        api.publish_lyrics(
+            track_name="Song",
+            artist_name="Artist",
+            album_name="Album",
+            duration=180,
+            plain_lyrics=None,
+            synced_lyrics=None,
+            instrumental=True,
+            publish_token="test-token",
+        )
+
+        _, _, kwargs = session.request.mock_calls[0]
+        assert kwargs["headers"]["X-Publish-Token"] == "test-token"
+        assert kwargs["json"]["instrumental"] is True
