@@ -55,6 +55,7 @@ from ui.hotkeys import HOTKEY_SPECS, effective_hotkey_text, parse_hotkey_binding
 from ui.widgets.track_list_widget import TrackListWidget
 from ui.dialogs.music_folders_dialog import MusicFoldersDialog
 from ui.dialogs.about_dialog import AboutDialog
+from ui.dialogs.ai_dependencies_dialog import AIDependenciesDialog
 from ui.icon_loader import load_app_icon
 from ui.player_bar import PlayerBar
 from ui.widgets.lyrics_editor_widget import LyricsEditorWidget
@@ -1446,7 +1447,7 @@ class MainWindow(QMainWindow):
         lyrics_actions.on_discard_draft_requested(self)
 
     def _on_auto_sync_requested(self) -> None:
-        from ui.workers.ai_sync_worker import _check_ai_sync_available, AiSyncWorker
+        from ui.workers.ai_sync_worker import _check_ai_sync_available, AiSyncWorker, get_missing_ai_dependencies
 
         track_id = self._editing_track_id
         if track_id is None:
@@ -1471,13 +1472,11 @@ class MainWindow(QMainWindow):
 
         ok, msg = _check_ai_sync_available()
         if not ok:
-            notify_user(
-                self.app_state,
-                msg,
-                "error",
-                show_status=self._show_status_message,
-                status_timeout_ms=6000,
-            )
+            dlg = AIDependenciesDialog(get_missing_ai_dependencies(), msg, self)
+            if dlg.exec() == QDialog.DialogCode.Accepted:
+                ok_after_install, _ = _check_ai_sync_available()
+                if ok_after_install:
+                    self._on_auto_sync_requested()
             return
 
         track = get_track_by_id(self.app_state.db, int(track_id))

@@ -1,8 +1,31 @@
 from pathlib import Path
+from importlib import import_module
+from PyInstaller.utils.hooks import collect_data_files
 
 
 SPEC_PATH = Path(globals().get("__file__", "pylrcget-portable.spec")).resolve()
 ROOT = SPEC_PATH.parent if SPEC_PATH.exists() else Path.cwd()
+
+def _optional_collect_data_files(package: str):
+    try:
+        return collect_data_files(package)
+    except Exception:
+        return []
+
+AI_DATAS = _optional_collect_data_files("whisper") + _optional_collect_data_files("demucs")
+
+def _optional_package_subdir(package: str, subdir: str):
+    try:
+        mod = import_module(package)
+        base = Path(mod.__file__).resolve().parent
+        path = base / subdir
+        if path.is_dir():
+            return [(str(path), f"{package}/{subdir}")]
+    except Exception:
+        return []
+    return []
+
+AI_DATAS += _optional_package_subdir("whisper", "assets")
 
 
 a = Analysis(
@@ -13,7 +36,7 @@ a = Analysis(
         (str(ROOT / "src" / "ui" / "qss"), "ui/qss"),
         (str(ROOT / "src" / "ui" / "assets"), "ui/assets"),
         (str(ROOT / "pyproject.toml"), "."),
-    ],
+    ] + AI_DATAS,
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},

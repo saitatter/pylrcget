@@ -1,5 +1,6 @@
 from tests.widgets_navigation._shared import *
 from PySide6.QtWidgets import QToolButton
+from PySide6.QtWidgets import QDialog
 
 
 @unittest.skipUnless(HAS_QT, "PySide6 is required for widget tests")
@@ -44,6 +45,26 @@ class MainWindowInstrumentalTests(unittest.TestCase):
             5000,
         )
         window._publish_instrumental_to_lrclib.assert_called_once_with([1, 2])
+
+    def test_auto_sync_missing_dependencies_opens_modal_dialog(self):
+        window = MainWindow.__new__(MainWindow)
+        window._editing_track_id = 1
+        window._ai_sync_worker = None
+        window._show_status_message = MagicMock()
+        window.app_state = SimpleNamespace()
+
+        with (
+            patch("ui.workers.ai_sync_worker._check_ai_sync_available", return_value=(False, "Missing deps")),
+            patch("ui.workers.ai_sync_worker.get_missing_ai_dependencies", return_value=["torch", "torchaudio"]),
+            patch("ui.main_window.AIDependenciesDialog") as dialog_cls,
+            patch("ui.main_window.notify_user") as notify_mock,
+        ):
+            dialog_cls.return_value.exec.return_value = QDialog.DialogCode.Rejected
+            MainWindow._on_auto_sync_requested(window)
+
+        dialog_cls.assert_called_once()
+        dialog_cls.return_value.exec.assert_called_once()
+        notify_mock.assert_not_called()
 
     def test_apply_track_filters_updates_embedded_album_and_artist_track_lists(self):
         window = MainWindow.__new__(MainWindow)

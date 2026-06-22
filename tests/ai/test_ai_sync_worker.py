@@ -7,7 +7,7 @@ import pytest
 
 from tests import test_support as _test_support  # noqa: F401
 
-from ui.workers.ai_sync_worker import _format_ts, _build_lrc_from_segments, _check_ai_sync_available
+from ui.workers.ai_sync_worker import _format_ts, _build_lrc_from_segments, _check_ai_sync_available, get_missing_ai_dependencies
 
 
 def test_format_ts_zero():
@@ -86,3 +86,20 @@ def test_ai_sync_availability_message_guides_exe_users(monkeypatch):
     assert "Missing AI dependencies:" in msg
     assert "pip install .[ai]" in msg
     assert "bundled Python" in msg
+
+
+def test_get_missing_ai_dependencies_returns_expected_packages(monkeypatch):
+    real_import = builtins.__import__
+
+    def fake_import(name, globals=None, locals=None, fromlist=(), level=0):
+        if name in {"torch", "soundfile"}:
+            raise ImportError(f"{name} missing")
+        if name in {"torchaudio", "whisper"}:
+            return object()
+        return real_import(name, globals, locals, fromlist, level)
+
+    monkeypatch.setattr(builtins, "__import__", fake_import)
+
+    missing = get_missing_ai_dependencies()
+
+    assert missing == ["torch", "soundfile"]

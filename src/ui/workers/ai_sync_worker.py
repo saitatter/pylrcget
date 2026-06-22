@@ -18,6 +18,20 @@ from PySide6.QtCore import QThread, Signal
 logger = logging.getLogger(__name__)
 
 
+def get_missing_ai_dependencies() -> list[str]:
+    deps = [
+        ("torch", "torch"),
+        ("torchaudio", "torchaudio"),
+        ("soundfile", "soundfile"),
+        ("whisper", "openai-whisper"),
+    ]
+    missing: list[str] = []
+    for module, package in deps:
+        if not _module_available(module):
+            missing.append(package)
+    return missing
+
+
 def _module_available(module: str) -> bool:
     try:
         __import__(module)
@@ -28,16 +42,7 @@ def _module_available(module: str) -> bool:
 
 def _check_ai_sync_available() -> tuple[bool, str]:
     """Check whether the required AI sync dependencies are installed."""
-    missing: list[str] = []
-    deps = [
-        ("torch", "torch"),
-        ("torchaudio", "torchaudio"),
-        ("soundfile", "soundfile"),
-        ("whisper", "openai-whisper"),
-    ]
-    for module, package in deps:
-        if not _module_available(module):
-            missing.append(package)
+    missing = get_missing_ai_dependencies()
     if missing:
         return False, (
             f"Missing AI dependencies: {', '.join(missing)}.\n\n"

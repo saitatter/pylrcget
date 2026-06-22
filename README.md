@@ -169,9 +169,9 @@ pip install pylrcget[ai]
 
 > **Note:** AI dependencies add ~2 GB to the install (mostly PyTorch). The `base` Whisper model (~140 MB) is downloaded automatically on first use. GPU acceleration (CUDA) is used when available, otherwise CPU.
 
-> **Note:** AI dependencies are **not** bundled in binary releases.
+> **Note:** base binary releases do not include AI dependencies by default.
 
-> **Tip for packaged `.exe` users:** installing AI packages into system Python is usually **not enough**. The packaged app uses its own bundled Python runtime, and AI packages must be available there. If you want the simplest AI setup, run PyLrcGet from source in a virtual environment and install `.[ai]`.
+> **Tip for packaged `.exe` users:** use the dedicated **AI-enabled portable build** (`pylrcget-windows-portable-ai.exe`). Installing packages into system Python does not patch an already packaged onefile executable.
 
 > **UI note:** there is no separate AI screen. The AI entrypoint is the **Auto Sync** button in the lyrics editor.
 
@@ -218,6 +218,13 @@ To build the portable single-file variant:
 pyinstaller --noconfirm pylrcget-portable.spec
 ```
 
+To build an AI-enabled portable variant (larger, includes AI deps):
+
+```bash
+python -m pip install .[ai]
+pyinstaller --noconfirm pylrcget-portable.spec
+```
+
 > **Note:** The app falls back to Qt Multimedia when `mpv` is unavailable, so packaged builds remain usable without an external `mpv` binary.
 
 ---
@@ -232,6 +239,7 @@ Uses **semantic-release** with Conventional Commits. On every push to `main`, CI
 - Installer assets are published for automatic update/install flows: `pylrcget-windows-installer.exe`, `pylrcget-linux.deb`, and `pylrcget-macos.pkg`
 - Folder-based archives are published as `pylrcget-windows.zip`, `pylrcget-linux.tar.gz`, and `pylrcget-macos.tar.gz`
 - Portable single-file executables are also published as `pylrcget-windows-portable.exe`, `pylrcget-linux-portable`, and `pylrcget-macos-portable`
+- Windows AI-enabled portable build is published as `pylrcget-windows-portable-ai.exe`
 
 ### 🛡️ Windows note
 
@@ -260,6 +268,7 @@ Local feed testing is supported via `PYLRCGET_UPDATE_LATEST_URL` and `PYLRCGET_U
 - **Playback not working for a format** — Check that the required codec is available on your system.
 - **Update installer not launching** — Ensure you confirm the administrator/UAC prompt when it appears.
 - **Auto Sync says dependencies are missing** — If you run from source, install `pip install .[ai]` in that same environment. If you use the packaged `.exe`, AI dependencies must be present in the app's bundled Python runtime.
+- **Using packaged `.exe` and want AI Auto Sync** — Download and run `pylrcget-windows-portable-ai.exe` (AI-enabled portable build).
 - **App closes with `QThread: Destroyed while thread is still running` after Auto Sync** — update to the latest release; shutdown handling for AI sync workers was fixed.
 
 ---
