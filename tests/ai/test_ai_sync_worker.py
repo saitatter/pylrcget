@@ -68,3 +68,21 @@ def test_ai_sync_availability_does_not_require_demucs(monkeypatch):
 
     assert ok is True
     assert msg == ""
+
+
+def test_ai_sync_availability_message_guides_exe_users(monkeypatch):
+    real_import = builtins.__import__
+
+    def fake_import(name, globals=None, locals=None, fromlist=(), level=0):
+        if name in {"torch", "torchaudio", "soundfile", "whisper"}:
+            raise ImportError(f"{name} missing")
+        return real_import(name, globals, locals, fromlist, level)
+
+    monkeypatch.setattr(builtins, "__import__", fake_import)
+
+    ok, msg = _check_ai_sync_available()
+
+    assert ok is False
+    assert "Missing AI dependencies:" in msg
+    assert "pip install .[ai]" in msg
+    assert "bundled Python" in msg

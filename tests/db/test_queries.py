@@ -327,7 +327,7 @@ class TrackRefreshQueryTests(unittest.TestCase):
                     startup_view="albums",
                     lrclib_instance=config.lrclib_instance,
                     lyrics_output_dir=config.lyrics_output_dir,
-                    lyrics_file_pattern=config.lyrics_file_pattern,
+                    lyrics_file_pattern="",
                     lyrics_lookup_subdir=config.lyrics_lookup_subdir,
                     scan_excluded_paths=config.scan_excluded_paths,
                     scan_excluded_patterns=config.scan_excluded_patterns,
@@ -348,6 +348,7 @@ class TrackRefreshQueryTests(unittest.TestCase):
                 self.assertEqual(reloaded.startup_view, "albums")
                 self.assertEqual(reloaded.lyrics_sidecar_format, "synced_only")
                 self.assertEqual(reloaded.lyrics_embed_format, "plain_only")
+                self.assertEqual(reloaded.lyrics_file_pattern, "")
                 self.assertEqual(reloaded.hotkey_bindings_json, '{"snap":{"enabled":true,"key":"Tab"}}')
                 self.assertEqual(reloaded.ui_state_json, '{"tab_index":2}')
             finally:

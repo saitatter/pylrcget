@@ -61,4 +61,6 @@ class PublishRetryTests(TestCase):
             BulkPublishInstrumentalWorker._publish_with_retry(api, "Song", "Artist", "Album", 120)
 
         self.assertEqual(api.publish_lyrics.call_count, 2)
+        for call in api.publish_lyrics.call_args_list:
+            self.assertTrue(call.kwargs["instrumental"])
         sleep_mock.assert_called_once_with(0.5)

@@ -63,7 +63,11 @@ def get_config(db: sqlite3.Connection) -> Config:
         startup_view=row["startup_view"] or "remember_last",
         lrclib_instance=row["lrclib_instance"],
         lyrics_output_dir=row["lyrics_output_dir"] or "",
-        lyrics_file_pattern=row["lyrics_file_pattern"] or "{artist} - {title}",
+        lyrics_file_pattern=(
+            row["lyrics_file_pattern"]
+            if row["lyrics_file_pattern"] is not None
+            else "{artist} - {title}"
+        ),
         lyrics_lookup_subdir=row["lyrics_lookup_subdir"] or "",
         scan_excluded_paths=row["scan_excluded_paths"] or "",
         scan_excluded_patterns=row["scan_excluded_patterns"] or "",

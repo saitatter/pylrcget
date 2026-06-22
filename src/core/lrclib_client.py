@@ -283,6 +283,7 @@ class LrcLibAPI:
         duration: int,
         plain_lyrics: str | None = None,
         synced_lyrics: str | None = None,
+        instrumental: bool | None = None,
         publish_token: str | None = None,
     ) -> None:
         if not publish_token:
@@ -295,6 +296,8 @@ class LrcLibAPI:
             "plainLyrics": plain_lyrics,
             "syncedLyrics": synced_lyrics,
         }
+        if instrumental is not None:
+            data["instrumental"] = bool(instrumental)
         self._request(
             "POST", "/publish",
             headers={"X-Publish-Token": publish_token},
