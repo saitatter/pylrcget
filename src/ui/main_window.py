@@ -1595,7 +1595,35 @@ class MainWindow(QMainWindow):
             step = 3
         elif "building lrc" in lowered:
             step = 4
+
         overlay.update_progress(step, 4, "AI Auto-Sync", message)
+
+        # Watchdog: if building LRC (final step) takes too long, show a soft timeout message
+        try:
+            # cancel previous watchdog if any when not in building step
+            if step != 4 and getattr(self, "_ai_sync_watchdog_timer", None):
+                try:
+                    self._ai_sync_watchdog_timer.stop()
+                except Exception:
+                    pass
+                self._ai_sync_watchdog_timer = None
+
+            if step == 4:
+                # start a 2-minute watchdog that nudges the overlay if not completed
+                if not getattr(self, "_ai_sync_watchdog_timer", None):
+                    timer = QTimer(self)
+                    timer.setSingleShot(True)
+                    timer.setInterval(120000)  # 2 minutes
+                    def _on_watchdog():
+                        ov = getattr(self, "ai_sync_overlay", None)
+                        if ov is not None:
+                            ov.update_progress(-1, 4, "AI Auto-Sync", "Still building LRC output — you can cancel")
+                    timer.timeout.connect(_on_watchdog)
+                    timer.start()
+                    self._ai_sync_watchdog_timer = timer
+        except Exception:
+            # non-fatal; overlay is advisory
+            pass
 
     def _cancel_ai_sync(self) -> None:
         worker = getattr(self, "_ai_sync_worker", None)
