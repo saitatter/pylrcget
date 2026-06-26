@@ -289,20 +289,6 @@ try:
     refined_fuzzy_eval = eval_pred(gt, refined_fuzzy_pred)
     print('WhisperX + Fuzzy:', refined_fuzzy_eval)
 
-    # If VAD segments available, also run WhisperX on concatenated vad_segments
-    if segs:
-        align_result_vad = wa.align(vad_segments, align_model, metadata, audio_np, 'cpu')
-        if isinstance(align_result_vad, dict) and 'segments' in align_result_vad:
-            vad_refined_segments = align_result_vad['segments']
-        else:
-            vad_refined_segments = getattr(align_result_vad, 'segments', None) or align_result_vad
-        print('VAD-refined segments:', len(vad_refined_segments) if vad_refined_segments else 0)
-        vad_refined_pred = greedy_align(plain_lines, vad_refined_segments)
-        vad_refined_eval = eval_pred(gt, vad_refined_pred)
-        print('VAD WhisperX (greedy):', vad_refined_eval)
-        vad_refined_fuzzy_pred = fuzzy_align(plain_lines, vad_refined_segments)
-        vad_refined_fuzzy_eval = eval_pred(gt, vad_refined_fuzzy_pred)
-        print('VAD WhisperX + Fuzzy:', vad_refined_fuzzy_eval)
 except Exception as e:
     print('\nWhisperX not available/failed:', e)
     refined_eval = None
