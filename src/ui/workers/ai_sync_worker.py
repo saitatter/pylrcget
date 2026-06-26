@@ -86,12 +86,19 @@ def _build_lrc_from_segments(segments: list[dict]) -> str:
 def _align_lyrics_to_segments(
     plain_lines: list[str],
     segments: list[dict],
+    *,
+    enable_fuzzy: bool = False,
+    fuzzy_threshold: int = 60,
+    fuzzy_window_words: int = 12,
 ) -> str:
     """
-    Align provided plain lyrics lines to WhisperX word timestamps.
+    Align provided plain lyrics lines to word timestamps.
 
-    Strategy: for each plain lyrics line, find the best matching segment
-    by text similarity and assign its start time.
+    Two modes:
+    - Greedy (original): compare first few words with windowed words
+    - Fuzzy (optional): use rapidfuzz to score a sliding window of words and pick best match
+
+    Returns LRC text.
     """
     if not segments:
         return ""
@@ -107,7 +114,15 @@ def _align_lyrics_to_segments(
         # Fall back to segment-level timestamps
         return _build_lrc_from_segments(segments)
 
-    # Simple greedy alignment: walk through words and match to lines
+    # Try to import rapidfuzz if fuzzy matching requested
+    fuzz = None
+    if enable_fuzzy:
+        try:
+            from rapidfuzz import fuzz as _fuzz
+            fuzz = _fuzz
+        except Exception:
+            fuzz = None
+
     lrc_lines: list[str] = []
     word_idx = 0
 
@@ -120,12 +135,41 @@ def _align_lyrics_to_segments(
         if not line_words:
             continue
 
-        # Find the best starting position for this line's words
+        # Define search window end
+        search_end = min(
+            len(words),
+            word_idx + len(words) // max(1, len(plain_lines)) + len(line_words) * 3,
+        )
+
+        # If fuzzy available, search by sliding window and use partial_ratio
+        if fuzz is not None:
+            best_idx = None
+            best_score = -1
+            # window size heuristic
+            base_window = max(fuzzy_window_words, len(line_words) * 2)
+            for i in range(word_idx, search_end):
+                window_end = min(len(words), i + base_window)
+                if window_end <= i:
+                    continue
+                wtext = " ".join(w.get("word", "") for w in words[i:window_end])
+                try:
+                    score = fuzz.partial_ratio(line_stripped, wtext)
+                except Exception:
+                    score = 0
+                if score > best_score:
+                    best_score = score
+                    best_idx = i
+            if best_score >= fuzzy_threshold and best_idx is not None:
+                start = words[best_idx].get("start", 0.0)
+                ts = _format_ts(start)
+                lrc_lines.append(f"[{ts}] {line_stripped}")
+                word_idx = min(best_idx + len(line_words), len(words))
+                continue
+            # else fall through to greedy
+
+        # Greedy fallback (original behavior)
         best_idx = word_idx
         best_score = -1
-
-        # Search in a window ahead
-        search_end = min(len(words), word_idx + len(words) // max(1, len(plain_lines)) + len(line_words) * 3)
         for i in range(word_idx, search_end):
             score = 0
             for j, lw in enumerate(line_words[:5]):  # compare first 5 words
@@ -146,10 +190,8 @@ def _align_lyrics_to_segments(
             start = words[best_idx].get("start", 0.0)
             ts = _format_ts(start)
             lrc_lines.append(f"[{ts}] {line_stripped}")
-            # Advance word_idx past this line's words
             word_idx = min(best_idx + len(line_words), len(words))
         else:
-            # No more words — use last known timestamp
             last_start = words[-1].get("start", 0.0) if words else 0.0
             ts = _format_ts(last_start)
             lrc_lines.append(f"[{ts}] {line_stripped}")
@@ -176,6 +218,9 @@ class AiSyncWorker(QThread):
         whisper_model: str = "base",
         device: str = "auto",
         use_vocal_separation: bool = True,
+        enable_fuzzy: bool = True,
+        fuzzy_threshold: int = 60,
+        fuzzy_window_words: int = 12,
         parent=None,
     ):
         super().__init__(parent)
@@ -184,6 +229,9 @@ class AiSyncWorker(QThread):
         self.whisper_model = whisper_model or "base"
         self._device = device
         self._use_vocal_separation = bool(use_vocal_separation)
+        self._enable_fuzzy = bool(enable_fuzzy)
+        self._fuzzy_threshold = int(fuzzy_threshold)
+        self._fuzzy_window_words = int(fuzzy_window_words)
 
     def _resolve_device(self) -> str:
         import torch
@@ -238,12 +286,38 @@ class AiSyncWorker(QThread):
             )
             segments = result.get("segments", [])
 
+            # Optional: refine timestamps with WhisperX if available. WhisperX
+            # runs a separate forced-alignment step and can improve word timings
+            # for long songs where Whisper's raw timestamps drift.
+            try:
+                import whisperx as _whisperx
+                import whisperx.alignment as _wxa
+                self.progress.emit("Refining timestamps with WhisperX...")
+                language = result.get("language", "en")
+                align_model, metadata = _whisperx.load_align_model(language_code=language, device=device)
+                align_result = _wxa.align(segments, align_model, metadata, audio_np, device)
+                # align_result may be dict-like; extract compatible segments
+                if isinstance(align_result, dict) and 'segments' in align_result:
+                    segments = align_result['segments']
+                else:
+                    segments = getattr(align_result, 'segments', None) or align_result
+                self.progress.emit("WhisperX alignment complete.")
+            except Exception:
+                # WhisperX is optional; on failure continue with Whisper's segments
+                logger.info("WhisperX not available or failed; skipping refinement.", exc_info=True)
+
             self.progress.emit("Building LRC output...")
 
             plain_lines = [l for l in self.plain_lyrics.splitlines() if l.strip()] if self.plain_lyrics else []
 
             if plain_lines:
-                lrc = _align_lyrics_to_segments(plain_lines, segments)
+                lrc = _align_lyrics_to_segments(
+                    plain_lines,
+                    segments,
+                    enable_fuzzy=self._enable_fuzzy,
+                    fuzzy_threshold=self._fuzzy_threshold,
+                    fuzzy_window_words=self._fuzzy_window_words,
+                )
             else:
                 lrc = _build_lrc_from_segments(segments)
 

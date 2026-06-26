@@ -324,11 +324,22 @@ class MusicFoldersDialog(QDialog):
             self.ai_device_combo.addItem(label, value)
         self.ai_use_demucs_chk = QCheckBox("Use vocal separation when Demucs is available")
         self.ai_use_demucs_chk.setChecked(True)
+        # Fuzzy matching controls
+        self.ai_enable_fuzzy_chk = QCheckBox("Enable fuzzy matching (tolerates ASR errors)")
+        self.ai_enable_fuzzy_chk.setChecked(True)
+        self.ai_fuzzy_threshold_spin = QSpinBox()
+        self.ai_fuzzy_threshold_spin.setRange(0, 100)
+        self.ai_fuzzy_threshold_spin.setValue(60)
+        self.ai_fuzzy_threshold_spin.setSuffix(" %")
+
         ai_sync_layout.addWidget(QLabel("Whisper model"), 0, 0)
         ai_sync_layout.addWidget(self.ai_whisper_model_combo, 0, 1)
         ai_sync_layout.addWidget(QLabel("Execution device"), 1, 0)
         ai_sync_layout.addWidget(self.ai_device_combo, 1, 1)
         ai_sync_layout.addWidget(self.ai_use_demucs_chk, 2, 0, 1, 2)
+        ai_sync_layout.addWidget(self.ai_enable_fuzzy_chk, 3, 0)
+        ai_sync_layout.addWidget(QLabel("Fuzzy threshold"), 3, 1)
+        ai_sync_layout.addWidget(self.ai_fuzzy_threshold_spin, 3, 2)
         ai_sync_hint = QLabel(
             "These options control local AI auto-sync only. The feature still works without Demucs, using the full audio mix. "
             "Changes apply to the next Auto Sync run."
@@ -427,6 +438,11 @@ class MusicFoldersDialog(QDialog):
         ai_device_idx = self.ai_device_combo.findData(str(ai_settings.get("device") or "auto"))
         self.ai_device_combo.setCurrentIndex(max(0, ai_device_idx))
         self.ai_use_demucs_chk.setChecked(bool(ai_settings.get("use_demucs", True)))
+        self.ai_enable_fuzzy_chk.setChecked(bool(ai_settings.get("enable_fuzzy", True)))
+        try:
+            self.ai_fuzzy_threshold_spin.setValue(int(ai_settings.get("fuzzy_threshold", 60)))
+        except Exception:
+            self.ai_fuzzy_threshold_spin.setValue(60)
         lrclib_url = (config.lrclib_instance or "").strip()
         self.lrclib_instance_edit.setText("" if lrclib_url == "https://lrclib.net" else lrclib_url)
         self.excluded_paths_edit.setPlainText(config.scan_excluded_paths)
@@ -791,6 +807,8 @@ class MusicFoldersDialog(QDialog):
                 "whisper_model": str(self.ai_whisper_model_combo.currentData() or "base"),
                 "device": str(self.ai_device_combo.currentData() or "auto"),
                 "use_demucs": self.ai_use_demucs_chk.isChecked(),
+                "enable_fuzzy": self.ai_enable_fuzzy_chk.isChecked(),
+                "fuzzy_threshold": int(self.ai_fuzzy_threshold_spin.value()),
             },
         )
         new_config = replace(

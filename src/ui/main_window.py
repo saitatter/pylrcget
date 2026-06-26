@@ -1514,6 +1514,8 @@ class MainWindow(QMainWindow):
             whisper_model=str(ai_sync_settings.get("whisper_model") or "base"),
             device=str(ai_sync_settings.get("device") or "auto"),
             use_vocal_separation=bool(ai_sync_settings.get("use_demucs", True)),
+            enable_fuzzy=bool(ai_sync_settings.get("enable_fuzzy", True)),
+            fuzzy_threshold=int(ai_sync_settings.get("fuzzy_threshold", 60)),
         )
         worker.progress.connect(self._on_ai_sync_progress)
         worker.completed.connect(lambda ok, msg, lrc: self._on_auto_sync_finished(ok, msg, lrc, sync_track_id))
