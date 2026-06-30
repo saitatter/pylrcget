@@ -1,0 +1,30 @@
+{
+  "base": {
+    "Keelhauled": {
+      "total_time": 7.995404005050659,
+      "load_time": 4.755666732788086,
+      "transcribe_time": 1.5313897132873535,
+      "error": Infinity
+    },
+    "Upside Down": {
+      "total_time": 1.9653637409210205,
+      "load_time": 0.44413185119628906,
+      "transcribe_time": 0.7619919776916504,
+      "error": Infinity
+    }
+  },
+  "medium": {
+    "Keelhauled": {
+      "total_time": 6.383080244064331,
+      "load_time": 2.0400373935699463,
+      "transcribe_time": 3.1100151538848877,
+      "error": Infinity
+    },
+    "Upside Down": {
+      "total_time": 3.8735334873199463,
+      "load_time": 1.7786474227905273,
+      "transcribe_time": 1.361323356628418,
+      "error": Infinity
+    }
+  }
+}

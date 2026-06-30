@@ -1,0 +1,187 @@
+{
+  "House of Sleep": {
+    "track": "House of Sleep",
+    "latency": {
+      "mean_delay": 44.43565217391304,
+      "std_delay": 41.149793789550095,
+      "matched_words": 23
+    },
+    "errors": {
+      "full_mix": {
+        "matched": 36,
+        "total": 36,
+        "coverage": 1.0,
+        "mean_error": 56.096666666666664,
+        "median_error": 39.019999999999996,
+        "p95_error": 161.8025,
+        "max_error": 162.44
+      },
+      "vocals_no_compensation": {
+        "matched": 36,
+        "total": 36,
+        "coverage": 1.0,
+        "mean_error": 57.321666666666665,
+        "median_error": 32.74000000000001,
+        "p95_error": 146.965,
+        "max_error": 151.27999999999997
+      },
+      "vocals_with_compensation": {
+        "matched": 36,
+        "total": 36,
+        "coverage": 1.0,
+        "mean_error": 58.09166666666667,
+        "median_error": 42.555,
+        "p95_error": 133.4625,
+        "max_error": 170.48
+      }
+    }
+  },
+  "Keelhauled": {
+    "track": "Keelhauled",
+    "latency": {
+      "mean_delay": -0.3024242424242391,
+      "std_delay": 3.203489603260821,
+      "matched_words": 33
+    },
+    "errors": {
+      "full_mix": {
+        "matched": 52,
+        "total": 52,
+        "coverage": 1.0,
+        "mean_error": 42.4821153846154,
+        "median_error": 24.220000000000013,
+        "p95_error": 99.7395,
+        "max_error": 105.22000000000001
+      },
+      "vocals_no_compensation": {
+        "matched": 52,
+        "total": 52,
+        "coverage": 1.0,
+        "mean_error": 40.53788461538461,
+        "median_error": 19.36,
+        "p95_error": 96.98899999999999,
+        "max_error": 105.42000000000002
+      },
+      "vocals_with_compensation": {
+        "matched": 52,
+        "total": 52,
+        "coverage": 1.0,
+        "mean_error": 40.49211538461539,
+        "median_error": 19.244999999999997,
+        "p95_error": 96.689,
+        "max_error": 105.12
+      }
+    }
+  },
+  "Nancy the Tavern Wench": {
+    "track": "Nancy the Tavern Wench",
+    "latency": {
+      "mean_delay": -1.1959999999999988,
+      "std_delay": 5.883833152922387,
+      "matched_words": 35
+    },
+    "errors": {
+      "full_mix": {
+        "matched": 40,
+        "total": 40,
+        "coverage": 1.0,
+        "mean_error": 62.69849999999999,
+        "median_error": 47.40999999999997,
+        "p95_error": 147.40550000000002,
+        "max_error": 148.31
+      },
+      "vocals_no_compensation": {
+        "matched": 40,
+        "total": 40,
+        "coverage": 1.0,
+        "mean_error": 58.541,
+        "median_error": 46.50999999999999,
+        "p95_error": 130.391,
+        "max_error": 136.61
+      },
+      "vocals_with_compensation": {
+        "matched": 40,
+        "total": 40,
+        "coverage": 1.0,
+        "mean_error": 59.09999999999998,
+        "median_error": 47.70999999999998,
+        "p95_error": 131.59099999999998,
+        "max_error": 135.41000000000003
+      }
+    }
+  },
+  "See You in Hell (acoustic)": {
+    "track": "See You in Hell (acoustic)",
+    "latency": {
+      "mean_delay": 27.429090909090913,
+      "std_delay": 26.637135204462705,
+      "matched_words": 11
+    },
+    "errors": {
+      "full_mix": {
+        "matched": 44,
+        "total": 44,
+        "coverage": 1.0,
+        "mean_error": 47.15204545454546,
+        "median_error": 25.159999999999997,
+        "p95_error": 114.72,
+        "max_error": 123.55
+      },
+      "vocals_no_compensation": {
+        "matched": 44,
+        "total": 44,
+        "coverage": 1.0,
+        "mean_error": 54.40204545454546,
+        "median_error": 50.43000000000001,
+        "p95_error": 122.83600000000004,
+        "max_error": 136.82999999999998
+      },
+      "vocals_with_compensation": {
+        "matched": 44,
+        "total": 44,
+        "coverage": 1.0,
+        "mean_error": 61.792954545454535,
+        "median_error": 67.60999999999999,
+        "p95_error": 99.56250000000004,
+        "max_error": 109.4
+      }
+    }
+  },
+  "Upside Down": {
+    "track": "Upside Down",
+    "latency": {
+      "mean_delay": 67.28,
+      "std_delay": 0.0,
+      "matched_words": 1
+    },
+    "errors": {
+      "full_mix": {
+        "matched": 28,
+        "total": 28,
+        "coverage": 1.0,
+        "mean_error": 43.87071428571429,
+        "median_error": 41.65,
+        "p95_error": 87.76800000000001,
+        "max_error": 90.34
+      },
+      "vocals_no_compensation": {
+        "matched": 28,
+        "total": 28,
+        "coverage": 1.0,
+        "mean_error": 47.40428571428573,
+        "median_error": 50.269999999999996,
+        "p95_error": 86.191,
+        "max_error": 89.58
+      },
+      "vocals_with_compensation": {
+        "matched": 28,
+        "total": 28,
+        "coverage": 1.0,
+        "mean_error": 65.49000000000001,
+        "median_error": 54.519999999999996,
+        "p95_error": 150.2,
+        "max_error": 150.2
+      }
+    }
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "Keelhauled": {
+    "total_time": 9.4237539768219,
+    "words_pred": 25,
+    "words_gt": 52,
+    "errors_matched": 25,
+    "mean_error": 45.758320000000005,
+    "median_error": 43.688
+  },
+  "Upside Down": {
+    "total_time": 1.9543097019195557,
+    "words_pred": 4,
+    "words_gt": 28,
+    "errors_matched": 4,
+    "mean_error": 54.309,
+    "median_error": 49.419
+  }
+}

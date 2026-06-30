@@ -1,0 +1,416 @@
+{
+  "selected": "viterbi",
+  "score": -857.8378002873405,
+  "candidates": [
+    {
+      "name": "forced_whisperx",
+      "score": -3.8020801930594104,
+      "count": 48
+    },
+    {
+      "name": "viterbi",
+      "score": -857.8378002873405,
+      "count": 48
+    },
+    {
+      "name": "fuzzy_local",
+      "score": -58.48700980508294,
+      "count": 48
+    }
+  ],
+  "eval": {
+    "coverage_pct": 100.0,
+    "matched": 48,
+    "total_gt": 48,
+    "mean_abs_s": 44.36604166666667,
+    "median_abs_s": 25.935000000000002,
+    "p95_abs_s": 115.32999999999998,
+    "p99_abs_s": 120.00999999999999
+  },
+  "per": [
+    {
+      "gt_t": 15.22,
+      "gt_text": "Are you feeling alone",
+      "pred_text": "Are you feeling alone",
+      "pred_t": 30.0,
+      "score": 100.0,
+      "time_diff": 14.78
+    },
+    {
+      "gt_t": 17.53,
+      "gt_text": "As the pages burn, all is set in stone",
+      "pred_text": "As the pages burn, all is set in stone",
+      "pred_t": 30.12,
+      "score": 100.0,
+      "time_diff": 12.59
+    },
+    {
+      "gt_t": 21.98,
+      "gt_text": "Hope is fading away",
+      "pred_text": "Hope is fading away",
+      "pred_t": 30.18,
+      "score": 100.0,
+      "time_diff": 8.2
+    },
+    {
+      "gt_t": 24.23,
+      "gt_text": "Now the tables turn, so you turn and pray",
+      "pred_text": "Now the tables turn, so you turn and pray",
+      "pred_t": 39.6,
+      "score": 100.0,
+      "time_diff": 15.370000000000001
+    },
+    {
+      "gt_t": 28.4,
+      "gt_text": "A sad illusion, the taste of a lie",
+      "pred_text": "A sad illusion, the taste of a lie",
+      "pred_t": 39.65,
+      "score": 100.0,
+      "time_diff": 11.25
+    },
+    {
+      "gt_t": 31.62,
+      "gt_text": "In your delusion, nowhere to hide",
+      "pred_text": "In your delusion, nowhere to hide",
+      "pred_t": 39.7,
+      "score": 100.0,
+      "time_diff": 8.080000000000002
+    },
+    {
+      "gt_t": 33.83,
+      "gt_text": "But tell me why, you swim against the tides",
+      "pred_text": "But tell me why, you swim against the tides",
+      "pred_t": 43.62,
+      "score": 100.0,
+      "time_diff": 9.79
+    },
+    {
+      "gt_t": 41.18,
+      "gt_text": "Upside down",
+      "pred_text": "Upside down",
+      "pred_t": 48.16,
+      "score": 100.0,
+      "time_diff": 6.979999999999997
+    },
+    {
+      "gt_t": 43.27,
+      "gt_text": "You fool yourself and you hide in disguise",
+      "pred_text": "You fool yourself and you hide in disguise",
+      "pred_t": 48.21,
+      "score": 100.0,
+      "time_diff": 4.939999999999998
+    },
+    {
+      "gt_t": 45.95,
+      "gt_text": "I see you now",
+      "pred_text": "I see you now",
+      "pred_t": 48.26,
+      "score": 100.0,
+      "time_diff": 2.309999999999995
+    },
+    {
+      "gt_t": 47.89,
+      "gt_text": "Drop that crown",
+      "pred_text": "Drop that crown",
+      "pred_t": 57.24,
+      "score": 100.0,
+      "time_diff": 9.350000000000001
+    },
+    {
+      "gt_t": 49.43,
+      "gt_text": "You burned the bridges",
+      "pred_text": "You burned the bridges",
+      "pred_t": 62.32,
+      "score": 100.0,
+      "time_diff": 12.89
+    },
+    {
+      "gt_t": 50.77,
+      "gt_text": "Get ready to dive",
+      "pred_text": "Get ready to dive",
+      "pred_t": 62.37,
+      "score": 100.0,
+      "time_diff": 11.599999999999994
+    },
+    {
+      "gt_t": 67.77,
+      "gt_text": "Are you still feeling alive",
+      "pred_text": "Are you still feeling alive",
+      "pred_t": 67.4,
+      "score": 100.0,
+      "time_diff": 0.36999999999999034
+    },
+    {
+      "gt_t": 70.06,
+      "gt_text": "Now your world's been turned upside down",
+      "pred_text": "Now your world's been turned upside down",
+      "pred_t": 70.58,
+      "score": 100.0,
+      "time_diff": 0.519999999999996
+    },
+    {
+      "gt_t": 74.24,
+      "gt_text": "How does it feel to be mad",
+      "pred_text": "How does it feel to be mad",
+      "pred_t": 74.26,
+      "score": 100.0,
+      "time_diff": 0.020000000000010232
+    },
+    {
+      "gt_t": 76.75,
+      "gt_text": "At the simple fact that you're born to die?",
+      "pred_text": "At the simple fact that you're born to die?",
+      "pred_t": 77.14,
+      "score": 100.0,
+      "time_diff": 0.39000000000000057
+    },
+    {
+      "gt_t": 80.75,
+      "gt_text": "In your reality, gold is divine",
+      "pred_text": "In your reality, gold is divine",
+      "pred_t": 80.76,
+      "score": 100.0,
+      "time_diff": 0.010000000000005116
+    },
+    {
+      "gt_t": 84.1,
+      "gt_text": "Your head is high and close to the sky",
+      "pred_text": "Your head is high and close to the sky",
+      "pred_t": 83.86,
+      "score": 100.0,
+      "time_diff": 0.23999999999999488
+    },
+    {
+      "gt_t": 86.66,
+      "gt_text": "So tell me why, your crown is falling down",
+      "pred_text": "So tell me why, your crown is falling down",
+      "pred_t": 86.7,
+      "score": 100.0,
+      "time_diff": 0.04000000000000625
+    },
+    {
+      "gt_t": 93.67,
+      "gt_text": "Upside down",
+      "pred_text": "Upside down",
+      "pred_t": 48.16,
+      "score": 100.0,
+      "time_diff": 45.510000000000005
+    },
+    {
+      "gt_t": 95.61,
+      "gt_text": "You fool yourself and you hide in disguise",
+      "pred_text": "You fool yourself and you hide in disguise",
+      "pred_t": 48.21,
+      "score": 100.0,
+      "time_diff": 47.4
+    },
+    {
+      "gt_t": 98.78,
+      "gt_text": "I see you now",
+      "pred_text": "I see you now",
+      "pred_t": 48.26,
+      "score": 100.0,
+      "time_diff": 50.52
+    },
+    {
+      "gt_t": 100.55,
+      "gt_text": "Drop that crown",
+      "pred_text": "Drop that crown",
+      "pred_t": 57.24,
+      "score": 100.0,
+      "time_diff": 43.309999999999995
+    },
+    {
+      "gt_t": 102.31,
+      "gt_text": "You burned the bridges",
+      "pred_text": "You burned the bridges",
+      "pred_t": 62.32,
+      "score": 100.0,
+      "time_diff": 39.99
+    },
+    {
+      "gt_t": 103.33,
+      "gt_text": "Get ready to dive",
+      "pred_text": "Get ready to dive",
+      "pred_t": 62.37,
+      "score": 100.0,
+      "time_diff": 40.96
+    },
+    {
+      "gt_t": 107.41,
+      "gt_text": "Watch out",
+      "pred_text": "Watch out",
+      "pred_t": 106.66,
+      "score": 100.0,
+      "time_diff": 0.75
+    },
+    {
+      "gt_t": 109.37,
+      "gt_text": "Poisoned by greed and denial",
+      "pred_text": "Poisoned by greed and denial",
+      "pred_t": 110.06,
+      "score": 100.0,
+      "time_diff": 0.6899999999999977
+    },
+    {
+      "gt_t": 111.79,
+      "gt_text": "Your mind is sinking in",
+      "pred_text": "Your mind is sinking in",
+      "pred_t": 112.4,
+      "score": 100.0,
+      "time_diff": 0.6099999999999994
+    },
+    {
+      "gt_t": 113.99,
+      "gt_text": "The void of your demise",
+      "pred_text": "The void of your demise",
+      "pred_t": 116.82,
+      "score": 100.0,
+      "time_diff": 2.8299999999999983
+    },
+    {
+      "gt_t": 139.79,
+      "gt_text": "Upside down",
+      "pred_text": "Upside down",
+      "pred_t": 48.16,
+      "score": 100.0,
+      "time_diff": 91.63
+    },
+    {
+      "gt_t": 141.82,
+      "gt_text": "You fool yourself and you hide in disguise",
+      "pred_text": "You fool yourself and you hide in disguise",
+      "pred_t": 48.21,
+      "score": 100.0,
+      "time_diff": 93.60999999999999
+    },
+    {
+      "gt_t": 144.53,
+      "gt_text": "I see you now",
+      "pred_text": "I see you now",
+      "pred_t": 48.26,
+      "score": 100.0,
+      "time_diff": 96.27000000000001
+    },
+    {
+      "gt_t": 146.49,
+      "gt_text": "Drop that crown",
+      "pred_text": "Drop that crown",
+      "pred_t": 57.24,
+      "score": 100.0,
+      "time_diff": 89.25
+    },
+    {
+      "gt_t": 148.55,
+      "gt_text": "You burned the bridges",
+      "pred_text": "You burned the bridges",
+      "pred_t": 62.32,
+      "score": 100.0,
+      "time_diff": 86.23000000000002
+    },
+    {
+      "gt_t": 149.34,
+      "gt_text": "Get ready to dive",
+      "pred_text": "Get ready to dive",
+      "pred_t": 62.37,
+      "score": 100.0,
+      "time_diff": 86.97
+    },
+    {
+      "gt_t": 153.1,
+      "gt_text": "Upside down",
+      "pred_text": "Upside down",
+      "pred_t": 48.16,
+      "score": 100.0,
+      "time_diff": 104.94
+    },
+    {
+      "gt_t": 155.3,
+      "gt_text": "You fool yourself and you hide in disguise",
+      "pred_text": "You fool yourself and you hide in disguise",
+      "pred_t": 48.21,
+      "score": 100.0,
+      "time_diff": 107.09
+    },
+    {
+      "gt_t": 157.42,
+      "gt_text": "I see you now",
+      "pred_text": "I see you now",
+      "pred_t": 48.26,
+      "score": 100.0,
+      "time_diff": 109.16
+    },
+    {
+      "gt_t": 159.58,
+      "gt_text": "Drop that crown",
+      "pred_text": "Drop that crown",
+      "pred_t": 57.24,
+      "score": 100.0,
+      "time_diff": 102.34
+    },
+    {
+      "gt_t": 161.55,
+      "gt_text": "You burned the bridges",
+      "pred_text": "You burned the bridges",
+      "pred_t": 62.32,
+      "score": 100.0,
+      "time_diff": 99.23000000000002
+    },
+    {
+      "gt_t": 162.12,
+      "gt_text": "Get ready to dive (Ready to dive)",
+      "pred_text": "Get ready to dive (Ready to dive)",
+      "pred_t": 125.62,
+      "score": 100.0,
+      "time_diff": 36.5
+    },
+    {
+      "gt_t": 166.21,
+      "gt_text": "Upside down",
+      "pred_text": "Upside down",
+      "pred_t": 48.16,
+      "score": 100.0,
+      "time_diff": 118.05000000000001
+    },
+    {
+      "gt_t": 168.22,
+      "gt_text": "You fool yourself and you hide in disguise",
+      "pred_text": "You fool yourself and you hide in disguise",
+      "pred_t": 48.21,
+      "score": 100.0,
+      "time_diff": 120.00999999999999
+    },
+    {
+      "gt_t": 170.89,
+      "gt_text": "Oh, I see you now",
+      "pred_text": "Oh, I see you now",
+      "pred_t": 125.62,
+      "score": 100.0,
+      "time_diff": 45.26999999999998
+    },
+    {
+      "gt_t": 172.57,
+      "gt_text": "Drop that crown",
+      "pred_text": "Drop that crown",
+      "pred_t": 57.24,
+      "score": 100.0,
+      "time_diff": 115.32999999999998
+    },
+    {
+      "gt_t": 174.55,
+      "gt_text": "You burned the bridges",
+      "pred_text": "You burned the bridges",
+      "pred_t": 62.32,
+      "score": 100.0,
+      "time_diff": 112.23000000000002
+    },
+    {
+      "gt_t": 175.54,
+      "gt_text": "Get ready to dive",
+      "pred_text": "Get ready to dive",
+      "pred_t": 62.37,
+      "score": 100.0,
+      "time_diff": 113.16999999999999
+    }
+  ]
+}

@@ -1,0 +1,1382 @@
+{
+  "audio_path": "C:\\Users\\andrvoicu\\Downloads\\music_test\\House of Sleep.flac",
+  "model": "base",
+  "words_count": 195,
+  "confidence_stats": {
+    "min": 0.12713420391082764,
+    "max": 0.9929666281677783,
+    "mean": 0.887527680518822,
+    "median": 0.9553554393351078,
+    "stdev": 0.18917793734511992
+  },
+  "low_confidence_threshold": 0.7,
+  "low_confidence_count": 30,
+  "low_confidence_percentage": 15.384615384615385,
+  "words": [
+    {
+      "word": " I",
+      "start": 31.5,
+      "end": 32.9,
+      "confidence": 0.47831207513809204,
+      "logprob": null
+    },
+    {
+      "word": " feel",
+      "start": 32.9,
+      "end": 33.18,
+      "confidence": 0.47831207513809204,
+      "logprob": null
+    },
+    {
+      "word": " you'll",
+      "start": 33.18,
+      "end": 33.5,
+      "confidence": 0.47831207513809204,
+      "logprob": null
+    },
+    {
+      "word": " never",
+      "start": 33.5,
+      "end": 33.78,
+      "confidence": 0.47831207513809204,
+      "logprob": null
+    },
+    {
+      "word": " sleep",
+      "start": 33.78,
+      "end": 34.76,
+      "confidence": 0.47831207513809204,
+      "logprob": null
+    },
+    {
+      "word": " alone",
+      "start": 34.76,
+      "end": 35.8,
+      "confidence": 0.47831207513809204,
+      "logprob": null
+    },
+    {
+      "word": " Never",
+      "start": 35.8,
+      "end": 37.88,
+      "confidence": 0.47831207513809204,
+      "logprob": null
+    },
+    {
+      "word": " without",
+      "start": 37.88,
+      "end": 38.48,
+      "confidence": 0.47831207513809204,
+      "logprob": null
+    },
+    {
+      "word": " you,",
+      "start": 38.48,
+      "end": 39.02,
+      "confidence": 0.47831207513809204,
+      "logprob": null
+    },
+    {
+      "word": " whatever",
+      "start": 39.02,
+      "end": 40.54,
+      "confidence": 0.47831207513809204,
+      "logprob": null
+    },
+    {
+      "word": " you",
+      "start": 40.54,
+      "end": 41.36,
+      "confidence": 0.47831207513809204,
+      "logprob": null
+    },
+    {
+      "word": " say",
+      "start": 41.36,
+      "end": 42.3,
+      "confidence": 0.47831207513809204,
+      "logprob": null
+    },
+    {
+      "word": " to",
+      "start": 42.3,
+      "end": 42.8,
+      "confidence": 0.47831207513809204,
+      "logprob": null
+    },
+    {
+      "word": " me",
+      "start": 42.8,
+      "end": 44.24,
+      "confidence": 0.47831207513809204,
+      "logprob": null
+    },
+    {
+      "word": " I",
+      "start": 44.24,
+      "end": 45.6,
+      "confidence": 0.47831207513809204,
+      "logprob": null
+    },
+    {
+      "word": " already",
+      "start": 45.6,
+      "end": 46.3,
+      "confidence": 0.47831207513809204,
+      "logprob": null
+    },
+    {
+      "word": " know",
+      "start": 46.3,
+      "end": 47.34,
+      "confidence": 0.47831207513809204,
+      "logprob": null
+    },
+    {
+      "word": " if",
+      "start": 47.34,
+      "end": 48.36,
+      "confidence": 0.47831207513809204,
+      "logprob": null
+    },
+    {
+      "word": " I",
+      "start": 48.36,
+      "end": 48.58,
+      "confidence": 0.47831207513809204,
+      "logprob": null
+    },
+    {
+      "word": " say",
+      "start": 48.58,
+      "end": 49.0,
+      "confidence": 0.47831207513809204,
+      "logprob": null
+    },
+    {
+      "word": " something",
+      "start": 49.0,
+      "end": 49.86,
+      "confidence": 0.47831207513809204,
+      "logprob": null
+    },
+    {
+      "word": " to",
+      "start": 49.86,
+      "end": 50.5,
+      "confidence": 0.47831207513809204,
+      "logprob": null
+    },
+    {
+      "word": " you",
+      "start": 50.5,
+      "end": 51.5,
+      "confidence": 0.47831207513809204,
+      "logprob": null
+    },
+    {
+      "word": " You",
+      "start": 51.5,
+      "end": 52.16,
+      "confidence": 0.47831207513809204,
+      "logprob": null
+    },
+    {
+      "word": " will",
+      "start": 52.16,
+      "end": 52.62,
+      "confidence": 0.47831207513809204,
+      "logprob": null
+    },
+    {
+      "word": " think",
+      "start": 52.62,
+      "end": 53.32,
+      "confidence": 0.47831207513809204,
+      "logprob": null
+    },
+    {
+      "word": " those",
+      "start": 53.32,
+      "end": 54.16,
+      "confidence": 0.47831207513809204,
+      "logprob": null
+    },
+    {
+      "word": " words",
+      "start": 54.16,
+      "end": 55.1,
+      "confidence": 0.47831207513809204,
+      "logprob": null
+    },
+    {
+      "word": " There's",
+      "start": 55.1,
+      "end": 56.54,
+      "confidence": 0.937768392264843,
+      "logprob": null
+    },
+    {
+      "word": " so",
+      "start": 56.54,
+      "end": 56.76,
+      "confidence": 0.937768392264843,
+      "logprob": null
+    },
+    {
+      "word": " much",
+      "start": 56.76,
+      "end": 57.32,
+      "confidence": 0.937768392264843,
+      "logprob": null
+    },
+    {
+      "word": " power",
+      "start": 57.32,
+      "end": 57.98,
+      "confidence": 0.937768392264843,
+      "logprob": null
+    },
+    {
+      "word": " in",
+      "start": 57.98,
+      "end": 58.72,
+      "confidence": 0.937768392264843,
+      "logprob": null
+    },
+    {
+      "word": " those",
+      "start": 58.72,
+      "end": 59.22,
+      "confidence": 0.937768392264843,
+      "logprob": null
+    },
+    {
+      "word": " words",
+      "start": 59.22,
+      "end": 60.32,
+      "confidence": 0.937768392264843,
+      "logprob": null
+    },
+    {
+      "word": " You",
+      "start": 60.32,
+      "end": 61.72,
+      "confidence": 0.937768392264843,
+      "logprob": null
+    },
+    {
+      "word": " don't",
+      "start": 61.72,
+      "end": 62.2,
+      "confidence": 0.937768392264843,
+      "logprob": null
+    },
+    {
+      "word": " know",
+      "start": 62.2,
+      "end": 63.42,
+      "confidence": 0.937768392264843,
+      "logprob": null
+    },
+    {
+      "word": " You",
+      "start": 65.1,
+      "end": 66.04,
+      "confidence": 0.937768392264843,
+      "logprob": null
+    },
+    {
+      "word": " don't",
+      "start": 66.04,
+      "end": 66.84,
+      "confidence": 0.937768392264843,
+      "logprob": null
+    },
+    {
+      "word": " know",
+      "start": 66.84,
+      "end": 67.1,
+      "confidence": 0.937768392264843,
+      "logprob": null
+    },
+    {
+      "word": " nothing",
+      "start": 67.1,
+      "end": 67.76,
+      "confidence": 0.937768392264843,
+      "logprob": null
+    },
+    {
+      "word": " yet",
+      "start": 67.76,
+      "end": 68.46000000000001,
+      "confidence": 0.937768392264843,
+      "logprob": null
+    },
+    {
+      "word": " About",
+      "start": 68.64,
+      "end": 69.46,
+      "confidence": 0.937768392264843,
+      "logprob": null
+    },
+    {
+      "word": " the",
+      "start": 69.46,
+      "end": 70.08,
+      "confidence": 0.937768392264843,
+      "logprob": null
+    },
+    {
+      "word": " dreams",
+      "start": 70.08,
+      "end": 70.64,
+      "confidence": 0.937768392264843,
+      "logprob": null
+    },
+    {
+      "word": " I",
+      "start": 70.64,
+      "end": 71.76,
+      "confidence": 0.937768392264843,
+      "logprob": null
+    },
+    {
+      "word": " have",
+      "start": 71.76,
+      "end": 72.72,
+      "confidence": 0.937768392264843,
+      "logprob": null
+    },
+    {
+      "word": " I",
+      "start": 72.72,
+      "end": 74.1,
+      "confidence": 0.937768392264843,
+      "logprob": null
+    },
+    {
+      "word": " will",
+      "start": 74.1,
+      "end": 74.42,
+      "confidence": 0.937768392264843,
+      "logprob": null
+    },
+    {
+      "word": " make",
+      "start": 74.42,
+      "end": 74.98,
+      "confidence": 0.937768392264843,
+      "logprob": null
+    },
+    {
+      "word": " you",
+      "start": 74.98,
+      "end": 75.4,
+      "confidence": 0.937768392264843,
+      "logprob": null
+    },
+    {
+      "word": " sleep",
+      "start": 75.4,
+      "end": 76.02,
+      "confidence": 0.937768392264843,
+      "logprob": null
+    },
+    {
+      "word": " You",
+      "start": 76.02,
+      "end": 77.02,
+      "confidence": 0.937768392264843,
+      "logprob": null
+    },
+    {
+      "word": " don't",
+      "start": 77.02,
+      "end": 77.54,
+      "confidence": 0.937768392264843,
+      "logprob": null
+    },
+    {
+      "word": " know",
+      "start": 77.54,
+      "end": 78.26,
+      "confidence": 0.937768392264843,
+      "logprob": null
+    },
+    {
+      "word": " You",
+      "start": 79.91999999999999,
+      "end": 81.32,
+      "confidence": 0.937768392264843,
+      "logprob": null
+    },
+    {
+      "word": " don't",
+      "start": 81.32,
+      "end": 82.18,
+      "confidence": 0.937768392264843,
+      "logprob": null
+    },
+    {
+      "word": " know",
+      "start": 82.18,
+      "end": 82.5,
+      "confidence": 0.937768392264843,
+      "logprob": null
+    },
+    {
+      "word": " nothing",
+      "start": 82.5,
+      "end": 83.1,
+      "confidence": 0.937768392264843,
+      "logprob": null
+    },
+    {
+      "word": " yet",
+      "start": 83.1,
+      "end": 84.0,
+      "confidence": 0.937768392264843,
+      "logprob": null
+    },
+    {
+      "word": " About",
+      "start": 84.0,
+      "end": 84.86,
+      "confidence": 0.9893219256773591,
+      "logprob": null
+    },
+    {
+      "word": " the",
+      "start": 84.86,
+      "end": 85.4,
+      "confidence": 0.9893219256773591,
+      "logprob": null
+    },
+    {
+      "word": " dreams",
+      "start": 85.4,
+      "end": 86.24,
+      "confidence": 0.9893219256773591,
+      "logprob": null
+    },
+    {
+      "word": " I",
+      "start": 86.24,
+      "end": 87.06,
+      "confidence": 0.9893219256773591,
+      "logprob": null
+    },
+    {
+      "word": " have",
+      "start": 87.06,
+      "end": 88.4,
+      "confidence": 0.9893219256773591,
+      "logprob": null
+    },
+    {
+      "word": " I",
+      "start": 88.72,
+      "end": 89.26,
+      "confidence": 0.9893219256773591,
+      "logprob": null
+    },
+    {
+      "word": " will",
+      "start": 89.26,
+      "end": 89.4,
+      "confidence": 0.9893219256773591,
+      "logprob": null
+    },
+    {
+      "word": " sleep",
+      "start": 89.4,
+      "end": 89.88,
+      "confidence": 0.9893219256773591,
+      "logprob": null
+    },
+    {
+      "word": " in",
+      "start": 89.88,
+      "end": 90.48,
+      "confidence": 0.9893219256773591,
+      "logprob": null
+    },
+    {
+      "word": " peace",
+      "start": 90.48,
+      "end": 90.7,
+      "confidence": 0.9893219256773591,
+      "logprob": null
+    },
+    {
+      "word": " alone",
+      "start": 90.7,
+      "end": 91.56,
+      "confidence": 0.9893219256773591,
+      "logprob": null
+    },
+    {
+      "word": " Oh,",
+      "start": 91.56,
+      "end": 93.02,
+      "confidence": 0.9893219256773591,
+      "logprob": null
+    },
+    {
+      "word": " whatever",
+      "start": 93.26,
+      "end": 93.64,
+      "confidence": 0.9893219256773591,
+      "logprob": null
+    },
+    {
+      "word": " you",
+      "start": 93.64,
+      "end": 94.34,
+      "confidence": 0.9893219256773591,
+      "logprob": null
+    },
+    {
+      "word": " will",
+      "start": 94.34,
+      "end": 94.78,
+      "confidence": 0.9893219256773591,
+      "logprob": null
+    },
+    {
+      "word": " be",
+      "start": 94.78,
+      "end": 95.18,
+      "confidence": 0.9893219256773591,
+      "logprob": null
+    },
+    {
+      "word": " I'm",
+      "start": 95.18,
+      "end": 95.86,
+      "confidence": 0.9893219256773591,
+      "logprob": null
+    },
+    {
+      "word": " stressed",
+      "start": 95.86,
+      "end": 96.36,
+      "confidence": 0.9893219256773591,
+      "logprob": null
+    },
+    {
+      "word": " of",
+      "start": 96.36,
+      "end": 98.32,
+      "confidence": 0.9893219256773591,
+      "logprob": null
+    },
+    {
+      "word": " that",
+      "start": 98.32,
+      "end": 98.74,
+      "confidence": 0.9893219256773591,
+      "logprob": null
+    },
+    {
+      "word": " love",
+      "start": 98.74,
+      "end": 100.24,
+      "confidence": 0.9893219256773591,
+      "logprob": null
+    },
+    {
+      "word": " You",
+      "start": 101.0,
+      "end": 101.56,
+      "confidence": 0.9893219256773591,
+      "logprob": null
+    },
+    {
+      "word": " will",
+      "start": 101.56,
+      "end": 102.14,
+      "confidence": 0.9893219256773591,
+      "logprob": null
+    },
+    {
+      "word": " be",
+      "start": 102.14,
+      "end": 102.56,
+      "confidence": 0.9893219256773591,
+      "logprob": null
+    },
+    {
+      "word": " getting",
+      "start": 102.56,
+      "end": 103.02,
+      "confidence": 0.9893219256773591,
+      "logprob": null
+    },
+    {
+      "word": " on",
+      "start": 103.02,
+      "end": 103.5,
+      "confidence": 0.9893219256773591,
+      "logprob": null
+    },
+    {
+      "word": " the",
+      "start": 103.5,
+      "end": 103.68,
+      "confidence": 0.9893219256773591,
+      "logprob": null
+    },
+    {
+      "word": " wire",
+      "start": 103.68,
+      "end": 104.12,
+      "confidence": 0.9893219256773591,
+      "logprob": null
+    },
+    {
+      "word": " bill",
+      "start": 104.12,
+      "end": 104.94,
+      "confidence": 0.9893219256773591,
+      "logprob": null
+    },
+    {
+      "word": " I'm",
+      "start": 104.94,
+      "end": 106.46,
+      "confidence": 0.9893219256773591,
+      "logprob": null
+    },
+    {
+      "word": " a",
+      "start": 106.46,
+      "end": 106.54,
+      "confidence": 0.9893219256773591,
+      "logprob": null
+    },
+    {
+      "word": " big",
+      "start": 106.54,
+      "end": 106.88,
+      "confidence": 0.9893219256773591,
+      "logprob": null
+    },
+    {
+      "word": " kid",
+      "start": 106.88,
+      "end": 107.38,
+      "confidence": 0.9893219256773591,
+      "logprob": null
+    },
+    {
+      "word": " to",
+      "start": 107.38,
+      "end": 107.8,
+      "confidence": 0.9893219256773591,
+      "logprob": null
+    },
+    {
+      "word": " the",
+      "start": 107.8,
+      "end": 108.14,
+      "confidence": 0.9893219256773591,
+      "logprob": null
+    },
+    {
+      "word": " kids",
+      "start": 108.14,
+      "end": 108.78,
+      "confidence": 0.9893219256773591,
+      "logprob": null
+    },
+    {
+      "word": " If",
+      "start": 108.78,
+      "end": 109.8,
+      "confidence": 0.9893219256773591,
+      "logprob": null
+    },
+    {
+      "word": " I",
+      "start": 109.8,
+      "end": 110.02,
+      "confidence": 0.9893219256773591,
+      "logprob": null
+    },
+    {
+      "word": " say",
+      "start": 110.02,
+      "end": 110.44,
+      "confidence": 0.9893219256773591,
+      "logprob": null
+    },
+    {
+      "word": " something",
+      "start": 110.44,
+      "end": 111.28,
+      "confidence": 0.9893219256773591,
+      "logprob": null
+    },
+    {
+      "word": " to",
+      "start": 111.28,
+      "end": 111.92,
+      "confidence": 0.9893219256773591,
+      "logprob": null
+    },
+    {
+      "word": " you",
+      "start": 111.92,
+      "end": 112.62,
+      "confidence": 0.9893219256773591,
+      "logprob": null
+    },
+    {
+      "word": " You",
+      "start": 112.62,
+      "end": 113.58,
+      "confidence": 0.9929666281677783,
+      "logprob": null
+    },
+    {
+      "word": " will",
+      "start": 113.58,
+      "end": 113.88,
+      "confidence": 0.9929666281677783,
+      "logprob": null
+    },
+    {
+      "word": " think",
+      "start": 113.88,
+      "end": 114.74,
+      "confidence": 0.9929666281677783,
+      "logprob": null
+    },
+    {
+      "word": " those",
+      "start": 114.74,
+      "end": 115.74,
+      "confidence": 0.9929666281677783,
+      "logprob": null
+    },
+    {
+      "word": " words",
+      "start": 115.74,
+      "end": 116.46,
+      "confidence": 0.9929666281677783,
+      "logprob": null
+    },
+    {
+      "word": " There's",
+      "start": 116.46,
+      "end": 117.96,
+      "confidence": 0.9929666281677783,
+      "logprob": null
+    },
+    {
+      "word": " so",
+      "start": 117.96,
+      "end": 118.2,
+      "confidence": 0.9929666281677783,
+      "logprob": null
+    },
+    {
+      "word": " much",
+      "start": 118.2,
+      "end": 118.74,
+      "confidence": 0.9929666281677783,
+      "logprob": null
+    },
+    {
+      "word": " power",
+      "start": 118.74,
+      "end": 119.4,
+      "confidence": 0.9929666281677783,
+      "logprob": null
+    },
+    {
+      "word": " in",
+      "start": 119.4,
+      "end": 120.16,
+      "confidence": 0.9929666281677783,
+      "logprob": null
+    },
+    {
+      "word": " those",
+      "start": 120.16,
+      "end": 120.72,
+      "confidence": 0.9929666281677783,
+      "logprob": null
+    },
+    {
+      "word": " words",
+      "start": 120.72,
+      "end": 121.4,
+      "confidence": 0.9929666281677783,
+      "logprob": null
+    },
+    {
+      "word": " Oh,",
+      "start": 121.4,
+      "end": 122.32,
+      "confidence": 0.9929666281677783,
+      "logprob": null
+    },
+    {
+      "word": " you",
+      "start": 123.0,
+      "end": 123.12,
+      "confidence": 0.9929666281677783,
+      "logprob": null
+    },
+    {
+      "word": " don't",
+      "start": 123.12,
+      "end": 123.64,
+      "confidence": 0.9929666281677783,
+      "logprob": null
+    },
+    {
+      "word": " know",
+      "start": 123.64,
+      "end": 124.32,
+      "confidence": 0.9929666281677783,
+      "logprob": null
+    },
+    {
+      "word": " You",
+      "start": 126.62,
+      "end": 127.42,
+      "confidence": 0.9929666281677783,
+      "logprob": null
+    },
+    {
+      "word": " don't",
+      "start": 127.42,
+      "end": 128.24,
+      "confidence": 0.9929666281677783,
+      "logprob": null
+    },
+    {
+      "word": " know",
+      "start": 128.24,
+      "end": 128.5,
+      "confidence": 0.9929666281677783,
+      "logprob": null
+    },
+    {
+      "word": " nothing",
+      "start": 128.5,
+      "end": 129.2,
+      "confidence": 0.9929666281677783,
+      "logprob": null
+    },
+    {
+      "word": " yet",
+      "start": 129.2,
+      "end": 130.1,
+      "confidence": 0.9929666281677783,
+      "logprob": null
+    },
+    {
+      "word": " About",
+      "start": 130.1,
+      "end": 130.84,
+      "confidence": 0.9929666281677783,
+      "logprob": null
+    },
+    {
+      "word": " the",
+      "start": 130.84,
+      "end": 131.42,
+      "confidence": 0.9929666281677783,
+      "logprob": null
+    },
+    {
+      "word": " dreams",
+      "start": 131.42,
+      "end": 132.12,
+      "confidence": 0.9929666281677783,
+      "logprob": null
+    },
+    {
+      "word": " I",
+      "start": 132.12,
+      "end": 133.26,
+      "confidence": 0.9929666281677783,
+      "logprob": null
+    },
+    {
+      "word": " have",
+      "start": 133.26,
+      "end": 134.26,
+      "confidence": 0.9929666281677783,
+      "logprob": null
+    },
+    {
+      "word": " I",
+      "start": 134.26,
+      "end": 135.44,
+      "confidence": 0.9929666281677783,
+      "logprob": null
+    },
+    {
+      "word": " will",
+      "start": 135.44,
+      "end": 135.78,
+      "confidence": 0.9929666281677783,
+      "logprob": null
+    },
+    {
+      "word": " make",
+      "start": 135.78,
+      "end": 136.42,
+      "confidence": 0.9929666281677783,
+      "logprob": null
+    },
+    {
+      "word": " you",
+      "start": 136.42,
+      "end": 136.9,
+      "confidence": 0.9929666281677783,
+      "logprob": null
+    },
+    {
+      "word": " sleep",
+      "start": 136.9,
+      "end": 137.6,
+      "confidence": 0.9929666281677783,
+      "logprob": null
+    },
+    {
+      "word": " You",
+      "start": 137.6,
+      "end": 138.48,
+      "confidence": 0.978942820802331,
+      "logprob": null
+    },
+    {
+      "word": " don't",
+      "start": 138.48,
+      "end": 138.98,
+      "confidence": 0.978942820802331,
+      "logprob": null
+    },
+    {
+      "word": " know",
+      "start": 138.98,
+      "end": 139.26,
+      "confidence": 0.978942820802331,
+      "logprob": null
+    },
+    {
+      "word": " You",
+      "start": 142.06,
+      "end": 142.76,
+      "confidence": 0.978942820802331,
+      "logprob": null
+    },
+    {
+      "word": " don't",
+      "start": 142.76,
+      "end": 143.64,
+      "confidence": 0.978942820802331,
+      "logprob": null
+    },
+    {
+      "word": " know",
+      "start": 143.64,
+      "end": 143.88,
+      "confidence": 0.978942820802331,
+      "logprob": null
+    },
+    {
+      "word": " nothing",
+      "start": 143.88,
+      "end": 144.58,
+      "confidence": 0.978942820802331,
+      "logprob": null
+    },
+    {
+      "word": " yet",
+      "start": 144.58,
+      "end": 145.48,
+      "confidence": 0.978942820802331,
+      "logprob": null
+    },
+    {
+      "word": " About",
+      "start": 145.48,
+      "end": 146.34,
+      "confidence": 0.978942820802331,
+      "logprob": null
+    },
+    {
+      "word": " the",
+      "start": 146.34,
+      "end": 146.74,
+      "confidence": 0.978942820802331,
+      "logprob": null
+    },
+    {
+      "word": " dreams",
+      "start": 146.74,
+      "end": 147.46,
+      "confidence": 0.978942820802331,
+      "logprob": null
+    },
+    {
+      "word": " I",
+      "start": 147.46,
+      "end": 148.54,
+      "confidence": 0.978942820802331,
+      "logprob": null
+    },
+    {
+      "word": " have",
+      "start": 148.54,
+      "end": 149.88,
+      "confidence": 0.978942820802331,
+      "logprob": null
+    },
+    {
+      "word": " I",
+      "start": 150.0,
+      "end": 150.7,
+      "confidence": 0.978942820802331,
+      "logprob": null
+    },
+    {
+      "word": " will",
+      "start": 150.7,
+      "end": 150.7,
+      "confidence": 0.978942820802331,
+      "logprob": null
+    },
+    {
+      "word": " sleep",
+      "start": 150.7,
+      "end": 151.3,
+      "confidence": 0.978942820802331,
+      "logprob": null
+    },
+    {
+      "word": " in",
+      "start": 151.3,
+      "end": 151.94,
+      "confidence": 0.978942820802331,
+      "logprob": null
+    },
+    {
+      "word": " peace",
+      "start": 151.94,
+      "end": 152.6,
+      "confidence": 0.978942820802331,
+      "logprob": null
+    },
+    {
+      "word": " alone",
+      "start": 152.6,
+      "end": 154.08,
+      "confidence": 0.978942820802331,
+      "logprob": null
+    },
+    {
+      "word": " I",
+      "start": 192.61999999999998,
+      "end": 194.01999999999998,
+      "confidence": 0.12713420391082764,
+      "logprob": null
+    },
+    {
+      "word": " know",
+      "start": 194.01999999999998,
+      "end": 195.42,
+      "confidence": 0.12713420391082764,
+      "logprob": null
+    },
+    {
+      "word": " You",
+      "start": 207.51999999999998,
+      "end": 208.92,
+      "confidence": 0.9273103028535843,
+      "logprob": null
+    },
+    {
+      "word": " don't",
+      "start": 208.92,
+      "end": 210.32,
+      "confidence": 0.9273103028535843,
+      "logprob": null
+    },
+    {
+      "word": " know",
+      "start": 210.32,
+      "end": 210.32,
+      "confidence": 0.9273103028535843,
+      "logprob": null
+    },
+    {
+      "word": " You",
+      "start": 210.32,
+      "end": 211.9,
+      "confidence": 0.9273103028535843,
+      "logprob": null
+    },
+    {
+      "word": " don't",
+      "start": 211.9,
+      "end": 212.68,
+      "confidence": 0.9273103028535843,
+      "logprob": null
+    },
+    {
+      "word": " know",
+      "start": 212.68,
+      "end": 212.96,
+      "confidence": 0.9273103028535843,
+      "logprob": null
+    },
+    {
+      "word": " nothing",
+      "start": 212.96,
+      "end": 213.58,
+      "confidence": 0.9273103028535843,
+      "logprob": null
+    },
+    {
+      "word": " yet",
+      "start": 213.58,
+      "end": 214.42,
+      "confidence": 0.9273103028535843,
+      "logprob": null
+    },
+    {
+      "word": " About",
+      "start": 214.42,
+      "end": 215.36,
+      "confidence": 0.9273103028535843,
+      "logprob": null
+    },
+    {
+      "word": " the",
+      "start": 215.36,
+      "end": 215.96,
+      "confidence": 0.9273103028535843,
+      "logprob": null
+    },
+    {
+      "word": " dreams",
+      "start": 215.96,
+      "end": 216.34,
+      "confidence": 0.9273103028535843,
+      "logprob": null
+    },
+    {
+      "word": " I",
+      "start": 216.34,
+      "end": 217.64,
+      "confidence": 0.9273103028535843,
+      "logprob": null
+    },
+    {
+      "word": " have",
+      "start": 217.64,
+      "end": 218.9,
+      "confidence": 0.9273103028535843,
+      "logprob": null
+    },
+    {
+      "word": " I",
+      "start": 218.9,
+      "end": 219.98,
+      "confidence": 0.9273103028535843,
+      "logprob": null
+    },
+    {
+      "word": " will",
+      "start": 219.98,
+      "end": 220.38,
+      "confidence": 0.9273103028535843,
+      "logprob": null
+    },
+    {
+      "word": " make",
+      "start": 220.38,
+      "end": 220.9,
+      "confidence": 0.9273103028535843,
+      "logprob": null
+    },
+    {
+      "word": " you",
+      "start": 220.9,
+      "end": 221.32,
+      "confidence": 0.9273103028535843,
+      "logprob": null
+    },
+    {
+      "word": " sleep",
+      "start": 221.32,
+      "end": 221.96,
+      "confidence": 0.9273103028535843,
+      "logprob": null
+    },
+    {
+      "word": " You",
+      "start": 221.96,
+      "end": 222.94,
+      "confidence": 0.9273103028535843,
+      "logprob": null
+    },
+    {
+      "word": " don't",
+      "start": 222.94,
+      "end": 223.48,
+      "confidence": 0.9273103028535843,
+      "logprob": null
+    },
+    {
+      "word": " know",
+      "start": 223.48,
+      "end": 224.56,
+      "confidence": 0.9273103028535843,
+      "logprob": null
+    },
+    {
+      "word": " You",
+      "start": 224.56,
+      "end": 227.24,
+      "confidence": 0.9273103028535843,
+      "logprob": null
+    },
+    {
+      "word": " don't",
+      "start": 227.24,
+      "end": 227.58,
+      "confidence": 0.9273103028535843,
+      "logprob": null
+    },
+    {
+      "word": " know",
+      "start": 227.58,
+      "end": 227.58,
+      "confidence": 0.9273103028535843,
+      "logprob": null
+    },
+    {
+      "word": " You",
+      "start": 227.58,
+      "end": 228.18,
+      "confidence": 0.9553554393351078,
+      "logprob": null
+    },
+    {
+      "word": " don't",
+      "start": 228.18,
+      "end": 228.22,
+      "confidence": 0.9553554393351078,
+      "logprob": null
+    },
+    {
+      "word": " know",
+      "start": 228.22,
+      "end": 228.38,
+      "confidence": 0.9553554393351078,
+      "logprob": null
+    },
+    {
+      "word": " nothing",
+      "start": 228.38,
+      "end": 228.98,
+      "confidence": 0.9553554393351078,
+      "logprob": null
+    },
+    {
+      "word": " yet",
+      "start": 228.98,
+      "end": 229.86,
+      "confidence": 0.9553554393351078,
+      "logprob": null
+    },
+    {
+      "word": " About",
+      "start": 229.86,
+      "end": 230.66,
+      "confidence": 0.9553554393351078,
+      "logprob": null
+    },
+    {
+      "word": " the",
+      "start": 230.66,
+      "end": 231.3,
+      "confidence": 0.9553554393351078,
+      "logprob": null
+    },
+    {
+      "word": " dreams",
+      "start": 231.3,
+      "end": 231.88,
+      "confidence": 0.9553554393351078,
+      "logprob": null
+    },
+    {
+      "word": " I",
+      "start": 231.88,
+      "end": 233.02,
+      "confidence": 0.9553554393351078,
+      "logprob": null
+    },
+    {
+      "word": " have",
+      "start": 233.02,
+      "end": 234.2,
+      "confidence": 0.9553554393351078,
+      "logprob": null
+    },
+    {
+      "word": " I",
+      "start": 234.2,
+      "end": 235.54,
+      "confidence": 0.9553554393351078,
+      "logprob": null
+    },
+    {
+      "word": " will",
+      "start": 235.54,
+      "end": 235.84,
+      "confidence": 0.9553554393351078,
+      "logprob": null
+    },
+    {
+      "word": " sleep",
+      "start": 235.84,
+      "end": 237.82,
+      "confidence": 0.9553554393351078,
+      "logprob": null
+    },
+    {
+      "word": " in",
+      "start": 237.82,
+      "end": 237.82,
+      "confidence": 0.9553554393351078,
+      "logprob": null
+    },
+    {
+      "word": " peace",
+      "start": 237.82,
+      "end": 242.74,
+      "confidence": 0.9553554393351078,
+      "logprob": null
+    },
+    {
+      "word": " alone",
+      "start": 242.74,
+      "end": 242.74,
+      "confidence": 0.9553554393351078,
+      "logprob": null
+    }
+  ]
+}

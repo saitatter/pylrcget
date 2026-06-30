@@ -559,8 +559,25 @@ class AiSyncWorker(QThread):
 
             self.progress.emit("Performing alignment (forced alignment)...")
             language = result.get("language", "en")
-            align_model, metadata = whisperx.load_align_model(language_code=language, device=device)
-            result = whisperx.align(result["segments"], align_model, metadata, audio, device)
+            
+            # Try alignment on the specified device, fallback to CPU on error
+            # (WhisperX alignment with Pyannote VAD can hang on Windows CUDA)
+            alignment_device = device
+            try:
+                align_model, metadata = whisperx.load_align_model(language_code=language, device=alignment_device)
+                result = whisperx.align(result["segments"], align_model, metadata, audio, alignment_device)
+            except Exception as e:
+                if alignment_device != "cpu":
+                    logger.warning("Alignment on %s failed, retrying on CPU: %s", alignment_device, e)
+                    try:
+                        align_model, metadata = whisperx.load_align_model(language_code=language, device="cpu")
+                        result = whisperx.align(result["segments"], align_model, metadata, audio, "cpu")
+                    except Exception as e2:
+                        logger.warning("CPU alignment also failed, using raw segments: %s", e2)
+                        # segments will remain without word-level timestamps
+                else:
+                    logger.warning("CPU alignment failed, using raw segments: %s", e)
+            
             segments = result.get("segments", [])
 
             self.progress.emit("Building LRC output...")

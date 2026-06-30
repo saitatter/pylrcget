@@ -1,0 +1,107 @@
+{
+  "House of Sleep": {
+    "gt_count": 36,
+    "fuzzy_local": {
+      "coverage_pct": 100.0,
+      "matched": 36,
+      "total_gt": 36,
+      "mean_abs_s": 52.63916666666666,
+      "median_abs_s": 41.89999999999999,
+      "p95_abs_s": 161.73999999999998,
+      "p99_abs_s": 161.87
+    },
+    "auto_viterbi": {
+      "coverage_pct": 100.0,
+      "matched": 36,
+      "total_gt": 36,
+      "mean_abs_s": 52.63916666666666,
+      "median_abs_s": 41.89999999999999,
+      "p95_abs_s": 161.73999999999998,
+      "p99_abs_s": 161.87
+    }
+  },
+  "Keelhauled": {
+    "gt_count": 52,
+    "fuzzy_local": {
+      "coverage_pct": 100.0,
+      "matched": 52,
+      "total_gt": 52,
+      "mean_abs_s": 49.09615384615385,
+      "median_abs_s": 38.395,
+      "p95_abs_s": 97.84,
+      "p99_abs_s": 101.84999999999998
+    },
+    "auto_viterbi": {
+      "coverage_pct": 100.0,
+      "matched": 52,
+      "total_gt": 52,
+      "mean_abs_s": 49.09615384615385,
+      "median_abs_s": 38.395,
+      "p95_abs_s": 97.84,
+      "p99_abs_s": 101.84999999999998
+    }
+  },
+  "Nancy the Tavern Wench": {
+    "gt_count": 40,
+    "fuzzy_local": {
+      "coverage_pct": 100.0,
+      "matched": 40,
+      "total_gt": 40,
+      "mean_abs_s": 56.37025,
+      "median_abs_s": 55.61999999999999,
+      "p95_abs_s": 147.28,
+      "p99_abs_s": 148.37
+    },
+    "auto_viterbi": {
+      "coverage_pct": 100.0,
+      "matched": 40,
+      "total_gt": 40,
+      "mean_abs_s": 56.37025,
+      "median_abs_s": 55.61999999999999,
+      "p95_abs_s": 147.28,
+      "p99_abs_s": 148.37
+    }
+  },
+  "See You in Hell (acoustic)": {
+    "gt_count": 44,
+    "fuzzy_local": {
+      "coverage_pct": 100.0,
+      "matched": 44,
+      "total_gt": 44,
+      "mean_abs_s": 65.09409090909091,
+      "median_abs_s": 60.215,
+      "p95_abs_s": 123.91000000000001,
+      "p99_abs_s": 132.26999999999998
+    },
+    "auto_viterbi": {
+      "coverage_pct": 100.0,
+      "matched": 44,
+      "total_gt": 44,
+      "mean_abs_s": 65.09409090909091,
+      "median_abs_s": 60.215,
+      "p95_abs_s": 123.91000000000001,
+      "p99_abs_s": 132.26999999999998
+    }
+  },
+  "Upside Down": {
+    "gt_count": 28,
+    "fuzzy_local": {
+      "coverage_pct": 100.0,
+      "matched": 28,
+      "total_gt": 28,
+      "mean_abs_s": 42.619285714285716,
+      "median_abs_s": 41.63999999999999,
+      "p95_abs_s": 88.02000000000001,
+      "p99_abs_s": 90.68
+    },
+    "auto_viterbi": {
+      "coverage_pct": 100.0,
+      "matched": 28,
+      "total_gt": 28,
+      "mean_abs_s": 42.619285714285716,
+      "median_abs_s": 41.63999999999999,
+      "p95_abs_s": 88.02000000000001,
+      "p99_abs_s": 90.68
+    }
+  }
+}

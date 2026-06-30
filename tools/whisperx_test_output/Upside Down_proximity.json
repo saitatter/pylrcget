@@ -1,0 +1,18 @@
+{
+  "audio": "C:\\Users\\andrvoicu\\Downloads\\Upside Down.flac",
+  "lrc": "C:\\Users\\andrvoicu\\Downloads\\Upside Down.lrc",
+  "proximity": {
+    "coverage_pct": 100.0,
+    "matched": 48,
+    "total_gt": 48,
+    "mean_abs_s": 43.649375,
+    "median_abs_s": 27.014999999999997
+  },
+  "proximity_whisperx": {
+    "coverage_pct": 100.0,
+    "matched": 48,
+    "total_gt": 48,
+    "mean_abs_s": 43.9031875,
+    "median_abs_s": 49.29
+  }
+}

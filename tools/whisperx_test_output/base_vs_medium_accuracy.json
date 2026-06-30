@@ -1,0 +1,96 @@
+{
+  "base": {
+    "House of Sleep": {
+      "total_time": 9.87153673171997,
+      "load_time": 4.765539169311523,
+      "transcribe_time": 1.4853997230529785,
+      "matched": 0,
+      "total": 2,
+      "mean_error": Infinity,
+      "median_error": Infinity
+    },
+    "Keelhauled": {
+      "total_time": 3.2562785148620605,
+      "load_time": 0.38292789459228516,
+      "transcribe_time": 1.43031644821167,
+      "matched": 6,
+      "total": 25,
+      "mean_error": 33.00650000000001,
+      "median_error": 0.7240000000000038
+    },
+    "Nancy the Tavern Wench": {
+      "total_time": 3.858135223388672,
+      "load_time": 0.4064342975616455,
+      "transcribe_time": 1.7808749675750732,
+      "matched": 3,
+      "total": 20,
+      "mean_error": 83.37466666666666,
+      "median_error": 98.54099999999998
+    },
+    "See You in Hell (acoustic)": {
+      "total_time": 2.240151882171631,
+      "load_time": 0.4223294258117676,
+      "transcribe_time": 0.8673496246337891,
+      "matched": 2,
+      "total": 6,
+      "mean_error": 9.472,
+      "median_error": 9.472
+    },
+    "Upside Down": {
+      "total_time": 2.2748799324035645,
+      "load_time": 0.4768540859222412,
+      "transcribe_time": 0.7830777168273926,
+      "matched": 2,
+      "total": 4,
+      "mean_error": 10.964,
+      "median_error": 10.964
+    }
+  },
+  "medium": {
+    "House of Sleep": {
+      "total_time": 6.073345899581909,
+      "load_time": 5.0851380825042725,
+      "transcribe_time": 0.520763635635376,
+      "matched": 1,
+      "total": 2,
+      "mean_error": 0.06899999999999551,
+      "median_error": 0.06899999999999551
+    },
+    "Keelhauled": {
+      "total_time": 6.198305368423462,
+      "load_time": 1.9564731121063232,
+      "transcribe_time": 2.88287353515625,
+      "matched": 4,
+      "total": 6,
+      "mean_error": 60.05775,
+      "median_error": 52.39450000000001
+    },
+    "Nancy the Tavern Wench": {
+      "total_time": 8.663298606872559,
+      "load_time": 1.8459434509277344,
+      "transcribe_time": 5.195117235183716,
+      "matched": 5,
+      "total": 11,
+      "mean_error": 20.1552,
+      "median_error": 4.265000000000001
+    },
+    "See You in Hell (acoustic)": {
+      "total_time": 4.735430479049683,
+      "load_time": 1.973093032836914,
+      "transcribe_time": 1.822866678237915,
+      "matched": 4,
+      "total": 6,
+      "mean_error": 5.972999999999998,
+      "median_error": 3.2970000000000033
+    },
+    "Upside Down": {
+      "total_time": 4.431063890457153,
+      "load_time": 1.8764753341674805,
+      "transcribe_time": 1.7413644790649414,
+      "matched": 3,
+      "total": 4,
+      "mean_error": 39.19333333333333,
+      "median_error": 14.907999999999987
+    }
+  }
+}

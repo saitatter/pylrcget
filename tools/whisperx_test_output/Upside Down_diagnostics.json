@@ -1,0 +1,1782 @@
+{
+  "audio": "C:\\Users\\andrvoicu\\Downloads\\Upside Down.flac",
+  "lrc": "C:\\Users\\andrvoicu\\Downloads\\Upside Down.lrc",
+  "per_line": [
+    {
+      "index": 0,
+      "gt_t": 15.22,
+      "gt_text": "Are you feeling alone",
+      "baseline": {
+        "gt_t": 15.22,
+        "gt_text": "Are you feeling alone",
+        "best_pred_text": "Are you feeling alone",
+        "best_pred_t": 36.2,
+        "score": 100.0,
+        "time_diff": 20.980000000000004
+      },
+      "fuzzy": {
+        "gt_t": 15.22,
+        "gt_text": "Are you feeling alone",
+        "best_pred_text": "Are you feeling alone",
+        "best_pred_t": 30.0,
+        "score": 100.0,
+        "time_diff": 14.78
+      },
+      "whisperx": {
+        "gt_t": 15.22,
+        "gt_text": "Are you feeling alone",
+        "best_pred_text": "Are you feeling alone",
+        "best_pred_t": 36.315,
+        "score": 100.0,
+        "time_diff": 21.095
+      },
+      "whisperx_fuzzy": {
+        "gt_t": 15.22,
+        "gt_text": "Are you feeling alone",
+        "best_pred_text": "Are you feeling alone",
+        "best_pred_t": 50.489,
+        "score": 100.0,
+        "time_diff": 35.269
+      }
+    },
+    {
+      "index": 1,
+      "gt_t": 17.53,
+      "gt_text": "As the pages burn, all is set in stone",
+      "baseline": {
+        "gt_t": 17.53,
+        "gt_text": "As the pages burn, all is set in stone",
+        "best_pred_text": "As the pages burn, all is set in stone",
+        "best_pred_t": 41.31,
+        "score": 100.0,
+        "time_diff": 23.78
+      },
+      "fuzzy": {
+        "gt_t": 17.53,
+        "gt_text": "As the pages burn, all is set in stone",
+        "best_pred_text": "As the pages burn, all is set in stone",
+        "best_pred_t": 30.0995,
+        "score": 100.0,
+        "time_diff": 12.569499999999998
+      },
+      "whisperx": {
+        "gt_t": 17.53,
+        "gt_text": "As the pages burn, all is set in stone",
+        "best_pred_text": "As the pages burn, all is set in stone",
+        "best_pred_t": 41.1265,
+        "score": 100.0,
+        "time_diff": 23.5965
+      },
+      "whisperx_fuzzy": {
+        "gt_t": 17.53,
+        "gt_text": "As the pages burn, all is set in stone",
+        "best_pred_text": "As the pages burn, all is set in stone",
+        "best_pred_t": 52.102,
+        "score": 100.0,
+        "time_diff": 34.571999999999996
+      }
+    },
+    {
+      "index": 2,
+      "gt_t": 21.98,
+      "gt_text": "Hope is fading away",
+      "baseline": {
+        "gt_t": 21.98,
+        "gt_text": "Hope is fading away",
+        "best_pred_text": "Hope is fading away",
+        "best_pred_t": 46.42,
+        "score": 100.0,
+        "time_diff": 24.44
+      },
+      "fuzzy": {
+        "gt_t": 21.98,
+        "gt_text": "Hope is fading away",
+        "best_pred_text": "Hope is fading away",
+        "best_pred_t": 30.198999999999998,
+        "score": 100.0,
+        "time_diff": 8.218999999999998
+      },
+      "whisperx": {
+        "gt_t": 21.98,
+        "gt_text": "Hope is fading away",
+        "best_pred_text": "Hope is fading away",
+        "best_pred_t": 45.938,
+        "score": 100.0,
+        "time_diff": 23.958000000000002
+      },
+      "whisperx_fuzzy": {
+        "gt_t": 21.98,
+        "gt_text": "Hope is fading away",
+        "best_pred_text": "Hope is fading away",
+        "best_pred_t": 54.443000000000005,
+        "score": 100.0,
+        "time_diff": 32.46300000000001
+      }
+    },
+    {
+      "index": 3,
+      "gt_t": 24.23,
+      "gt_text": "Now the tables turn, so you turn and pray",
+      "baseline": {
+        "gt_t": 24.23,
+        "gt_text": "Now the tables turn, so you turn and pray",
+        "best_pred_text": "Now the tables turn, so you turn and pray",
+        "best_pred_t": 51.53,
+        "score": 100.0,
+        "time_diff": 27.3
+      },
+      "fuzzy": {
+        "gt_t": 24.23,
+        "gt_text": "Now the tables turn, so you turn and pray",
+        "best_pred_text": "Now the tables turn, so you turn and pray",
+        "best_pred_t": 30.298499999999997,
+        "score": 100.0,
+        "time_diff": 6.068499999999997
+      },
+      "whisperx": {
+        "gt_t": 24.23,
+        "gt_text": "Now the tables turn, so you turn and pray",
+        "best_pred_text": "Now the tables turn, so you turn and pray",
+        "best_pred_t": 50.749500000000005,
+        "score": 100.0,
+        "time_diff": 26.519500000000004
+      },
+      "whisperx_fuzzy": {
+        "gt_t": 24.23,
+        "gt_text": "Now the tables turn, so you turn and pray",
+        "best_pred_text": "Now the tables turn, so you turn and pray",
+        "best_pred_t": 56.78400000000001,
+        "score": 100.0,
+        "time_diff": 32.554000000000016
+      }
+    },
+    {
+      "index": 4,
+      "gt_t": 28.4,
+      "gt_text": "A sad illusion, the taste of a lie",
+      "baseline": {
+        "gt_t": 28.4,
+        "gt_text": "A sad illusion, the taste of a lie",
+        "best_pred_text": "A sad illusion, the taste of a lie",
+        "best_pred_t": 56.64,
+        "score": 100.0,
+        "time_diff": 28.240000000000002
+      },
+      "fuzzy": {
+        "gt_t": 28.4,
+        "gt_text": "A sad illusion, the taste of a lie",
+        "best_pred_text": "A sad illusion, the taste of a lie",
+        "best_pred_t": 30.397999999999996,
+        "score": 100.0,
+        "time_diff": 1.9979999999999976
+      },
+      "whisperx": {
+        "gt_t": 28.4,
+        "gt_text": "A sad illusion, the taste of a lie",
+        "best_pred_text": "A sad illusion, the taste of a lie",
+        "best_pred_t": 55.56100000000001,
+        "score": 100.0,
+        "time_diff": 27.16100000000001
+      },
+      "whisperx_fuzzy": {
+        "gt_t": 28.4,
+        "gt_text": "A sad illusion, the taste of a lie",
+        "best_pred_text": "A sad illusion, the taste of a lie",
+        "best_pred_t": 59.12500000000002,
+        "score": 100.0,
+        "time_diff": 30.725000000000023
+      }
+    },
+    {
+      "index": 5,
+      "gt_t": 31.62,
+      "gt_text": "In your delusion, nowhere to hide",
+      "baseline": {
+        "gt_t": 31.62,
+        "gt_text": "In your delusion, nowhere to hide",
+        "best_pred_text": "In your delusion, nowhere to hide",
+        "best_pred_t": 61.75,
+        "score": 100.0,
+        "time_diff": 30.13
+      },
+      "fuzzy": {
+        "gt_t": 31.62,
+        "gt_text": "In your delusion, nowhere to hide",
+        "best_pred_text": "In your delusion, nowhere to hide",
+        "best_pred_t": 30.497499999999995,
+        "score": 100.0,
+        "time_diff": 1.1225000000000058
+      },
+      "whisperx": {
+        "gt_t": 31.62,
+        "gt_text": "In your delusion, nowhere to hide",
+        "best_pred_text": "In your delusion, nowhere to hide",
+        "best_pred_t": 60.37250000000001,
+        "score": 100.0,
+        "time_diff": 28.75250000000001
+      },
+      "whisperx_fuzzy": {
+        "gt_t": 31.62,
+        "gt_text": "In your delusion, nowhere to hide",
+        "best_pred_text": "In your delusion, nowhere to hide",
+        "best_pred_t": 61.46600000000003,
+        "score": 100.0,
+        "time_diff": 29.84600000000003
+      }
+    },
+    {
+      "index": 6,
+      "gt_t": 33.83,
+      "gt_text": "But tell me why, you swim against the tides",
+      "baseline": {
+        "gt_t": 33.83,
+        "gt_text": "But tell me why, you swim against the tides",
+        "best_pred_text": "But tell me why, you swim against the tides",
+        "best_pred_t": 66.86,
+        "score": 100.0,
+        "time_diff": 33.03
+      },
+      "fuzzy": {
+        "gt_t": 33.83,
+        "gt_text": "But tell me why, you swim against the tides",
+        "best_pred_text": "But tell me why, you swim against the tides",
+        "best_pred_t": 32.16,
+        "score": 100.0,
+        "time_diff": 1.6700000000000017
+      },
+      "whisperx": {
+        "gt_t": 33.83,
+        "gt_text": "But tell me why, you swim against the tides",
+        "best_pred_text": "But tell me why, you swim against the tides",
+        "best_pred_t": 65.18400000000001,
+        "score": 100.0,
+        "time_diff": 31.354000000000013
+      },
+      "whisperx_fuzzy": {
+        "gt_t": 33.83,
+        "gt_text": "But tell me why, you swim against the tides",
+        "best_pred_text": "But tell me why, you swim against the tides",
+        "best_pred_t": 63.80700000000004,
+        "score": 100.0,
+        "time_diff": 29.97700000000004
+      }
+    },
+    {
+      "index": 7,
+      "gt_t": 41.18,
+      "gt_text": "Upside down",
+      "baseline": {
+        "gt_t": 41.18,
+        "gt_text": "Upside down",
+        "best_pred_text": "Upside down",
+        "best_pred_t": 71.97,
+        "score": 100.0,
+        "time_diff": 30.79
+      },
+      "fuzzy": {
+        "gt_t": 41.18,
+        "gt_text": "Upside down",
+        "best_pred_text": "Upside down",
+        "best_pred_t": 34.15,
+        "score": 100.0,
+        "time_diff": 7.030000000000001
+      },
+      "whisperx": {
+        "gt_t": 41.18,
+        "gt_text": "Upside down",
+        "best_pred_text": "Upside down",
+        "best_pred_t": 69.99550000000002,
+        "score": 100.0,
+        "time_diff": 28.81550000000002
+      },
+      "whisperx_fuzzy": {
+        "gt_t": 41.18,
+        "gt_text": "Upside down",
+        "best_pred_text": "Upside down",
+        "best_pred_t": 66.14800000000005,
+        "score": 100.0,
+        "time_diff": 24.968000000000053
+      }
+    },
+    {
+      "index": 8,
+      "gt_t": 43.27,
+      "gt_text": "You fool yourself and you hide in disguise",
+      "baseline": {
+        "gt_t": 43.27,
+        "gt_text": "You fool yourself and you hide in disguise",
+        "best_pred_text": "You fool yourself and you hide in disguise",
+        "best_pred_t": 77.08,
+        "score": 100.0,
+        "time_diff": 33.809999999999995
+      },
+      "fuzzy": {
+        "gt_t": 43.27,
+        "gt_text": "You fool yourself and you hide in disguise",
+        "best_pred_text": "You fool yourself and you hide in disguise",
+        "best_pred_t": 36.14,
+        "score": 100.0,
+        "time_diff": 7.130000000000003
+      },
+      "whisperx": {
+        "gt_t": 43.27,
+        "gt_text": "You fool yourself and you hide in disguise",
+        "best_pred_text": "You fool yourself and you hide in disguise",
+        "best_pred_t": 74.80700000000002,
+        "score": 100.0,
+        "time_diff": 31.537000000000013
+      },
+      "whisperx_fuzzy": {
+        "gt_t": 43.27,
+        "gt_text": "You fool yourself and you hide in disguise",
+        "best_pred_text": "You fool yourself and you hide in disguise",
+        "best_pred_t": 68.48900000000006,
+        "score": 100.0,
+        "time_diff": 25.219000000000058
+      }
+    },
+    {
+      "index": 9,
+      "gt_t": 45.95,
+      "gt_text": "I see you now",
+      "baseline": {
+        "gt_t": 45.95,
+        "gt_text": "I see you now",
+        "best_pred_text": "I see you now",
+        "best_pred_t": 82.19,
+        "score": 100.0,
+        "time_diff": 36.239999999999995
+      },
+      "fuzzy": {
+        "gt_t": 45.95,
+        "gt_text": "I see you now",
+        "best_pred_text": "I see you now",
+        "best_pred_t": 38.13,
+        "score": 100.0,
+        "time_diff": 7.82
+      },
+      "whisperx": {
+        "gt_t": 45.95,
+        "gt_text": "I see you now",
+        "best_pred_text": "I see you now",
+        "best_pred_t": 79.61850000000001,
+        "score": 100.0,
+        "time_diff": 33.66850000000001
+      },
+      "whisperx_fuzzy": {
+        "gt_t": 45.95,
+        "gt_text": "I see you now",
+        "best_pred_text": "I see you now",
+        "best_pred_t": 70.83000000000007,
+        "score": 100.0,
+        "time_diff": 24.880000000000067
+      }
+    },
+    {
+      "index": 10,
+      "gt_t": 47.89,
+      "gt_text": "Drop that crown",
+      "baseline": {
+        "gt_t": 47.89,
+        "gt_text": "Drop that crown",
+        "best_pred_text": "Drop that crown",
+        "best_pred_t": 87.3,
+        "score": 100.0,
+        "time_diff": 39.41
+      },
+      "fuzzy": {
+        "gt_t": 47.89,
+        "gt_text": "Drop that crown",
+        "best_pred_text": "Drop that crown",
+        "best_pred_t": 40.120000000000005,
+        "score": 100.0,
+        "time_diff": 7.769999999999996
+      },
+      "whisperx": {
+        "gt_t": 47.89,
+        "gt_text": "Drop that crown",
+        "best_pred_text": "Drop that crown",
+        "best_pred_t": 84.43,
+        "score": 100.0,
+        "time_diff": 36.540000000000006
+      },
+      "whisperx_fuzzy": {
+        "gt_t": 47.89,
+        "gt_text": "Drop that crown",
+        "best_pred_text": "Drop that crown",
+        "best_pred_t": 73.17100000000008,
+        "score": 100.0,
+        "time_diff": 25.281000000000077
+      }
+    },
+    {
+      "index": 11,
+      "gt_t": 49.43,
+      "gt_text": "You burned the bridges",
+      "baseline": {
+        "gt_t": 49.43,
+        "gt_text": "You burned the bridges",
+        "best_pred_text": "You burned the bridges",
+        "best_pred_t": 92.41,
+        "score": 100.0,
+        "time_diff": 42.98
+      },
+      "fuzzy": {
+        "gt_t": 49.43,
+        "gt_text": "You burned the bridges",
+        "best_pred_text": "You burned the bridges",
+        "best_pred_t": 42.11000000000001,
+        "score": 100.0,
+        "time_diff": 7.319999999999993
+      },
+      "whisperx": {
+        "gt_t": 49.43,
+        "gt_text": "You burned the bridges",
+        "best_pred_text": "You burned the bridges",
+        "best_pred_t": 89.2415,
+        "score": 100.0,
+        "time_diff": 39.8115
+      },
+      "whisperx_fuzzy": {
+        "gt_t": 49.43,
+        "gt_text": "You burned the bridges",
+        "best_pred_text": "You burned the bridges",
+        "best_pred_t": 75.51200000000009,
+        "score": 100.0,
+        "time_diff": 26.082000000000086
+      }
+    },
+    {
+      "index": 12,
+      "gt_t": 50.77,
+      "gt_text": "Get ready to dive",
+      "baseline": {
+        "gt_t": 50.77,
+        "gt_text": "Get ready to dive",
+        "best_pred_text": "Get ready to dive",
+        "best_pred_t": 97.52,
+        "score": 100.0,
+        "time_diff": 46.74999999999999
+      },
+      "fuzzy": {
+        "gt_t": 50.77,
+        "gt_text": "Get ready to dive",
+        "best_pred_text": "Get ready to dive",
+        "best_pred_t": 44.10000000000001,
+        "score": 100.0,
+        "time_diff": 6.669999999999995
+      },
+      "whisperx": {
+        "gt_t": 50.77,
+        "gt_text": "Get ready to dive",
+        "best_pred_text": "Get ready to dive",
+        "best_pred_t": 94.053,
+        "score": 100.0,
+        "time_diff": 43.282999999999994
+      },
+      "whisperx_fuzzy": {
+        "gt_t": 50.77,
+        "gt_text": "Get ready to dive",
+        "best_pred_text": "Get ready to dive",
+        "best_pred_t": 77.8530000000001,
+        "score": 100.0,
+        "time_diff": 27.08300000000009
+      }
+    },
+    {
+      "index": 13,
+      "gt_t": 67.77,
+      "gt_text": "Are you still feeling alive",
+      "baseline": {
+        "gt_t": 67.77,
+        "gt_text": "Are you still feeling alive",
+        "best_pred_text": "Are you still feeling alive",
+        "best_pred_t": 102.63,
+        "score": 100.0,
+        "time_diff": 34.86
+      },
+      "fuzzy": {
+        "gt_t": 67.77,
+        "gt_text": "Are you still feeling alive",
+        "best_pred_text": "Are you still feeling alive",
+        "best_pred_t": 46.09000000000001,
+        "score": 100.0,
+        "time_diff": 21.679999999999986
+      },
+      "whisperx": {
+        "gt_t": 67.77,
+        "gt_text": "Are you still feeling alive",
+        "best_pred_text": "Are you still feeling alive",
+        "best_pred_t": 98.86449999999999,
+        "score": 100.0,
+        "time_diff": 31.094499999999996
+      },
+      "whisperx_fuzzy": {
+        "gt_t": 67.77,
+        "gt_text": "Are you still feeling alive",
+        "best_pred_text": "Are you still feeling alive",
+        "best_pred_t": 80.1940000000001,
+        "score": 100.0,
+        "time_diff": 12.424000000000106
+      }
+    },
+    {
+      "index": 14,
+      "gt_t": 70.06,
+      "gt_text": "Now your world's been turned upside down",
+      "baseline": {
+        "gt_t": 70.06,
+        "gt_text": "Now your world's been turned upside down",
+        "best_pred_text": "Now your world's been turned upside down",
+        "best_pred_t": 107.74,
+        "score": 100.0,
+        "time_diff": 37.67999999999999
+      },
+      "fuzzy": {
+        "gt_t": 70.06,
+        "gt_text": "Now your world's been turned upside down",
+        "best_pred_text": "Now your world's been turned upside down",
+        "best_pred_t": 48.08000000000001,
+        "score": 100.0,
+        "time_diff": 21.97999999999999
+      },
+      "whisperx": {
+        "gt_t": 70.06,
+        "gt_text": "Now your world's been turned upside down",
+        "best_pred_text": "Now your world's been turned upside down",
+        "best_pred_t": 103.67599999999999,
+        "score": 100.0,
+        "time_diff": 33.615999999999985
+      },
+      "whisperx_fuzzy": {
+        "gt_t": 70.06,
+        "gt_text": "Now your world's been turned upside down",
+        "best_pred_text": "Now your world's been turned upside down",
+        "best_pred_t": 82.53500000000011,
+        "score": 100.0,
+        "time_diff": 12.475000000000108
+      }
+    },
+    {
+      "index": 15,
+      "gt_t": 74.24,
+      "gt_text": "How does it feel to be mad",
+      "baseline": {
+        "gt_t": 74.24,
+        "gt_text": "How does it feel to be mad",
+        "best_pred_text": "How does it feel to be mad",
+        "best_pred_t": 112.85,
+        "score": 100.0,
+        "time_diff": 38.61
+      },
+      "fuzzy": {
+        "gt_t": 74.24,
+        "gt_text": "How does it feel to be mad",
+        "best_pred_text": "How does it feel to be mad",
+        "best_pred_t": 50.070000000000014,
+        "score": 100.0,
+        "time_diff": 24.16999999999998
+      },
+      "whisperx": {
+        "gt_t": 74.24,
+        "gt_text": "How does it feel to be mad",
+        "best_pred_text": "How does it feel to be mad",
+        "best_pred_t": 108.48749999999998,
+        "score": 100.0,
+        "time_diff": 34.24749999999999
+      },
+      "whisperx_fuzzy": {
+        "gt_t": 74.24,
+        "gt_text": "How does it feel to be mad",
+        "best_pred_text": "How does it feel to be mad",
+        "best_pred_t": 84.87600000000012,
+        "score": 100.0,
+        "time_diff": 10.636000000000124
+      }
+    },
+    {
+      "index": 16,
+      "gt_t": 76.75,
+      "gt_text": "At the simple fact that you're born to die?",
+      "baseline": {
+        "gt_t": 76.75,
+        "gt_text": "At the simple fact that you're born to die?",
+        "best_pred_text": "At the simple fact that you're born to die?",
+        "best_pred_t": 117.96,
+        "score": 100.0,
+        "time_diff": 41.209999999999994
+      },
+      "fuzzy": {
+        "gt_t": 76.75,
+        "gt_text": "At the simple fact that you're born to die?",
+        "best_pred_text": "At the simple fact that you're born to die?",
+        "best_pred_t": 52.06000000000002,
+        "score": 100.0,
+        "time_diff": 24.689999999999984
+      },
+      "whisperx": {
+        "gt_t": 76.75,
+        "gt_text": "At the simple fact that you're born to die?",
+        "best_pred_text": "At the simple fact that you're born to die?",
+        "best_pred_t": 113.29899999999998,
+        "score": 100.0,
+        "time_diff": 36.54899999999998
+      },
+      "whisperx_fuzzy": {
+        "gt_t": 76.75,
+        "gt_text": "At the simple fact that you're born to die?",
+        "best_pred_text": "At the simple fact that you're born to die?",
+        "best_pred_t": 87.21700000000013,
+        "score": 100.0,
+        "time_diff": 10.467000000000127
+      }
+    },
+    {
+      "index": 17,
+      "gt_t": 80.75,
+      "gt_text": "In your reality, gold is divine",
+      "baseline": {
+        "gt_t": 80.75,
+        "gt_text": "In your reality, gold is divine",
+        "best_pred_text": "In your reality, gold is divine",
+        "best_pred_t": 123.07,
+        "score": 100.0,
+        "time_diff": 42.31999999999999
+      },
+      "fuzzy": {
+        "gt_t": 80.75,
+        "gt_text": "In your reality, gold is divine",
+        "best_pred_text": "In your reality, gold is divine",
+        "best_pred_t": 54.05000000000002,
+        "score": 100.0,
+        "time_diff": 26.69999999999998
+      },
+      "whisperx": {
+        "gt_t": 80.75,
+        "gt_text": "In your reality, gold is divine",
+        "best_pred_text": "In your reality, gold is divine",
+        "best_pred_t": 118.11049999999997,
+        "score": 100.0,
+        "time_diff": 37.36049999999997
+      },
+      "whisperx_fuzzy": {
+        "gt_t": 80.75,
+        "gt_text": "In your reality, gold is divine",
+        "best_pred_text": "In your reality, gold is divine",
+        "best_pred_t": 89.55800000000013,
+        "score": 100.0,
+        "time_diff": 8.808000000000135
+      }
+    },
+    {
+      "index": 18,
+      "gt_t": 84.1,
+      "gt_text": "Your head is high and close to the sky",
+      "baseline": {
+        "gt_t": 84.1,
+        "gt_text": "Your head is high and close to the sky",
+        "best_pred_text": "Your head is high and close to the sky",
+        "best_pred_t": 128.18,
+        "score": 100.0,
+        "time_diff": 44.08000000000001
+      },
+      "fuzzy": {
+        "gt_t": 84.1,
+        "gt_text": "Your head is high and close to the sky",
+        "best_pred_text": "Your head is high and close to the sky",
+        "best_pred_t": 56.04000000000002,
+        "score": 100.0,
+        "time_diff": 28.059999999999974
+      },
+      "whisperx": {
+        "gt_t": 84.1,
+        "gt_text": "Your head is high and close to the sky",
+        "best_pred_text": "Your head is high and close to the sky",
+        "best_pred_t": 122.92199999999997,
+        "score": 100.0,
+        "time_diff": 38.821999999999974
+      },
+      "whisperx_fuzzy": {
+        "gt_t": 84.1,
+        "gt_text": "Your head is high and close to the sky",
+        "best_pred_text": "Your head is high and close to the sky",
+        "best_pred_t": 91.89900000000014,
+        "score": 100.0,
+        "time_diff": 7.799000000000149
+      }
+    },
+    {
+      "index": 19,
+      "gt_t": 86.66,
+      "gt_text": "So tell me why, your crown is falling down",
+      "baseline": {
+        "gt_t": 86.66,
+        "gt_text": "So tell me why, your crown is falling down",
+        "best_pred_text": "So tell me why, your crown is falling down",
+        "best_pred_t": 133.29000000000002,
+        "score": 100.0,
+        "time_diff": 46.630000000000024
+      },
+      "fuzzy": {
+        "gt_t": 86.66,
+        "gt_text": "So tell me why, your crown is falling down",
+        "best_pred_text": "So tell me why, your crown is falling down",
+        "best_pred_t": 58.03000000000002,
+        "score": 100.0,
+        "time_diff": 28.629999999999974
+      },
+      "whisperx": {
+        "gt_t": 86.66,
+        "gt_text": "So tell me why, your crown is falling down",
+        "best_pred_text": "So tell me why, your crown is falling down",
+        "best_pred_t": 127.73349999999996,
+        "score": 100.0,
+        "time_diff": 41.07349999999997
+      },
+      "whisperx_fuzzy": {
+        "gt_t": 86.66,
+        "gt_text": "So tell me why, your crown is falling down",
+        "best_pred_text": "So tell me why, your crown is falling down",
+        "best_pred_t": 94.24000000000015,
+        "score": 100.0,
+        "time_diff": 7.580000000000155
+      }
+    },
+    {
+      "index": 20,
+      "gt_t": 93.67,
+      "gt_text": "Upside down",
+      "baseline": {
+        "gt_t": 93.67,
+        "gt_text": "Upside down",
+        "best_pred_text": "Upside down",
+        "best_pred_t": 71.97,
+        "score": 100.0,
+        "time_diff": 21.700000000000003
+      },
+      "fuzzy": {
+        "gt_t": 93.67,
+        "gt_text": "Upside down",
+        "best_pred_text": "Upside down",
+        "best_pred_t": 34.15,
+        "score": 100.0,
+        "time_diff": 59.52
+      },
+      "whisperx": {
+        "gt_t": 93.67,
+        "gt_text": "Upside down",
+        "best_pred_text": "Upside down",
+        "best_pred_t": 69.99550000000002,
+        "score": 100.0,
+        "time_diff": 23.67449999999998
+      },
+      "whisperx_fuzzy": {
+        "gt_t": 93.67,
+        "gt_text": "Upside down",
+        "best_pred_text": "Upside down",
+        "best_pred_t": 66.14800000000005,
+        "score": 100.0,
+        "time_diff": 27.52199999999995
+      }
+    },
+    {
+      "index": 21,
+      "gt_t": 95.61,
+      "gt_text": "You fool yourself and you hide in disguise",
+      "baseline": {
+        "gt_t": 95.61,
+        "gt_text": "You fool yourself and you hide in disguise",
+        "best_pred_text": "You fool yourself and you hide in disguise",
+        "best_pred_t": 77.08,
+        "score": 100.0,
+        "time_diff": 18.53
+      },
+      "fuzzy": {
+        "gt_t": 95.61,
+        "gt_text": "You fool yourself and you hide in disguise",
+        "best_pred_text": "You fool yourself and you hide in disguise",
+        "best_pred_t": 36.14,
+        "score": 100.0,
+        "time_diff": 59.47
+      },
+      "whisperx": {
+        "gt_t": 95.61,
+        "gt_text": "You fool yourself and you hide in disguise",
+        "best_pred_text": "You fool yourself and you hide in disguise",
+        "best_pred_t": 74.80700000000002,
+        "score": 100.0,
+        "time_diff": 20.802999999999983
+      },
+      "whisperx_fuzzy": {
+        "gt_t": 95.61,
+        "gt_text": "You fool yourself and you hide in disguise",
+        "best_pred_text": "You fool yourself and you hide in disguise",
+        "best_pred_t": 68.48900000000006,
+        "score": 100.0,
+        "time_diff": 27.12099999999994
+      }
+    },
+    {
+      "index": 22,
+      "gt_t": 98.78,
+      "gt_text": "I see you now",
+      "baseline": {
+        "gt_t": 98.78,
+        "gt_text": "I see you now",
+        "best_pred_text": "I see you now",
+        "best_pred_t": 82.19,
+        "score": 100.0,
+        "time_diff": 16.590000000000003
+      },
+      "fuzzy": {
+        "gt_t": 98.78,
+        "gt_text": "I see you now",
+        "best_pred_text": "I see you now",
+        "best_pred_t": 38.13,
+        "score": 100.0,
+        "time_diff": 60.65
+      },
+      "whisperx": {
+        "gt_t": 98.78,
+        "gt_text": "I see you now",
+        "best_pred_text": "I see you now",
+        "best_pred_t": 79.61850000000001,
+        "score": 100.0,
+        "time_diff": 19.16149999999999
+      },
+      "whisperx_fuzzy": {
+        "gt_t": 98.78,
+        "gt_text": "I see you now",
+        "best_pred_text": "I see you now",
+        "best_pred_t": 70.83000000000007,
+        "score": 100.0,
+        "time_diff": 27.949999999999932
+      }
+    },
+    {
+      "index": 23,
+      "gt_t": 100.55,
+      "gt_text": "Drop that crown",
+      "baseline": {
+        "gt_t": 100.55,
+        "gt_text": "Drop that crown",
+        "best_pred_text": "Drop that crown",
+        "best_pred_t": 87.3,
+        "score": 100.0,
+        "time_diff": 13.25
+      },
+      "fuzzy": {
+        "gt_t": 100.55,
+        "gt_text": "Drop that crown",
+        "best_pred_text": "Drop that crown",
+        "best_pred_t": 40.120000000000005,
+        "score": 100.0,
+        "time_diff": 60.42999999999999
+      },
+      "whisperx": {
+        "gt_t": 100.55,
+        "gt_text": "Drop that crown",
+        "best_pred_text": "Drop that crown",
+        "best_pred_t": 84.43,
+        "score": 100.0,
+        "time_diff": 16.11999999999999
+      },
+      "whisperx_fuzzy": {
+        "gt_t": 100.55,
+        "gt_text": "Drop that crown",
+        "best_pred_text": "Drop that crown",
+        "best_pred_t": 73.17100000000008,
+        "score": 100.0,
+        "time_diff": 27.37899999999992
+      }
+    },
+    {
+      "index": 24,
+      "gt_t": 102.31,
+      "gt_text": "You burned the bridges",
+      "baseline": {
+        "gt_t": 102.31,
+        "gt_text": "You burned the bridges",
+        "best_pred_text": "You burned the bridges",
+        "best_pred_t": 92.41,
+        "score": 100.0,
+        "time_diff": 9.900000000000006
+      },
+      "fuzzy": {
+        "gt_t": 102.31,
+        "gt_text": "You burned the bridges",
+        "best_pred_text": "You burned the bridges",
+        "best_pred_t": 42.11000000000001,
+        "score": 100.0,
+        "time_diff": 60.199999999999996
+      },
+      "whisperx": {
+        "gt_t": 102.31,
+        "gt_text": "You burned the bridges",
+        "best_pred_text": "You burned the bridges",
+        "best_pred_t": 89.2415,
+        "score": 100.0,
+        "time_diff": 13.0685
+      },
+      "whisperx_fuzzy": {
+        "gt_t": 102.31,
+        "gt_text": "You burned the bridges",
+        "best_pred_text": "You burned the bridges",
+        "best_pred_t": 75.51200000000009,
+        "score": 100.0,
+        "time_diff": 26.797999999999917
+      }
+    },
+    {
+      "index": 25,
+      "gt_t": 103.33,
+      "gt_text": "Get ready to dive",
+      "baseline": {
+        "gt_t": 103.33,
+        "gt_text": "Get ready to dive",
+        "best_pred_text": "Get ready to dive",
+        "best_pred_t": 97.52,
+        "score": 100.0,
+        "time_diff": 5.810000000000002
+      },
+      "fuzzy": {
+        "gt_t": 103.33,
+        "gt_text": "Get ready to dive",
+        "best_pred_text": "Get ready to dive",
+        "best_pred_t": 44.10000000000001,
+        "score": 100.0,
+        "time_diff": 59.22999999999999
+      },
+      "whisperx": {
+        "gt_t": 103.33,
+        "gt_text": "Get ready to dive",
+        "best_pred_text": "Get ready to dive",
+        "best_pred_t": 94.053,
+        "score": 100.0,
+        "time_diff": 9.277000000000001
+      },
+      "whisperx_fuzzy": {
+        "gt_t": 103.33,
+        "gt_text": "Get ready to dive",
+        "best_pred_text": "Get ready to dive",
+        "best_pred_t": 77.8530000000001,
+        "score": 100.0,
+        "time_diff": 25.476999999999904
+      }
+    },
+    {
+      "index": 26,
+      "gt_t": 107.41,
+      "gt_text": "Watch out",
+      "baseline": {
+        "gt_t": 107.41,
+        "gt_text": "Watch out",
+        "best_pred_text": "Watch out",
+        "best_pred_t": 169.06000000000012,
+        "score": 100.0,
+        "time_diff": 61.65000000000012
+      },
+      "fuzzy": {
+        "gt_t": 107.41,
+        "gt_text": "Watch out",
+        "best_pred_text": "Watch out",
+        "best_pred_t": 71.96000000000006,
+        "score": 100.0,
+        "time_diff": 35.44999999999993
+      },
+      "whisperx": {
+        "gt_t": 107.41,
+        "gt_text": "Watch out",
+        "best_pred_text": "Watch out",
+        "best_pred_t": 161.41399999999993,
+        "score": 100.0,
+        "time_diff": 54.003999999999934
+      },
+      "whisperx_fuzzy": {
+        "gt_t": 107.41,
+        "gt_text": "Watch out",
+        "best_pred_text": "Watch out",
+        "best_pred_t": 110.62700000000021,
+        "score": 100.0,
+        "time_diff": 3.217000000000212
+      }
+    },
+    {
+      "index": 27,
+      "gt_t": 109.37,
+      "gt_text": "Poisoned by greed and denial",
+      "baseline": {
+        "gt_t": 109.37,
+        "gt_text": "Poisoned by greed and denial",
+        "best_pred_text": "Poisoned by greed and denial",
+        "best_pred_t": 177.6,
+        "score": 100.0,
+        "time_diff": 68.22999999999999
+      },
+      "fuzzy": {
+        "gt_t": 109.37,
+        "gt_text": "Poisoned by greed and denial",
+        "best_pred_text": "Poisoned by greed and denial",
+        "best_pred_t": 73.95000000000007,
+        "score": 100.0,
+        "time_diff": 35.41999999999993
+      },
+      "whisperx": {
+        "gt_t": 109.37,
+        "gt_text": "Poisoned by greed and denial",
+        "best_pred_text": "Poisoned by greed and denial",
+        "best_pred_t": 166.22549999999993,
+        "score": 100.0,
+        "time_diff": 56.85549999999992
+      },
+      "whisperx_fuzzy": {
+        "gt_t": 109.37,
+        "gt_text": "Poisoned by greed and denial",
+        "best_pred_text": "Poisoned by greed and denial",
+        "best_pred_t": 112.96800000000022,
+        "score": 100.0,
+        "time_diff": 3.598000000000212
+      }
+    },
+    {
+      "index": 28,
+      "gt_t": 111.79,
+      "gt_text": "Your mind is sinking in",
+      "baseline": {
+        "gt_t": 111.79,
+        "gt_text": "Your mind is sinking in",
+        "best_pred_text": "Your mind is sinking in",
+        "best_pred_t": 177.8555,
+        "score": 100.0,
+        "time_diff": 66.0655
+      },
+      "fuzzy": {
+        "gt_t": 111.79,
+        "gt_text": "Your mind is sinking in",
+        "best_pred_text": "Your mind is sinking in",
+        "best_pred_t": 75.94000000000008,
+        "score": 100.0,
+        "time_diff": 35.84999999999992
+      },
+      "whisperx": {
+        "gt_t": 111.79,
+        "gt_text": "Your mind is sinking in",
+        "best_pred_text": "Your mind is sinking in",
+        "best_pred_t": 171.03699999999992,
+        "score": 100.0,
+        "time_diff": 59.246999999999915
+      },
+      "whisperx_fuzzy": {
+        "gt_t": 111.79,
+        "gt_text": "Your mind is sinking in",
+        "best_pred_text": "Your mind is sinking in",
+        "best_pred_t": 115.30900000000022,
+        "score": 100.0,
+        "time_diff": 3.5190000000002186
+      }
+    },
+    {
+      "index": 29,
+      "gt_t": 113.99,
+      "gt_text": "The void of your demise",
+      "baseline": {
+        "gt_t": 113.99,
+        "gt_text": "The void of your demise",
+        "best_pred_text": "The void of your demise",
+        "best_pred_t": 178.11100000000002,
+        "score": 100.0,
+        "time_diff": 64.12100000000002
+      },
+      "fuzzy": {
+        "gt_t": 113.99,
+        "gt_text": "The void of your demise",
+        "best_pred_text": "The void of your demise",
+        "best_pred_t": 77.93000000000009,
+        "score": 100.0,
+        "time_diff": 36.0599999999999
+      },
+      "whisperx": {
+        "gt_t": 113.99,
+        "gt_text": "The void of your demise",
+        "best_pred_text": "The void of your demise",
+        "best_pred_t": 177.403,
+        "score": 100.0,
+        "time_diff": 63.413
+      },
+      "whisperx_fuzzy": {
+        "gt_t": 113.99,
+        "gt_text": "The void of your demise",
+        "best_pred_text": "The void of your demise",
+        "best_pred_t": 117.65000000000023,
+        "score": 100.0,
+        "time_diff": 3.660000000000238
+      }
+    },
+    {
+      "index": 30,
+      "gt_t": 139.79,
+      "gt_text": "Upside down",
+      "baseline": {
+        "gt_t": 139.79,
+        "gt_text": "Upside down",
+        "best_pred_text": "Upside down",
+        "best_pred_t": 71.97,
+        "score": 100.0,
+        "time_diff": 67.82
+      },
+      "fuzzy": {
+        "gt_t": 139.79,
+        "gt_text": "Upside down",
+        "best_pred_text": "Upside down",
+        "best_pred_t": 34.15,
+        "score": 100.0,
+        "time_diff": 105.63999999999999
+      },
+      "whisperx": {
+        "gt_t": 139.79,
+        "gt_text": "Upside down",
+        "best_pred_text": "Upside down",
+        "best_pred_t": 69.99550000000002,
+        "score": 100.0,
+        "time_diff": 69.79449999999997
+      },
+      "whisperx_fuzzy": {
+        "gt_t": 139.79,
+        "gt_text": "Upside down",
+        "best_pred_text": "Upside down",
+        "best_pred_t": 66.14800000000005,
+        "score": 100.0,
+        "time_diff": 73.64199999999994
+      }
+    },
+    {
+      "index": 31,
+      "gt_t": 141.82,
+      "gt_text": "You fool yourself and you hide in disguise",
+      "baseline": {
+        "gt_t": 141.82,
+        "gt_text": "You fool yourself and you hide in disguise",
+        "best_pred_text": "You fool yourself and you hide in disguise",
+        "best_pred_t": 77.08,
+        "score": 100.0,
+        "time_diff": 64.74
+      },
+      "fuzzy": {
+        "gt_t": 141.82,
+        "gt_text": "You fool yourself and you hide in disguise",
+        "best_pred_text": "You fool yourself and you hide in disguise",
+        "best_pred_t": 36.14,
+        "score": 100.0,
+        "time_diff": 105.67999999999999
+      },
+      "whisperx": {
+        "gt_t": 141.82,
+        "gt_text": "You fool yourself and you hide in disguise",
+        "best_pred_text": "You fool yourself and you hide in disguise",
+        "best_pred_t": 74.80700000000002,
+        "score": 100.0,
+        "time_diff": 67.01299999999998
+      },
+      "whisperx_fuzzy": {
+        "gt_t": 141.82,
+        "gt_text": "You fool yourself and you hide in disguise",
+        "best_pred_text": "You fool yourself and you hide in disguise",
+        "best_pred_t": 68.48900000000006,
+        "score": 100.0,
+        "time_diff": 73.33099999999993
+      }
+    },
+    {
+      "index": 32,
+      "gt_t": 144.53,
+      "gt_text": "I see you now",
+      "baseline": {
+        "gt_t": 144.53,
+        "gt_text": "I see you now",
+        "best_pred_text": "I see you now",
+        "best_pred_t": 82.19,
+        "score": 100.0,
+        "time_diff": 62.34
+      },
+      "fuzzy": {
+        "gt_t": 144.53,
+        "gt_text": "I see you now",
+        "best_pred_text": "I see you now",
+        "best_pred_t": 38.13,
+        "score": 100.0,
+        "time_diff": 106.4
+      },
+      "whisperx": {
+        "gt_t": 144.53,
+        "gt_text": "I see you now",
+        "best_pred_text": "I see you now",
+        "best_pred_t": 79.61850000000001,
+        "score": 100.0,
+        "time_diff": 64.91149999999999
+      },
+      "whisperx_fuzzy": {
+        "gt_t": 144.53,
+        "gt_text": "I see you now",
+        "best_pred_text": "I see you now",
+        "best_pred_t": 70.83000000000007,
+        "score": 100.0,
+        "time_diff": 73.69999999999993
+      }
+    },
+    {
+      "index": 33,
+      "gt_t": 146.49,
+      "gt_text": "Drop that crown",
+      "baseline": {
+        "gt_t": 146.49,
+        "gt_text": "Drop that crown",
+        "best_pred_text": "Drop that crown",
+        "best_pred_t": 87.3,
+        "score": 100.0,
+        "time_diff": 59.19000000000001
+      },
+      "fuzzy": {
+        "gt_t": 146.49,
+        "gt_text": "Drop that crown",
+        "best_pred_text": "Drop that crown",
+        "best_pred_t": 40.120000000000005,
+        "score": 100.0,
+        "time_diff": 106.37
+      },
+      "whisperx": {
+        "gt_t": 146.49,
+        "gt_text": "Drop that crown",
+        "best_pred_text": "Drop that crown",
+        "best_pred_t": 84.43,
+        "score": 100.0,
+        "time_diff": 62.06
+      },
+      "whisperx_fuzzy": {
+        "gt_t": 146.49,
+        "gt_text": "Drop that crown",
+        "best_pred_text": "Drop that crown",
+        "best_pred_t": 73.17100000000008,
+        "score": 100.0,
+        "time_diff": 73.31899999999993
+      }
+    },
+    {
+      "index": 34,
+      "gt_t": 148.55,
+      "gt_text": "You burned the bridges",
+      "baseline": {
+        "gt_t": 148.55,
+        "gt_text": "You burned the bridges",
+        "best_pred_text": "You burned the bridges",
+        "best_pred_t": 92.41,
+        "score": 100.0,
+        "time_diff": 56.140000000000015
+      },
+      "fuzzy": {
+        "gt_t": 148.55,
+        "gt_text": "You burned the bridges",
+        "best_pred_text": "You burned the bridges",
+        "best_pred_t": 42.11000000000001,
+        "score": 100.0,
+        "time_diff": 106.44
+      },
+      "whisperx": {
+        "gt_t": 148.55,
+        "gt_text": "You burned the bridges",
+        "best_pred_text": "You burned the bridges",
+        "best_pred_t": 89.2415,
+        "score": 100.0,
+        "time_diff": 59.30850000000001
+      },
+      "whisperx_fuzzy": {
+        "gt_t": 148.55,
+        "gt_text": "You burned the bridges",
+        "best_pred_text": "You burned the bridges",
+        "best_pred_t": 75.51200000000009,
+        "score": 100.0,
+        "time_diff": 73.03799999999993
+      }
+    },
+    {
+      "index": 35,
+      "gt_t": 149.34,
+      "gt_text": "Get ready to dive",
+      "baseline": {
+        "gt_t": 149.34,
+        "gt_text": "Get ready to dive",
+        "best_pred_text": "Get ready to dive",
+        "best_pred_t": 97.52,
+        "score": 100.0,
+        "time_diff": 51.82000000000001
+      },
+      "fuzzy": {
+        "gt_t": 149.34,
+        "gt_text": "Get ready to dive",
+        "best_pred_text": "Get ready to dive",
+        "best_pred_t": 44.10000000000001,
+        "score": 100.0,
+        "time_diff": 105.24
+      },
+      "whisperx": {
+        "gt_t": 149.34,
+        "gt_text": "Get ready to dive",
+        "best_pred_text": "Get ready to dive",
+        "best_pred_t": 94.053,
+        "score": 100.0,
+        "time_diff": 55.287000000000006
+      },
+      "whisperx_fuzzy": {
+        "gt_t": 149.34,
+        "gt_text": "Get ready to dive",
+        "best_pred_text": "Get ready to dive",
+        "best_pred_t": 77.8530000000001,
+        "score": 100.0,
+        "time_diff": 71.48699999999991
+      }
+    },
+    {
+      "index": 36,
+      "gt_t": 153.1,
+      "gt_text": "Upside down",
+      "baseline": {
+        "gt_t": 153.1,
+        "gt_text": "Upside down",
+        "best_pred_text": "Upside down",
+        "best_pred_t": 71.97,
+        "score": 100.0,
+        "time_diff": 81.13
+      },
+      "fuzzy": {
+        "gt_t": 153.1,
+        "gt_text": "Upside down",
+        "best_pred_text": "Upside down",
+        "best_pred_t": 34.15,
+        "score": 100.0,
+        "time_diff": 118.94999999999999
+      },
+      "whisperx": {
+        "gt_t": 153.1,
+        "gt_text": "Upside down",
+        "best_pred_text": "Upside down",
+        "best_pred_t": 69.99550000000002,
+        "score": 100.0,
+        "time_diff": 83.10449999999997
+      },
+      "whisperx_fuzzy": {
+        "gt_t": 153.1,
+        "gt_text": "Upside down",
+        "best_pred_text": "Upside down",
+        "best_pred_t": 66.14800000000005,
+        "score": 100.0,
+        "time_diff": 86.95199999999994
+      }
+    },
+    {
+      "index": 37,
+      "gt_t": 155.3,
+      "gt_text": "You fool yourself and you hide in disguise",
+      "baseline": {
+        "gt_t": 155.3,
+        "gt_text": "You fool yourself and you hide in disguise",
+        "best_pred_text": "You fool yourself and you hide in disguise",
+        "best_pred_t": 77.08,
+        "score": 100.0,
+        "time_diff": 78.22000000000001
+      },
+      "fuzzy": {
+        "gt_t": 155.3,
+        "gt_text": "You fool yourself and you hide in disguise",
+        "best_pred_text": "You fool yourself and you hide in disguise",
+        "best_pred_t": 36.14,
+        "score": 100.0,
+        "time_diff": 119.16000000000001
+      },
+      "whisperx": {
+        "gt_t": 155.3,
+        "gt_text": "You fool yourself and you hide in disguise",
+        "best_pred_text": "You fool yourself and you hide in disguise",
+        "best_pred_t": 74.80700000000002,
+        "score": 100.0,
+        "time_diff": 80.493
+      },
+      "whisperx_fuzzy": {
+        "gt_t": 155.3,
+        "gt_text": "You fool yourself and you hide in disguise",
+        "best_pred_text": "You fool yourself and you hide in disguise",
+        "best_pred_t": 68.48900000000006,
+        "score": 100.0,
+        "time_diff": 86.81099999999995
+      }
+    },
+    {
+      "index": 38,
+      "gt_t": 157.42,
+      "gt_text": "I see you now",
+      "baseline": {
+        "gt_t": 157.42,
+        "gt_text": "I see you now",
+        "best_pred_text": "I see you now",
+        "best_pred_t": 82.19,
+        "score": 100.0,
+        "time_diff": 75.22999999999999
+      },
+      "fuzzy": {
+        "gt_t": 157.42,
+        "gt_text": "I see you now",
+        "best_pred_text": "I see you now",
+        "best_pred_t": 38.13,
+        "score": 100.0,
+        "time_diff": 119.28999999999999
+      },
+      "whisperx": {
+        "gt_t": 157.42,
+        "gt_text": "I see you now",
+        "best_pred_text": "I see you now",
+        "best_pred_t": 79.61850000000001,
+        "score": 100.0,
+        "time_diff": 77.80149999999998
+      },
+      "whisperx_fuzzy": {
+        "gt_t": 157.42,
+        "gt_text": "I see you now",
+        "best_pred_text": "I see you now",
+        "best_pred_t": 70.83000000000007,
+        "score": 100.0,
+        "time_diff": 86.58999999999992
+      }
+    },
+    {
+      "index": 39,
+      "gt_t": 159.58,
+      "gt_text": "Drop that crown",
+      "baseline": {
+        "gt_t": 159.58,
+        "gt_text": "Drop that crown",
+        "best_pred_text": "Drop that crown",
+        "best_pred_t": 87.3,
+        "score": 100.0,
+        "time_diff": 72.28000000000002
+      },
+      "fuzzy": {
+        "gt_t": 159.58,
+        "gt_text": "Drop that crown",
+        "best_pred_text": "Drop that crown",
+        "best_pred_t": 40.120000000000005,
+        "score": 100.0,
+        "time_diff": 119.46000000000001
+      },
+      "whisperx": {
+        "gt_t": 159.58,
+        "gt_text": "Drop that crown",
+        "best_pred_text": "Drop that crown",
+        "best_pred_t": 84.43,
+        "score": 100.0,
+        "time_diff": 75.15
+      },
+      "whisperx_fuzzy": {
+        "gt_t": 159.58,
+        "gt_text": "Drop that crown",
+        "best_pred_text": "Drop that crown",
+        "best_pred_t": 73.17100000000008,
+        "score": 100.0,
+        "time_diff": 86.40899999999993
+      }
+    },
+    {
+      "index": 40,
+      "gt_t": 161.55,
+      "gt_text": "You burned the bridges",
+      "baseline": {
+        "gt_t": 161.55,
+        "gt_text": "You burned the bridges",
+        "best_pred_text": "You burned the bridges",
+        "best_pred_t": 92.41,
+        "score": 100.0,
+        "time_diff": 69.14000000000001
+      },
+      "fuzzy": {
+        "gt_t": 161.55,
+        "gt_text": "You burned the bridges",
+        "best_pred_text": "You burned the bridges",
+        "best_pred_t": 42.11000000000001,
+        "score": 100.0,
+        "time_diff": 119.44
+      },
+      "whisperx": {
+        "gt_t": 161.55,
+        "gt_text": "You burned the bridges",
+        "best_pred_text": "You burned the bridges",
+        "best_pred_t": 89.2415,
+        "score": 100.0,
+        "time_diff": 72.30850000000001
+      },
+      "whisperx_fuzzy": {
+        "gt_t": 161.55,
+        "gt_text": "You burned the bridges",
+        "best_pred_text": "You burned the bridges",
+        "best_pred_t": 75.51200000000009,
+        "score": 100.0,
+        "time_diff": 86.03799999999993
+      }
+    },
+    {
+      "index": 41,
+      "gt_t": 162.12,
+      "gt_text": "Get ready to dive (Ready to dive)",
+      "baseline": {
+        "gt_t": 162.12,
+        "gt_text": "Get ready to dive (Ready to dive)",
+        "best_pred_text": "Get ready to dive (Ready to dive)",
+        "best_pred_t": 181.17700000000016,
+        "score": 100.0,
+        "time_diff": 19.05700000000016
+      },
+      "fuzzy": {
+        "gt_t": 162.12,
+        "gt_text": "Get ready to dive (Ready to dive)",
+        "best_pred_text": "Get ready to dive (Ready to dive)",
+        "best_pred_t": 101.8100000000002,
+        "score": 100.0,
+        "time_diff": 60.3099999999998
+      },
+      "whisperx": {
+        "gt_t": 162.12,
+        "gt_text": "Get ready to dive (Ready to dive)",
+        "best_pred_text": "Get ready to dive (Ready to dive)",
+        "best_pred_t": 180.28990000000007,
+        "score": 100.0,
+        "time_diff": 18.16990000000007
+      },
+      "whisperx_fuzzy": {
+        "gt_t": 162.12,
+        "gt_text": "Get ready to dive (Ready to dive)",
+        "best_pred_text": "Get ready to dive (Ready to dive)",
+        "best_pred_t": 145.74200000000033,
+        "score": 100.0,
+        "time_diff": 16.377999999999673
+      }
+    },
+    {
+      "index": 42,
+      "gt_t": 166.21,
+      "gt_text": "Upside down",
+      "baseline": {
+        "gt_t": 166.21,
+        "gt_text": "Upside down",
+        "best_pred_text": "Upside down",
+        "best_pred_t": 71.97,
+        "score": 100.0,
+        "time_diff": 94.24000000000001
+      },
+      "fuzzy": {
+        "gt_t": 166.21,
+        "gt_text": "Upside down",
+        "best_pred_text": "Upside down",
+        "best_pred_t": 34.15,
+        "score": 100.0,
+        "time_diff": 132.06
+      },
+      "whisperx": {
+        "gt_t": 166.21,
+        "gt_text": "Upside down",
+        "best_pred_text": "Upside down",
+        "best_pred_t": 69.99550000000002,
+        "score": 100.0,
+        "time_diff": 96.21449999999999
+      },
+      "whisperx_fuzzy": {
+        "gt_t": 166.21,
+        "gt_text": "Upside down",
+        "best_pred_text": "Upside down",
+        "best_pred_t": 66.14800000000005,
+        "score": 100.0,
+        "time_diff": 100.06199999999995
+      }
+    },
+    {
+      "index": 43,
+      "gt_t": 168.22,
+      "gt_text": "You fool yourself and you hide in disguise",
+      "baseline": {
+        "gt_t": 168.22,
+        "gt_text": "You fool yourself and you hide in disguise",
+        "best_pred_text": "You fool yourself and you hide in disguise",
+        "best_pred_t": 77.08,
+        "score": 100.0,
+        "time_diff": 91.14
+      },
+      "fuzzy": {
+        "gt_t": 168.22,
+        "gt_text": "You fool yourself and you hide in disguise",
+        "best_pred_text": "You fool yourself and you hide in disguise",
+        "best_pred_t": 36.14,
+        "score": 100.0,
+        "time_diff": 132.07999999999998
+      },
+      "whisperx": {
+        "gt_t": 168.22,
+        "gt_text": "You fool yourself and you hide in disguise",
+        "best_pred_text": "You fool yourself and you hide in disguise",
+        "best_pred_t": 74.80700000000002,
+        "score": 100.0,
+        "time_diff": 93.41299999999998
+      },
+      "whisperx_fuzzy": {
+        "gt_t": 168.22,
+        "gt_text": "You fool yourself and you hide in disguise",
+        "best_pred_text": "You fool yourself and you hide in disguise",
+        "best_pred_t": 68.48900000000006,
+        "score": 100.0,
+        "time_diff": 99.73099999999994
+      }
+    },
+    {
+      "index": 44,
+      "gt_t": 170.89,
+      "gt_text": "Oh, I see you now",
+      "baseline": {
+        "gt_t": 170.89,
+        "gt_text": "Oh, I see you now",
+        "best_pred_text": "Oh, I see you now",
+        "best_pred_t": 181.9435000000002,
+        "score": 100.0,
+        "time_diff": 11.053500000000213
+      },
+      "fuzzy": {
+        "gt_t": 170.89,
+        "gt_text": "Oh, I see you now",
+        "best_pred_text": "Oh, I see you now",
+        "best_pred_t": 107.78000000000023,
+        "score": 100.0,
+        "time_diff": 63.10999999999976
+      },
+      "whisperx": {
+        "gt_t": 170.89,
+        "gt_text": "Oh, I see you now",
+        "best_pred_text": "Oh, I see you now",
+        "best_pred_t": 181.0116250000001,
+        "score": 100.0,
+        "time_diff": 10.121625000000108
+      },
+      "whisperx_fuzzy": {
+        "gt_t": 170.89,
+        "gt_text": "Oh, I see you now",
+        "best_pred_text": "Oh, I see you now",
+        "best_pred_t": 152.76500000000036,
+        "score": 100.0,
+        "time_diff": 18.12499999999963
+      }
+    },
+    {
+      "index": 45,
+      "gt_t": 172.57,
+      "gt_text": "Drop that crown",
+      "baseline": {
+        "gt_t": 172.57,
+        "gt_text": "Drop that crown",
+        "best_pred_text": "Drop that crown",
+        "best_pred_t": 87.3,
+        "score": 100.0,
+        "time_diff": 85.27
+      },
+      "fuzzy": {
+        "gt_t": 172.57,
+        "gt_text": "Drop that crown",
+        "best_pred_text": "Drop that crown",
+        "best_pred_t": 40.120000000000005,
+        "score": 100.0,
+        "time_diff": 132.45
+      },
+      "whisperx": {
+        "gt_t": 172.57,
+        "gt_text": "Drop that crown",
+        "best_pred_text": "Drop that crown",
+        "best_pred_t": 84.43,
+        "score": 100.0,
+        "time_diff": 88.13999999999999
+      },
+      "whisperx_fuzzy": {
+        "gt_t": 172.57,
+        "gt_text": "Drop that crown",
+        "best_pred_text": "Drop that crown",
+        "best_pred_t": 73.17100000000008,
+        "score": 100.0,
+        "time_diff": 99.39899999999992
+      }
+    },
+    {
+      "index": 46,
+      "gt_t": 174.55,
+      "gt_text": "You burned the bridges",
+      "baseline": {
+        "gt_t": 174.55,
+        "gt_text": "You burned the bridges",
+        "best_pred_text": "You burned the bridges",
+        "best_pred_t": 92.41,
+        "score": 100.0,
+        "time_diff": 82.14000000000001
+      },
+      "fuzzy": {
+        "gt_t": 174.55,
+        "gt_text": "You burned the bridges",
+        "best_pred_text": "You burned the bridges",
+        "best_pred_t": 42.11000000000001,
+        "score": 100.0,
+        "time_diff": 132.44
+      },
+      "whisperx": {
+        "gt_t": 174.55,
+        "gt_text": "You burned the bridges",
+        "best_pred_text": "You burned the bridges",
+        "best_pred_t": 89.2415,
+        "score": 100.0,
+        "time_diff": 85.30850000000001
+      },
+      "whisperx_fuzzy": {
+        "gt_t": 174.55,
+        "gt_text": "You burned the bridges",
+        "best_pred_text": "You burned the bridges",
+        "best_pred_t": 75.51200000000009,
+        "score": 100.0,
+        "time_diff": 99.03799999999993
+      }
+    },
+    {
+      "index": 47,
+      "gt_t": 175.54,
+      "gt_text": "Get ready to dive",
+      "baseline": {
+        "gt_t": 175.54,
+        "gt_text": "Get ready to dive",
+        "best_pred_text": "Get ready to dive",
+        "best_pred_t": 97.52,
+        "score": 100.0,
+        "time_diff": 78.02
+      },
+      "fuzzy": {
+        "gt_t": 175.54,
+        "gt_text": "Get ready to dive",
+        "best_pred_text": "Get ready to dive",
+        "best_pred_t": 44.10000000000001,
+        "score": 100.0,
+        "time_diff": 131.44
+      },
+      "whisperx": {
+        "gt_t": 175.54,
+        "gt_text": "Get ready to dive",
+        "best_pred_text": "Get ready to dive",
+        "best_pred_t": 94.053,
+        "score": 100.0,
+        "time_diff": 81.487
+      },
+      "whisperx_fuzzy": {
+        "gt_t": 175.54,
+        "gt_text": "Get ready to dive",
+        "best_pred_text": "Get ready to dive",
+        "best_pred_t": 77.8530000000001,
+        "score": 100.0,
+        "time_diff": 97.6869999999999
+      }
+    }
+  ]
+}

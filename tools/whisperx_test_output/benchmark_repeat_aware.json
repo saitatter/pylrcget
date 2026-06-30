@@ -1,0 +1,87 @@
+{
+  "House of Sleep": {
+    "greedy": {
+      "mean_abs_s": 52.63916666666666,
+      "median_abs_s": 41.89999999999999,
+      "p95_abs_s": 161.73999999999998
+    },
+    "fuzzy": {
+      "mean_abs_s": 52.811388888888885,
+      "median_abs_s": 41.89999999999999,
+      "p95_abs_s": 161.73999999999998
+    },
+    "repeat_aware": {
+      "mean_abs_s": 52.811388888888885,
+      "median_abs_s": 41.89999999999999,
+      "p95_abs_s": 161.73999999999998
+    }
+  },
+  "Keelhauled": {
+    "greedy": {
+      "mean_abs_s": 52.22538461538462,
+      "median_abs_s": 35.964999999999996,
+      "p95_abs_s": 102.02000000000001
+    },
+    "fuzzy": {
+      "mean_abs_s": 50.081153846153846,
+      "median_abs_s": 35.964999999999996,
+      "p95_abs_s": 102.02000000000001
+    },
+    "repeat_aware": {
+      "mean_abs_s": 50.081153846153846,
+      "median_abs_s": 35.964999999999996,
+      "p95_abs_s": 102.02000000000001
+    }
+  },
+  "Nancy the Tavern Wench": {
+    "greedy": {
+      "mean_abs_s": 55.04825,
+      "median_abs_s": 40.32499999999999,
+      "p95_abs_s": 147.32
+    },
+    "fuzzy": {
+      "mean_abs_s": 57.45525,
+      "median_abs_s": 40.32499999999999,
+      "p95_abs_s": 150.49
+    },
+    "repeat_aware": {
+      "mean_abs_s": 57.45525,
+      "median_abs_s": 40.32499999999999,
+      "p95_abs_s": 150.49
+    }
+  },
+  "See You in Hell (acoustic)": {
+    "greedy": {
+      "mean_abs_s": 62.821363636363635,
+      "median_abs_s": 60.215,
+      "p95_abs_s": 116.23
+    },
+    "fuzzy": {
+      "mean_abs_s": 62.95272727272727,
+      "median_abs_s": 60.60999999999999,
+      "p95_abs_s": 123.57000000000001
+    },
+    "repeat_aware": {
+      "mean_abs_s": 62.95272727272727,
+      "median_abs_s": 60.60999999999999,
+      "p95_abs_s": 123.57000000000001
+    }
+  },
+  "Upside Down": {
+    "greedy": {
+      "mean_abs_s": 42.619285714285716,
+      "median_abs_s": 41.63999999999999,
+      "p95_abs_s": 88.02000000000001
+    },
+    "fuzzy": {
+      "mean_abs_s": 49.21785714285714,
+      "median_abs_s": 47.660000000000004,
+      "p95_abs_s": 95.78
+    },
+    "repeat_aware": {
+      "mean_abs_s": 49.21785714285714,
+      "median_abs_s": 47.660000000000004,
+      "p95_abs_s": 95.78
+    }
+  }
+}
