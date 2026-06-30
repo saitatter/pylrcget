@@ -411,6 +411,40 @@ def _same_phrase_rewind_penalty(
     return -(1.2 + rewind_distance * 0.035)
 
 
+def _same_phrase_rewind_transition_penalty(
+    line_idx: int,
+    prev_word_idx: int,
+    word_idx: int,
+    rewind_targets: dict[int, int],
+    *,
+    rewind_slack: int = 18,
+) -> float:
+    """
+    Extra penalty when consecutive lines stay in an early repeated cluster.
+
+    This is transition-level (depends on prev->current), complementary to state penalty.
+    """
+    target = rewind_targets.get(line_idx)
+    if target is None:
+        return 0.0
+
+    threshold = target - rewind_slack
+    if word_idx >= threshold:
+        return 0.0
+
+    # We only penalize "same-cluster drift" when both prev/current are still too early.
+    if prev_word_idx >= threshold:
+        return 0.0
+
+    lag = threshold - word_idx
+    jump = max(0, word_idx - prev_word_idx)
+
+    # If jump is tiny while still lagging behind expected cluster, likely rewind collapse.
+    jump_penalty = max(0.0, (6.0 - jump) * 0.12)
+    lag_penalty = lag * 0.015
+    return -(0.4 + jump_penalty + lag_penalty)
+
+
 def _align_lyrics_to_segments_viterbi(
     plain_lines: list[str],
     segments: list[dict],
@@ -510,8 +544,21 @@ def _align_lyrics_to_segments_viterbi(
                 emission = emissions[line_idx][word_idx]
                 anchor_shape = _anchor_bonus(line_idx, word_idx, anchors)
                 rewind_shape = _same_phrase_rewind_penalty(line_idx, word_idx, rewind_targets)
+                rewind_transition_shape = _same_phrase_rewind_transition_penalty(
+                    line_idx,
+                    prev_idx,
+                    word_idx,
+                    rewind_targets,
+                )
 
-                total_score = prev_score + emission + transition_cost + anchor_shape + rewind_shape
+                total_score = (
+                    prev_score
+                    + emission
+                    + transition_cost
+                    + anchor_shape
+                    + rewind_shape
+                    + rewind_transition_shape
+                )
 
                 if total_score > best_prev_score:
                     best_prev_score = total_score
