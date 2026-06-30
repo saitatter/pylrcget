@@ -330,6 +330,87 @@ def _anchor_bonus(line_idx: int, word_idx: int, anchors: dict[int, int]) -> floa
     return -(0.8 + (distance - 20) * 0.01)
 
 
+def _normalize_line_text(line: str) -> str:
+    return " ".join(_normalize_word(tok) for tok in line.split() if tok.strip())
+
+
+def _build_same_phrase_rewind_targets(
+    plain_lines: list[str],
+    emissions: list[list[float]],
+    *,
+    score_threshold: float = 0.52,
+    min_cluster_gap: int = 26,
+) -> dict[int, int]:
+    """
+    Build expected cluster targets for duplicated lines.
+
+    For each duplicated phrase, we detect temporal clusters of strong matches in ASR word space
+    and map each line occurrence to the corresponding cluster order.
+    """
+    phrase_to_lines: dict[str, list[int]] = {}
+    for idx, line in enumerate(plain_lines):
+        key = _normalize_line_text(line)
+        if key:
+            phrase_to_lines.setdefault(key, []).append(idx)
+
+    targets: dict[int, int] = {}
+
+    for indices in phrase_to_lines.values():
+        if len(indices) <= 1:
+            continue
+
+        rep_idx = indices[0]
+        row = emissions[rep_idx]
+        candidates = [(wi, score) for wi, score in enumerate(row) if score >= score_threshold]
+        if not candidates:
+            continue
+
+        # Cluster nearby candidate word indices.
+        clusters: list[list[tuple[int, float]]] = [[candidates[0]]]
+        for wi, score in candidates[1:]:
+            if wi - clusters[-1][-1][0] <= min_cluster_gap:
+                clusters[-1].append((wi, score))
+            else:
+                clusters.append([(wi, score)])
+
+        # Use the highest-scoring point from each cluster as representative.
+        cluster_centers: list[int] = []
+        for cluster in clusters:
+            best_wi, _ = max(cluster, key=lambda x: x[1])
+            cluster_centers.append(best_wi)
+
+        cluster_centers.sort()
+        if len(cluster_centers) <= 1:
+            continue
+
+        # Map k-th repeated line to k-th cluster (clamped if fewer clusters than repeats).
+        for occ_idx, line_idx in enumerate(indices):
+            target_idx = cluster_centers[min(occ_idx, len(cluster_centers) - 1)]
+            targets[line_idx] = target_idx
+
+    return targets
+
+
+def _same_phrase_rewind_penalty(
+    line_idx: int,
+    word_idx: int,
+    rewind_targets: dict[int, int],
+    *,
+    rewind_slack: int = 18,
+) -> float:
+    """
+    Penalize mapping duplicated phrases to significantly earlier clusters (rewind).
+    """
+    target = rewind_targets.get(line_idx)
+    if target is None:
+        return 0.0
+    if word_idx >= target - rewind_slack:
+        return 0.0
+
+    rewind_distance = (target - rewind_slack) - word_idx
+    return -(1.2 + rewind_distance * 0.035)
+
+
 def _align_lyrics_to_segments_viterbi(
     plain_lines: list[str],
     segments: list[dict],
@@ -380,6 +461,7 @@ def _align_lyrics_to_segments_viterbi(
 
     # Build sparse confidence anchors globally.
     anchors = _find_confidence_anchors(line_words_list, words)
+    rewind_targets = _build_same_phrase_rewind_targets(plain_lines, emissions)
 
     # Initialize DP
     viterbi = {}
@@ -387,7 +469,11 @@ def _align_lyrics_to_segments_viterbi(
 
     # Start: try to match first line near beginning.
     for word_idx in range(min(120, num_words)):
-        score = emissions[0][word_idx] + _anchor_bonus(0, word_idx, anchors)
+        score = (
+            emissions[0][word_idx]
+            + _anchor_bonus(0, word_idx, anchors)
+            + _same_phrase_rewind_penalty(0, word_idx, rewind_targets)
+        )
         viterbi[(0, word_idx)] = score
         backptr[(0, word_idx)] = -1
 
@@ -423,8 +509,9 @@ def _align_lyrics_to_segments_viterbi(
 
                 emission = emissions[line_idx][word_idx]
                 anchor_shape = _anchor_bonus(line_idx, word_idx, anchors)
+                rewind_shape = _same_phrase_rewind_penalty(line_idx, word_idx, rewind_targets)
 
-                total_score = prev_score + emission + transition_cost + anchor_shape
+                total_score = prev_score + emission + transition_cost + anchor_shape + rewind_shape
 
                 if total_score > best_prev_score:
                     best_prev_score = total_score
