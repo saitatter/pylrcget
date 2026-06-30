@@ -1,4 +1,11 @@
 # Changelog
+## v1.11.0 (2026-06-22)
+
+### ✨ Features
+* **ai:** Add guided packaged flow and ai-enabled portable release ([d5bc85a](https://github.com/saitatter/pylrcget/commit/d5bc85af7340d6c1625f6ba28e4de2f28ce9065d))
+  Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+
+
 ## v1.10.1 (2026-06-22)
 
 ### 🐛 Fixes
