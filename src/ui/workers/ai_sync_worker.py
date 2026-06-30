@@ -284,7 +284,6 @@ class AiSyncWorker(QThread):
         *,
         whisper_model: str = "base",
         device: str = "auto",
-        use_vocal_separation: bool = True,
         enable_fuzzy: bool = True,
         fuzzy_threshold: int = 60,
         fuzzy_window_words: int = 12,
@@ -295,7 +294,6 @@ class AiSyncWorker(QThread):
         self.plain_lyrics = (plain_lyrics or "").strip()
         self.whisper_model = whisper_model or "base"
         self._device = device
-        self._use_vocal_separation = bool(use_vocal_separation)
         self._enable_fuzzy = bool(enable_fuzzy)
         self._fuzzy_threshold = int(fuzzy_threshold)
         self._fuzzy_window_words = int(fuzzy_window_words)
@@ -323,18 +321,11 @@ class AiSyncWorker(QThread):
 
             device = self._resolve_device()
 
-            if self._use_vocal_separation and _module_available("demucs"):
-                self.progress.emit("Separating vocals with Demucs...")
-                vocals_path = self._separate_vocals(device)
-            elif self._use_vocal_separation:
-                self.progress.emit("Demucs is not installed, using the full audio mix...")
-            else:
-                self.progress.emit("Vocal separation disabled, using the full audio mix...")
+            # Always use full audio mix - vocal separation degrades timestamp accuracy
+            self.progress.emit("Loading audio (full mix, no vocal separation)...")
             if self.isInterruptionRequested():
                 self.completed.emit(False, "Cancelled.", "")
                 return
-
-            audio_input = vocals_path or self.audio_path
 
             self.progress.emit("Loading Whisper model...")
             model = whisper.load_model(
@@ -346,7 +337,7 @@ class AiSyncWorker(QThread):
                 return
 
             self.progress.emit("Transcribing audio...")
-            audio_np = self._load_audio_as_numpy(audio_input)
+            audio_np = self._load_audio_as_numpy(self.audio_path)
             result = model.transcribe(
                 audio_np,
                 word_timestamps=True,
@@ -442,62 +433,3 @@ class AiSyncWorker(QThread):
             data = tensor.squeeze(0).numpy()
         return data
 
-    def _separate_vocals(self, device: str) -> str | None:
-        """Run Demucs vocal separation, return path to vocals WAV or None on failure."""
-        try:
-            from demucs.apply import apply_model
-            from demucs.pretrained import get_model
-            import soundfile as sf
-            import torch
-            import torchaudio.functional as F
-
-            self.progress.emit("Loading Demucs model...")
-            model = get_model("htdemucs")
-            model.to(device)
-
-            self.progress.emit("Separating vocals...")
-            data, sr = sf.read(self.audio_path, dtype="float32")  # [samples, channels]
-            if data.ndim == 1:
-                data = data[:, None]  # [samples, 1]
-            wav = torch.from_numpy(data.T).float()  # [channels, samples]
-            # Resample to model's sample rate if needed
-            if sr != model.samplerate:
-                wav = F.resample(wav, sr, model.samplerate)
-            # Ensure correct number of channels
-            if wav.shape[0] != model.audio_channels:
-                if model.audio_channels == 1:
-                    wav = wav.mean(0, keepdim=True)
-                else:
-                    wav = wav.repeat(model.audio_channels, 1)[:model.audio_channels]
-            ref = wav.mean(0)
-            wav = (wav - ref.mean()) / ref.std()
-            wav = wav.to(device)
-
-            with torch.no_grad():
-                sources = apply_model(model, wav[None], progress=False)[0]
-
-            # Demucs htdemucs sources order: drums, bass, other, vocals
-            sources = sources.cpu()
-            vocals = sources[-1]  # vocals is the last source
-            vocals = vocals * ref.std() + ref.mean()
-
-            # Save to temp file
-            tmp = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
-            tmp_name = tmp.name
-            tmp.close()
-            try:
-                sf.write(tmp_name, vocals.numpy().T, model.samplerate)
-            except Exception:
-                try:
-                    os.unlink(tmp_name)
-                except OSError:
-                    pass
-                raise
-
-            self.progress.emit("Vocal separation complete.")
-            return tmp_name
-
-        except Exception as exc:
-            logger.warning("Demucs vocal separation failed, proceeding with full mix: %s", exc)
-            self.progress.emit("Vocal separation skipped, using full audio...")
-            return None
