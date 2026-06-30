@@ -68,3 +68,4 @@ node_modules/
 # Misc
 .cache/
 .mypy_cache/
+tools/

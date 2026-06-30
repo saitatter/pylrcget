@@ -191,13 +191,8 @@ def _compute_line_to_words_score(line_words: list[str], words: list[dict], start
     if not window_words or not line_words:
         return 0.0
     
-    # Use sequence matching to find longest common subsequence
-    # This handles cases where words might be in different order or one set missing words
-    from difflib import SequenceMatcher
-    
     line_words_norm = [w.lower() for w in line_words[:10]]
     
-    best_match_len = 0
     best_match_ratio = 0.0
     
     # Try all starting positions in window
@@ -224,9 +219,115 @@ def _compute_line_to_words_score(line_words: list[str], words: list[dict], start
         
         if adjusted_ratio > best_match_ratio:
             best_match_ratio = adjusted_ratio
-            best_match_len = len(window_slice)
     
     return max(0.0, best_match_ratio)
+
+
+def _extract_word_confidence(word: dict) -> float | None:
+    """Extract normalized confidence score [0, 1] from a Whisper/WhisperX word dict."""
+    for key in ("score", "confidence", "probability", "prob"):
+        val = word.get(key)
+        if val is None:
+            continue
+        try:
+            fval = float(val)
+        except (TypeError, ValueError):
+            continue
+        if 0.0 <= fval <= 1.0:
+            return fval
+    return None
+
+
+def _find_confidence_anchors(
+    line_words_list: list[list[str]],
+    words: list[dict],
+    *,
+    min_confidence: float = 0.90,
+    min_token_len: int = 4,
+    max_token_occurrences: int = 1,
+) -> dict[int, int]:
+    """
+    Build sparse anchor points: line_idx -> word_idx.
+
+    Anchors are based on words that are:
+    - high confidence in ASR output
+    - rare in lyrics/ASR (to avoid chorus ambiguity)
+    - monotonic in timeline
+    """
+    asr_positions: dict[str, list[int]] = {}
+    for idx, w in enumerate(words):
+        token = _normalize_word(str(w.get("word", "")).strip())
+        if len(token) < min_token_len:
+            continue
+        conf = _extract_word_confidence(w)
+        if conf is None or conf < min_confidence:
+            continue
+        asr_positions.setdefault(token, []).append(idx)
+
+    if not asr_positions:
+        return {}
+
+    line_token_counts: dict[str, int] = {}
+    for line_words in line_words_list:
+        for token in {_normalize_word(t) for t in line_words if len(_normalize_word(t)) >= min_token_len}:
+            line_token_counts[token] = line_token_counts.get(token, 0) + 1
+
+    anchors: dict[int, int] = {}
+    prev_anchor_idx = -1
+
+    for line_idx, line_words in enumerate(line_words_list):
+        candidates = {
+            _normalize_word(t)
+            for t in line_words
+            if len(_normalize_word(t)) >= min_token_len
+        }
+        if not candidates:
+            continue
+
+        ranked = sorted(
+            candidates,
+            key=lambda t: (
+                line_token_counts.get(t, 999),          # prefer lyrics-rare tokens
+                len(asr_positions.get(t, [])),          # then ASR-rare tokens
+                -len(t),                                # then longer tokens
+            ),
+        )
+
+        chosen_idx: int | None = None
+        for token in ranked:
+            positions = asr_positions.get(token, [])
+            if line_token_counts.get(token, 0) != 1:
+                continue
+            if not positions or len(positions) > max_token_occurrences:
+                continue
+            next_pos = next((p for p in positions if p > prev_anchor_idx), None)
+            if next_pos is not None:
+                chosen_idx = next_pos
+                break
+
+        if chosen_idx is None:
+            continue
+
+        anchors[line_idx] = chosen_idx
+        prev_anchor_idx = chosen_idx
+
+    return anchors
+
+
+def _anchor_bonus(line_idx: int, word_idx: int, anchors: dict[int, int]) -> float:
+    """Confidence-anchor shaping for Viterbi state score."""
+    anchor_idx = anchors.get(line_idx)
+    if anchor_idx is None:
+        return 0.0
+
+    distance = abs(word_idx - anchor_idx)
+    if distance <= 2:
+        return 1.0
+    if distance <= 8:
+        return 0.3
+    if distance <= 20:
+        return -0.2
+    return -(0.8 + (distance - 20) * 0.01)
 
 
 def _align_lyrics_to_segments_viterbi(
@@ -266,30 +367,41 @@ def _align_lyrics_to_segments_viterbi(
     # Build word array
     line_words_list = [l.split() for l in plain_lines]
 
-    # DP table: viterbi[line_idx][word_idx] = (score, prev_word_idx)
-    # score = log probability of best path to this state
-    # prev_word_idx = previous word index in best path
     num_lines = len(plain_lines)
     num_words = len(words)
+    if num_words <= 0:
+        return _build_lrc_from_segments(segments)
+
+    # Precompute emissions once (critical perf fix).
+    emissions: list[list[float]] = []
+    for line_words in line_words_list:
+        row = [_compute_line_to_words_score(line_words, words, word_idx) for word_idx in range(num_words)]
+        emissions.append(row)
+
+    # Build sparse confidence anchors globally.
+    anchors = _find_confidence_anchors(line_words_list, words)
 
     # Initialize DP
     viterbi = {}
     backptr = {}
 
-    # Start: try to match first line to first 50 words
-    for word_idx in range(min(50, num_words)):
-        score = _compute_line_to_words_score(line_words_list[0], words, word_idx)
+    # Start: try to match first line near beginning.
+    for word_idx in range(min(120, num_words)):
+        score = emissions[0][word_idx] + _anchor_bonus(0, word_idx, anchors)
         viterbi[(0, word_idx)] = score
         backptr[(0, word_idx)] = -1
 
     # Forward pass: fill DP table
     for line_idx in range(1, num_lines):
-        for word_idx in range(num_words):
-            best_prev_score = -1
+        candidate_start = 0
+        candidate_end = num_words
+
+        for word_idx in range(candidate_start, candidate_end):
+            best_prev_score = -1e18
             best_prev_idx = -1
 
             # Try all previous word indices
-            search_start = max(0, word_idx - 100)  # look back max 100 words
+            search_start = max(0, word_idx - 140)  # look back max 140 words
             search_end = word_idx
 
             for prev_idx in range(search_start, search_end):
@@ -309,10 +421,10 @@ def _align_lyrics_to_segments_viterbi(
                 else:
                     transition_cost = -(word_distance - 20) * 0.05  # Gradual penalty for big jumps
 
-                # Emission score for this line at this word
-                emission = _compute_line_to_words_score(line_words_list[line_idx], words, word_idx)
+                emission = emissions[line_idx][word_idx]
+                anchor_shape = _anchor_bonus(line_idx, word_idx, anchors)
 
-                total_score = prev_score + emission + transition_cost
+                total_score = prev_score + emission + transition_cost + anchor_shape
 
                 if total_score > best_prev_score:
                     best_prev_score = total_score
@@ -326,9 +438,12 @@ def _align_lyrics_to_segments_viterbi(
     alignment = {}  # line_idx -> word_idx
 
     # Find best final state
-    best_final_score = -1
+    best_final_score = -1e18
     best_final_word = -1
-    for word_idx in range(max(0, num_words - 200), num_words):
+    final_start = max(0, num_words - 200)
+    final_end = num_words
+
+    for word_idx in range(final_start, final_end):
         if (num_lines - 1, word_idx) in viterbi:
             score = viterbi[(num_lines - 1, word_idx)]
             if score > best_final_score:
@@ -642,5 +757,3 @@ class AiSyncWorker(QThread):
                     os.unlink(vocals_path)
                 except OSError:
                     pass
-
-
