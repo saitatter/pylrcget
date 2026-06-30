@@ -12,12 +12,12 @@ AI_SYNC_MODEL_OPTIONS: tuple[tuple[str, str], ...] = (
 AI_SYNC_DEVICE_OPTIONS: tuple[tuple[str, str], ...] = (
     ("Auto", "auto"),
     ("CPU only", "cpu"),
+    ("GPU (CUDA)", "cuda"),
 )
 
 _DEFAULT_AI_SYNC_SETTINGS = {
     "whisper_model": "base",
     "device": "auto",
-    "use_demucs": True,
     "enable_fuzzy": True,
     "fuzzy_threshold": 60,
 }
@@ -48,7 +48,6 @@ def load_ai_sync_settings(ui_state_json: str) -> dict[str, object]:
     return {
         "whisper_model": whisper_model,
         "device": device,
-        "use_demucs": bool(raw.get("use_demucs", _DEFAULT_AI_SYNC_SETTINGS["use_demucs"])),
         "enable_fuzzy": bool(raw.get("enable_fuzzy", _DEFAULT_AI_SYNC_SETTINGS["enable_fuzzy"])),
         "fuzzy_threshold": int(raw.get("fuzzy_threshold", _DEFAULT_AI_SYNC_SETTINGS["fuzzy_threshold"])),
     }

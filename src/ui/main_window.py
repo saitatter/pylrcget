@@ -1513,7 +1513,6 @@ class MainWindow(QMainWindow):
             plain_lyrics,
             whisper_model=str(ai_sync_settings.get("whisper_model") or "base"),
             device=str(ai_sync_settings.get("device") or "auto"),
-            use_vocal_separation=bool(ai_sync_settings.get("use_demucs", True)),
             enable_fuzzy=bool(ai_sync_settings.get("enable_fuzzy", True)),
             fuzzy_threshold=int(ai_sync_settings.get("fuzzy_threshold", 60)),
         )

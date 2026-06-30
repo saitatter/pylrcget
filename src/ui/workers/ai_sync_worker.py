@@ -1,10 +1,9 @@
 """
 AI-powered lyrics synchronization worker.
 
-Pipeline: optional Demucs vocal separation → Whisper transcription → LRC generation.
+Pipeline: WhisperX transcription (with forced alignment) → LRC generation.
 
-Requires optional dependencies: torch, torchaudio, soundfile, openai-whisper.
-Demucs is optional and the worker falls back to the full mix when it is unavailable.
+Requires optional dependencies: torch, torchaudio, soundfile, whisperx.
 """
 from __future__ import annotations
 
@@ -23,7 +22,7 @@ def get_missing_ai_dependencies() -> list[str]:
         ("torch", "torch"),
         ("torchaudio", "torchaudio"),
         ("soundfile", "soundfile"),
-        ("whisper", "openai-whisper"),
+        ("whisperx", "whisperx"),
     ]
     missing: list[str] = []
     for module, package in deps:
@@ -317,52 +316,34 @@ class AiSyncWorker(QThread):
                 return
 
             import torch
-            import whisper
+            import whisperx
 
             device = self._resolve_device()
 
-            # Always use full audio mix - vocal separation degrades timestamp accuracy
-            self.progress.emit("Loading audio (full mix, no vocal separation)...")
+            self.progress.emit("Loading audio...")
             if self.isInterruptionRequested():
                 self.completed.emit(False, "Cancelled.", "")
                 return
 
-            self.progress.emit("Loading Whisper model...")
-            model = whisper.load_model(
+            self.progress.emit("Loading WhisperX model...")
+            model = whisperx.load_model(
                 self.whisper_model,
                 device=device,
+                compute_type="float16" if device == "cuda" else "int8",
             )
             if self.isInterruptionRequested():
                 self.completed.emit(False, "Cancelled.", "")
                 return
 
             self.progress.emit("Transcribing audio...")
-            audio_np = self._load_audio_as_numpy(self.audio_path)
-            result = model.transcribe(
-                audio_np,
-                word_timestamps=True,
-            )
-            segments = result.get("segments", [])
+            audio = whisperx.load_audio(self.audio_path)
+            result = model.transcribe(audio, language="auto")
 
-            # Optional: refine timestamps with WhisperX if available. WhisperX
-            # runs a separate forced-alignment step and can improve word timings
-            # for long songs where Whisper's raw timestamps drift.
-            try:
-                import whisperx as _whisperx
-                import whisperx.alignment as _wxa
-                self.progress.emit("Refining timestamps with WhisperX...")
-                language = result.get("language", "en")
-                align_model, metadata = _whisperx.load_align_model(language_code=language, device=device)
-                align_result = _wxa.align(segments, align_model, metadata, audio_np, device)
-                # align_result may be dict-like; extract compatible segments
-                if isinstance(align_result, dict) and 'segments' in align_result:
-                    segments = align_result['segments']
-                else:
-                    segments = getattr(align_result, 'segments', None) or align_result
-                self.progress.emit("WhisperX alignment complete.")
-            except Exception:
-                # WhisperX is optional; on failure continue with Whisper's segments
-                logger.info("WhisperX not available or failed; skipping refinement.", exc_info=True)
+            self.progress.emit("Performing alignment (forced alignment)...")
+            language = result.get("language", "en")
+            align_model, metadata = whisperx.load_align_model(language_code=language, device=device)
+            result = whisperx.align(result["segments"], align_model, metadata, audio, device)
+            segments = result.get("segments", [])
 
             self.progress.emit("Building LRC output...")
 
@@ -416,20 +397,4 @@ class AiSyncWorker(QThread):
                 except OSError:
                     pass
 
-    @staticmethod
-    def _load_audio_as_numpy(path: str):
-        """Load audio file via soundfile and return float32 numpy array at 16 kHz mono (Whisper format)."""
-        import soundfile as sf
-        import torch
-        import torchaudio.functional as F
-
-        data, sr = sf.read(path, dtype="float32")  # [samples] or [samples, channels]
-        if data.ndim > 1:
-            data = data.mean(axis=1)  # mono
-        # Resample to 16 kHz (Whisper expects 16 kHz)
-        if sr != 16000:
-            tensor = torch.from_numpy(data).unsqueeze(0)
-            tensor = F.resample(tensor, sr, 16000)
-            data = tensor.squeeze(0).numpy()
-        return data
 
