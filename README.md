@@ -29,7 +29,7 @@ PyLrcGet goes beyond bulk lyric downloads and turns the app into a full desktop 
 
 - Synced lyrics (`.lrc`) and plain lyrics support
 - Toggle between synced and plain editing modes on any track
-- AI-powered auto-sync: generate synced lyrics from audio using Whisper + Demucs (see [AI Auto-Sync](#-ai-auto-sync))
+- AI-powered auto-sync: generate synced lyrics from audio using WhisperX (see [AI Auto-Sync](#-ai-auto-sync))
 - Configurable download modes: `Prefer synced`, `Synced only`, `Plain only`
 - Bulk `Download missing lyrics` action based on the active download mode
 - Per-selection download overrides from the track context menu
@@ -142,23 +142,22 @@ File export and embedded lyric format are controlled separately in Settings. For
 
 ## 🤖 AI Auto-Sync
 
-PyLrcGet can generate synced lyrics locally using **OpenAI Whisper** for transcription and **Demucs** for vocal separation. Everything runs on your machine — no API keys or internet connection required (after initial model download).
+PyLrcGet can generate synced lyrics locally using **WhisperX** for transcription and alignment. Everything runs on your machine — no API keys or internet connection required (after initial model download).
 
 The feature lives inside the track lyrics editor. Select a track, open the lyrics pane, and use **Auto Sync**. If the track has no lyrics yet, the empty lyrics state also exposes an **Auto Sync** action.
 
 ### How it works
 
-1. **Demucs** isolates the vocal track from the audio (optional — falls back to the full mix if it is unavailable or fails)
-2. **Whisper** transcribes the vocals with word-level timestamps
-3. If plain lyrics are already present, they are aligned to the detected timestamps; otherwise Whisper's transcription is used directly
-4. The result is placed in the synced lyrics editor as an unsaved draft
+1. **WhisperX** transcribes the audio with word-level timestamps
+2. If plain lyrics are already present, they are aligned to the detected timestamps; otherwise WhisperX's transcription is used directly
+3. The result is placed in the synced lyrics editor as an unsaved draft
 
 ### Install AI dependencies
 
 AI sync dependencies are **not** included in the base install. Install them separately:
 
 ```bash
-pip install torch torchaudio openai-whisper demucs soundfile
+pip install torch torchaudio whisperx soundfile
 ```
 
 Or, if installing from `pyproject.toml`:
@@ -201,7 +200,7 @@ python main.py
 To enable AI auto-sync (optional):
 
 ```bash
-python -m pip install torch torchaudio openai-whisper demucs soundfile
+python -m pip install torch torchaudio whisperx soundfile
 ```
 
 ### Build standalone app folder
