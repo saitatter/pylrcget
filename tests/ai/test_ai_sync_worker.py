@@ -30,6 +30,7 @@ from ui.workers.ai_sync_worker import (
     _segment_tail_seconds,
     _should_use_relaxed_vad_result,
     _should_retry_with_relaxed_vad,
+    _select_best_relaxed_segments,
     _tail_rescue_alignment_indices,
     _tail_rescue_rewind_target_lag_indices,
     get_missing_ai_dependencies,
@@ -485,6 +486,31 @@ def test_should_not_retry_with_relaxed_vad_when_coverage_is_sufficient():
     assert _should_retry_with_relaxed_vad(audio_samples, segments, plain_lines) is False
 
 
+def test_segment_alignment_quality_penalizes_out_of_vocab_over_detection():
+    """An over-detecting pass that dilutes real lyrics with out-of-vocabulary
+    instrumental noise must score lower than a clean pass, because the strongly
+    weighted vocab_ratio term drops as noise words are added."""
+    plain = ["hello world", "goodbye moon"]
+
+    def words_seg(pairs):
+        return [{"words": [{"word": w, "start": t} for w, t in pairs], "end": pairs[-1][1] + 1.0}]
+
+    clean = words_seg([("hello", 5.0), ("world", 6.0), ("goodbye", 60.0), ("moon", 61.0)])
+    # Same real words at the same positions, but padded with noise tokens.
+    noisy = words_seg(
+        [
+            ("hello", 5.0), ("world", 6.0),
+            ("qzx", 20.0), ("wrp", 25.0), ("blm", 30.0), ("kvn", 35.0),
+            ("goodbye", 60.0), ("moon", 61.0),
+            ("zzt", 70.0), ("frb", 75.0), ("gnx", 80.0), ("plq", 85.0),
+        ]
+    )
+
+    clean_quality = _segment_alignment_quality(clean, plain, 120.0)
+    noisy_quality = _segment_alignment_quality(noisy, plain, 120.0)
+    assert clean_quality > noisy_quality
+
+
 def test_segment_alignment_quality_returns_low_value_without_words():
     quality = _segment_alignment_quality([{"start": 0.0, "text": "hello"}], ["line one"], 180.0)
     assert quality < -1e8
@@ -505,6 +531,35 @@ def test_should_use_relaxed_vad_result_when_quality_gain_is_material(monkeypatch
 
     monkeypatch.setattr(ai_sync_worker, "_segment_alignment_quality", fake_quality)
     assert _should_use_relaxed_vad_result(default_segments, relaxed_segments, ["a"], 140.0) is True
+
+
+def test_select_best_relaxed_segments_picks_highest_quality_candidate(monkeypatch):
+    default_segments = [{"words": [{"word": "a", "start": 80.0}], "end": 81.0}]
+    cand_low = [{"words": [{"word": "a", "start": 100.0}], "end": 101.0}]
+    cand_high = [{"words": [{"word": "a", "start": 100.0}], "end": 101.0}]
+
+    # Both candidates clear the tail-gain gate (start 100 vs default 80, dur 140).
+    quality_map = {id(default_segments): 0.70, id(cand_low): 0.80, id(cand_high): 0.95}
+    monkeypatch.setattr(
+        ai_sync_worker,
+        "_segment_alignment_quality",
+        lambda segments, plain_lines, duration_s: quality_map[id(segments)],
+    )
+    best = _select_best_relaxed_segments(default_segments, [cand_low, cand_high], ["a"], 140.0)
+    assert best is cand_high
+
+
+def test_select_best_relaxed_segments_returns_none_when_no_candidate_beats_default(monkeypatch):
+    default_segments = [{"words": [{"word": "a", "start": 80.0}], "end": 130.0}]
+    # Candidate has same/earlier tail and lower quality -> should be rejected.
+    weak_candidate = [{"words": [{"word": "a", "start": 79.0}], "end": 129.0}]
+    quality_map = {id(default_segments): 0.90, id(weak_candidate): 0.70}
+    monkeypatch.setattr(
+        ai_sync_worker,
+        "_segment_alignment_quality",
+        lambda segments, plain_lines, duration_s: quality_map[id(segments)],
+    )
+    assert _select_best_relaxed_segments(default_segments, [weak_candidate], ["a"], 140.0) is None
 
 
 def test_late_line_expected_position_bonus_prefers_expected_region_for_weak_lines():

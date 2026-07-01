@@ -1402,11 +1402,18 @@ def _segment_alignment_quality(
     - coverage: reliable_tail_seconds / duration_seconds (0..1)
 
     Final score:
-        quality = line_match * 2.0 + vocab_ratio + coverage * 0.5
+        quality = line_match * 2.0 + vocab_ratio * 3.0 + coverage * 0.5
+
+    The vocab_ratio weight is deliberately high: an over-aggressive VAD onset inflates
+    line_match (more ASR words -> more chances to match a line) while diluting the words
+    with out-of-vocabulary instrumental noise, which shows up as a drop in vocab_ratio.
+    Weighting vocab_ratio strongly lets the selector reject an over-detecting onset (real
+    noise) while still accepting an aggressive onset that recovers genuine lyrics (whose
+    words stay in-vocabulary, keeping vocab_ratio stable).
 
     Example:
     - line_match=0.62, vocab_ratio=0.58, coverage=0.80
-    - quality=0.62*2 + 0.58 + 0.80*0.5 = 2.22
+    - quality=0.62*2 + 0.58*3 + 0.80*0.5 = 3.38
     Higher is better (used only for comparing two candidate ASR outputs).
     """
     words: list[dict] = []
@@ -1454,7 +1461,7 @@ def _segment_alignment_quality(
 
     coverage = _segment_reliable_tail_seconds(segments) / max(duration_s, 1.0)
 
-    return line_match * 2.0 + vocab_ratio + coverage * 0.5
+    return line_match * 2.0 + vocab_ratio * 3.0 + coverage * 0.5
 
 
 def _should_use_relaxed_vad_result(
@@ -1487,6 +1494,35 @@ def _should_use_relaxed_vad_result(
     default_quality = _segment_alignment_quality(default_segments, plain_lines, duration_s)
     relaxed_quality = _segment_alignment_quality(relaxed_segments, plain_lines, duration_s)
     return relaxed_quality > default_quality + min_quality_gain
+
+
+def _select_best_relaxed_segments(
+    default_segments: list[dict],
+    relaxed_candidates: list[list[dict]],
+    plain_lines: list[str],
+    duration_s: float,
+) -> list[dict] | None:
+    """
+    Choose the best relaxed-VAD candidate over the default pass, or None to keep default.
+
+    Each candidate must first clear `_should_use_relaxed_vad_result` (i.e. it is
+    genuinely better than the default pass). Among the candidates that pass, the one
+    with the highest `_segment_alignment_quality` proxy is returned.
+
+    This lets the pipeline run several VAD onsets (softly-sung sections need an
+    aggressive onset, but that onset over-detects on other tracks) and keep whichever
+    recovers the most real lyrical coverage without regressing.
+    """
+    best_segments = None
+    best_quality = None
+    for candidate in relaxed_candidates:
+        if not _should_use_relaxed_vad_result(default_segments, candidate, plain_lines, duration_s):
+            continue
+        quality = _segment_alignment_quality(candidate, plain_lines, duration_s)
+        if best_quality is None or quality > best_quality:
+            best_segments = candidate
+            best_quality = quality
+    return best_segments
 
 
 def _align_lyrics_to_segments_viterbi(
@@ -1978,24 +2014,55 @@ class AiSyncWorker(QThread):
             plain_lines = self.plain_lyrics.splitlines() if self.plain_lyrics else []
             self._emit_stage(5, total_steps, "Checking speech coverage and selecting best pass…")
             if _should_retry_with_relaxed_vad(audio, segments, plain_lines):
-                self._emit_stage(5, total_steps, "Low coverage detected — running relaxed VAD retry…")
-                relaxed_model = _get_cached_whisperx_model(
-                    whisperx,
-                    self.whisper_model,
-                    device=device,
-                    compute_type=compute_type,
-                    vad_method="pyannote",
-                    vad_options={"vad_onset": 0.15, "vad_offset": 0.05},
-                )
-                relaxed_segments = _transcribe_and_align(relaxed_model, pass_label="relaxed VAD pass")
                 duration_s = float(len(audio)) / 16000.0 if hasattr(audio, "__len__") else 0.0
-                if _should_use_relaxed_vad_result(segments, relaxed_segments, plain_lines, duration_s):
+                # Escalating relaxed-VAD onsets. Softly-sung sections (e.g. quiet
+                # acoustic choruses) are missed by the default VAD and even by a
+                # single relaxed pass; a more aggressive onset recovers them but can
+                # over-detect instrumental noise on other tracks. We run several
+                # onsets and keep the candidate with the best alignment-quality proxy
+                # (whose strongly weighted vocab_ratio term rejects a noise-diluted
+                # over-detecting pass while still accepting an aggressive pass that
+                # recovers genuine in-vocabulary lyrics). Guarded so we only ever
+                # replace the default pass when a relaxed pass is genuinely better.
+                relaxed_vad_configs = (
+                    {"vad_onset": 0.15, "vad_offset": 0.05},
+                    {"vad_onset": 0.10, "vad_offset": 0.03},
+                    {"vad_onset": 0.02, "vad_offset": 0.01},
+                )
+                best_relaxed = None
+                relaxed_candidates: list[list[dict]] = []
+                for idx, vad_options in enumerate(relaxed_vad_configs, start=1):
+                    self._emit_stage(
+                        5,
+                        total_steps,
+                        f"Low coverage detected — running relaxed VAD retry "
+                        f"({idx}/{len(relaxed_vad_configs)}, onset {vad_options['vad_onset']:.2f})…",
+                    )
+                    relaxed_model = _get_cached_whisperx_model(
+                        whisperx,
+                        self.whisper_model,
+                        device=device,
+                        compute_type=compute_type,
+                        vad_method="pyannote",
+                        vad_options=vad_options,
+                    )
+                    relaxed_candidates.append(
+                        _transcribe_and_align(
+                            relaxed_model,
+                            pass_label=f"relaxed VAD pass (onset {vad_options['vad_onset']:.2f})",
+                        )
+                    )
+
+                best_relaxed = _select_best_relaxed_segments(
+                    segments, relaxed_candidates, plain_lines, duration_s
+                )
+                if best_relaxed is not None:
                     logger.info(
                         "Using relaxed VAD result (tail %.2fs -> %.2fs).",
                         _segment_tail_seconds(segments),
-                        _segment_tail_seconds(relaxed_segments),
+                        _segment_tail_seconds(best_relaxed),
                     )
-                    segments = relaxed_segments
+                    segments = best_relaxed
 
             self._emit_stage(6, total_steps, "Building synced LRC output…")
 
