@@ -170,7 +170,7 @@ pip install pylrcget[ai]
 > **Note:** AI dependencies add ~2 GB to the install (mostly PyTorch). The `base` Whisper model (~140 MB) is downloaded automatically on first use. GPU acceleration (CUDA) is used when available, otherwise CPU.
 
 > **Note:** base binary releases do not include AI dependencies by default.
-> **Note:** AI-enabled portable builds are published for Windows, Linux, and macOS. They include the Python AI stack, but `ffmpeg` is still a system prerequisite for Whisper/WhisperX. The Linux `.deb` release declares `ffmpeg` as a package dependency so it is installed automatically on apt-based distros.
+> **Note:** AI-enabled portable builds are published for Windows and macOS. The Linux AI build is generated in CI but is too large for GitHub release assets, so it is not published there. All AI builds include the Python AI stack, but `ffmpeg` is still a system prerequisite for Whisper/WhisperX. The Linux `.deb` release declares `ffmpeg` as a package dependency so it is installed automatically on apt-based distros.
 
 > **Tip for packaged users:** installing packages into system Python does not patch an already packaged executable.
 
@@ -242,7 +242,7 @@ Uses **semantic-release** with Conventional Commits. On every push to `main`, CI
 - The Linux `.deb` installs a desktop launcher (`pylrcget.desktop`) and app icon under the standard XDG locations
 - Folder-based archives are published as `pylrcget-windows.zip`, `pylrcget-linux.tar.gz`, and `pylrcget-macos.tar.gz`
 - Portable single-file executables are also published as `pylrcget-windows-portable.exe`, `pylrcget-linux-portable`, and `pylrcget-macos-portable`
-- AI-enabled portable builds are published as `pylrcget-windows-portable-ai.exe`, `pylrcget-linux-portable-ai`, and `pylrcget-macos-portable-ai`
+- AI-enabled portable builds are published as `pylrcget-windows-portable-ai.exe` and `pylrcget-macos-portable-ai`
 
 ### 🛡️ Windows note
 

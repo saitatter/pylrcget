@@ -223,6 +223,7 @@ jobs:
         run: gh release upload "${{ needs.release.outputs.tag }}" "${{ matrix.portable_name }}" --clobber
 
       - name: Upload release asset (portable AI)
+        if: runner.os != 'Linux'
         env:
           GITHUB_TOKEN: ${{ secrets.RELEASE_PAT }}
         run: gh release upload "${{ needs.release.outputs.tag }}" "${{ matrix.portable_ai_name }}" --clobber
