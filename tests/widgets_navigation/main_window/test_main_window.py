@@ -1,6 +1,10 @@
 from tests.widgets_navigation._shared import *
 from PySide6.QtWidgets import QToolButton
 from PySide6.QtWidgets import QDialog
+from dataclasses import replace
+
+from db.queries import get_config, set_config
+from ui.main_window_parts.preferences import persist_window_state_payload
 
 
 @unittest.skipUnless(HAS_QT, "PySide6 is required for widget tests")
@@ -584,3 +588,92 @@ class MainWindowInstrumentalTests(unittest.TestCase):
         MainWindow._play_selected_from_track_list(window, track_list)
 
         self.assertEqual(played, [42])
+
+    def test_persist_window_state_payload_preserves_ai_sync_settings(self):
+        with TemporaryDirectory() as tmp:
+            app_state = simple_app_state(initialize_database(tmp))
+            try:
+                config = get_config(app_state.db)
+                initial_state = {
+                    "ai_sync": {
+                        "device": "cpu",
+                        "language": "ro",
+                        "enable_fuzzy": False,
+                        "fuzzy_threshold": 72,
+                    },
+                    "some_other_ui_flag": True,
+                }
+                set_config(
+                    app_state.db,
+                    replace(
+                        config,
+                        ui_state_json=json.dumps(initial_state, ensure_ascii=True, separators=(",", ":")),
+                    ),
+                )
+
+                window = SimpleNamespace(app_state=app_state)
+                persist_window_state_payload(window, {"tab_index": 2, "geometry": "dummy"})
+
+                reloaded = get_config(app_state.db)
+                merged = json.loads(reloaded.ui_state_json)
+                self.assertEqual(merged.get("tab_index"), 2)
+                self.assertEqual(merged.get("geometry"), "dummy")
+                self.assertEqual(merged.get("some_other_ui_flag"), True)
+                self.assertEqual(
+                    merged.get("ai_sync"),
+                    {
+                        "device": "cpu",
+                        "language": "ro",
+                        "enable_fuzzy": False,
+                        "fuzzy_threshold": 72,
+                    },
+                )
+            finally:
+                app_state.db.close()
+
+    def test_persist_window_state_payload_handles_invalid_existing_json(self):
+        with TemporaryDirectory() as tmp:
+            app_state = simple_app_state(initialize_database(tmp))
+            try:
+                config = get_config(app_state.db)
+                set_config(app_state.db, replace(config, ui_state_json="{invalid json"))
+
+                window = SimpleNamespace(app_state=app_state)
+                persist_window_state_payload(window, {"tab_index": 3})
+
+                reloaded = get_config(app_state.db)
+                parsed = json.loads(reloaded.ui_state_json)
+                self.assertEqual(parsed.get("tab_index"), 3)
+            finally:
+                app_state.db.close()
+
+    def test_ai_sync_progress_parses_structured_progress_message(self):
+        updates: list[tuple[int, int, str, str]] = []
+        statuses: list[str] = []
+        window = MainWindow.__new__(MainWindow)
+        window._show_status_message = lambda msg, *_args, **_kwargs: statuses.append(str(msg))
+        window.ai_sync_overlay = SimpleNamespace(
+            update_progress=lambda current, total, label, status: updates.append((current, total, label, status))
+        )
+
+        MainWindow._on_ai_sync_progress(
+            window,
+            "__AI_SYNC_PROGRESS__|3|8|Transcribing audio (base pass)…",
+        )
+
+        self.assertEqual(statuses[-1], "Transcribing audio (base pass)…")
+        self.assertEqual(updates[-1], (3, 8, "AI Auto-Sync", "Transcribing audio (base pass)…"))
+
+    def test_ai_sync_progress_fallback_mapping_without_marker(self):
+        updates: list[tuple[int, int, str, str]] = []
+        statuses: list[str] = []
+        window = MainWindow.__new__(MainWindow)
+        window._show_status_message = lambda msg, *_args, **_kwargs: statuses.append(str(msg))
+        window.ai_sync_overlay = SimpleNamespace(
+            update_progress=lambda current, total, label, status: updates.append((current, total, label, status))
+        )
+
+        MainWindow._on_ai_sync_progress(window, "Performing alignment (forced alignment)...")
+
+        self.assertEqual(statuses[-1], "Performing alignment (forced alignment)...")
+        self.assertEqual(updates[-1], (4, 8, "AI Auto-Sync", "Performing alignment (forced alignment)..."))

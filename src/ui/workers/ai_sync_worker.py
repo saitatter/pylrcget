@@ -27,12 +27,101 @@ import logging
 import os
 import re
 import tempfile
+import threading
 from bisect import bisect_left
 from pathlib import Path
 
 from PySide6.QtCore import QThread, Signal
 
 logger = logging.getLogger(__name__)
+
+try:
+    from rapidfuzz import fuzz as _rapidfuzz_fuzz
+except Exception:
+    _rapidfuzz_fuzz = None
+
+_INFERENCE_CACHE_LOCK = threading.Lock()
+_WHISPERX_MODEL_CACHE: dict[tuple[str, str, str, str | None, tuple[tuple[str, float], ...]], object] = {}
+_ALIGN_MODEL_CACHE: dict[tuple[str, str], tuple[object, object]] = {}
+
+
+def _clear_inference_caches() -> None:
+    """Clear cached WhisperX/align models (used by tests)."""
+    with _INFERENCE_CACHE_LOCK:
+        _WHISPERX_MODEL_CACHE.clear()
+        _ALIGN_MODEL_CACHE.clear()
+
+
+def _canonical_vad_options(vad_options: dict | None) -> tuple[tuple[str, float], ...]:
+    if not vad_options:
+        return ()
+    normalized: list[tuple[str, float]] = []
+    for key in sorted(vad_options):
+        try:
+            normalized.append((str(key), float(vad_options[key])))
+        except (TypeError, ValueError):
+            continue
+    return tuple(normalized)
+
+
+def _get_cached_whisperx_model(
+    whisperx_module: object,
+    model_name: str,
+    *,
+    device: str,
+    compute_type: str,
+    vad_method: str | None = None,
+    vad_options: dict | None = None,
+) -> object:
+    """
+    Return WhisperX model from in-process cache to avoid repeated load_model cost.
+    """
+    key = (
+        str(model_name or "base"),
+        str(device),
+        str(compute_type),
+        str(vad_method) if vad_method else None,
+        _canonical_vad_options(vad_options),
+    )
+    with _INFERENCE_CACHE_LOCK:
+        cached = _WHISPERX_MODEL_CACHE.get(key)
+        if cached is not None:
+            return cached
+    kwargs = {
+        "device": device,
+        "compute_type": compute_type,
+    }
+    if vad_method:
+        kwargs["vad_method"] = vad_method
+    if vad_options:
+        kwargs["vad_options"] = vad_options
+    model = whisperx_module.load_model(model_name, **kwargs)
+    with _INFERENCE_CACHE_LOCK:
+        _WHISPERX_MODEL_CACHE[key] = model
+    return model
+
+
+def _get_cached_align_model(
+    whisperx_module: object,
+    *,
+    language_code: str,
+    device: str,
+) -> tuple[object, object]:
+    """
+    Return align model/metadata from in-process cache by (language, device).
+    """
+    normalized_lang = str(language_code or "en").strip().lower() or "en"
+    if normalized_lang == "auto":
+        normalized_lang = "en"
+    key = (normalized_lang, str(device))
+    with _INFERENCE_CACHE_LOCK:
+        cached = _ALIGN_MODEL_CACHE.get(key)
+        if cached is not None:
+            return cached
+    align_model, metadata = whisperx_module.load_align_model(language_code=normalized_lang, device=device)
+    with _INFERENCE_CACHE_LOCK:
+        _ALIGN_MODEL_CACHE[key] = (align_model, metadata)
+    return align_model, metadata
 
 
 def get_missing_ai_dependencies() -> list[str]:
@@ -298,15 +387,17 @@ def _words_match(w1: str, w2: str, threshold: float = 0.85) -> tuple[bool, float
     - score >= 0.70: partial match
     - score < 0.70: no match
     """
-    from difflib import SequenceMatcher
-    
     norm_w1 = _normalize_word(w1)
     norm_w2 = _normalize_word(w2)
-    
+
     if norm_w1 == norm_w2:
         return True, 1.0
-    
-    ratio = SequenceMatcher(None, norm_w1, norm_w2).ratio()
+
+    if _rapidfuzz_fuzz is not None:
+        ratio = float(_rapidfuzz_fuzz.ratio(norm_w1, norm_w2)) / 100.0
+    else:
+        from difflib import SequenceMatcher
+        ratio = SequenceMatcher(None, norm_w1, norm_w2).ratio()
     return ratio >= threshold, ratio
 
 
@@ -948,6 +1039,73 @@ def _tail_rescue_alignment_indices(
     return rescued
 
 
+def _tail_rescue_rewind_target_lag_indices(
+    aligned_indices: list[int],
+    rewind_targets: dict[int, int],
+    line_peak_emissions: list[float],
+    *,
+    num_words: int,
+    tail_start_ratio: float = 0.66,
+    min_lag_words: int = 26,
+    min_tail_hits: int = 3,
+    strong_peak_threshold: float = 0.72,
+) -> list[int]:
+    """
+    Rescue late repeated lines that are confidently matched to earlier clusters.
+
+    Unlike `_tail_rescue_alignment_indices` (which focuses on weak-emission collapse),
+    this pass targets "confident but wrong" tail lines by comparing aligned indices
+    against repeated-phrase rewind targets.
+    """
+    if not aligned_indices or len(aligned_indices) != len(line_peak_emissions):
+        return aligned_indices
+    if not rewind_targets:
+        return aligned_indices
+
+    num_lines = len(aligned_indices)
+    if num_lines < 10 or num_words <= 1:
+        return aligned_indices
+
+    tail_start = int((num_lines - 1) * tail_start_ratio)
+    if tail_start >= num_lines - 2:
+        return aligned_indices
+
+    lagged_tail_lines: list[int] = []
+    for li in range(tail_start, num_lines):
+        target = rewind_targets.get(li)
+        if target is None:
+            continue
+        cur = aligned_indices[li]
+        lag = target - cur
+        if lag >= min_lag_words and line_peak_emissions[li] >= strong_peak_threshold:
+            lagged_tail_lines.append(li)
+
+    if len(lagged_tail_lines) < min_tail_hits:
+        return aligned_indices
+
+    rescued = list(aligned_indices)
+    prev = rescued[max(0, tail_start - 1)] if tail_start > 0 else 0
+    very_late_start = int((num_lines - 1) * 0.84)
+    for li in range(tail_start, num_lines):
+        cur = rescued[li]
+        target = rewind_targets.get(li)
+        if target is not None:
+            lag = target - cur
+            very_late = li >= very_late_start
+            if lag >= min_lag_words and (
+                line_peak_emissions[li] >= strong_peak_threshold or very_late
+            ):
+                floor = max(prev + 1, min(num_words - 1, target - 8))
+                if cur < floor:
+                    cur = floor
+        cur = max(cur, prev + 1)
+        cur = min(cur, num_words - 1)
+        rescued[li] = cur
+        prev = rescued[li]
+
+    return rescued
+
+
 def _prepare_manual_line_anchors(
     plain_lines: list[str],
     words: list[dict],
@@ -1295,6 +1453,7 @@ def _segment_alignment_quality(
     vocab_ratio = in_vocab / max(1, len(words))
 
     coverage = _segment_reliable_tail_seconds(segments) / max(duration_s, 1.0)
+
     return line_match * 2.0 + vocab_ratio + coverage * 0.5
 
 
@@ -1555,6 +1714,12 @@ def _align_lyrics_to_segments_viterbi(
         num_words=num_words,
         word_starts=[float(w.get("start", 0.0)) for w in words],
     )
+    aligned_indices = _tail_rescue_rewind_target_lag_indices(
+        aligned_indices,
+        rewind_targets,
+        line_peak_emissions,
+        num_words=num_words,
+    )
 
     aligned_starts: list[float] = []
     for word_idx in aligned_indices:
@@ -1694,6 +1859,7 @@ class AiSyncWorker(QThread):
 
     progress = Signal(str)  # status message
     completed = Signal(bool, str, str)  # ok, message, lrc_text
+    _PROGRESS_MARKER = "__AI_SYNC_PROGRESS__"
 
     def __init__(
         self,
@@ -1730,6 +1896,9 @@ class AiSyncWorker(QThread):
             return "mps"
         return "cpu"
 
+    def _emit_stage(self, current: int, total: int, message: str) -> None:
+        self.progress.emit(f"{self._PROGRESS_MARKER}|{int(current)}|{int(total)}|{message}")
+
     def run(self):
         vocals_path = None
         try:
@@ -1742,17 +1911,20 @@ class AiSyncWorker(QThread):
             import whisperx
 
             device = self._resolve_device()
+            total_steps = 8
 
-            self.progress.emit("Loading audio...")
+            self._emit_stage(1, total_steps, f"Loading audio file ({Path(self.audio_path).name})…")
             if self.isInterruptionRequested():
                 self.completed.emit(False, "Cancelled.", "")
                 return
 
-            self.progress.emit("Loading WhisperX model...")
-            model = whisperx.load_model(
+            self._emit_stage(2, total_steps, f"Loading ASR model ({self.whisper_model}, {device})…")
+            compute_type = "float16" if device == "cuda" else "int8"
+            model = _get_cached_whisperx_model(
+                whisperx,
                 self.whisper_model,
                 device=device,
-                compute_type="float16" if device == "cuda" else "int8",
+                compute_type=compute_type,
             )
             if self.isInterruptionRequested():
                 self.completed.emit(False, "Cancelled.", "")
@@ -1760,28 +1932,39 @@ class AiSyncWorker(QThread):
 
             audio = whisperx.load_audio(self.audio_path)
             transcribe_language = _normalized_transcribe_language(self._language)
+            language_label = transcribe_language or "auto-detect"
 
-            def _transcribe_and_align(model_obj):
-                self.progress.emit("Transcribing audio...")
+            def _transcribe_and_align(model_obj, *, pass_label: str):
+                self._emit_stage(3, total_steps, f"Transcribing audio ({pass_label}, language: {language_label})…")
                 if transcribe_language is None:
                     result_local = model_obj.transcribe(audio)
                 else:
                     result_local = model_obj.transcribe(audio, language=transcribe_language)
 
-                self.progress.emit("Performing alignment (forced alignment)...")
-                language = result_local.get("language", "en")
+                self._emit_stage(4, total_steps, f"Aligning detected words to audio ({pass_label})…")
+                language = transcribe_language or result_local.get("language", "en")
+                if language == "auto":
+                    language = "en"
 
                 # Try alignment on the specified device, fallback to CPU on error
                 # (WhisperX alignment with Pyannote VAD can hang on Windows CUDA)
                 alignment_device = device
                 try:
-                    align_model, metadata = whisperx.load_align_model(language_code=language, device=alignment_device)
+                    align_model, metadata = _get_cached_align_model(
+                        whisperx,
+                        language_code=str(language),
+                        device=alignment_device,
+                    )
                     result_local = whisperx.align(result_local["segments"], align_model, metadata, audio, alignment_device)
                 except Exception as e:
                     if alignment_device != "cpu":
                         logger.warning("Alignment on %s failed, retrying on CPU: %s", alignment_device, e)
                         try:
-                            align_model, metadata = whisperx.load_align_model(language_code=language, device="cpu")
+                            align_model, metadata = _get_cached_align_model(
+                                whisperx,
+                                language_code=str(language),
+                                device="cpu",
+                            )
                             result_local = whisperx.align(result_local["segments"], align_model, metadata, audio, "cpu")
                         except Exception as e2:
                             logger.warning("CPU alignment also failed, using raw segments: %s", e2)
@@ -1790,19 +1973,21 @@ class AiSyncWorker(QThread):
                         logger.warning("CPU alignment failed, using raw segments: %s", e)
                 return result_local.get("segments", [])
 
-            segments = _transcribe_and_align(model)
+            segments = _transcribe_and_align(model, pass_label="base pass")
 
             plain_lines = self.plain_lyrics.splitlines() if self.plain_lyrics else []
+            self._emit_stage(5, total_steps, "Checking speech coverage and selecting best pass…")
             if _should_retry_with_relaxed_vad(audio, segments, plain_lines):
-                self.progress.emit("Low speech coverage detected; retrying with relaxed VAD...")
-                relaxed_model = whisperx.load_model(
+                self._emit_stage(5, total_steps, "Low coverage detected — running relaxed VAD retry…")
+                relaxed_model = _get_cached_whisperx_model(
+                    whisperx,
                     self.whisper_model,
                     device=device,
-                    compute_type="float16" if device == "cuda" else "int8",
+                    compute_type=compute_type,
                     vad_method="pyannote",
                     vad_options={"vad_onset": 0.15, "vad_offset": 0.05},
                 )
-                relaxed_segments = _transcribe_and_align(relaxed_model)
+                relaxed_segments = _transcribe_and_align(relaxed_model, pass_label="relaxed VAD pass")
                 duration_s = float(len(audio)) / 16000.0 if hasattr(audio, "__len__") else 0.0
                 if _should_use_relaxed_vad_result(segments, relaxed_segments, plain_lines, duration_s):
                     logger.info(
@@ -1812,13 +1997,19 @@ class AiSyncWorker(QThread):
                     )
                     segments = relaxed_segments
 
-            self.progress.emit("Building LRC output...")
+            self._emit_stage(6, total_steps, "Building synced LRC output…")
 
             if plain_lines:
                 # produce tuples first so we can post-process smoothing
                 lrc_tuples = []
                 if self.manual_anchors:
-                    self.progress.emit(f"Building LRC output (using {len(self.manual_anchors)} manual anchor hint(s))...")
+                    self._emit_stage(
+                        7,
+                        total_steps,
+                        f"Aligning lyric lines (using {len(self.manual_anchors)} manual anchor hint(s))…",
+                    )
+                else:
+                    self._emit_stage(7, total_steps, "Aligning lyric lines to word timestamps…")
                 
                 # Try Viterbi DP alignment (global optimization)
                 # If it fails, fall back to greedy
@@ -1856,7 +2047,10 @@ class AiSyncWorker(QThread):
                 # Keep raw aligned timing; smoothing can over-compress long instrumental gaps.
                 lrc = "\n".join(f"[{_format_ts(s)}] {t}" for s, t in lrc_tuples)
             else:
+                self._emit_stage(7, total_steps, "No plain lyrics provided — using segment-level timestamps…")
                 lrc = _build_lrc_from_segments(segments)
+
+            self._emit_stage(8, total_steps, "Finalizing AI sync result…")
 
             if not lrc.strip():
                 self.completed.emit(False, "Could not generate synced lyrics — no speech detected.", "")

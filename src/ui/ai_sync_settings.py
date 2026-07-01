@@ -35,6 +35,28 @@ _DEFAULT_AI_SYNC_SETTINGS = {
 }
 
 
+def _coerce_bool(value: object, default: bool) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return bool(value)
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in {"1", "true", "yes", "on"}:
+            return True
+        if normalized in {"0", "false", "no", "off", ""}:
+            return False
+    return default
+
+
+def _coerce_int(value: object, default: int, *, minimum: int, maximum: int) -> int:
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        parsed = default
+    return max(minimum, min(maximum, parsed))
+
+
 def load_ai_sync_settings(ui_state_json: str) -> dict[str, object]:
     try:
         state = json.loads(ui_state_json or "{}")
@@ -61,8 +83,16 @@ def load_ai_sync_settings(ui_state_json: str) -> dict[str, object]:
         "whisper_model": "base",
         "device": device,
         "language": language,
-        "enable_fuzzy": bool(raw.get("enable_fuzzy", _DEFAULT_AI_SYNC_SETTINGS["enable_fuzzy"])),
-        "fuzzy_threshold": int(raw.get("fuzzy_threshold", _DEFAULT_AI_SYNC_SETTINGS["fuzzy_threshold"])),
+        "enable_fuzzy": _coerce_bool(
+            raw.get("enable_fuzzy", _DEFAULT_AI_SYNC_SETTINGS["enable_fuzzy"]),
+            bool(_DEFAULT_AI_SYNC_SETTINGS["enable_fuzzy"]),
+        ),
+        "fuzzy_threshold": _coerce_int(
+            raw.get("fuzzy_threshold", _DEFAULT_AI_SYNC_SETTINGS["fuzzy_threshold"]),
+            int(_DEFAULT_AI_SYNC_SETTINGS["fuzzy_threshold"]),
+            minimum=0,
+            maximum=100,
+        ),
     }
 
 

@@ -193,9 +193,17 @@ def build_window_state_payload(window) -> dict[str, object]:
 
 def persist_window_state_payload(window, state: dict[str, object]) -> None:
     config = get_config(window.app_state.db)
+    try:
+        existing_state = json.loads(config.ui_state_json or "{}")
+    except (TypeError, ValueError, json.JSONDecodeError):
+        existing_state = {}
+    if not isinstance(existing_state, dict):
+        existing_state = {}
+    merged_state = dict(existing_state)
+    merged_state.update(state)
     set_config(
         window.app_state.db,
-        replace(config, ui_state_json=json.dumps(state, ensure_ascii=True, separators=(",", ":"))),
+        replace(config, ui_state_json=json.dumps(merged_state, ensure_ascii=True, separators=(",", ":"))),
     )
 
 

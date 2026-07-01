@@ -17,6 +17,9 @@ from ui.workers.ai_sync_worker import (
     _build_lrc_from_segments,
     _build_lrc_from_plain_lines_and_segments,
     _check_ai_sync_available,
+    _clear_inference_caches,
+    _get_cached_align_model,
+    _get_cached_whisperx_model,
     _format_ts,
     _normalized_transcribe_language,
     _prepare_manual_line_anchors,
@@ -28,6 +31,7 @@ from ui.workers.ai_sync_worker import (
     _should_use_relaxed_vad_result,
     _should_retry_with_relaxed_vad,
     _tail_rescue_alignment_indices,
+    _tail_rescue_rewind_target_lag_indices,
     get_missing_ai_dependencies,
 )
 
@@ -255,6 +259,45 @@ def test_normalized_transcribe_language_auto_returns_none():
 def test_normalized_transcribe_language_specific_code():
     assert _normalized_transcribe_language("EN") == "en"
     assert _normalized_transcribe_language(" ro ") == "ro"
+
+
+def test_get_cached_whisperx_model_reuses_same_key():
+    class _FakeWhisperX:
+        def __init__(self):
+            self.calls = 0
+
+        def load_model(self, model_name, **kwargs):
+            self.calls += 1
+            return {"model_name": model_name, "kwargs": kwargs, "id": self.calls}
+
+    fake = _FakeWhisperX()
+    _clear_inference_caches()
+
+    m1 = _get_cached_whisperx_model(fake, "base", device="cuda", compute_type="float16")
+    m2 = _get_cached_whisperx_model(fake, "base", device="cuda", compute_type="float16")
+
+    assert m1 is m2
+    assert fake.calls == 1
+
+
+def test_get_cached_align_model_reuses_same_key():
+    class _FakeWhisperX:
+        def __init__(self):
+            self.calls = 0
+
+        def load_align_model(self, language_code, device):
+            self.calls += 1
+            return (f"align-{language_code}-{device}-{self.calls}", {"meta": self.calls})
+
+    fake = _FakeWhisperX()
+    _clear_inference_caches()
+
+    a1, m1 = _get_cached_align_model(fake, language_code="en", device="cuda")
+    a2, m2 = _get_cached_align_model(fake, language_code="EN", device="cuda")
+
+    assert a1 == a2
+    assert m1 == m2
+    assert fake.calls == 1
 
 
 def test_build_guided_word_ranges_from_manual_targets():
@@ -591,3 +634,41 @@ def test_same_phrase_rewind_targets_expand_tail_when_clusters_are_few():
     assert targets[2] > targets[0]
     assert targets[4] > targets[2]
     assert targets[6] > targets[4]
+
+
+def test_tail_rescue_rewind_target_lag_indices_pushes_confident_late_repeats_forward():
+    aligned = [i * 4 for i in range(16)] + [60, 62, 64, 66, 68, 70]
+    peaks = [0.8] * len(aligned)
+    rewind_targets = {
+        16: 96,
+        17: 101,
+        18: 106,
+        19: 111,
+        20: 116,
+        21: 121,
+    }
+
+    rescued = _tail_rescue_rewind_target_lag_indices(
+        aligned,
+        rewind_targets,
+        peaks,
+        num_words=150,
+    )
+
+    assert rescued[-1] > aligned[-1]
+    assert all(rescued[i] < rescued[i + 1] for i in range(len(rescued) - 1))
+
+
+def test_tail_rescue_rewind_target_lag_indices_keeps_alignment_when_not_lagging():
+    aligned = [i * 5 for i in range(20)]
+    peaks = [0.9] * 20
+    rewind_targets = {16: 82, 17: 87, 18: 92, 19: 97}
+
+    rescued = _tail_rescue_rewind_target_lag_indices(
+        aligned,
+        rewind_targets,
+        peaks,
+        num_words=140,
+    )
+
+    assert rescued == aligned

@@ -1510,8 +1510,8 @@ class MainWindow(QMainWindow):
             view.btn_auto_sync.setEnabled(False)
             view.btn_auto_sync.setText("Syncing...")
 
-        self.ai_sync_overlay.start_batch("Current track", 4)
-        self.ai_sync_overlay.update_progress(0, 4, "AI Auto-Sync", "Preparing local AI sync...")
+        self.ai_sync_overlay.start_batch("Current track", 8)
+        self.ai_sync_overlay.update_progress(0, 8, "AI Auto-Sync", "Preparing AI sync pipeline…")
         self._show_status_message("AI sync starting...")
         sync_track_id = int(track_id)
 
@@ -1595,22 +1595,47 @@ class MainWindow(QMainWindow):
 
     # ------------------ helpers ------------------
     def _on_ai_sync_progress(self, message: str) -> None:
-        self._show_status_message(message)
+        raw_message = str(message or "").strip()
+        display_message = raw_message
+        total = 8
+        step = 0
+        marker = "__AI_SYNC_PROGRESS__|"
+        if raw_message.startswith(marker):
+            payload = raw_message[len(marker):]
+            parts = payload.split("|", 2)
+            if len(parts) == 3:
+                try:
+                    step = max(0, int(parts[0]))
+                    total = max(1, int(parts[1]))
+                    display_message = parts[2].strip() or "Working…"
+                except (TypeError, ValueError):
+                    step = 0
+                    total = 8
+                    display_message = raw_message
+        else:
+            lowered = raw_message.lower()
+            if "loading audio" in lowered:
+                step = 1
+            elif "whisperx model" in lowered or "asr model" in lowered:
+                step = 2
+            elif "transcribing" in lowered:
+                step = 3
+            elif "forced alignment" in lowered or "aligning detected words" in lowered:
+                step = 4
+            elif "coverage" in lowered or "relaxed vad" in lowered:
+                step = 5
+            elif "building lrc" in lowered or "building synced" in lowered:
+                step = 6
+            elif "aligning lyric lines" in lowered:
+                step = 7
+            elif "finalizing" in lowered:
+                step = 8
+
+        self._show_status_message(display_message)
         overlay = getattr(self, "ai_sync_overlay", None)
         if overlay is None:
             return
-        lowered = (message or "").strip().lower()
-        step = 0
-        if "demucs" in lowered or "vocal separation" in lowered:
-            step = 1
-        elif "whisper model" in lowered:
-            step = 2
-        elif "transcribing" in lowered:
-            step = 3
-        elif "building lrc" in lowered:
-            step = 4
-
-        overlay.update_progress(step, 4, "AI Auto-Sync", message)
+        overlay.update_progress(step, total, "AI Auto-Sync", display_message)
 
         # Watchdog: if building LRC (final step) takes too long, show a soft timeout message
         try:
@@ -1622,7 +1647,7 @@ class MainWindow(QMainWindow):
                     pass
                 self._ai_sync_watchdog_timer = None
 
-            if step == 4:
+            if step >= max(1, total - 2):
                 # start a 2-minute watchdog that nudges the overlay if not completed
                 if not getattr(self, "_ai_sync_watchdog_timer", None):
                     timer = QTimer(self)
@@ -1631,7 +1656,7 @@ class MainWindow(QMainWindow):
                     def _on_watchdog():
                         ov = getattr(self, "ai_sync_overlay", None)
                         if ov is not None:
-                            ov.update_progress(-1, 4, "AI Auto-Sync", "Still building LRC output — you can cancel")
+                            ov.update_progress(-1, total, "AI Auto-Sync", "Still processing final alignment — you can cancel")
                     timer.timeout.connect(_on_watchdog)
                     timer.start()
                     self._ai_sync_watchdog_timer = timer
@@ -1645,7 +1670,7 @@ class MainWindow(QMainWindow):
             worker.requestInterruption()
             overlay = getattr(self, "ai_sync_overlay", None)
             if overlay is not None:
-                overlay.update_progress(-1, 4, "AI Auto-Sync", "Cancelling now...")
+                overlay.update_progress(-1, 8, "AI Auto-Sync", "Cancelling now…")
 
     def _normalize_lrclib_base(self, url: str) -> str:
         u = (url or "").strip().rstrip("/")
