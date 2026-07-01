@@ -170,9 +170,9 @@ pip install pylrcget[ai]
 > **Note:** AI dependencies add ~2 GB to the install (mostly PyTorch). The `base` Whisper model (~140 MB) is downloaded automatically on first use. GPU acceleration (CUDA) is used when available, otherwise CPU.
 
 > **Note:** base binary releases do not include AI dependencies by default.
-> **Note for Linux users:** Whisper/WhisperX also expects `ffmpeg` to be available on the system. The Linux `.deb` release declares `ffmpeg` as a package dependency so it should be installed automatically on apt-based distros.
+> **Note:** AI-enabled portable builds are published for Windows, Linux, and macOS. They include the Python AI stack, but `ffmpeg` is still a system prerequisite for Whisper/WhisperX. The Linux `.deb` release declares `ffmpeg` as a package dependency so it is installed automatically on apt-based distros.
 
-> **Tip for packaged `.exe` users:** use the dedicated **AI-enabled portable build** (`pylrcget-windows-portable-ai.exe`). Installing packages into system Python does not patch an already packaged onefile executable.
+> **Tip for packaged users:** installing packages into system Python does not patch an already packaged executable.
 
 > **UI note:** there is no separate AI screen. The AI entrypoint is the **Auto Sync** button in the lyrics editor.
 
@@ -242,7 +242,7 @@ Uses **semantic-release** with Conventional Commits. On every push to `main`, CI
 - The Linux `.deb` installs a desktop launcher (`pylrcget.desktop`) and app icon under the standard XDG locations
 - Folder-based archives are published as `pylrcget-windows.zip`, `pylrcget-linux.tar.gz`, and `pylrcget-macos.tar.gz`
 - Portable single-file executables are also published as `pylrcget-windows-portable.exe`, `pylrcget-linux-portable`, and `pylrcget-macos-portable`
-- Windows AI-enabled portable build is published as `pylrcget-windows-portable-ai.exe`
+- AI-enabled portable builds are published as `pylrcget-windows-portable-ai.exe`, `pylrcget-linux-portable-ai`, and `pylrcget-macos-portable-ai`
 
 ### 🛡️ Windows note
 

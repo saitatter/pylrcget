@@ -49,12 +49,12 @@ jobs:
             archive_name: pylrcget-linux.tar.gz
             installer_name: pylrcget-linux.deb
             portable_name: pylrcget-linux-portable
-            portable_ai_name: ""
+            portable_ai_name: pylrcget-linux-portable-ai
           - os: macos-latest
             archive_name: pylrcget-macos.tar.gz
             installer_name: pylrcget-macos.pkg
             portable_name: pylrcget-macos-portable
-            portable_ai_name: ""
+            portable_ai_name: pylrcget-macos-portable-ai
 
     steps:
       - uses: actions/checkout@v7
@@ -86,18 +86,20 @@ jobs:
         if: runner.os != 'Windows'
         run: mv dist/pylrcget-portable "${{ matrix.portable_name }}"
 
-      - name: Install AI dependencies for Windows AI portable build
-        if: runner.os == 'Windows'
+      - name: Install AI dependencies for portable AI build
         run: pip install .[ai]
 
-      - name: Build AI-enabled portable executable (Windows)
-        if: runner.os == 'Windows'
+      - name: Build AI-enabled portable executable
         run: pyinstaller --noconfirm pylrcget-portable.spec
 
       - name: Rename AI-enabled portable executable (Windows)
-        if: runner.os == 'Windows'
         shell: pwsh
+        if: runner.os == 'Windows'
         run: Move-Item -LiteralPath dist/pylrcget-portable.exe -Destination ${{ matrix.portable_ai_name }} -Force
+
+      - name: Rename AI-enabled portable executable (Unix)
+        if: runner.os != 'Windows'
+        run: mv dist/pylrcget-portable "${{ matrix.portable_ai_name }}"
 
       - name: Package archive (Windows)
         if: runner.os == 'Windows'
@@ -200,7 +202,6 @@ jobs:
           path: ${{ matrix.portable_name }}
 
       - name: Upload workflow artifact (portable AI)
-        if: runner.os == 'Windows'
         uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.portable_ai_name }}
@@ -222,7 +223,6 @@ jobs:
         run: gh release upload "${{ needs.release.outputs.tag }}" "${{ matrix.portable_name }}" --clobber
 
       - name: Upload release asset (portable AI)
-        if: runner.os == 'Windows'
         env:
           GITHUB_TOKEN: ${{ secrets.RELEASE_PAT }}
         run: gh release upload "${{ needs.release.outputs.tag }}" "${{ matrix.portable_ai_name }}" --clobber
