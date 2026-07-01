@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=PyLrcGet
+Comment=Download synced LRC lyrics
+Categories=AudioVideo;Audio;Music;
+Exec=pylrcget
+Icon=pylrcget
+StartupWMClass=PyLrcGet
+Terminal=false

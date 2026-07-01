@@ -148,14 +148,19 @@ jobs:
         run: |
           mkdir -p pkgroot/DEBIAN
           mkdir -p pkgroot/opt/PyLrcGet
-          mkdir -p pkgroot/usr/local/bin
+          mkdir -p pkgroot/usr/bin
+          mkdir -p pkgroot/usr/share/applications
+          mkdir -p pkgroot/usr/share/icons/hicolor/scalable/apps
           cp -R dist/pylrcget/. pkgroot/opt/PyLrcGet/
-          ln -s /opt/PyLrcGet/pylrcget pkgroot/usr/local/bin/pylrcget
+          ln -s /opt/PyLrcGet/pylrcget pkgroot/usr/bin/pylrcget
+          cp packaging/linux/pylrcget.desktop pkgroot/usr/share/applications/pylrcget.desktop
+          cp packaging/linux/pylrcget.svg pkgroot/usr/share/icons/hicolor/scalable/apps/pylrcget.svg
           cat > pkgroot/DEBIAN/control <<EOF
           Package: pylrcget
           Version: ${{ needs.release.outputs.version }}
           Section: utils
           Priority: optional
+          Depends: ffmpeg
           Architecture: amd64
           Maintainer: PyLrcGet Maintainers <noreply@github.com>
           Description: Desktop-native lyrics manager and player built with PySide6.

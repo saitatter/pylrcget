@@ -170,6 +170,7 @@ pip install pylrcget[ai]
 > **Note:** AI dependencies add ~2 GB to the install (mostly PyTorch). The `base` Whisper model (~140 MB) is downloaded automatically on first use. GPU acceleration (CUDA) is used when available, otherwise CPU.
 
 > **Note:** base binary releases do not include AI dependencies by default.
+> **Note for Linux users:** Whisper/WhisperX also expects `ffmpeg` to be available on the system. The Linux `.deb` release declares `ffmpeg` as a package dependency so it should be installed automatically on apt-based distros.
 
 > **Tip for packaged `.exe` users:** use the dedicated **AI-enabled portable build** (`pylrcget-windows-portable-ai.exe`). Installing packages into system Python does not patch an already packaged onefile executable.
 
@@ -236,7 +237,9 @@ Uses **semantic-release** with Conventional Commits. On every push to `main`, CI
 - Use Conventional Commits: `feat: ...`, `fix: ...`, `chore: ...`
 - Breaking changes: use `!` or a `BREAKING CHANGE:` footer
 - Build artifacts for Windows, Linux, and macOS are attached to GitHub Releases
+- Shared Linux packaging assets live in `packaging/linux/` so future `.deb`/`.rpm`/AppImage packaging can reuse the same launcher metadata
 - Installer assets are published for automatic update/install flows: `pylrcget-windows-installer.exe`, `pylrcget-linux.deb`, and `pylrcget-macos.pkg`
+- The Linux `.deb` installs a desktop launcher (`pylrcget.desktop`) and app icon under the standard XDG locations
 - Folder-based archives are published as `pylrcget-windows.zip`, `pylrcget-linux.tar.gz`, and `pylrcget-macos.tar.gz`
 - Portable single-file executables are also published as `pylrcget-windows-portable.exe`, `pylrcget-linux-portable`, and `pylrcget-macos-portable`
 - Windows AI-enabled portable build is published as `pylrcget-windows-portable-ai.exe`
