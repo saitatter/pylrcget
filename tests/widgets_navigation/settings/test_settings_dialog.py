@@ -93,17 +93,19 @@ class SettingsDialogTests(unittest.TestCase):
             app_state = simple_app_state(initialize_database(tmp))
             try:
                 dialog = MusicFoldersDialog(app_state)
-                dialog.ai_whisper_model_combo.setCurrentIndex(dialog.ai_whisper_model_combo.findData("small"))
                 dialog.ai_device_combo.setCurrentIndex(dialog.ai_device_combo.findData("cpu"))
-                dialog.ai_use_demucs_chk.setChecked(False)
+                dialog.ai_language_combo.setCurrentIndex(dialog.ai_language_combo.findData("ro"))
+                dialog.ai_enable_fuzzy_chk.setChecked(False)
+                dialog.ai_fuzzy_threshold_spin.setValue(72)
 
                 dialog.save()
 
                 reloaded = MusicFoldersDialog(app_state)
                 try:
-                    self.assertEqual(reloaded.ai_whisper_model_combo.currentData(), "small")
                     self.assertEqual(reloaded.ai_device_combo.currentData(), "cpu")
-                    self.assertFalse(reloaded.ai_use_demucs_chk.isChecked())
+                    self.assertEqual(reloaded.ai_language_combo.currentData(), "ro")
+                    self.assertFalse(reloaded.ai_enable_fuzzy_chk.isChecked())
+                    self.assertEqual(reloaded.ai_fuzzy_threshold_spin.value(), 72)
                 finally:
                     reloaded.deleteLater()
                     dialog.deleteLater()

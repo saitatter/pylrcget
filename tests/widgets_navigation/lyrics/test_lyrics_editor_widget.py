@@ -518,6 +518,50 @@ class LyricsEditorWidgetTests(unittest.TestCase):
         finally:
             widget.deleteLater()
 
+    def test_ai_sync_manual_anchors_only_include_non_zero_synced_rows(self):
+        widget = LyricsEditorWidget()
+        try:
+            widget._set_synced([(0, "First line"), (1500, "Second line"), (4500, "Third line")])
+
+            anchors = widget.ai_sync_manual_anchors()
+
+            self.assertEqual(
+                anchors,
+                [
+                    {"line_index": 1, "time_ms": 1500, "text": "Second line"},
+                    {"line_index": 2, "time_ms": 4500, "text": "Third line"},
+                ],
+            )
+        finally:
+            widget.deleteLater()
+
+    def test_ai_sync_manual_anchors_empty_in_plain_mode(self):
+        widget = LyricsEditorWidget()
+        try:
+            widget._set_plain("First line\nSecond line")
+
+            anchors = widget.ai_sync_manual_anchors()
+
+            self.assertEqual(anchors, [])
+        finally:
+            widget.deleteLater()
+
+    def test_ai_sync_plain_source_from_plain_mode(self):
+        widget = LyricsEditorWidget()
+        try:
+            widget._set_plain("Line one\nLine two")
+            self.assertEqual(widget.ai_sync_plain_source(), "Line one\nLine two")
+        finally:
+            widget.deleteLater()
+
+    def test_ai_sync_plain_source_from_synced_mode(self):
+        widget = LyricsEditorWidget()
+        try:
+            widget._set_synced([(1200, "Line one"), (3000, "Line two")])
+            self.assertEqual(widget.ai_sync_plain_source(), "Line one\nLine two")
+        finally:
+            widget.deleteLater()
+
     def test_propagate_dialog_returns_checked_track_ids(self):
         from db.models import Track
 

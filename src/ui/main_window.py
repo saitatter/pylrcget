@@ -1492,12 +1492,19 @@ class MainWindow(QMainWindow):
             )
             return
 
-        # Get plain lyrics if available (prefer dirty draft for alignment)
-        plain_lyrics = ""
-        if track.dirty_lyrics_present and track.dirty_txt_lyrics:
-            plain_lyrics = track.dirty_txt_lyrics
-        elif track.txt_lyrics:
-            plain_lyrics = track.txt_lyrics
+        active_view = self._active_lyrics_view()
+        # Get plain lyrics source in strict priority:
+        # active editor -> dirty draft -> saved plain -> plain derived from saved LRC
+        plain_lyrics = active_view.ai_sync_plain_source() if active_view is not None else ""
+        if not plain_lyrics:
+            if track.dirty_lyrics_present and track.dirty_txt_lyrics:
+                plain_lyrics = track.dirty_txt_lyrics
+            elif track.txt_lyrics:
+                plain_lyrics = track.txt_lyrics
+            elif track.lrc_lyrics:
+                from core.utils import plain_text_from_lrc
+                plain_lyrics = plain_text_from_lrc(track.lrc_lyrics)
+        manual_anchors = active_view.ai_sync_manual_anchors() if active_view is not None else []
 
         for view in self._all_lyrics_views():
             view.btn_auto_sync.setEnabled(False)
@@ -1511,8 +1518,10 @@ class MainWindow(QMainWindow):
         worker = AiSyncWorker(
             audio_path,
             plain_lyrics,
-            whisper_model=str(ai_sync_settings.get("whisper_model") or "base"),
+            manual_anchors=manual_anchors,
+            whisper_model="base",
             device=str(ai_sync_settings.get("device") or "auto"),
+            language=str(ai_sync_settings.get("language") or "auto"),
             enable_fuzzy=bool(ai_sync_settings.get("enable_fuzzy", True)),
             fuzzy_threshold=int(ai_sync_settings.get("fuzzy_threshold", 60)),
         )
@@ -1548,11 +1557,17 @@ class MainWindow(QMainWindow):
 
         try:
             from core.utils import plain_text_from_lrc
-            plain = plain_text_from_lrc(lrc)
+            track = get_track_by_id(self.app_state.db, int(track_id))
+            plain_source = ""
+            if track.dirty_lyrics_present and track.dirty_txt_lyrics:
+                plain_source = (track.dirty_txt_lyrics or "").strip()
+            elif track.txt_lyrics:
+                plain_source = (track.txt_lyrics or "").strip()
+            plain = plain_source if plain_source else plain_text_from_lrc(lrc)
             update_track_dirty_lyrics(self.app_state.db, int(track_id), lrc.strip(), plain.strip())
             if self._editing_track_id == track_id:
-                track = get_track_by_id(self.app_state.db, int(track_id))
-                self._set_track_lyrics_views(track)
+                refreshed_track = get_track_by_id(self.app_state.db, int(track_id))
+                self._set_track_lyrics_views(refreshed_track)
             self.track_list.set_dirty_lyrics_state(int(track_id), True)
             self.albums_tab.set_dirty_lyrics_state(int(track_id), True)
             self.artists_tab.set_dirty_lyrics_state(int(track_id), True)

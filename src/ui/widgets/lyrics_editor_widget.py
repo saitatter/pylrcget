@@ -1475,6 +1475,47 @@ class LyricsEditorWidget(QWidget):
                 logger.warning("Failed to get playback position from provider: %s", exc)
         return int(self._current_pos_ms)
 
+    def ai_sync_manual_anchors(self, *, max_hints: int = 8) -> list[dict]:
+        """
+        Return manual AI-sync anchors captured from synced rows.
+
+        Heuristic: only non-zero timestamps are treated as explicit anchor hints, so
+        plain->synced default 00:00 rows are ignored until the user snaps lines.
+        """
+        if self.stack.currentWidget() is not self.table:
+            return []
+
+        hints: list[dict] = []
+        for row in range(self.table.rowCount()):
+            if len(hints) >= max_hints:
+                break
+            it_time = self.table.item(row, TIME_COLUMN)
+            it_text = self.table.item(row, TEXT_COLUMN)
+            if it_time is None or it_text is None:
+                continue
+
+            text = (it_text.text() or "").strip()
+            if not text:
+                continue
+
+            try:
+                ms = int(it_time.data(TIMESTAMP_MS_ROLE) or 0)
+            except (TypeError, ValueError):
+                continue
+            if ms <= 0:
+                continue
+
+            hints.append({"line_index": row, "time_ms": ms, "text": text})
+
+        return hints
+
+    def ai_sync_plain_source(self) -> str:
+        """
+        Return the best plain-lyrics source currently visible in the editor.
+        """
+        _lrc, txt = self._current_lyrics_text()
+        return (txt or "").strip()
+
     def _emit_save(self):
         # Synced view: build LRC + plain
         if self.stack.currentWidget() is self.table:

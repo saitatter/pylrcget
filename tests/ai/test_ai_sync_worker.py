@@ -7,7 +7,29 @@ import pytest
 
 from tests import test_support as _test_support  # noqa: F401
 
-from ui.workers.ai_sync_worker import _format_ts, _build_lrc_from_segments, _check_ai_sync_available, get_missing_ai_dependencies
+import ui.workers.ai_sync_worker as ai_sync_worker
+from ui.workers.ai_sync_worker import (
+    _align_lyrics_to_segments,
+    _align_lyrics_to_segments_viterbi,
+    _build_same_phrase_rewind_targets,
+    _build_speech_candidate_mask,
+    _build_guided_word_ranges,
+    _build_lrc_from_segments,
+    _build_lrc_from_plain_lines_and_segments,
+    _check_ai_sync_available,
+    _format_ts,
+    _normalized_transcribe_language,
+    _prepare_manual_line_anchors,
+    _late_line_expected_position_bonus,
+    _late_line_candidate_start_floor,
+    _segment_alignment_quality,
+    _segment_reliable_tail_seconds,
+    _segment_tail_seconds,
+    _should_use_relaxed_vad_result,
+    _should_retry_with_relaxed_vad,
+    _tail_rescue_alignment_indices,
+    get_missing_ai_dependencies,
+)
 
 
 def test_format_ts_zero():
@@ -52,11 +74,97 @@ def test_build_lrc_skips_empty_text():
     assert "Real line" in lines[0]
 
 
+def test_build_lrc_skips_music_playing_markers():
+    segments = [
+        {"start": 0.0, "text": "[Music playing]"},
+        {"start": 1.0, "text": "music playing"},
+        {"start": 2.0, "text": "Real line"},
+    ]
+    result = _build_lrc_from_segments(segments)
+    lines = result.strip().split("\n")
+    assert lines == ["[00:02.00] Real line"]
+
+
+def test_build_lrc_from_plain_lines_and_segments_preserves_plain_text():
+    plain_lines = ["Exact line A", "Exact line B"]
+    segments = [
+        {"start": 5.0, "text": "ASR one"},
+        {"start": 10.0, "text": "ASR two"},
+    ]
+
+    result = _build_lrc_from_plain_lines_and_segments(plain_lines, segments)
+
+    assert result.splitlines() == [
+        "[00:05.00] Exact line A",
+        "[00:10.00] Exact line B",
+    ]
+
+
+def test_build_lrc_from_plain_lines_and_segments_keeps_blank_lines():
+    plain_lines = ["Exact line A", "", "Exact line B"]
+    segments = [
+        {"start": 10.0, "text": "ASR one"},
+        {"start": 20.0, "text": "ASR two"},
+    ]
+
+    result = _build_lrc_from_plain_lines_and_segments(plain_lines, segments)
+
+    assert result.splitlines() == [
+        "[00:10.00] Exact line A",
+        "[00:15.00]",
+        "[00:20.00] Exact line B",
+    ]
+
+
+def test_align_greedy_without_words_keeps_plain_lines():
+    plain_lines = ["Keep this line", "And this line"]
+    segments = [{"start": 2.0, "text": "Whisper guessed text"}]
+
+    result = _align_lyrics_to_segments(plain_lines, segments)
+
+    assert "Keep this line" in result
+    assert "And this line" in result
+    assert "Whisper guessed text" not in result
+
+
+def test_align_viterbi_keeps_blank_lines_in_layout():
+    plain_lines = ["Alpha line", "", "Beta line"]
+    segments = [
+        {
+            "words": [
+                {"word": "Alpha", "start": 2.0},
+                {"word": "line", "start": 2.2},
+                {"word": "Beta", "start": 8.0},
+                {"word": "line", "start": 8.2},
+            ]
+        }
+    ]
+
+    result = _align_lyrics_to_segments_viterbi(plain_lines, segments)
+
+    assert result.splitlines() == [
+        "[00:02.00] Alpha line",
+        "[00:05.00]",
+        "[00:08.00] Beta line",
+    ]
+
+
+def test_align_viterbi_without_words_keeps_plain_lines():
+    plain_lines = ["Keep this line", "And this line"]
+    segments = [{"start": 2.0, "text": "Whisper guessed text"}]
+
+    result = _align_lyrics_to_segments_viterbi(plain_lines, segments)
+
+    assert "Keep this line" in result
+    assert "And this line" in result
+    assert "Whisper guessed text" not in result
+
+
 def test_ai_sync_availability_does_not_require_demucs(monkeypatch):
     real_import = builtins.__import__
 
     def fake_import(name, globals=None, locals=None, fromlist=(), level=0):
-        if name in {"torch", "torchaudio", "soundfile", "whisper"}:
+        if name in {"torch", "torchaudio", "soundfile", "whisperx"}:
             return object()
         if name == "demucs":
             raise ImportError("demucs missing")
@@ -74,7 +182,7 @@ def test_ai_sync_availability_message_guides_exe_users(monkeypatch):
     real_import = builtins.__import__
 
     def fake_import(name, globals=None, locals=None, fromlist=(), level=0):
-        if name in {"torch", "torchaudio", "soundfile", "whisper"}:
+        if name in {"torch", "torchaudio", "soundfile", "whisperx"}:
             raise ImportError(f"{name} missing")
         return real_import(name, globals, locals, fromlist, level)
 
@@ -94,7 +202,7 @@ def test_get_missing_ai_dependencies_returns_expected_packages(monkeypatch):
     def fake_import(name, globals=None, locals=None, fromlist=(), level=0):
         if name in {"torch", "soundfile"}:
             raise ImportError(f"{name} missing")
-        if name in {"torchaudio", "whisper"}:
+        if name in {"torchaudio", "whisperx"}:
             return object()
         return real_import(name, globals, locals, fromlist, level)
 
@@ -103,3 +211,383 @@ def test_get_missing_ai_dependencies_returns_expected_packages(monkeypatch):
     missing = get_missing_ai_dependencies()
 
     assert missing == ["torch", "soundfile"]
+
+
+def test_prepare_manual_line_anchors_maps_to_nearest_word_index():
+    plain_lines = ["line1", "line2", "line3"]
+    words = [
+        {"word": "a", "start": 1.0},
+        {"word": "b", "start": 2.0},
+        {"word": "c", "start": 3.1},
+        {"word": "d", "start": 5.0},
+    ]
+    manual = [
+        {"line_index": 0, "time_ms": 1900},
+        {"line_index": 2, "time_ms": 4900},
+    ]
+
+    targets = _prepare_manual_line_anchors(plain_lines, words, manual)
+
+    assert targets == {0: 1, 2: 3}
+
+
+def test_prepare_manual_line_anchors_ignores_invalid_entries():
+    plain_lines = ["line1"]
+    words = [{"word": "a", "start": 0.5}]
+    manual = [
+        {"line_index": -1, "time_ms": 1000},
+        {"line_index": 3, "time_ms": 1000},
+        {"line_index": 0, "time_ms": "bad"},
+        {"line_index": "x", "time_ms": 1000},
+    ]
+
+    targets = _prepare_manual_line_anchors(plain_lines, words, manual)
+
+    assert targets == {}
+
+
+def test_normalized_transcribe_language_auto_returns_none():
+    assert _normalized_transcribe_language("auto") is None
+    assert _normalized_transcribe_language("") is None
+    assert _normalized_transcribe_language(None) is None
+
+
+def test_normalized_transcribe_language_specific_code():
+    assert _normalized_transcribe_language("EN") == "en"
+    assert _normalized_transcribe_language(" ro ") == "ro"
+
+
+def test_build_guided_word_ranges_from_manual_targets():
+    ranges = _build_guided_word_ranges(
+        num_lines=6,
+        num_words=200,
+        manual_targets={1: 40, 4: 120},
+        half_window=10,
+    )
+
+    assert len(ranges) == 6
+    assert ranges[1][0] <= 40 < ranges[1][1]
+    assert ranges[4][0] <= 120 < ranges[4][1]
+    assert all(0 <= start < end <= 200 for start, end in ranges.values())
+
+
+def test_build_speech_candidate_mask_uses_confidence_and_token_quality():
+    plain_lines = ["Hi there"]
+    words = [
+        {"word": "Hi", "score": 0.9},
+        {"word": "uh", "score": 0.1},
+        {"word": "...", "score": 0.95},
+        {"word": "there", "score": 0.4},
+        {"word": "unknown", "score": 0.6},
+        {"word": "unknown", "score": 0.9},
+    ]
+
+    mask = _build_speech_candidate_mask(
+        words,
+        plain_lines,
+        min_confidence_in_vocab=0.35,
+        min_confidence_out_vocab=0.78,
+    )
+
+    assert mask == [True, False, False, True, False, True]
+
+
+def test_viterbi_ignores_low_confidence_candidates_for_matching():
+    plain_lines = ["alpha line", "beta line"]
+    segments = [
+        {
+            "words": [
+                {"word": "alpha", "start": 1.0, "score": 0.10},
+                {"word": "line", "start": 1.2, "score": 0.10},
+                {"word": "beta", "start": 1.4, "score": 0.10},
+                {"word": "line", "start": 1.6, "score": 0.10},
+                {"word": "alpha", "start": 12.0, "score": 0.95},
+                {"word": "line", "start": 12.2, "score": 0.95},
+                {"word": "beta", "start": 16.0, "score": 0.95},
+                {"word": "line", "start": 16.2, "score": 0.95},
+            ]
+        }
+    ]
+
+    result = _align_lyrics_to_segments_viterbi(plain_lines, segments)
+
+    assert result.splitlines() == [
+        "[00:12.00] alpha line",
+        "[00:16.00] beta line",
+    ]
+
+
+def test_build_speech_candidate_mask_suppresses_sparse_tail_candidates():
+    plain_lines = ["alpha beta gamma delta noise tail"]
+    words = [
+        {"word": "alpha", "start": 1.0, "score": 0.9},
+        {"word": "beta", "start": 1.4, "score": 0.9},
+        {"word": "gamma", "start": 1.8, "score": 0.9},
+        {"word": "delta", "start": 2.2, "score": 0.9},
+        {"word": "noise", "start": 2.6, "score": 0.9},
+        {"word": "tail", "start": 20.0, "score": 0.95},
+        {"word": "tail", "start": 24.0, "score": 0.95},
+        {"word": "tail", "start": 28.0, "score": 0.95},
+        {"word": "tail", "start": 32.0, "score": 0.95},
+        {"word": "tail", "start": 36.0, "score": 0.95},
+        {"word": "tail", "start": 40.0, "score": 0.95},
+        {"word": "tail", "start": 44.0, "score": 0.95},
+    ]
+
+    mask = _build_speech_candidate_mask(
+        words,
+        plain_lines,
+        min_confidence_in_vocab=0.3,
+        min_confidence_out_vocab=0.3,
+    )
+
+    assert mask[:5] == [True, True, True, True, True]
+    assert mask[5:] == [False, False, False, False, False, False, False]
+
+
+def test_build_speech_candidate_mask_keeps_late_reentry_phrase_in_vocab():
+    plain_lines = ["alpha beta gamma delta epsilon zeta eta theta you don't know nothing"]
+    words = [
+        {"word": "alpha", "start": 1.0, "score": 0.9},
+        {"word": "beta", "start": 1.2, "score": 0.9},
+        {"word": "gamma", "start": 1.4, "score": 0.9},
+        {"word": "delta", "start": 1.6, "score": 0.9},
+        {"word": "epsilon", "start": 1.8, "score": 0.9},
+        {"word": "zeta", "start": 2.0, "score": 0.9},
+        {"word": "eta", "start": 2.2, "score": 0.9},
+        {"word": "theta", "start": 2.4, "score": 0.9},
+        {"word": "you", "start": 28.0, "score": 0.92},
+        {"word": "don't", "start": 28.2, "score": 0.01},
+        {"word": "know", "start": 28.4, "score": 0.01},
+        {"word": "nothing", "start": 28.6, "score": 0.01},
+    ]
+
+    mask = _build_speech_candidate_mask(
+        words,
+        plain_lines,
+        min_confidence_in_vocab=0.3,
+        min_confidence_out_vocab=0.3,
+    )
+
+    assert mask[:8] == [True, True, True, True, True, True, True, True]
+    assert mask[8:] == [True, True, True, True]
+
+
+def test_segment_tail_seconds_prefers_last_word_start():
+    segments = [
+        {"start": 0.0, "end": 10.0, "words": [{"word": "a", "start": 1.0}]},
+        {"start": 10.0, "end": 20.0, "words": [{"word": "b", "start": 14.5}]},
+    ]
+    assert _segment_tail_seconds(segments) == 14.5
+
+
+def test_segment_reliable_tail_seconds_ignores_isolated_outlier():
+    segments = [
+        {
+            "start": 0.0,
+            "end": 230.0,
+            "words": [
+                {"word": "a", "start": 100.0},
+                {"word": "b", "start": 101.0},
+                {"word": "c", "start": 103.0},
+                {"word": "z", "start": 225.0},
+            ],
+        }
+    ]
+
+    assert _segment_tail_seconds(segments) == 225.0
+    assert _segment_reliable_tail_seconds(segments) == 103.0
+
+
+def test_should_retry_with_relaxed_vad_when_tail_coverage_is_low():
+    audio_samples = [0.0] * (16000 * 240)  # 240s
+    plain_lines = [f"line {i}" for i in range(20)]
+    segments = [{"end": 60.0, "words": [{"word": "hello", "start": 58.0}]}]
+
+    assert _should_retry_with_relaxed_vad(audio_samples, segments, plain_lines) is True
+
+
+def test_should_retry_with_relaxed_vad_when_tail_has_only_isolated_outlier():
+    audio_samples = [0.0] * (16000 * 240)  # 240s
+    plain_lines = [f"line {i}" for i in range(20)]
+    segments = [
+        {
+            "end": 230.0,
+            "words": [
+                {"word": "alpha", "start": 100.0},
+                {"word": "beta", "start": 101.0},
+                {"word": "gamma", "start": 103.0},
+                {"word": "noise", "start": 225.0},
+            ],
+        }
+    ]
+
+    assert _should_retry_with_relaxed_vad(audio_samples, segments, plain_lines) is True
+
+
+def test_should_not_retry_with_relaxed_vad_when_coverage_is_sufficient():
+    audio_samples = [0.0] * (16000 * 240)  # 240s
+    plain_lines = [f"line {i}" for i in range(20)]
+    segments = [
+        {
+            "end": 230.0,
+            "words": [
+                {"word": "hello", "start": 223.0},
+                {"word": "world", "start": 225.0},
+                {"word": "again", "start": 227.0},
+            ],
+        }
+    ]
+
+    assert _should_retry_with_relaxed_vad(audio_samples, segments, plain_lines) is False
+
+
+def test_segment_alignment_quality_returns_low_value_without_words():
+    quality = _segment_alignment_quality([{"start": 0.0, "text": "hello"}], ["line one"], 180.0)
+    assert quality < -1e8
+
+
+def test_should_use_relaxed_vad_result_when_tail_gain_is_large():
+    default_segments = [{"words": [{"word": "a", "start": 80.0}], "end": 81.0}]
+    relaxed_segments = [{"words": [{"word": "a", "start": 100.0}], "end": 101.0}]
+    assert _should_use_relaxed_vad_result(default_segments, relaxed_segments, ["a"], 140.0) is True
+
+
+def test_should_use_relaxed_vad_result_when_quality_gain_is_material(monkeypatch):
+    default_segments = [{"words": [{"word": "a", "start": 80.0}], "end": 81.0}]
+    relaxed_segments = [{"words": [{"word": "a", "start": 81.0}], "end": 82.0}]
+
+    def fake_quality(segments, plain_lines, duration_s):
+        return 0.80 if segments is relaxed_segments else 0.70
+
+    monkeypatch.setattr(ai_sync_worker, "_segment_alignment_quality", fake_quality)
+    assert _should_use_relaxed_vad_result(default_segments, relaxed_segments, ["a"], 140.0) is True
+
+
+def test_late_line_expected_position_bonus_prefers_expected_region_for_weak_lines():
+    near = _late_line_expected_position_bonus(
+        line_idx=16,
+        word_idx=160,
+        num_lines=30,
+        num_words=280,
+        line_peak_emission=0.25,
+    )
+    far = _late_line_expected_position_bonus(
+        line_idx=16,
+        word_idx=80,
+        num_lines=30,
+        num_words=280,
+        line_peak_emission=0.25,
+    )
+    assert near > 0.0
+    assert near > far
+
+
+def test_late_line_expected_position_bonus_disabled_for_strong_or_early_lines():
+    strong = _late_line_expected_position_bonus(
+        line_idx=18,
+        word_idx=160,
+        num_lines=30,
+        num_words=280,
+        line_peak_emission=0.9,
+    )
+    early = _late_line_expected_position_bonus(
+        line_idx=4,
+        word_idx=40,
+        num_lines=30,
+        num_words=280,
+        line_peak_emission=0.2,
+    )
+    assert strong == 0.0
+    assert early == 0.0
+
+
+def test_late_line_candidate_start_floor_applies_only_for_weak_late_lines():
+    floor = _late_line_candidate_start_floor(
+        line_idx=24,
+        num_lines=30,
+        num_words=240,
+        line_peak_emission=0.30,
+    )
+    assert floor is not None
+    assert floor >= 0
+
+    no_floor_strong = _late_line_candidate_start_floor(
+        line_idx=24,
+        num_lines=30,
+        num_words=240,
+        line_peak_emission=0.90,
+    )
+    assert no_floor_strong is None
+
+    no_floor_early = _late_line_candidate_start_floor(
+        line_idx=6,
+        num_lines=30,
+        num_words=240,
+        line_peak_emission=0.20,
+    )
+    assert no_floor_early is None
+
+
+def test_tail_rescue_alignment_indices_keeps_values_when_no_collapse():
+    aligned = [i * 5 for i in range(20)]
+    peaks = [0.8] * 20
+    rescued = _tail_rescue_alignment_indices(aligned, peaks, num_words=200)
+    assert rescued == aligned
+
+
+def test_tail_rescue_alignment_indices_pushes_late_weak_collapsed_lines_forward():
+    aligned = [i * 5 for i in range(14)] + [40, 41, 42, 43, 44, 45]
+    peaks = [0.8] * 14 + [0.2] * 6
+    rescued = _tail_rescue_alignment_indices(aligned, peaks, num_words=220)
+
+    # Tail should be pushed forward and remain monotonic.
+    assert rescued[-1] > aligned[-1]
+    assert all(rescued[i] < rescued[i + 1] for i in range(len(rescued) - 1))
+
+
+def test_tail_rescue_alignment_indices_uses_time_based_floor_on_sparse_tail():
+    aligned = [5 * i for i in range(14)] + [70, 71, 72, 73, 74, 75]
+    peaks = [0.8] * 14 + [0.2] * 6
+    # Sparse timeline: last words extend much farther in time.
+    starts = [float(i) for i in range(80)] + [160.0, 170.0, 180.0, 190.0, 200.0, 210.0]
+    rescued = _tail_rescue_alignment_indices(
+        aligned,
+        peaks,
+        num_words=len(starts),
+        word_starts=starts,
+    )
+    assert rescued[-1] > aligned[-1]
+    assert all(rescued[i] < rescued[i + 1] for i in range(len(rescued) - 1))
+
+
+def test_same_phrase_rewind_targets_expand_tail_when_clusters_are_few():
+    plain_lines = [
+        "repeat line",
+        "other",
+        "repeat line",
+        "other",
+        "repeat line",
+        "other",
+        "repeat line",
+    ]
+    # Only one strong cluster detected for the repeated phrase around index ~10.
+    # Tail expansion should synthesize later targets for later occurrences.
+    emissions = [
+        [0.0] * 60,
+        [0.0] * 60,
+        [0.0] * 60,
+        [0.0] * 60,
+        [0.0] * 60,
+        [0.0] * 60,
+        [0.0] * 60,
+    ]
+    for li in (0, 2, 4, 6):
+        emissions[li][10] = 0.9
+
+    targets = _build_same_phrase_rewind_targets(plain_lines, emissions, score_threshold=0.8, min_cluster_gap=3)
+
+    assert targets[0] == 10
+    assert targets[2] > targets[0]
+    assert targets[4] > targets[2]
+    assert targets[6] > targets[4]
