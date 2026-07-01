@@ -23,6 +23,10 @@ def test_plain_autofix_removes_unnecessary_empty_lines():
     assert autofix_plain_lyrics("\nFirst\n\n\nSecond\n") == "First\n\nSecond"
 
 
+def test_plain_autofix_trims_and_capitalizes_first_letter_after_symbols():
+    assert autofix_plain_lyrics("  'cause  \n  ¿debería  \n  hello  ") == "'Cause\n¿Debería\nHello"
+
+
 def test_synced_validator_checks_punctuation_order_and_end_marker():
     problems = validate_synced_lyrics([(3000, "Second."), (2000, "First")])
 
@@ -44,6 +48,15 @@ def test_synced_autofix_sorts_strips_punctuation_and_adds_end_marker():
     assert autofix_synced_lyrics([(3000, "Second."), (2000, "First,")]) == [
         (2000, "First"),
         (3000, "Second"),
+        (8000, ""),
+    ]
+
+
+def test_synced_autofix_trims_and_capitalizes_first_letter_after_symbols():
+    assert autofix_synced_lyrics([(1000, "  'cause  "), (2000, "  ¿debería  "), (3000, "  hello  ")]) == [
+        (1000, "'Cause"),
+        (2000, "¿Debería"),
+        (3000, "Hello"),
         (8000, ""),
     ]
 

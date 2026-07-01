@@ -70,6 +70,22 @@ class MainWindowInstrumentalTests(unittest.TestCase):
         dialog_cls.return_value.exec.assert_called_once()
         notify_mock.assert_not_called()
 
+    def test_slider_up_down_moves_active_lyrics_selection(self):
+        window = MainWindow.__new__(MainWindow)
+        slider = SimpleNamespace()
+        active_view = SimpleNamespace(move_selection_by_rows=MagicMock(return_value=True))
+        window.player_bar = SimpleNamespace(slider=slider)
+        window._active_lyrics_view = MagicMock(return_value=active_view)
+
+        event = QKeyEvent(
+            QEvent.Type.KeyPress,
+            Qt.Key.Key_Down,
+            Qt.KeyboardModifier.NoModifier,
+        )
+
+        self.assertTrue(MainWindow.eventFilter(window, slider, event))
+        active_view.move_selection_by_rows.assert_called_once_with(1)
+
     def test_apply_track_filters_updates_embedded_album_and_artist_track_lists(self):
         window = MainWindow.__new__(MainWindow)
         main_track_list = SimpleNamespace(

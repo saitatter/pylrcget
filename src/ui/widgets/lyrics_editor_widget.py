@@ -64,6 +64,17 @@ class _HeightForWidthWidget(QWidget):
         return layout.minimumSize()
 
 
+class _LyricsTableWidget(QTableWidget):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._suppress_auto_scroll = False
+
+    def scrollTo(self, index, hint=QTableWidget.ScrollHint.EnsureVisible):
+        if self._suppress_auto_scroll:
+            return
+        super().scrollTo(index, hint)
+
+
 class LyricsEditorWidget(QWidget):
     """
     Right-side lyrics panel:
@@ -313,7 +324,7 @@ class LyricsEditorWidget(QWidget):
         self.stack.addWidget(self.plain)
 
         # Synced editor table
-        self.table = QTableWidget(0, 3)
+        self.table = _LyricsTableWidget(0, 3)
         self.table.setHorizontalHeaderLabels(["Time", "Text", "#"])
         line_header = self.table.verticalHeader()
         line_header.setVisible(False)
@@ -329,6 +340,21 @@ class LyricsEditorWidget(QWidget):
         self.table.itemSelectionChanged.connect(self._on_table_selection_changed)
         self.table.itemChanged.connect(self._on_table_item_changed)
         self.table.customContextMenuRequested.connect(self._show_synced_context_menu)
+        self._line_navigation_widgets = {
+            self.btn_snap,
+            self.btn_shift_minus,
+            self.btn_shift_plus,
+            self.btn_shift_selected,
+            self.btn_shift_all_from_first,
+            self.btn_add,
+            self.btn_del,
+            self.btn_autofix,
+            self.btn_save,
+            self.btn_sync_others,
+            self.btn_export_files,
+        }
+        for widget in self._line_navigation_widgets:
+            widget.installEventFilter(self)
 
         header_view = self.table.horizontalHeader()
         header_view.setSectionResizeMode(TIME_COLUMN, QHeaderView.ResizeMode.Fixed)
@@ -423,6 +449,17 @@ class LyricsEditorWidget(QWidget):
             if self._validation_problems:
                 self._jump_to_first_validation_problem()
                 return True
+        if (
+            watched in self._line_navigation_widgets
+            and self.stack.currentWidget() is self.table
+            and event.type() == QEvent.Type.KeyPress
+        ):
+            modifiers = event.modifiers() & ~Qt.KeyboardModifier.KeypadModifier
+            if modifiers == Qt.KeyboardModifier.NoModifier:
+                if event.key() == Qt.Key.Key_Up and self.move_selection_by_rows(-1):
+                    return True
+                if event.key() == Qt.Key.Key_Down and self.move_selection_by_rows(1):
+                    return True
         if watched in {self.table, self.table.viewport()} and event.type() == QEvent.Type.KeyPress:
             modifiers = event.modifiers() & ~Qt.KeyboardModifier.KeypadModifier
             if (
@@ -1207,7 +1244,47 @@ class LyricsEditorWidget(QWidget):
         ms = it_time.data(TIMESTAMP_MS_ROLE)
         if ms is None:
             return
+        if int(ms) == 0 and self._table_has_only_zero_timestamps():
+            return
         self.seekRequested.emit(int(ms))
+
+    def move_selection_by_rows(self, delta: int) -> bool:
+        if self.stack.currentWidget() is not self.table:
+            return False
+        if self.table.rowCount() <= 0 or delta == 0:
+            return False
+
+        current_row = self.table.currentRow()
+        if current_row < 0:
+            target_row = 0 if delta > 0 else self.table.rowCount() - 1
+        else:
+            target_row = max(0, min(self.table.rowCount() - 1, current_row + delta))
+            if target_row == current_row:
+                return False
+
+        self.table.selectRow(target_row)
+        current_column = self.table.currentColumn()
+        if current_column < 0:
+            current_column = TEXT_COLUMN
+        self.table.setCurrentCell(target_row, current_column)
+        target_item = self.table.item(target_row, current_column)
+        if target_item is None:
+            target_item = self.table.item(target_row, TEXT_COLUMN)
+        if target_item is not None:
+            self.table.scrollToItem(target_item, self.table.ScrollHint.PositionAtCenter)
+        return True
+
+    def _table_has_only_zero_timestamps(self) -> bool:
+        has_timestamps = False
+        for row in range(self.table.rowCount()):
+            it_time = self.table.item(row, 0)
+            it_text = self.table.item(row, 1)
+            if it_time is None or it_text is None or not it_text.text().strip():
+                continue
+            has_timestamps = True
+            if int(it_time.data(TIMESTAMP_MS_ROLE) or 0) > 0:
+                return False
+        return has_timestamps
 
     def _on_table_item_changed(self, item: QTableWidgetItem):
         # If user edited the Time cell, validate and update ms
@@ -1283,6 +1360,9 @@ class LyricsEditorWidget(QWidget):
     def _insert_line_at(self, insert_at: int):
         self._push_undo()
         insert_at = max(0, min(int(insert_at), self.table.rowCount()))
+        top_visible_row = self.table.rowAt(0)
+        auto_scroll = self.table.hasAutoScroll()
+        self.table.setAutoScroll(False)
 
         # default time: current playback time
         ms = int(self._current_playback_ms())
@@ -1306,16 +1386,17 @@ class LyricsEditorWidget(QWidget):
 
         self._rebuild_times_cache()
         self._refresh_row_styles()
-        self.table.selectRow(insert_at)
-        self.table.setCurrentCell(insert_at, 1)
-        self.table.editItem(self.table.item(insert_at, 1))
         self._validate_current_lyrics()
         self._emit_dirty_draft_changed()
+        self.table.setAutoScroll(auto_scroll)
 
     def _delete_selected_line(self):
         rows = self._selected_rows()
         if not rows:
             return
+        top_visible_row = self.table.rowAt(0)
+        auto_scroll = self.table.hasAutoScroll()
+        self.table.setAutoScroll(False)
         self._push_undo()
         self.table.blockSignals(True)
         for row in reversed(rows):
@@ -1330,6 +1411,7 @@ class LyricsEditorWidget(QWidget):
         self._validate_current_lyrics()
         self._refresh_row_styles()
         self._emit_dirty_draft_changed()
+        self.table.setAutoScroll(auto_scroll)
 
     def _snap_selected_line_to_current_time(self):
         row = self.table.currentRow()

@@ -3,6 +3,19 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 
+def _normalize_autofix_line(text: str) -> str:
+    cleaned = (text or "").strip()
+    if not cleaned:
+        return ""
+
+    chars = list(cleaned)
+    for index, char in enumerate(chars):
+        if char.isalpha():
+            chars[index] = char.upper()
+            break
+    return "".join(chars)
+
+
 @dataclass(frozen=True)
 class LyricsValidationProblem:
     line: int
@@ -44,16 +57,16 @@ def validate_plain_lyrics(text: str) -> list[LyricsValidationProblem]:
 
 
 def autofix_plain_lyrics(text: str) -> str:
-    lines = [line.rstrip() for line in (text or "").splitlines()]
+    lines = [(line or "").strip() for line in (text or "").splitlines()]
     fixed: list[str] = []
     previous_empty = False
     for line in lines:
-        is_empty = not line.strip()
+        is_empty = not line
         if is_empty and (not fixed or previous_empty):
             continue
-        fixed.append("" if is_empty else line)
+        fixed.append("" if is_empty else _normalize_autofix_line(line))
         previous_empty = is_empty
-    while fixed and not fixed[-1].strip():
+    while fixed and not fixed[-1]:
         fixed.pop()
     return "\n".join(fixed)
 
@@ -133,10 +146,10 @@ def autofix_synced_lyrics(pairs: list[tuple[int, str]]) -> list[tuple[int, str]]
     fixed: list[tuple[int, str]] = []
     previous_ms: int | None = None
     for ms, text in sorted(((int(ms), text or "") for ms, text in pairs), key=lambda item: item[0]):
-        content = text.rstrip()
-        stripped = content.rstrip()
+        stripped = (text or "").strip()
         while stripped.endswith(",") or (stripped.endswith(".") and not stripped.endswith("...")):
             stripped = stripped[:-1].rstrip()
+        stripped = _normalize_autofix_line(stripped)
         if not stripped and fixed and not fixed[-1][1].strip():
             continue
         fixed_ms = ms if previous_ms is None else max(ms, previous_ms + 50)

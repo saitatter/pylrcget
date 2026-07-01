@@ -15,7 +15,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from PySide6.QtCore import Qt, QByteArray, QTimer
+from PySide6.QtCore import QEvent, Qt, QByteArray, QTimer
 from PySide6.QtGui import QCloseEvent, QShortcut, QKeySequence
 import logging
 import os
@@ -317,6 +317,7 @@ class MainWindow(QMainWindow):
         self.player_bar.volumeChanged.connect(self._persist_playback_volume)
         self.player_bar.artistNavigationRequested.connect(self._navigate_current_track_artist)
         self.player_bar.albumNavigationRequested.connect(self._navigate_current_track_album)
+        self.player_bar.slider.installEventFilter(self)
         for view in self._all_lyrics_views():
             view.set_reaction_delay_ms(get_config(self.app_state.db).reaction_delay_ms)
             view.set_current_position_provider(self.app_state.player.position_ms if self.app_state.player else None)
@@ -1816,6 +1817,12 @@ class MainWindow(QMainWindow):
             return self.artists_lyrics_view
         return None
 
+    def _move_active_lyrics_selection(self, delta: int) -> bool:
+        view = self._active_lyrics_view()
+        if view is None:
+            return False
+        return view.move_selection_by_rows(delta)
+
     def _refresh_active_lyrics_view_layout(self, *_args) -> None:
         view = self._active_lyrics_view()
         if view is None:
@@ -1856,6 +1863,16 @@ class MainWindow(QMainWindow):
         view.downloadRequested.connect(self._download_current_track_lyrics)
         view.searchRequested.connect(self._search_current_track_lyrics)
         view.exportFilesRequested.connect(self._export_current_track_sidecars)
+
+    def eventFilter(self, watched, event):
+        if watched is self.player_bar.slider and event.type() == QEvent.Type.KeyPress:
+            modifiers = event.modifiers() & ~Qt.KeyboardModifier.KeypadModifier
+            if modifiers == Qt.KeyboardModifier.NoModifier:
+                if event.key() == Qt.Key.Key_Up and self._move_active_lyrics_selection(-1):
+                    return True
+                if event.key() == Qt.Key.Key_Down and self._move_active_lyrics_selection(1):
+                    return True
+        return super().eventFilter(watched, event)
 
     def _all_lyrics_views(self) -> list[LyricsEditorWidget]:
         return [self.lyrics_view, self.albums_lyrics_view, self.artists_lyrics_view]

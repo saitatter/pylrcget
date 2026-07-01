@@ -248,7 +248,7 @@ class LyricsEditorWidgetTests(unittest.TestCase):
             self.assertEqual(widget.table.rowCount(), 3)
             self.assertEqual(widget.table.item(0, 0).text(), "00:00.50")
             self.assertEqual(widget.table.item(0, 1).text(), "")
-            self.assertEqual(widget.table.currentRow(), 0)
+            self.assertEqual(widget.table.currentRow(), 1)
             self.assertEqual(widget.table.currentColumn(), 1)
             self.assertEqual(widget.table.item(1, 1).text(), "First line")
         finally:
@@ -266,6 +266,44 @@ class LyricsEditorWidgetTests(unittest.TestCase):
 
             self.assertEqual(emitted, [])
             self.assertEqual(widget.table.state(), widget.table.State.EditingState)
+        finally:
+            widget.deleteLater()
+
+    def test_clicking_unsynced_zero_timestamps_does_not_seek(self):
+        widget = LyricsEditorWidget()
+        emitted: list[int] = []
+        widget.seekRequested.connect(emitted.append)
+        try:
+            widget._set_synced([(0, "First line"), (0, "Second line")])
+
+            widget._on_table_clicked_seek(1, 1)
+
+            self.assertEqual(emitted, [])
+        finally:
+            widget.deleteLater()
+
+    def test_up_down_on_toolbar_button_moves_lyrics_selection(self):
+        widget = LyricsEditorWidget()
+        try:
+            widget._set_synced([(1200, "First line"), (3000, "Second line"), (5000, "")])
+            widget.table.selectRow(0)
+            widget.table.setCurrentCell(0, 1)
+            event = QKeyEvent(
+                QEvent.Type.KeyPress,
+                Qt.Key.Key_Down,
+                Qt.KeyboardModifier.NoModifier,
+            )
+
+            self.assertTrue(widget.eventFilter(widget.btn_snap, event))
+            self.assertEqual(widget.table.currentRow(), 1)
+
+            event_up = QKeyEvent(
+                QEvent.Type.KeyPress,
+                Qt.Key.Key_Up,
+                Qt.KeyboardModifier.NoModifier,
+            )
+            self.assertTrue(widget.eventFilter(widget.btn_snap, event_up))
+            self.assertEqual(widget.table.currentRow(), 0)
         finally:
             widget.deleteLater()
 
