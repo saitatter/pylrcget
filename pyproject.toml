@@ -1,6 +1,6 @@
 [project]
 name = "pylrcget"
-version = "1.11.0"
+version = "1.12.0"
 description = "Desktop-native lyrics manager and player built with PySide6"
 requires-python = ">=3.10"
 dependencies = [

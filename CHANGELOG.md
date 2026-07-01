@@ -1,9 +1,102 @@
 # Changelog
+## v1.12.0 (2026-07-01)
+
+### ✨ Features
+* **release:** Add ai portable assets for linux and macos\n\nbuild ai-enabled portable variants for windows, linux, and macos, and\nupdate the release notes to describe the remaining ffmpeg prerequisite.\n\nco-authored-by: copilot <223556219+copilot@users.noreply.github.com> ([c81966b](https://github.com/saitatter/pylrcget/commit/c81966bafe3cc7beadeaf3b2a3ecccd6530421bd))
+* **ai-sync:** Multi-onset relaxed vad with vocab-weighted selection ([1a5bba3](https://github.com/saitatter/pylrcget/commit/1a5bba3e687152ba859101f89079dc67ec68aa93))
+  Run three relaxed VAD onsets (0.15/0.10/0.02) when the coverage retry gate fires and keep the best candidate by alignment quality. Raise the vocab_ratio weight in the quality proxy so an over-detecting aggressive onset (diluted with out-of-vocabulary instrumental noise) is rejected while an aggressive onset that recovers genuine softly-sung lyrics is accepted.
+  Positional mean-of-means across the 5-track suite improves 9.78s -> 7.32s; See You in Hell (acoustic) worst case 15.87s -> 9.70s with no regressions.
+  Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+* **ai-sync:** Persist settings, staged progress, and alignment hardening ([9588fde](https://github.com/saitatter/pylrcget/commit/9588fdea79273e732d403d4b3ab57536ac777c0a))
+  - Persist AI Sync execution device and transcription language across runs
+  - Report staged progress (load/transcribe/align/select/build) to the UI
+  - Cache WhisperX + alignment models; add relaxed-VAD retry and pass selection
+  - Add tail-rescue for late repeated lines collapsing onto earlier clusters
+  - Document detection/alignment methods (AI_SYNC_WORKER_METHODS.md) and add tests
+  Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+* Harden ai sync alignment and document scoring pipeline ([55b413d](https://github.com/saitatter/pylrcget/commit/55b413dc849fdd2ca2d55e4becac4cc965dd6134))
+  Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+* **ai-sync:** Add repeat-aware transition penalty for rewind collapse ([4bb99b5](https://github.com/saitatter/pylrcget/commit/4bb99b5ee479b25203ebc1e6ed519b68e5cd20ea))
+  Introduce a transition-level penalty for duplicate phrases that remain in an earlier repeated cluster across consecutive lines.
+  This reduces repeat-block collapse on hard tracks while keeping runtime stable.
+  Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+* **ai-sync:** Penalize same-phrase rewind in viterbi alignment ([83851a8](https://github.com/saitatter/pylrcget/commit/83851a861997e72181f489527a5ab76f03506ccf))
+  Add an explicit rewind penalty for duplicated lyric phrases so later occurrences are less likely to snap to earlier temporal clusters.
+  This improves repeat-heavy tracks while keeping alignment/runtime stable.
+  Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+* **ai-sync:** Implement viterbi dp for global alignment optimization ([9633c5a](https://github.com/saitatter/pylrcget/commit/9633c5ae95be070180b9123a7b134de76f057ac1))
+  - Replace greedy local matching with Viterbi dynamic programming
+- Global optimization finds globally optimal alignment path, not greedy left-to-right
+- Reduces systematic drift by considering full lyric context
+- Emission scoring: word overlap detection with sequence matching
+- Transition costs: penalize backwards movement and large jumps
+- Fallback to greedy if Viterbi fails (safety mechanism)
+- Expected improvement: 50s error -> 5-10s error on well-transcribed audio
+  Algorithm: O(n_lines × n_words × window_size) ≈ 60 × 500 × 100 = 3M ops (tractable)
+  Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+
+### 🐛 Fixes
+* **ui:** Polish lyrics editor navigation and autofix\n\ntrim and capitalize lines during autofix, stop unsynced zero-timestamp clicks\nfrom seeking to the start, make up/down move lyric selection from toolbar and\nseekbar focus, and stop add/delete from causing lyric-view scroll jumps.\n\nco-authored-by: copilot <223556219+copilot@users.noreply.github.com> ([f8c2ea3](https://github.com/saitatter/pylrcget/commit/f8c2ea3328f819d1cdef7f3b524c7ab13f13d885))
+* **packaging:** Add linux launcher assets and ffmpeg dep\n\nadd shared linux desktop-entry and icon assets, install them from the .deb\nworkflow, and declare ffmpeg as a package dependency so whisper/whisperx\ncan decode audio on apt-based distros without extra manual setup.\n\nco-authored-by: copilot <223556219+copilot@users.noreply.github.com> ([58e0830](https://github.com/saitatter/pylrcget/commit/58e08303457a5620a1eb5e9ed2ceda44fc10a6e7))
+* **ai-sync:** Add cpu fallback for alignment on cuda errors ([5d8621e](https://github.com/saitatter/pylrcget/commit/5d8621eac473c5fc0f87d0da40cf4bb47d6a1cd8))
+  WhisperX alignment with Pyannote VAD can hang on Windows when using CUDA (Triton kernel initialization issue). Add try/except with automatic CPU fallback.
+  Also fixes edge case where alignment fails silently - now logs warnings and continues with raw segment timestamps.
+
+### 🧰 CI & Build
+* Remove tools from repository tracking ([4a557fd](https://github.com/saitatter/pylrcget/commit/4a557fd2d9923cac3dd77bb64f76dae6cd993901))
+  - keep tools/ ignored via .gitignore
+- remove tracked tools scripts and benchmark artifacts
+- keep AI sync on global anchors variant
+  Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+
+
 ## v1.11.0 (2026-06-22)
 
 ### ✨ Features
+* **ai-sync:** Replace whisper with whisperx and add cuda device toggle ([cecf900](https://github.com/saitatter/pylrcget/commit/cecf9008b1762526685a863da8ee95789518bb85))
+  - Replace Whisper base model with WhisperX for consistent forced alignment
+- Remove vocal separation (Demucs) integration entirely
+- Add GPU (CUDA) device option in settings (Auto/CPU/GPU)
+- WhisperX provides better word-level timestamp accuracy via forced alignment
+- Benchmark results: ~24% faster (6.1s -> 4.7s), equivalent accuracy (49.4s error)
+- Device selection is now configurable: auto-detect, CPU-only, or CUDA
+- Remove use_vocal_separation parameter from worker instantiation
+- Update dependencies: whisperx replaces openai-whisper
+  Measurements from investigation 5 (WhisperX vs Whisper base):
+- Load time: WhisperX faster on longer tracks (-27% to -55%)
+- Transcribe: WhisperX -24% faster on average (-43% to -74%)
+- Alignment accuracy: equivalent (49.4s vs 49.4s mean error)
+  Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+* **ai-sync:** Remove demucs vocal separation - degraded alignment accuracy ([825f67d](https://github.com/saitatter/pylrcget/commit/825f67de4972f401d34ba71dd7b2b4bf13b31637))
+  Investigation results (4 benchmarks on 5 test tracks):
+  1. Demucs vocal separation reduced alignment accuracy by ~20% on average
+   - Full mix baseline: 48.2s mean error
+   - Separated vocals: 47.5s (-1.4%, inconsistent improvement)
+   - Latency compensation: Made it worse (-8.2%)
+  2. Latency analysis showed variable delay (+67s to -0.3s) per track
+   - No fixed latency to compensate
+   - Compensation attempts made results worse (-14.7% average)
+  3. Whisper large-v3 model (CUDA) showed no consistent improvement
+   - Average -5.4% vs base model
+   - 30+ second load time not justified
+   - Kept base model as default
+  Decision: Simplify to greedy baseline
+- Remove Demucs from optional dependencies
+- Use full audio mix (no vocal separation)
+- Faster processing, more predictable results
+- Keep greedy alignment as stable workhorse
+  Remaining improvements for future investigation:
+- Confidence-based word filtering (helps some songs, hurts others)
+- Segment boundary edge cases
+- Post-processing smoothing refinements
+  Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+* **ai-sync:** Add postprocessing smoothing for aligned timestamps; apply same postprocess in benchmark ([c0fe9ac](https://github.com/saitatter/pylrcget/commit/c0fe9ac47b94f59d3c914211c958708736ed7137))
+* **ai-sync:** Add fuzzy matching support and ui settings for ai auto-sync\n\nadd configurable fuzzy matching (rapidfuzz) to improve alignment robustness. expose enable_fuzzy and fuzzy_threshold in ai sync settings and pass settings to the worker.\n\nco-authored-by: copilot <223556219+copilot@users.noreply.github.com> ([b644141](https://github.com/saitatter/pylrcget/commit/b64414161c5b5f87e6e1b4e27ed4818221e5ba5b))
 * **ai:** Add guided packaged flow and ai-enabled portable release ([d5bc85a](https://github.com/saitatter/pylrcget/commit/d5bc85af7340d6c1625f6ba28e4de2f28ce9065d))
   Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+
+### 🐛 Fixes
+* **ui:** Avoid ai sync settings layout break; add watchdog for long 'building lrc' progress ([637691c](https://github.com/saitatter/pylrcget/commit/637691c60b07addc48087f209568232f37706b5f))
 
 
 ## v1.10.1 (2026-06-22)
