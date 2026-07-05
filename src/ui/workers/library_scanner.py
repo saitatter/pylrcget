@@ -34,12 +34,15 @@ class _ScanTimingStats:
     def __init__(self) -> None:
         self.path_discovery_s = 0.0
         self.signature_check_s = 0.0
+        self.signature_audio_stat_s = 0.0
+        self.signature_sidecar_stat_s = 0.0
         self.metadata_read_s = 0.0
         self.embedded_lyrics_read_s = 0.0
         self.sidecar_lookup_s = 0.0
         self.db_flush_s = 0.0
         self.path_discovery_count = 0
         self.signature_check_count = 0
+        self.signature_sidecar_candidate_count = 0
         self.metadata_read_count = 0
         self.embedded_lyrics_read_count = 0
         self.sidecar_lookup_count = 0
@@ -56,6 +59,8 @@ class _ScanTimingStats:
                 self.path_discovery_count += 1
             elif field_name == "signature_check_s":
                 self.signature_check_count += 1
+            elif field_name == "signature_sidecar_candidate_count":
+                self.signature_sidecar_candidate_count += int(elapsed_s)
             elif field_name == "metadata_read_s":
                 self.metadata_read_count += 1
             elif field_name == "embedded_lyrics_read_s":
@@ -108,6 +113,8 @@ def _scan_track_for_path(
         lyrics_lookup_subdir,
         metadata=metadata,
         lyrics_file_pattern=lyrics_file_pattern,
+        timing_hook=None if timings is None else timings.record,
+        count_hook=None if timings is None else timings.record,
     )
     if timings is not None:
         timings.record("sidecar_lookup_s", time.perf_counter() - sidecar_started)
@@ -279,6 +286,8 @@ class LibraryScanner(QThread):
                             self.lyrics_lookup_subdir,
                             metadata=existing[1],
                             lyrics_file_pattern=self.lyrics_file_pattern,
+                            timing_hook=timings.record,
+                            count_hook=timings.record,
                         )
                         timings.record("signature_check_s", time.perf_counter() - signature_started)
                         if existing[0] == signature:
@@ -341,6 +350,15 @@ class LibraryScanner(QThread):
                 "Library scan signature check time: %.3fs (%d checks)",
                 timings.signature_check_s,
                 timings.signature_check_count,
+            )
+            logger.info(
+                "Library scan signature audio stat time: %.3fs",
+                timings.signature_audio_stat_s,
+            )
+            logger.info(
+                "Library scan signature sidecar stat time: %.3fs (%d candidates)",
+                timings.signature_sidecar_stat_s,
+                timings.signature_sidecar_candidate_count,
             )
             logger.info(
                 "Library scan metadata read time: %.3fs (%d reads)",

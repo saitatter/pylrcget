@@ -205,12 +205,16 @@ def get_audio_file_signature(
     *,
     metadata: AudioMetadata | None = None,
     lyrics_file_pattern: str | None = None,
+    timing_hook: Callable[[str, float], None] | None = None,
+    count_hook: Callable[[str, int], None] | None = None,
 ) -> tuple[float | None, int | None]:
     return get_audio_file_signature_with_lookup(
         path,
         lyrics_lookup_subdir,
         metadata=metadata,
         lyrics_file_pattern=lyrics_file_pattern,
+        timing_hook=timing_hook,
+        count_hook=count_hook,
     )
 
 
@@ -232,19 +236,36 @@ def get_audio_file_signature_with_lookup(
     *,
     metadata: AudioMetadata | None = None,
     lyrics_file_pattern: str | None = None,
+    timing_hook: Callable[[str, float], None] | None = None,
+    count_hook: Callable[[str, int], None] | None = None,
 ) -> tuple[float | None, int | None]:
     newest_mtime: float | None = None
     total_size = 0
-    candidates = [path]
+    sidecar_candidates: list[str] = []
     for base in _sidecar_base_candidates(
         path,
         lyrics_lookup_subdir,
         metadata=metadata,
         lyrics_file_pattern=lyrics_file_pattern,
     ):
-        candidates.extend([base + ".txt", base + ".lrc"])
+        sidecar_candidates.extend([base + ".txt", base + ".lrc"])
 
-    for candidate in candidates:
+    if count_hook is not None:
+        count_hook("signature_sidecar_candidate_count", len(sidecar_candidates))
+
+    audio_started = time.perf_counter()
+    try:
+        stat = os.stat(path)
+    except OSError:
+        stat = None
+    if timing_hook is not None:
+        timing_hook("signature_audio_stat_s", time.perf_counter() - audio_started)
+    if stat is not None:
+        newest_mtime = float(stat.st_mtime)
+        total_size += int(stat.st_size)
+
+    sidecar_started = time.perf_counter()
+    for candidate in sidecar_candidates:
         try:
             stat = os.stat(candidate)
         except OSError:
@@ -252,6 +273,8 @@ def get_audio_file_signature_with_lookup(
         candidate_mtime = float(stat.st_mtime)
         newest_mtime = candidate_mtime if newest_mtime is None else max(newest_mtime, candidate_mtime)
         total_size += int(stat.st_size)
+    if timing_hook is not None:
+        timing_hook("signature_sidecar_stat_s", time.perf_counter() - sidecar_started)
 
     return newest_mtime, total_size if newest_mtime is not None else None
 
