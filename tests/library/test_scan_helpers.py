@@ -105,6 +105,24 @@ class ScanLibraryHelpersTests(unittest.TestCase):
             self.assertEqual(sig[1], audio_size)
             self.assertEqual(sig[0], audio_mtime)
 
+    def test_get_audio_file_signature_uses_provided_audio_signature(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            audio = root / "track.mp3"
+            touch_text(audio, "audio")
+            audio_signature = (audio.stat().st_mtime, audio.stat().st_size)
+
+            with patch("library.scan_library.os.stat", wraps=os.stat) as stat_mock:
+                sig = get_audio_file_signature(
+                    str(audio),
+                    audio_signature=audio_signature,
+                    sidecar_lookup_cache=SidecarLookupCache(),
+                )
+
+            self.assertEqual(sig[0], audio_signature[0])
+            self.assertEqual(sig[1], audio_signature[1])
+            self.assertEqual(stat_mock.call_count, 0)
+
     def test_iter_audio_paths_and_preview_apply_path_and_regex_exclusions(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

@@ -279,6 +279,7 @@ def get_audio_file_signature(
     *,
     metadata: AudioMetadata | None = None,
     lyrics_file_pattern: str | None = None,
+    audio_signature: tuple[float | None, int | None] | None = None,
     sidecar_lookup_cache: SidecarLookupCache | None = None,
     timing_hook: Callable[[str, float], None] | None = None,
     count_hook: Callable[[str, int], None] | None = None,
@@ -288,6 +289,7 @@ def get_audio_file_signature(
         lyrics_lookup_subdir,
         metadata=metadata,
         lyrics_file_pattern=lyrics_file_pattern,
+        audio_signature=audio_signature,
         sidecar_lookup_cache=sidecar_lookup_cache,
         timing_hook=timing_hook,
         count_hook=count_hook,
@@ -312,6 +314,7 @@ def get_audio_file_signature_with_lookup(
     *,
     metadata: AudioMetadata | None = None,
     lyrics_file_pattern: str | None = None,
+    audio_signature: tuple[float | None, int | None] | None = None,
     sidecar_lookup_cache: SidecarLookupCache | None = None,
     timing_hook: Callable[[str, float], None] | None = None,
     count_hook: Callable[[str, int], None] | None = None,
@@ -330,16 +333,19 @@ def get_audio_file_signature_with_lookup(
     if count_hook is not None:
         count_hook("signature_sidecar_candidate_count", len(sidecar_candidates))
 
-    audio_started = time.perf_counter()
-    try:
-        stat = os.stat(path)
-    except OSError:
-        stat = None
-    if timing_hook is not None:
-        timing_hook("signature_audio_stat_s", time.perf_counter() - audio_started)
-    if stat is not None:
-        newest_mtime = float(stat.st_mtime)
-        total_size += int(stat.st_size)
+    if audio_signature is not None:
+        newest_mtime, total_size = audio_signature
+    else:
+        audio_started = time.perf_counter()
+        try:
+            stat = os.stat(path)
+        except OSError:
+            stat = None
+        if timing_hook is not None:
+            timing_hook("signature_audio_stat_s", time.perf_counter() - audio_started)
+        if stat is not None:
+            newest_mtime = float(stat.st_mtime)
+            total_size += int(stat.st_size)
 
     sidecar_started = time.perf_counter()
     for candidate in sidecar_candidates:

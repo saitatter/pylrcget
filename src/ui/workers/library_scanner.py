@@ -310,6 +310,7 @@ class LibraryScanner(QThread):
                             self.lyrics_lookup_subdir,
                             metadata=existing_metadata,
                             lyrics_file_pattern=self.lyrics_file_pattern,
+                            audio_signature=discovered_signatures.get(p),
                             sidecar_lookup_cache=sidecar_lookup_cache,
                             timing_hook=timings.record,
                             count_hook=timings.record,
