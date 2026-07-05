@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sqlite3
+import os
 import tempfile
 import time
 import unittest
@@ -14,6 +15,7 @@ from db.database import add_tracks, get_library_file_index, initialize_database
 from library.scan_library import (
     AudioMetadata,
     MutagenError,
+    SidecarLookupCache,
     get_audio_file_signature,
     iter_audio_paths,
     new_fs_track_from_path,
@@ -83,6 +85,24 @@ class ScanLibraryHelpersTests(unittest.TestCase):
             self.assertIsNotNone(sig[0])
             self.assertEqual(sig[1], audio.stat().st_size + lrc.stat().st_size)
             self.assertEqual(sig[0], max(audio.stat().st_mtime, lrc.stat().st_mtime))
+
+    def test_get_audio_file_signature_uses_sidecar_cache_to_skip_missing_candidates(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            audio = root / "track.mp3"
+            touch_text(audio, "audio")
+            audio_size = audio.stat().st_size
+            audio_mtime = audio.stat().st_mtime
+
+            with (
+                patch("library.scan_library.os.listdir", return_value=[]),
+                patch("library.scan_library.os.stat", wraps=os.stat) as stat_mock,
+            ):
+                sig = get_audio_file_signature(str(audio), sidecar_lookup_cache=SidecarLookupCache())
+
+            self.assertEqual(stat_mock.call_count, 1)
+            self.assertEqual(sig[1], audio_size)
+            self.assertEqual(sig[0], audio_mtime)
 
     def test_iter_audio_paths_and_preview_apply_path_and_regex_exclusions(self):
         with tempfile.TemporaryDirectory() as tmp:

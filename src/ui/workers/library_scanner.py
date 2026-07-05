@@ -14,6 +14,7 @@ from library.scan_library import (
     get_audio_file_signature,
     iter_audio_paths,
     new_fs_track_from_path,
+    SidecarLookupCache,
     read_audio_metadata,
 )
 from db.database import (
@@ -162,6 +163,7 @@ class LibraryScanner(QThread):
         db = None
         started_at = time.perf_counter()
         timings = _ScanTimingStats()
+        sidecar_lookup_cache = SidecarLookupCache()
         try:
             # IMPORTANT: open db connection inside this thread
             db = sqlite3.connect(self.db_path)
@@ -315,6 +317,7 @@ class LibraryScanner(QThread):
                             self.lyrics_lookup_subdir,
                             metadata=existing_metadata,
                             lyrics_file_pattern=self.lyrics_file_pattern,
+                            sidecar_lookup_cache=sidecar_lookup_cache,
                             timing_hook=timings.record,
                             count_hook=timings.record,
                         )

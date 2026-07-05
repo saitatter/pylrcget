@@ -5,6 +5,7 @@ import os
 import logging
 import re
 import time
+import threading
 from pathlib import Path
 from dataclasses import dataclass
 from typing import Callable
@@ -47,6 +48,33 @@ class AudioMetadata:
     album_artist: str
     track_number: int | None
     duration: float
+
+
+class SidecarLookupCache:
+    def __init__(self) -> None:
+        self._dir_entries: dict[str, dict[str, str]] = {}
+        self._lock = threading.Lock()
+
+    def _dir_key(self, directory: str) -> str:
+        return os.path.normcase(os.path.abspath(directory))
+
+    def candidate_exists(self, candidate: str) -> bool:
+        directory, filename = os.path.split(candidate)
+        if not directory or not filename:
+            return False
+
+        dir_key = self._dir_key(directory)
+        with self._lock:
+            entries = self._dir_entries.get(dir_key)
+        if entries is None:
+            try:
+                names = os.listdir(directory)
+            except OSError:
+                names = []
+            entries = {os.path.normcase(name): name for name in names}
+            with self._lock:
+                self._dir_entries.setdefault(dir_key, entries)
+        return os.path.normcase(filename) in entries
 
 
 def _read_vorbis_lyrics(audio) -> tuple[str | None, str | None]:
@@ -205,6 +233,7 @@ def get_audio_file_signature(
     *,
     metadata: AudioMetadata | None = None,
     lyrics_file_pattern: str | None = None,
+    sidecar_lookup_cache: SidecarLookupCache | None = None,
     timing_hook: Callable[[str, float], None] | None = None,
     count_hook: Callable[[str, int], None] | None = None,
 ) -> tuple[float | None, int | None]:
@@ -213,6 +242,7 @@ def get_audio_file_signature(
         lyrics_lookup_subdir,
         metadata=metadata,
         lyrics_file_pattern=lyrics_file_pattern,
+        sidecar_lookup_cache=sidecar_lookup_cache,
         timing_hook=timing_hook,
         count_hook=count_hook,
     )
@@ -236,6 +266,7 @@ def get_audio_file_signature_with_lookup(
     *,
     metadata: AudioMetadata | None = None,
     lyrics_file_pattern: str | None = None,
+    sidecar_lookup_cache: SidecarLookupCache | None = None,
     timing_hook: Callable[[str, float], None] | None = None,
     count_hook: Callable[[str, int], None] | None = None,
 ) -> tuple[float | None, int | None]:
@@ -266,6 +297,8 @@ def get_audio_file_signature_with_lookup(
 
     sidecar_started = time.perf_counter()
     for candidate in sidecar_candidates:
+        if sidecar_lookup_cache is not None and not sidecar_lookup_cache.candidate_exists(candidate):
+            continue
         try:
             stat = os.stat(candidate)
         except OSError:
