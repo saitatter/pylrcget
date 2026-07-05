@@ -1771,8 +1771,7 @@ class MainWindow(QMainWindow):
         self._export_track_ids([int(track_id)])
 
     def _export_track_ids(self, track_ids: list[int]) -> bool:
-        config = get_config(self.app_state.db)
-        export_config = replace(config, save_lyrics_sidecars=True)
+        export_config = self._export_config_for_sidecars()
         return self.lyrics_output.export_tracks(
             [int(track_id) for track_id in track_ids],
             export_config=export_config,
@@ -1781,8 +1780,7 @@ class MainWindow(QMainWindow):
         )
 
     def _export_tracks_from_widget(self, widget) -> bool:
-        config = get_config(self.app_state.db)
-        export_config = replace(config, save_lyrics_sidecars=True)
+        export_config = self._export_config_for_sidecars()
         scope = widget.export_scope()
         return self.lyrics_output.export_tracks(
             [],
@@ -1791,6 +1789,10 @@ class MainWindow(QMainWindow):
             on_item_finished=self._on_lyrics_exported,
             on_finished=self._on_lyrics_export_finished,
         )
+
+    def _export_config_for_sidecars(self):
+        config = get_config(self.app_state.db)
+        return replace(config, save_lyrics_sidecars=True, try_embed_lyrics=False)
 
     def _save_active_lyrics(self):
         """Ctrl+S: trigger save on the currently visible lyrics editor."""

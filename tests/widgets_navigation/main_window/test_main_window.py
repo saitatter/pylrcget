@@ -3,6 +3,7 @@ from PySide6.QtWidgets import QToolButton
 from PySide6.QtWidgets import QDialog
 from dataclasses import replace
 
+from db.models import Config
 from db.queries import get_config, set_config
 from ui.main_window_parts.preferences import persist_window_state_payload
 
@@ -207,6 +208,47 @@ class MainWindowInstrumentalTests(unittest.TestCase):
             self.assertEqual([action.text() for action in buttons[1].menu().actions()], ["Use current mode", "Synced only", "Plain only"])
         finally:
             bar.deleteLater()
+
+    def test_export_track_ids_disables_audio_embedding(self):
+        window = MainWindow.__new__(MainWindow)
+        window.app_state = SimpleNamespace(db=object())
+        window.lyrics_output = SimpleNamespace(export_tracks=MagicMock(return_value=True))
+        window._on_lyrics_exported = MagicMock()
+        window._on_lyrics_export_finished = MagicMock()
+
+        config = Config(
+            skip_tracks_with_synced_lyrics=False,
+            skip_tracks_with_plain_lyrics=False,
+            download_lyrics_mode="prefer_synced",
+            show_line_count=True,
+            save_lyrics_sidecars=False,
+            lyrics_sidecar_format="both",
+            try_embed_lyrics=True,
+            lyrics_embed_format="both",
+            theme_mode="auto",
+            ui_scale_percent=100,
+            font_size_mode="normal",
+            show_album_art=True,
+            startup_view="remember_last",
+            lrclib_instance="https://lrclib.net",
+            lyrics_output_dir="",
+            lyrics_file_pattern="{filename}",
+            lyrics_lookup_subdir="",
+            scan_excluded_paths="",
+            scan_excluded_patterns="",
+            reaction_delay_ms=0,
+            playback_speed=1.0,
+            playback_volume=0.7,
+            last_library_route="",
+        )
+
+        with patch("ui.main_window.get_config", return_value=config):
+            MainWindow._export_track_ids(window, [1, 2])
+
+        args, kwargs = window.lyrics_output.export_tracks.call_args
+        self.assertEqual(args[0], [1, 2])
+        self.assertTrue(kwargs["export_config"].save_lyrics_sidecars)
+        self.assertFalse(kwargs["export_config"].try_embed_lyrics)
 
     def test_save_window_state_persists_filter_checkboxes(self):
         window = MainWindow.__new__(MainWindow)

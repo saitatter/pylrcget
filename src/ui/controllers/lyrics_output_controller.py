@@ -102,6 +102,10 @@ class LyricsOutputController(QObject):
                 message = str((payload or {}).get("message", "")) if isinstance(payload, dict) else ""
                 self._export_overlay.append_result(label, message or "Exported", bool(ok))
 
+        def _handle_progress(current: int, total: int, label: str, status: str, _elapsed: float) -> None:
+            if self._export_overlay is not None:
+                self._export_overlay.update_progress(current, total, label, status)
+
         def _handle_finished(ok: bool, summary: str, stats: dict) -> None:
             worker = self._export_worker
             self._export_worker = None
@@ -114,6 +118,7 @@ class LyricsOutputController(QObject):
                 on_finished(bool(ok), summary, stats)
 
         self._export_worker.itemFinished.connect(_handle_item_finished)
+        self._export_worker.progress.connect(_handle_progress)
         self._export_worker.finishedBatch.connect(_handle_finished)
         self._show_status(f"Exporting lyrics for {len(track_ids)} track(s)...", 2500)
         self._export_worker.start()
