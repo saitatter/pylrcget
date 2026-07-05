@@ -63,7 +63,6 @@ from ui.widgets.lyrics_editor_widget import LyricsEditorWidget
 from core.utils import parse_lrc
 from ui.dialogs.first_run_dialog import FirstRunDialog
 from player.player import NowPlaying, Player
-from ui.services.lyrics_download_service import sync_track_outputs_with_result
 from ui.services.feedback import exception_message, log_and_notify, normalize_notify_type, notify_user
 from ui.app_theme import apply_app_theme
 from ui.widgets.album_list_widget import AlbumListWidget
@@ -179,6 +178,7 @@ class MainWindow(QMainWindow):
         self.top_bar = TopBarController(
             on_refresh=self.refresh_library,
             on_download_missing=self._download_missing_lyrics,
+            on_export_library=self._export_library_tracks,
             on_open_settings=self.open_config_modal,
             on_open_about=self.open_about_modal,
             on_toggle_logs=self._toggle_logs_panel,
@@ -329,6 +329,8 @@ class MainWindow(QMainWindow):
 
         self.download_overlay = DownloadProgressOverlay(self.central_widget)
         self.download_overlay.sync_to_parent()
+        self.export_overlay = DownloadProgressOverlay(self.central_widget, verb="Export")
+        self.export_overlay.sync_to_parent()
         self.downloads = LyricsDownloadController(
             self.app_state,
             self.download_overlay,
@@ -343,6 +345,7 @@ class MainWindow(QMainWindow):
             parent=self,
         )
         self.download_overlay.cancelRequested.connect(self.downloads.cancel)
+        self.export_overlay.cancelRequested.connect(self._cancel_lyrics_export)
         self.publish_overlay = DownloadProgressOverlay(self.central_widget, verb="Publish")
         self.publish_overlay.sync_to_parent()
         self.scan_overlay = DownloadProgressOverlay(self.central_widget, verb="Scan")
@@ -363,6 +366,7 @@ class MainWindow(QMainWindow):
             self.app_state,
             show_status=self._show_status_message,
             lyrics_views=self._all_lyrics_views,
+            export_overlay=self.export_overlay,
             parent=self,
         )
         self.track_maintenance = TrackMaintenanceController(
@@ -381,14 +385,17 @@ class MainWindow(QMainWindow):
 
         # Background activity button — shows when an overlay is minimized
         self.download_overlay.activeChanged.connect(self._update_bg_activity_button)
+        self.export_overlay.activeChanged.connect(self._update_bg_activity_button)
         self.publish_overlay.activeChanged.connect(self._update_bg_activity_button)
         self.scan_overlay.activeChanged.connect(self._update_bg_activity_button)
         self.ai_sync_overlay.activeChanged.connect(self._update_bg_activity_button)
         self.download_overlay.minimized.connect(self._update_bg_activity_button)
+        self.export_overlay.minimized.connect(self._update_bg_activity_button)
         self.publish_overlay.minimized.connect(self._update_bg_activity_button)
         self.scan_overlay.minimized.connect(self._update_bg_activity_button)
         self.ai_sync_overlay.minimized.connect(self._update_bg_activity_button)
         self.download_overlay.dismissed.connect(self._update_bg_activity_button)
+        self.export_overlay.dismissed.connect(self._update_bg_activity_button)
         self.publish_overlay.dismissed.connect(self._update_bg_activity_button)
         self.scan_overlay.dismissed.connect(self._update_bg_activity_button)
         self.ai_sync_overlay.dismissed.connect(self._update_bg_activity_button)
@@ -669,78 +676,11 @@ class MainWindow(QMainWindow):
         track_ids = self._selected_track_ids_for_toolbar()
         if not track_ids:
             return
-
         for view in self._all_lyrics_views():
             view.set_export_feedback("loading", "Exporting...")
-
-        try:
-            export_config = replace(get_config(self.app_state.db), save_lyrics_sidecars=True)
-            exported_count = 0
-            skipped_count = 0
-            output_errors: list[str] = []
-            first_output_dir: str | None = None
-
-            for track_id in track_ids:
-                track = get_track_by_id(self.app_state.db, int(track_id))
-                if track is None or not (track.lrc_lyrics or track.txt_lyrics):
-                    skipped_count += 1
-                    continue
-
-                result = sync_track_outputs_with_result(track, export_config)
-                if result.sidecar_error is not None:
-                    output_errors.append(f"{track.title}: {result.sidecar_error}")
-                    continue
-                if not result.sidecar_paths:
-                    skipped_count += 1
-                    continue
-
-                exported_count += 1
-                if first_output_dir is None:
-                    first_output_dir = os.path.dirname(result.sidecar_paths[0]) or os.path.dirname(track.file_path)
-
-            if exported_count == 0:
-                notify_user(
-                    self.app_state,
-                    "No lyrics files were generated for the selected tracks.",
-                    "warning",
-                    show_status=self._show_status_message,
-                    status_timeout_ms=3000,
-                )
-                for view in self._all_lyrics_views():
-                    view.set_export_feedback("error", "Nothing Exported")
-                return
-
-            notify_type = "warning" if output_errors or skipped_count else "success"
-            summary = f"Lyrics files generated for {exported_count} track(s)."
-            if skipped_count:
-                summary = f"{summary} {skipped_count} skipped."
-            if output_errors:
-                summary = f"{summary} Some exports failed."
-            notify_user(
-                self.app_state,
-                summary,
-                notify_type,
-                show_status=self._show_status_message,
-                status_timeout_ms=3000,
-            )
-            if first_output_dir:
-                self._show_status_message(f"Lyrics files exported to {first_output_dir}", 3000)
-            for error in output_errors[:3]:
-                logger.warning("Lyrics export issue: %s", error)
+        if not self._export_track_ids(track_ids):
             for view in self._all_lyrics_views():
-                view.set_export_feedback("success", "Exported")
-        except (sqlite3.Error, OSError, ValueError) as exc:
-            log_and_notify(
-                self.app_state,
-                logger,
-                logging.ERROR,
-                exception_message("Failed to export lyrics files", exc),
-                "error",
-                show_status=self._show_status_message,
-                status_timeout_ms=4000,
-            )
-            for view in self._all_lyrics_views():
-                view.set_export_feedback("error", "Export Failed")
+                view.set_export_feedback("error", "Export Busy")
 
     def _mark_selected_tracks_instrumental(self) -> None:
         track_ids = self._selected_track_ids_for_toolbar()
@@ -1639,6 +1579,11 @@ class MainWindow(QMainWindow):
             if overlay is not None:
                 overlay.update_progress(-1, 8, "AI Auto-Sync", "Cancelling now…")
 
+    def _cancel_lyrics_export(self) -> None:
+        controller = getattr(self, "lyrics_output", None)
+        if controller is not None:
+            controller.cancel_export()
+
     def _normalize_lrclib_base(self, url: str) -> str:
         u = (url or "").strip().rstrip("/")
         if not u:
@@ -1686,6 +1631,46 @@ class MainWindow(QMainWindow):
 
     def _on_track_lyrics_output_sync_finished(self, ok: bool, summary: str, stats: dict) -> None:
         del ok, stats
+        if summary:
+            self._show_status_message(summary, 2500)
+
+    def _on_lyrics_exported(self, track_id: int, payload: dict) -> None:
+        del track_id
+        if payload.get("sidecar_error") is not None:
+            log_and_notify(
+                self.app_state,
+                logger,
+                logging.ERROR,
+                exception_message("Failed to export lyrics files", payload["sidecar_error"]),
+                "error",
+                show_status=self._show_status_message,
+                status_timeout_ms=4000,
+            )
+            return
+        sidecar_paths = payload.get("sidecar_paths") or ()
+        if sidecar_paths:
+            self._show_status_message(f"Lyrics exported to {os.path.dirname(sidecar_paths[0])}", 3000)
+        if payload.get("embed_error") is not None:
+            log_and_notify(
+                self.app_state,
+                logger,
+                logging.ERROR,
+                exception_message("Failed to embed lyrics", payload["embed_error"]),
+                "error",
+                show_status=self._show_status_message,
+                status_timeout_ms=4000,
+            )
+        elif payload.get("embedded"):
+            self._show_status_message("Lyrics embedded into the audio file.", 3000)
+
+    def _on_lyrics_export_finished(self, ok: bool, summary: str, stats: dict) -> None:
+        del ok
+        cancelled = bool(stats.get("cancelled"))
+        failed = int(stats.get("failed", 0))
+        state = "error" if cancelled or failed else "success"
+        label = "Cancelled" if cancelled else "Exported" if not failed else "Partial"
+        for view in self._all_lyrics_views():
+            view.set_export_feedback(state, label)
         if summary:
             self._show_status_message(summary, 2500)
 
@@ -1775,8 +1760,37 @@ class MainWindow(QMainWindow):
     def _export_current_track_sidecars(self):
         lyrics_actions.export_current_track_sidecars(self)
 
+    def _export_library_tracks(self) -> None:
+        widget = self._active_track_list_widget()
+        if widget is None:
+            self._show_status_message("Select a track list first.")
+            return
+        self._export_tracks_from_widget(widget)
+
     def _export_track_sidecars(self, track_id: int):
-        lyrics_actions.export_track_sidecars(self, track_id)
+        self._export_track_ids([int(track_id)])
+
+    def _export_track_ids(self, track_ids: list[int]) -> bool:
+        config = get_config(self.app_state.db)
+        export_config = replace(config, save_lyrics_sidecars=True)
+        return self.lyrics_output.export_tracks(
+            [int(track_id) for track_id in track_ids],
+            export_config=export_config,
+            on_item_finished=self._on_lyrics_exported,
+            on_finished=self._on_lyrics_export_finished,
+        )
+
+    def _export_tracks_from_widget(self, widget) -> bool:
+        config = get_config(self.app_state.db)
+        export_config = replace(config, save_lyrics_sidecars=True)
+        scope = widget.export_scope()
+        return self.lyrics_output.export_tracks(
+            [],
+            export_config=export_config,
+            export_scope=scope,
+            on_item_finished=self._on_lyrics_exported,
+            on_finished=self._on_lyrics_export_finished,
+        )
 
     def _save_active_lyrics(self):
         """Ctrl+S: trigger save on the currently visible lyrics editor."""
@@ -2143,6 +2157,7 @@ class MainWindow(QMainWindow):
         """Show the background-activity button when any overlay is active but hidden."""
         overlays = [
             getattr(self, "download_overlay", None),
+            getattr(self, "export_overlay", None),
             getattr(self, "publish_overlay", None),
             getattr(self, "scan_overlay", None),
             getattr(self, "ai_sync_overlay", None),
@@ -2157,6 +2172,7 @@ class MainWindow(QMainWindow):
         """Re-show whichever overlay is running in the background."""
         overlays = [
             getattr(self, "download_overlay", None),
+            getattr(self, "export_overlay", None),
             getattr(self, "publish_overlay", None),
             getattr(self, "scan_overlay", None),
             getattr(self, "ai_sync_overlay", None),

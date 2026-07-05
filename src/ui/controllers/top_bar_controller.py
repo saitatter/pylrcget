@@ -32,6 +32,7 @@ class TopBarController(QWidget):
         *,
         on_refresh,
         on_download_missing,
+        on_export_library,
         on_open_settings,
         on_open_about,
         on_toggle_logs,
@@ -157,6 +158,14 @@ class TopBarController(QWidget):
             "Download missing lyrics",
             on_download_missing,
         )
+        self.btn_export_library = self._make_action_button(
+            "download.svg",
+            "Export lyrics",
+            "Export lyrics",
+            on_export_library,
+        )
+        self.btn_export_library.setText("Export")
+        self.btn_export_library.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
         self.btn_config = self._make_action_button(
             "settings-2.svg",
             "Settings",
@@ -196,6 +205,7 @@ class TopBarController(QWidget):
 
         actions_row.addWidget(self.btn_refresh)
         actions_row.addWidget(self.btn_download_missing)
+        actions_row.addWidget(self.btn_export_library)
         actions_row.addWidget(self.btn_config)
         actions_row.addWidget(self.btn_about)
         actions_row.addWidget(self.btn_logs)

@@ -12,6 +12,7 @@ class SharedUiComponentTests(unittest.TestCase):
         widget = TopBarController(
             on_refresh=noop,
             on_download_missing=noop,
+            on_export_library=noop,
             on_open_settings=noop,
             on_open_about=noop,
             on_toggle_logs=noop,
@@ -23,6 +24,7 @@ class SharedUiComponentTests(unittest.TestCase):
             widget.set_download_missing_mode("prefer_synced")
             self.assertIn("Download missing lyrics", widget.btn_download_missing.toolTip())
             self.assertEqual(widget.btn_download_missing.statusTip(), "")
+            self.assertEqual(widget.btn_export_library.text(), "Export")
         finally:
             widget.deleteLater()
 

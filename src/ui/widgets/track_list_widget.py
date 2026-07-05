@@ -34,6 +34,7 @@ from ui.widgets.sortable_header_view import SortableHeaderView
 from ui.widgets.library_table_utils import should_load_more
 from ui.widgets.track_list_rows import build_track_list_rows
 from core.tracklist_models import DownloadState, LyricsState
+from ui.workers.bulk_lyrics_export_worker import TrackExportScope
 
 
 TRACK_NUMBER_COLUMN_WIDTH = 56
@@ -584,6 +585,22 @@ class TrackListWidget(QWidget):
 
     def current_queue_track_ids(self) -> list[int]:
         return self.model.all_track_ids()
+
+    def export_scope(self) -> TrackExportScope:
+        return TrackExportScope(
+            search_query=self._search,
+            synced_lyrics_tracks=self._filters["synced"],
+            plain_lyrics_tracks=self._filters["plain"],
+            instrumental_tracks=self._filters["instrumental"],
+            no_lyrics_tracks=self._filters["none"],
+            unsaved_draft_only=self._filters.get("unsaved", False),
+            artist_id=self._artist_id,
+            album_id=self._album_id,
+            artist_ids=tuple(self._artist_ids or ()),
+            album_ids=tuple(self._album_ids or ()),
+            sort_column=self._sort_column,
+            sort_order="desc" if self._sort_order == Qt.SortOrder.DescendingOrder else "asc",
+        )
 
     def selected_track_id(self) -> int | None:
         idx = self.table.currentIndex()
