@@ -270,6 +270,50 @@ class ScanLibraryHelpersTests(unittest.TestCase):
             assert track is not None
             self.assertEqual(track.lrc_lyrics, "[00:01.00]synced")
 
+    def test_new_fs_track_from_path_respects_scan_lyrics_source_mode(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            audio = root / "track.mp3"
+            touch_text(audio, "audio")
+            touch_text(root / "track.txt", "plain sidecar")
+
+            class _FakeAudio:
+                def __init__(self) -> None:
+                    self.info = type("Info", (), {"length": 180.0})()
+
+                def get(self, key):
+                    mapping = {
+                        "title": ["Track"],
+                        "album": ["Album"],
+                        "artist": ["Artist"],
+                        "albumartist": ["Artist"],
+                    }
+                    return mapping.get(key)
+
+            with patch("library.scan_library.MutagenFile", return_value=_FakeAudio()) as file_mock, patch(
+                "library.scan_library.read_embedded_lyrics",
+                return_value=("embedded plain", "[00:03.00]embedded synced"),
+            ) as embedded_mock:
+                track = new_fs_track_from_path(str(audio), scan_lyrics_source_mode="sidecar_only")
+
+            self.assertIsNotNone(track)
+            assert track is not None
+            self.assertIsNone(track.lrc_lyrics)
+            self.assertEqual(track.txt_lyrics, "plain sidecar")
+            embedded_mock.assert_not_called()
+
+            with patch("library.scan_library.MutagenFile", return_value=_FakeAudio()), patch(
+                "library.scan_library.read_embedded_lyrics",
+                return_value=("embedded plain", "[00:03.00]embedded synced"),
+            ) as embedded_mock:
+                track = new_fs_track_from_path(str(audio), scan_lyrics_source_mode="embedded_only")
+
+            self.assertIsNotNone(track)
+            assert track is not None
+            self.assertEqual(track.txt_lyrics, "embedded plain")
+            self.assertEqual(track.lrc_lyrics, "[00:03.00]embedded synced")
+            embedded_mock.assert_called_once()
+
 
 class LibraryScannerIncrementalTests(unittest.TestCase):
     def test_library_scanner_uses_worker_pool_for_first_scan(self):

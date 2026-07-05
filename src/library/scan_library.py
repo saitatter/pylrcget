@@ -33,6 +33,9 @@ from core.embed_lyrics import (
 logger = logging.getLogger(__name__)
 
 AUDIO_EXTS = {".mp3", ".m4a", ".flac", ".ogg", ".opus", ".wav", ".wma", ".asf", ".dsf", ".dff", ".mpc"}
+SCAN_LYRICS_SOURCE_BOTH = "both"
+SCAN_LYRICS_SOURCE_EMBEDDED_ONLY = "embedded_only"
+SCAN_LYRICS_SOURCE_SIDECAR_ONLY = "sidecar_only"
 
 ASF_PLAIN_KEYS = ("WM/Lyrics", "LYRICS", "UNSYNCEDLYRICS")
 ASF_SYNCED_KEYS = ("LRCLIB_LRC", "SYNCEDLYRICS")
@@ -299,6 +302,7 @@ def get_audio_file_signature(
     *,
     metadata: AudioMetadata | None = None,
     lyrics_file_pattern: str | None = None,
+    scan_lyrics_source_mode: str | None = None,
     audio_signature: tuple[float | None, int | None] | None = None,
     sidecar_lookup_cache: SidecarLookupCache | None = None,
     timing_hook: Callable[[str, float], None] | None = None,
@@ -309,6 +313,7 @@ def get_audio_file_signature(
         lyrics_lookup_subdir,
         metadata=metadata,
         lyrics_file_pattern=lyrics_file_pattern,
+        scan_lyrics_source_mode=scan_lyrics_source_mode,
         audio_signature=audio_signature,
         sidecar_lookup_cache=sidecar_lookup_cache,
         timing_hook=timing_hook,
@@ -328,27 +333,48 @@ def _normalized_lyrics_lookup_subdir(lyrics_lookup_subdir: str | None) -> str:
     return os.path.join(*parts)
 
 
+def _normalize_scan_lyrics_source_mode(mode: str | None) -> str:
+    value = (mode or SCAN_LYRICS_SOURCE_BOTH).strip().lower()
+    if value in {"embedded", "embedded_only", "embedded-only"}:
+        return SCAN_LYRICS_SOURCE_EMBEDDED_ONLY
+    if value in {"sidecar", "sidecar_only", "sidecar-only"}:
+        return SCAN_LYRICS_SOURCE_SIDECAR_ONLY
+    return SCAN_LYRICS_SOURCE_BOTH
+
+
+def _scan_lyrics_source_flags(mode: str | None) -> tuple[bool, bool]:
+    normalized = _normalize_scan_lyrics_source_mode(mode)
+    if normalized == SCAN_LYRICS_SOURCE_EMBEDDED_ONLY:
+        return True, False
+    if normalized == SCAN_LYRICS_SOURCE_SIDECAR_ONLY:
+        return False, True
+    return True, True
+
+
 def get_audio_file_signature_with_lookup(
     path: str,
     lyrics_lookup_subdir: str | None = None,
     *,
     metadata: AudioMetadata | None = None,
     lyrics_file_pattern: str | None = None,
+    scan_lyrics_source_mode: str | None = None,
     audio_signature: tuple[float | None, int | None] | None = None,
     sidecar_lookup_cache: SidecarLookupCache | None = None,
     timing_hook: Callable[[str, float], None] | None = None,
     count_hook: Callable[[str, int], None] | None = None,
 ) -> tuple[float | None, int | None]:
+    use_embedded, use_sidecar = _scan_lyrics_source_flags(scan_lyrics_source_mode)
     newest_mtime: float | None = None
     total_size = 0
     sidecar_candidates: list[str] = []
-    for base in _sidecar_base_candidates(
-        path,
-        lyrics_lookup_subdir,
-        metadata=metadata,
-        lyrics_file_pattern=lyrics_file_pattern,
-    ):
-        sidecar_candidates.extend([base + ".txt", base + ".lrc"])
+    if use_sidecar:
+        for base in _sidecar_base_candidates(
+            path,
+            lyrics_lookup_subdir,
+            metadata=metadata,
+            lyrics_file_pattern=lyrics_file_pattern,
+        ):
+            sidecar_candidates.extend([base + ".txt", base + ".lrc"])
 
     if count_hook is not None:
         count_hook("signature_sidecar_candidate_count", len(sidecar_candidates))
@@ -367,19 +393,22 @@ def get_audio_file_signature_with_lookup(
             newest_mtime = float(stat.st_mtime)
             total_size += int(stat.st_size)
 
-    sidecar_started = time.perf_counter()
-    for candidate in sidecar_candidates:
-        if sidecar_lookup_cache is not None and not sidecar_lookup_cache.candidate_exists(candidate):
-            continue
-        try:
-            stat = os.stat(candidate)
-        except OSError:
-            continue
-        candidate_mtime = float(stat.st_mtime)
-        newest_mtime = candidate_mtime if newest_mtime is None else max(newest_mtime, candidate_mtime)
-        total_size += int(stat.st_size)
-    if timing_hook is not None:
-        timing_hook("signature_sidecar_stat_s", time.perf_counter() - sidecar_started)
+    if use_sidecar:
+        sidecar_started = time.perf_counter()
+        for candidate in sidecar_candidates:
+            if sidecar_lookup_cache is not None and not sidecar_lookup_cache.candidate_exists(candidate):
+                continue
+            try:
+                stat = os.stat(candidate)
+            except OSError:
+                continue
+            candidate_mtime = float(stat.st_mtime)
+            newest_mtime = candidate_mtime if newest_mtime is None else max(newest_mtime, candidate_mtime)
+            total_size += int(stat.st_size)
+        if timing_hook is not None:
+            timing_hook("signature_sidecar_stat_s", time.perf_counter() - sidecar_started)
+    elif timing_hook is not None:
+        timing_hook("signature_sidecar_stat_s", 0.0)
 
     return newest_mtime, total_size if newest_mtime is not None else None
 
@@ -750,6 +779,7 @@ def new_fs_track_from_path(
     signature: tuple[float | None, int | None] | None = None,
     lyrics_lookup_subdir: str | None = None,
     lyrics_file_pattern: str | None = None,
+    scan_lyrics_source_mode: str | None = None,
     metadata: AudioMetadata | None = None,
     audio=None,
     timing_hook: Callable[[str, float], None] | None = None,
@@ -761,26 +791,34 @@ def new_fs_track_from_path(
                 return None
             _audio, metadata = metadata_result
 
+        use_embedded, use_sidecar = _scan_lyrics_source_flags(scan_lyrics_source_mode)
         # Preferred order: embedded, same-folder sidecars, then optional subfolder sidecars.
         embedded_started = time.perf_counter()
         txt_embedded: str | None
         lrc_embedded: str | None
-        if audio is not None:
+        if use_embedded and audio is not None:
             txt_embedded, lrc_embedded = read_embedded_lyrics_from_audio(audio, path)
-        else:
+        elif use_embedded:
             txt_embedded, lrc_embedded = read_embedded_lyrics(path)
+        else:
+            txt_embedded, lrc_embedded = None, None
         if timing_hook is not None:
             timing_hook("embedded_lyrics_read_s", time.perf_counter() - embedded_started)
 
-        sidecar_started = time.perf_counter()
-        txt_sidecar, lrc_sidecar = _read_sidecar(
-            path,
-            lyrics_lookup_subdir,
-            metadata=metadata,
-            lyrics_file_pattern=lyrics_file_pattern,
-        )
-        if timing_hook is not None:
-            timing_hook("sidecar_lookup_s", time.perf_counter() - sidecar_started)
+        if use_sidecar:
+            sidecar_started = time.perf_counter()
+            txt_sidecar, lrc_sidecar = _read_sidecar(
+                path,
+                lyrics_lookup_subdir,
+                metadata=metadata,
+                lyrics_file_pattern=lyrics_file_pattern,
+            )
+            if timing_hook is not None:
+                timing_hook("sidecar_lookup_s", time.perf_counter() - sidecar_started)
+        else:
+            txt_sidecar, lrc_sidecar = None, None
+            if timing_hook is not None:
+                timing_hook("sidecar_lookup_s", 0.0)
 
         txt_lyrics = txt_embedded or txt_sidecar
         lrc_lyrics = lrc_embedded or lrc_sidecar

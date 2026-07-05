@@ -38,6 +38,7 @@ class MigrationTests(unittest.TestCase):
                         "playback_volume",
                         "lyrics_sidecar_format",
                         "lyrics_embed_format",
+                        "scan_lyrics_source_mode",
                         "hotkey_bindings_json",
                         "ui_state_json",
                     }
@@ -54,6 +55,7 @@ class MigrationTests(unittest.TestCase):
                     """
                     SELECT download_lyrics_mode,
                            lyrics_lookup_subdir,
+                           scan_lyrics_source_mode,
                            scan_worker_count,
                            ui_scale_percent,
                            font_size_mode,
@@ -70,6 +72,7 @@ class MigrationTests(unittest.TestCase):
                 self.assertIsNotNone(row)
                 self.assertEqual(row["download_lyrics_mode"], "prefer_synced")
                 self.assertEqual(row["lyrics_lookup_subdir"], "")
+                self.assertEqual(row["scan_lyrics_source_mode"], "both")
                 self.assertEqual(int(row["scan_worker_count"]), 4)
                 self.assertEqual(int(row["ui_scale_percent"]), 100)
                 self.assertEqual(row["font_size_mode"], "normal")
@@ -220,6 +223,43 @@ class MigrationTests(unittest.TestCase):
                 ).fetchone()
                 self.assertEqual(row["hotkey_bindings_json"], "")
                 self.assertEqual(row["ui_state_json"], "")
+            finally:
+                db.close()
+
+    def test_v5_database_upgrades_scan_lyrics_source_mode_column(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db_path = Path(tmp) / "pylrcget.db.sqlite3"
+            db = sqlite3.connect(str(db_path))
+            db.row_factory = sqlite3.Row
+            try:
+                db.execute(
+                    """
+                    CREATE TABLE config_data (
+                        id INTEGER PRIMARY KEY,
+                        download_lyrics_mode TEXT DEFAULT 'prefer_synced',
+                        save_lyrics_sidecars BOOLEAN DEFAULT 1,
+                        try_embed_lyrics BOOLEAN DEFAULT 1,
+                        lyrics_sidecar_format TEXT DEFAULT 'both',
+                        lyrics_embed_format TEXT DEFAULT 'both',
+                        hotkey_bindings_json TEXT DEFAULT '',
+                        ui_state_json TEXT DEFAULT ''
+                    )
+                    """
+                )
+                db.execute("INSERT INTO config_data (id) VALUES (1)")
+                db.execute("PRAGMA user_version=5")
+                db.commit()
+
+                upgrade_database_if_needed(db, 5)
+
+                version = int(db.execute("PRAGMA user_version").fetchone()[0])
+                self.assertEqual(version, CURRENT_DB_VERSION)
+                columns = {row["name"] for row in db.execute("PRAGMA table_info(config_data)").fetchall()}
+                self.assertIn("scan_lyrics_source_mode", columns)
+                row = db.execute(
+                    "SELECT scan_lyrics_source_mode FROM config_data LIMIT 1"
+                ).fetchone()
+                self.assertEqual(row["scan_lyrics_source_mode"], "both")
             finally:
                 db.close()
 

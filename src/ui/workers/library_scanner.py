@@ -111,6 +111,7 @@ def _scan_track_for_path(
     replace_existing: bool,
     lyrics_lookup_subdir: str,
     lyrics_file_pattern: str,
+    scan_lyrics_source_mode: str,
     timings: _ScanTimingStats | None = None,
 ) -> _ScanTaskResult:
     metadata_result = _read_metadata_for_scan(path, timings=timings)
@@ -123,6 +124,7 @@ def _scan_track_for_path(
         lyrics_lookup_subdir,
         metadata=metadata,
         lyrics_file_pattern=lyrics_file_pattern,
+        scan_lyrics_source_mode=scan_lyrics_source_mode,
         timing_hook=None if timings is None else timings.record,
         count_hook=None if timings is None else timings.record,
     )
@@ -153,6 +155,7 @@ class LibraryScanner(QThread):
         excluded_patterns: str = "",
         lyrics_lookup_subdir: str = "",
         lyrics_file_pattern: str = "",
+        scan_lyrics_source_mode: str = "both",
         scan_worker_count: int = LIBRARY_SCAN_MAX_WORKERS,
     ):
         super().__init__()
@@ -162,6 +165,7 @@ class LibraryScanner(QThread):
         self.excluded_patterns = excluded_patterns
         self.lyrics_lookup_subdir = lyrics_lookup_subdir
         self.lyrics_file_pattern = lyrics_file_pattern
+        self.scan_lyrics_source_mode = scan_lyrics_source_mode
         self.scan_worker_count = max(1, int(scan_worker_count or LIBRARY_SCAN_MAX_WORKERS))
 
     def run(self):
@@ -323,6 +327,7 @@ class LibraryScanner(QThread):
                             self.lyrics_lookup_subdir,
                             metadata=existing_metadata,
                             lyrics_file_pattern=self.lyrics_file_pattern,
+                            scan_lyrics_source_mode=self.scan_lyrics_source_mode,
                             audio_signature=discovered_signatures.get(p),
                             sidecar_lookup_cache=sidecar_lookup_cache,
                             timing_hook=timings.record,
@@ -343,6 +348,7 @@ class LibraryScanner(QThread):
                             replace_existing=existing is not None,
                             lyrics_lookup_subdir=self.lyrics_lookup_subdir,
                             lyrics_file_pattern=self.lyrics_file_pattern,
+                            scan_lyrics_source_mode=self.scan_lyrics_source_mode,
                             timings=timings,
                         )
                     ] = None

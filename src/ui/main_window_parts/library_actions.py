@@ -54,6 +54,7 @@ def refresh_library(window) -> None:
         excluded_paths=config.scan_excluded_paths,
         excluded_patterns=config.scan_excluded_patterns,
         lyrics_lookup_subdir=config.lyrics_lookup_subdir,
+        scan_lyrics_source_mode=getattr(config, "scan_lyrics_source_mode", "both"),
         lyrics_file_pattern=config.lyrics_file_pattern,
         scan_worker_count=getattr(config, "scan_worker_count", 4),
     )

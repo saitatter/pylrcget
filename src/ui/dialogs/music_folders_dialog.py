@@ -303,11 +303,18 @@ class MusicFoldersDialog(QDialog):
         self.scan_worker_spin.setSuffix(" workers")
         scan_layout.addWidget(QLabel("Parallel workers"), 0, 0)
         scan_layout.addWidget(self.scan_worker_spin, 0, 1)
+        self.scan_source_combo = QComboBox()
+        self.scan_source_combo.addItem("Embedded + sidecar", "both")
+        self.scan_source_combo.addItem("Embedded only", "embedded_only")
+        self.scan_source_combo.addItem("Sidecar only", "sidecar_only")
+        scan_layout.addWidget(QLabel("Lyrics source during scan"), 1, 0)
+        scan_layout.addWidget(self.scan_source_combo, 1, 1)
         scan_hint = QLabel(
-            "Higher values can speed up SSD scans, while lower values may be better for HDDs or network shares."
+            "Higher values can speed up SSD scans, while lower values may be better for HDDs or network shares. "
+            "Choosing embedded-only or sidecar-only can also reduce scan time on slow network storage."
         )
         scan_hint.setWordWrap(True)
-        scan_layout.addWidget(scan_hint, 1, 0, 1, 2)
+        scan_layout.addWidget(scan_hint, 2, 0, 1, 2)
         lyrics_files_layout.addWidget(scan_box)
 
         embed_box = QGroupBox("Audio File")
@@ -444,6 +451,8 @@ class MusicFoldersDialog(QDialog):
         self.output_dir_edit.setText(config.lyrics_output_dir)
         self.pattern_edit.setText(config.lyrics_file_pattern or "")
         self.lookup_subdir_edit.setText(config.lyrics_lookup_subdir or "")
+        source_idx = self.scan_source_combo.findData(getattr(config, "scan_lyrics_source_mode", "both") or "both")
+        self.scan_source_combo.setCurrentIndex(max(0, source_idx))
         self.scan_worker_spin.setValue(int(getattr(config, "scan_worker_count", 4) or 4))
         self.embed_chk.setChecked(config.try_embed_lyrics)
         embed_format_idx = self.embed_format_combo.findData(getattr(config, "lyrics_embed_format", "both") or "both")
@@ -845,6 +854,7 @@ class MusicFoldersDialog(QDialog):
             lyrics_lookup_subdir=self._normalized_lookup_subdir(),
             scan_excluded_paths=self.excluded_paths_edit.toPlainText().strip(),
             scan_excluded_patterns=self.excluded_patterns_edit.toPlainText().strip(),
+            scan_lyrics_source_mode=str(self.scan_source_combo.currentData() or "both"),
             scan_worker_count=int(self.scan_worker_spin.value()),
             reaction_delay_ms=int(self.reaction_delay_spin.value()),
             lrclib_instance=self.lrclib_instance_edit.text().strip() or "https://lrclib.net",

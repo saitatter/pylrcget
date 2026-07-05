@@ -125,6 +125,21 @@ def upgrade_database_if_needed(db: sqlite3.Connection, existing_version: int) ->
         db.commit()
         current_version = 5
 
+    if current_version < 6:
+        logger.info("Upgrade database version %d -> 6...", current_version)
+        config_table = db.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='config_data'"
+        ).fetchone()
+        if config_table is not None:
+            config_columns = {
+                row["name"] for row in db.execute("PRAGMA table_info(config_data)").fetchall()
+            }
+            if "scan_lyrics_source_mode" not in config_columns:
+                db.execute("ALTER TABLE config_data ADD COLUMN scan_lyrics_source_mode TEXT DEFAULT 'both'")
+        db.execute("PRAGMA user_version=6")
+        db.commit()
+        current_version = 6
+
     if current_version == CURRENT_DB_VERSION:
         return
 
