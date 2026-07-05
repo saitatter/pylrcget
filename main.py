@@ -19,6 +19,7 @@ from db.migrations import DB_FILENAME
 from ui.app_theme import apply_app_theme
 from ui.icon_loader import load_app_icon
 from ui.main_window import MainWindow
+from ui.services.logging_preferences import apply_logging_verbosity
 
 def debug_print_schema(db) -> None:
     for table in ("tracks", "albums"):
@@ -126,6 +127,7 @@ def main() -> int:
     app_data_dir = get_app_data_dir()
     app_state = init_app_state(app_data_dir)
     config = get_config(app_state.db)
+    apply_logging_verbosity(config.logging_verbosity)
     apply_app_theme(
         qt_app,
         config.theme_mode,

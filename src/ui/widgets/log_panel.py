@@ -61,6 +61,7 @@ class LogPanel(QWidget):
         self.level_filter = QComboBox()
         self.level_filter.setObjectName("LogPanelFilter")
         self.level_filter.addItem("All", "ALL")
+        self.level_filter.addItem("DEBUG", "DEBUG")
         self.level_filter.addItem("INFO", "INFO")
         self.level_filter.addItem("WARNING", "WARNING")
         self.level_filter.addItem("ERROR", "ERROR")

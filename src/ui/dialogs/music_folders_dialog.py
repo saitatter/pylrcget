@@ -41,6 +41,7 @@ from ui.ai_sync_settings import (
 )
 from ui.hotkeys import HOTKEY_SPECS, find_duplicate_hotkeys, parse_hotkey_bindings, serialize_hotkey_bindings
 from ui.services.download_modes import missing_lyrics_detail, missing_lyrics_summary
+from ui.services.logging_preferences import LOG_VERBOSITY_CHOICES
 from ui.theme_tokens import get_available_themes
 
 
@@ -315,6 +316,16 @@ class MusicFoldersDialog(QDialog):
         )
         scan_hint.setWordWrap(True)
         scan_layout.addWidget(scan_hint, 2, 0, 1, 2)
+        self.logging_verbosity_combo = QComboBox()
+        self.logging_verbosity_combo.addItem("Errors only", LOG_VERBOSITY_CHOICES[0])
+        self.logging_verbosity_combo.addItem("Warnings", LOG_VERBOSITY_CHOICES[1])
+        self.logging_verbosity_combo.addItem("Normal (info)", LOG_VERBOSITY_CHOICES[2])
+        self.logging_verbosity_combo.addItem("Verbose (debug)", LOG_VERBOSITY_CHOICES[3])
+        scan_layout.addWidget(QLabel("Logging verbosity"), 3, 0)
+        scan_layout.addWidget(self.logging_verbosity_combo, 3, 1)
+        logging_hint = QLabel("Verbose mode shows extra diagnostic details in the log panel and log file.")
+        logging_hint.setWordWrap(True)
+        scan_layout.addWidget(logging_hint, 4, 0, 1, 2)
         lyrics_files_layout.addWidget(scan_box)
 
         embed_box = QGroupBox("Audio File")
@@ -454,6 +465,8 @@ class MusicFoldersDialog(QDialog):
         source_idx = self.scan_source_combo.findData(getattr(config, "scan_lyrics_source_mode", "both") or "both")
         self.scan_source_combo.setCurrentIndex(max(0, source_idx))
         self.scan_worker_spin.setValue(int(getattr(config, "scan_worker_count", 4) or 4))
+        verbosity_idx = self.logging_verbosity_combo.findData(getattr(config, "logging_verbosity", "info") or "info")
+        self.logging_verbosity_combo.setCurrentIndex(max(0, verbosity_idx))
         self.embed_chk.setChecked(config.try_embed_lyrics)
         embed_format_idx = self.embed_format_combo.findData(getattr(config, "lyrics_embed_format", "both") or "both")
         self.embed_format_combo.setCurrentIndex(max(0, embed_format_idx))
@@ -856,6 +869,7 @@ class MusicFoldersDialog(QDialog):
             scan_excluded_patterns=self.excluded_patterns_edit.toPlainText().strip(),
             scan_lyrics_source_mode=str(self.scan_source_combo.currentData() or "both"),
             scan_worker_count=int(self.scan_worker_spin.value()),
+            logging_verbosity=str(self.logging_verbosity_combo.currentData() or "info"),
             reaction_delay_ms=int(self.reaction_delay_spin.value()),
             lrclib_instance=self.lrclib_instance_edit.text().strip() or "https://lrclib.net",
             hotkey_bindings_json=serialize_hotkey_bindings(hotkey_bindings),

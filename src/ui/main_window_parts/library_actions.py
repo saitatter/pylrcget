@@ -48,7 +48,7 @@ def refresh_library(window) -> None:
     window.btn_cancel_scan.setEnabled(True)
 
     config = get_config(window.app_state.db)
-    logger.info(
+    logger.debug(
         "Library scan config: lyrics source mode=%s, worker count=%s",
         getattr(config, "scan_lyrics_source_mode", "both"),
         getattr(config, "scan_worker_count", 4),

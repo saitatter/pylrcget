@@ -106,6 +106,23 @@ class SettingsDialogTests(unittest.TestCase):
             finally:
                 app_state.db.close()
 
+    def test_settings_dialog_loads_and_saves_logging_verbosity(self):
+        with TemporaryDirectory() as tmp:
+            app_state = simple_app_state(initialize_database(tmp))
+            try:
+                dialog = MusicFoldersDialog(app_state)
+                dialog.logging_verbosity_combo.setCurrentIndex(dialog.logging_verbosity_combo.findData("debug"))
+                dialog.save()
+
+                reloaded = MusicFoldersDialog(app_state)
+                try:
+                    self.assertEqual(reloaded.logging_verbosity_combo.currentData(), "debug")
+                finally:
+                    reloaded.deleteLater()
+                    dialog.deleteLater()
+            finally:
+                app_state.db.close()
+
     def test_settings_dialog_loads_and_saves_ai_sync_preferences(self):
         with TemporaryDirectory() as tmp:
             app_state = simple_app_state(initialize_database(tmp))

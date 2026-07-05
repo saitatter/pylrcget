@@ -145,6 +145,7 @@ def find_best_lyrics_match(
             duration_s=duration_s or None,
         )
         if _strip_empty(getattr(lyrics, "synced_lyrics", None)) or _strip_empty(getattr(lyrics, "plain_lyrics", None)):
+            logger.debug("LRCLIB exact match selected for track %s with exact metadata.", track_label)
             return LyricsDownloadMatch(lyrics, 100, "exact metadata")
         notify("Exact LRCLIB match has no usable lyrics; trying alternatives...")
     except Exception as exc:
@@ -178,6 +179,12 @@ def find_best_lyrics_match(
         )
         if candidate is not None and (best is None or candidate.score > best.score):
             best = candidate
+            logger.debug(
+                "LRCLIB candidate selected for %s via %s with score %s.",
+                track_label,
+                query.label,
+                candidate.score,
+            )
         if best is not None and best.score >= 100:
             break
 

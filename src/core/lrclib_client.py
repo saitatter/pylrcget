@@ -208,8 +208,10 @@ class LrcLibAPI:
     def _request(self, method: str, endpoint: str, **kwargs: Any) -> requests.Response:
         kwargs.setdefault("timeout", self._timeout)
         url = f"{self._base_url}{endpoint}"
+        logger.debug("LRCLIB %s %s", method.upper(), endpoint)
         response = self._session.request(method, url, **kwargs)
         _raise_for_status(response)
+        logger.debug("LRCLIB %s %s -> %s", method.upper(), endpoint, response.status_code)
         return response
 
     # --- GET /api/get  &  /api/get-cached ---

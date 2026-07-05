@@ -38,6 +38,7 @@ class _ScanTimingStats:
         self.path_discovery_s = 0.0
         self.audio_fast_path_s = 0.0
         self.signature_check_s = 0.0
+        self.signature_lookup_s = 0.0
         self.signature_audio_stat_s = 0.0
         self.signature_sidecar_stat_s = 0.0
         self.metadata_read_s = 0.0
@@ -69,6 +70,8 @@ class _ScanTimingStats:
                 self.audio_fast_path_hit_count += int(elapsed_s)
             elif field_name == "signature_check_s":
                 self.signature_check_count += 1
+            elif field_name == "signature_lookup_s":
+                pass
             elif field_name == "signature_sidecar_candidate_count":
                 self.signature_sidecar_candidate_count += int(elapsed_s)
             elif field_name == "metadata_read_s":
@@ -129,7 +132,7 @@ def _scan_track_for_path(
         count_hook=None if timings is None else timings.record,
     )
     if timings is not None:
-        timings.record("sidecar_lookup_s", time.perf_counter() - sidecar_started)
+        timings.record("signature_lookup_s", time.perf_counter() - sidecar_started)
     track = new_fs_track_from_path(
         path,
         signature=signature,
@@ -186,7 +189,7 @@ class LibraryScanner(QThread):
                 self.scan_lyrics_source_mode = str(
                     config_row["scan_lyrics_source_mode"] or self.scan_lyrics_source_mode or "both"
                 )
-            logger.info("Library scan lyrics source mode: %s", self.scan_lyrics_source_mode)
+            logger.debug("Library scan lyrics source mode: %s", self.scan_lyrics_source_mode)
 
             existing_index = get_library_scan_index(db)
             discovery_started = time.perf_counter()
@@ -398,49 +401,53 @@ class LibraryScanner(QThread):
                 removed,
                 worker_failures,
             )
-            logger.info("Library scan path discovery time: %.3fs", timings.path_discovery_s)
-            logger.info(
+            logger.debug("Library scan path discovery time: %.3fs", timings.path_discovery_s)
+            logger.debug(
                 "Library scan audio-only fast path time: %.3fs (%d attempts, %d hits)",
                 timings.audio_fast_path_s,
                 timings.audio_fast_path_count,
                 timings.audio_fast_path_hit_count,
             )
-            logger.info(
+            logger.debug(
                 "Library scan signature check time: %.3fs (%d checks)",
                 timings.signature_check_s,
                 timings.signature_check_count,
             )
-            logger.info(
+            logger.debug(
                 "Library scan signature audio stat time: %.3fs",
                 timings.signature_audio_stat_s,
             )
-            logger.info(
+            logger.debug(
                 "Library scan signature sidecar stat time: %.3fs (%d candidates)",
                 timings.signature_sidecar_stat_s,
                 timings.signature_sidecar_candidate_count,
             )
-            logger.info(
+            logger.debug(
                 "Library scan metadata read time: %.3fs (%d reads)",
                 timings.metadata_read_s,
                 timings.metadata_read_count,
             )
-            logger.info(
+            logger.debug(
                 "Library scan embedded lyrics read time: %.3fs (%d reads)",
                 timings.embedded_lyrics_read_s,
                 timings.embedded_lyrics_read_count,
             )
-            logger.info(
+            logger.debug(
+                "Library scan signature lookup time: %.3fs",
+                timings.signature_lookup_s,
+            )
+            logger.debug(
                 "Library scan sidecar lookup time: %.3fs (%d lookups)",
                 timings.sidecar_lookup_s,
                 timings.sidecar_lookup_count,
             )
-            logger.info(
+            logger.debug(
                 "Library scan DB flush time: %.3fs (%d flushes)",
                 timings.db_flush_s,
                 timings.db_flush_count,
             )
             if total_elapsed > 0:
-                logger.info(
+                logger.debug(
                     "Library scan average throughput: %.2f tracks/sec (%d tracks in %.2fs)",
                     scanned / total_elapsed,
                     scanned,

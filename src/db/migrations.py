@@ -30,6 +30,17 @@ def upgrade_database_if_needed(db: sqlite3.Connection, existing_version: int) ->
     logger.info("Existing database version: %d", existing_version)
 
     if existing_version == CURRENT_DB_VERSION:
+        config_table = db.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='config_data'"
+        ).fetchone()
+        if config_table is not None:
+            config_columns = {
+                row["name"] for row in db.execute("PRAGMA table_info(config_data)").fetchall()
+            }
+            if "logging_verbosity" not in config_columns:
+                logger.info("Backfill config_data.logging_verbosity for database version %d", existing_version)
+                db.execute("ALTER TABLE config_data ADD COLUMN logging_verbosity TEXT DEFAULT 'info'")
+                db.commit()
         return
 
     if existing_version > CURRENT_DB_VERSION:
@@ -123,6 +134,8 @@ def upgrade_database_if_needed(db: sqlite3.Connection, existing_version: int) ->
                 db.execute("ALTER TABLE config_data ADD COLUMN scan_worker_count INTEGER DEFAULT 4")
             if "scan_lyrics_source_mode" not in config_columns:
                 db.execute("ALTER TABLE config_data ADD COLUMN scan_lyrics_source_mode TEXT DEFAULT 'both'")
+            if "logging_verbosity" not in config_columns:
+                db.execute("ALTER TABLE config_data ADD COLUMN logging_verbosity TEXT DEFAULT 'info'")
         db.execute("PRAGMA user_version=5")
         db.commit()
         current_version = 5

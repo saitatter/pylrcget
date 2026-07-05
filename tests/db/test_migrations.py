@@ -41,6 +41,7 @@ class MigrationTests(unittest.TestCase):
                         "scan_lyrics_source_mode",
                         "hotkey_bindings_json",
                         "ui_state_json",
+                        "logging_verbosity",
                     }
                     <= config_columns
                 )
@@ -57,6 +58,7 @@ class MigrationTests(unittest.TestCase):
                            lyrics_lookup_subdir,
                            scan_lyrics_source_mode,
                            scan_worker_count,
+                           logging_verbosity,
                            ui_scale_percent,
                            font_size_mode,
                            show_album_art,
@@ -74,6 +76,7 @@ class MigrationTests(unittest.TestCase):
                 self.assertEqual(row["lyrics_lookup_subdir"], "")
                 self.assertEqual(row["scan_lyrics_source_mode"], "both")
                 self.assertEqual(int(row["scan_worker_count"]), 4)
+                self.assertEqual(row["logging_verbosity"], "info")
                 self.assertEqual(int(row["ui_scale_percent"]), 100)
                 self.assertEqual(row["font_size_mode"], "normal")
                 self.assertEqual(int(row["show_album_art"]), 1)
@@ -226,7 +229,7 @@ class MigrationTests(unittest.TestCase):
             finally:
                 db.close()
 
-    def test_v4_database_upgrades_scan_lyrics_source_mode_column(self):
+    def test_v4_database_upgrades_scan_lyrics_source_mode_and_logging_columns(self):
         with tempfile.TemporaryDirectory() as tmp:
             db_path = Path(tmp) / "pylrcget.db.sqlite3"
             db = sqlite3.connect(str(db_path))
@@ -257,10 +260,51 @@ class MigrationTests(unittest.TestCase):
                 columns = {row["name"] for row in db.execute("PRAGMA table_info(config_data)").fetchall()}
                 self.assertIn("scan_lyrics_source_mode", columns)
                 self.assertIn("scan_worker_count", columns)
+                self.assertIn("logging_verbosity", columns)
                 row = db.execute(
-                    "SELECT scan_lyrics_source_mode FROM config_data LIMIT 1"
+                    "SELECT scan_lyrics_source_mode, logging_verbosity FROM config_data LIMIT 1"
                 ).fetchone()
                 self.assertEqual(row["scan_lyrics_source_mode"], "both")
+                self.assertEqual(row["logging_verbosity"], "info")
+            finally:
+                db.close()
+
+    def test_v5_database_backfills_missing_logging_verbosity_column(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db_path = Path(tmp) / "pylrcget.db.sqlite3"
+            db = sqlite3.connect(str(db_path))
+            db.row_factory = sqlite3.Row
+            try:
+                db.execute(
+                    """
+                    CREATE TABLE config_data (
+                        id INTEGER PRIMARY KEY,
+                        download_lyrics_mode TEXT DEFAULT 'prefer_synced',
+                        save_lyrics_sidecars BOOLEAN DEFAULT 1,
+                        try_embed_lyrics BOOLEAN DEFAULT 1,
+                        lyrics_sidecar_format TEXT DEFAULT 'both',
+                        lyrics_embed_format TEXT DEFAULT 'both',
+                        hotkey_bindings_json TEXT DEFAULT '',
+                        ui_state_json TEXT DEFAULT '',
+                        scan_lyrics_source_mode TEXT DEFAULT 'both',
+                        scan_worker_count INTEGER DEFAULT 4
+                    )
+                    """
+                )
+                db.execute("INSERT INTO config_data (id) VALUES (1)")
+                db.execute(f"PRAGMA user_version={CURRENT_DB_VERSION}")
+                db.commit()
+
+                upgrade_database_if_needed(db, CURRENT_DB_VERSION)
+
+                version = int(db.execute("PRAGMA user_version").fetchone()[0])
+                self.assertEqual(version, CURRENT_DB_VERSION)
+                columns = {row["name"] for row in db.execute("PRAGMA table_info(config_data)").fetchall()}
+                self.assertIn("logging_verbosity", columns)
+                row = db.execute(
+                    "SELECT logging_verbosity FROM config_data LIMIT 1"
+                ).fetchone()
+                self.assertEqual(row["logging_verbosity"], "info")
             finally:
                 db.close()
 

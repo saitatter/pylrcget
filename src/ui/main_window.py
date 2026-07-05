@@ -72,6 +72,7 @@ from ui.spacing import SPACE_1, SPACE_2, SPACE_3, set_layout_spacing
 from ui.style_loader import load_stylesheet
 from ui.widgets.toast import ToastManager
 from ui.widgets.log_panel import LogPanel, QtLogHandler
+from ui.services.logging_preferences import apply_logging_verbosity
 from ui.widgets.my_lrclib_widget import MyLrclibWidget
 from ui.widgets.lrclib_browser_widget import LrclibBrowserWidget
 from ui.widgets.download_progress_overlay import DownloadProgressOverlay
@@ -173,6 +174,8 @@ class MainWindow(QMainWindow):
         self._ui_log_handler.setFormatter(
             logging.Formatter("%(asctime)s  %(levelname)s  %(name)s: %(message)s", "%H:%M:%S")
         )
+        logging.getLogger().addHandler(self._ui_log_handler)
+        self._apply_logging_preferences(get_config(self.app_state.db))
 
         # --- Top controls (search + filters) ---
         self.top_bar = TopBarController(
@@ -1004,6 +1007,7 @@ class MainWindow(QMainWindow):
         if dlg.exec():
             updated_config = get_config(self.app_state.db)
             self._apply_appearance_preferences(updated_config)
+            self._apply_logging_preferences(updated_config)
             self._apply_hotkey_preferences(updated_config)
             self._sync_download_mode_ui()
             self.lrclib_browser_tab.set_lrclib_url(
@@ -1019,6 +1023,15 @@ class MainWindow(QMainWindow):
     def _sync_download_mode_ui(self) -> None:
         config = get_config(self.app_state.db)
         self.top_bar.set_download_missing_mode(str(config.download_lyrics_mode or "prefer_synced"))
+
+    def _apply_logging_preferences(self, config) -> None:
+        level = apply_logging_verbosity(getattr(config, "logging_verbosity", "info"))
+        self._ui_log_handler.setLevel(level)
+        logger.debug(
+            "Applied logging verbosity: %s (%s)",
+            getattr(config, "logging_verbosity", "info"),
+            logging.getLevelName(level),
+        )
 
     def open_about_modal(self):
         dlg = AboutDialog(self.app_state, self)
