@@ -15,7 +15,7 @@ from library.scan_library import (
     iter_audio_paths_with_signatures,
     new_fs_track_from_path,
     SidecarLookupCache,
-    read_audio_metadata,
+    read_audio_metadata_for_scan,
 )
 from db.database import (
     delete_tracks_by_paths,
@@ -31,6 +31,11 @@ LIBRARY_SCAN_MAX_WORKERS = 4
 LIBRARY_SCAN_MAX_PENDING_MULTIPLIER = 4
 LIBRARY_SCAN_PROGRESS_INTERVAL_S = 0.75
 LIBRARY_SCAN_BATCH_SIZE = 500
+
+
+def _scan_mode_allows_sidecar(mode: str | None) -> bool:
+    normalized = (mode or "both").strip().lower()
+    return normalized not in {"embedded_only", "embedded-only"}
 
 
 class _ScanTimingStats:
@@ -94,7 +99,7 @@ class _ScanTaskResult:
 def _read_metadata_for_scan(path: str, *, timings: _ScanTimingStats | None = None):
     started_at = time.perf_counter()
     try:
-        return read_audio_metadata(path)
+        return read_audio_metadata_for_scan(path)
     except Exception as exc:
         logger.warning("Skipping unreadable audio file during scan: %s (%s)", path, exc)
         return None
@@ -409,54 +414,82 @@ class LibraryScanner(QThread):
                 removed,
                 worker_failures,
             )
-            logger.debug("Library scan path discovery time: %.3fs", timings.path_discovery_s)
+            cumulative_worker_s = (
+                timings.path_discovery_s
+                + timings.audio_fast_path_s
+                + timings.signature_check_s
+                + timings.signature_lookup_s
+                + timings.signature_audio_stat_s
+                + timings.signature_sidecar_stat_s
+                + timings.metadata_read_s
+                + timings.embedded_lyrics_read_s
+                + timings.sidecar_lookup_s
+                + timings.db_flush_s
+            )
+            logger.info(
+                "Library scan timing totals are cumulative worker time across workers; wall time is %.3fs.",
+                total_elapsed,
+            )
+            logger.info(
+                "Library scan cumulative worker time: %.3fs (%.2fx wall time)",
+                cumulative_worker_s,
+                (cumulative_worker_s / total_elapsed) if total_elapsed > 0 else 0.0,
+            )
+            logger.debug("Library scan path discovery cumulative worker time: %.3fs", timings.path_discovery_s)
             logger.debug(
-                "Library scan audio-only fast path time: %.3fs (%d attempts, %d hits)",
+                "Library scan audio-only fast path cumulative worker time: %.3fs (%d attempts, %d hits)",
                 timings.audio_fast_path_s,
                 timings.audio_fast_path_count,
                 timings.audio_fast_path_hit_count,
             )
             logger.debug(
-                "Library scan signature check time: %.3fs (%d checks)",
+                "Library scan signature check cumulative worker time: %.3fs (%d checks)",
                 timings.signature_check_s,
                 timings.signature_check_count,
             )
             logger.debug(
-                "Library scan signature audio stat time: %.3fs",
+                "Library scan signature audio stat cumulative worker time: %.3fs",
                 timings.signature_audio_stat_s,
             )
             logger.debug(
-                "Library scan signature sidecar stat time: %.3fs (%d candidates)",
+                "Library scan signature sidecar stat cumulative worker time: %.3fs (%d candidates)",
                 timings.signature_sidecar_stat_s,
                 timings.signature_sidecar_candidate_count,
             )
             logger.debug(
-                "Library scan metadata read time: %.3fs (%d reads)",
+                "Library scan metadata read cumulative worker time: %.3fs (%d reads)",
                 timings.metadata_read_s,
                 timings.metadata_read_count,
             )
             logger.debug(
-                "Library scan embedded lyrics read time: %.3fs (%d reads)",
+                "Library scan embedded lyrics read cumulative worker time: %.3fs (%d reads)",
                 timings.embedded_lyrics_read_s,
                 timings.embedded_lyrics_read_count,
             )
             logger.debug(
-                "Library scan signature lookup time: %.3fs",
+                "Library scan signature lookup cumulative worker time: %.3fs",
                 timings.signature_lookup_s,
             )
             logger.debug(
-                "Library scan sidecar lookup time: %.3fs (%d lookups)",
+                "Library scan sidecar lookup cumulative worker time: %.3fs (%d lookups)",
                 timings.sidecar_lookup_s,
                 timings.sidecar_lookup_count,
             )
             logger.debug(
-                "Library scan DB flush time: %.3fs (%d flushes)",
+                "Library scan DB flush cumulative worker time: %.3fs (%d flushes)",
                 timings.db_flush_s,
                 timings.db_flush_count,
             )
+            if not _scan_mode_allows_sidecar(self.scan_lyrics_source_mode) and (
+                timings.sidecar_lookup_s > 0 or timings.signature_sidecar_stat_s > 0
+            ):
+                logger.warning(
+                    "Library scan recorded sidecar timing while scan mode=%s; this suggests a caller/config mismatch.",
+                    self.scan_lyrics_source_mode,
+                )
             if total_elapsed > 0:
                 logger.debug(
-                    "Library scan average throughput: %.2f tracks/sec (%d tracks in %.2fs)",
+                    "Library scan average throughput: %.2f tracks/sec (%d tracks in %.2fs wall time)",
                     scanned / total_elapsed,
                     scanned,
                     total_elapsed,

@@ -437,26 +437,108 @@ def _parse_track_number(raw: str | None) -> int | None:
         return None
 
 
-def read_audio_metadata(path: str) -> tuple[object, AudioMetadata] | None:
-    audio = MutagenFile(path, easy=True)
-    if audio is None:
+def _first_audio_tag_text(audio, keys: tuple[str, ...]) -> str | None:
+    tags = getattr(audio, "tags", None)
+    for key in keys:
+        for source in (audio, tags):
+            if source is None:
+                continue
+            getter = getattr(source, "get", None)
+            if not callable(getter):
+                continue
+            try:
+                value = getter(key)
+            except Exception:
+                continue
+            if value is None:
+                continue
+            if isinstance(value, (list, tuple)):
+                if not value:
+                    continue
+                value = value[0]
+            text = getattr(value, "text", None)
+            if isinstance(text, (list, tuple)):
+                if text:
+                    text = text[0]
+                else:
+                    text = None
+            if text is None:
+                text = getattr(value, "value", value)
+            if isinstance(text, (list, tuple)):
+                if not text:
+                    continue
+                text = text[0]
+            rendered = str(text).strip()
+            if rendered:
+                return rendered
+    return None
+
+
+def _parse_track_number_value(value) -> int | None:
+    if value is None:
+        return None
+    if isinstance(value, (list, tuple)) and value:
+        value = value[0]
+    if isinstance(value, tuple) and value:
+        value = value[0]
+    if isinstance(value, int):
+        return value
+    if isinstance(value, str):
+        return _parse_track_number(value)
+    try:
+        return _parse_track_number(str(value))
+    except (TypeError, ValueError):
         return None
 
-    title = _first(audio, "title")
-    album = _first(audio, "album")
-    artist = _first(audio, "artist")
 
-    title = title or os.path.splitext(os.path.basename(path))[0]
-    album = album or "Unknown Album"
-    artist = artist or "Unknown Artist"
+def read_audio_metadata_from_audio(audio, path: str) -> AudioMetadata:
+    ext = Path(path).suffix.lower()
 
-    album_artist = (
-        _first(audio, "albumartist")
-        or _first(audio, "album artist")
-        or artist
-    )
-
-    track_number = _parse_track_number(_first(audio, "tracknumber"))
+    if ext == ".mp3":
+        title = _first_audio_tag_text(audio, ("TIT2",)) or os.path.splitext(os.path.basename(path))[0]
+        album = _first_audio_tag_text(audio, ("TALB",)) or "Unknown Album"
+        artist = _first_audio_tag_text(audio, ("TPE1",)) or "Unknown Artist"
+        album_artist = _first_audio_tag_text(audio, ("TPE2",)) or artist
+        track_number = _parse_track_number(_first_audio_tag_text(audio, ("TRCK",)))
+    elif ext in {".flac", ".ogg", ".oga", ".opus", ".mpc"}:
+        title = _first_audio_tag_text(audio, ("title",)) or os.path.splitext(os.path.basename(path))[0]
+        album = _first_audio_tag_text(audio, ("album",)) or "Unknown Album"
+        artist = _first_audio_tag_text(audio, ("artist",)) or "Unknown Artist"
+        album_artist = _first_audio_tag_text(audio, ("albumartist", "album artist")) or artist
+        track_number = _parse_track_number(_first_audio_tag_text(audio, ("tracknumber",)))
+    elif ext in {".m4a", ".mp4"}:
+        title = _first_audio_tag_text(audio, ("©nam",)) or os.path.splitext(os.path.basename(path))[0]
+        album = _first_audio_tag_text(audio, ("©alb",)) or "Unknown Album"
+        artist = _first_audio_tag_text(audio, ("©ART",)) or "Unknown Artist"
+        album_artist = _first_audio_tag_text(audio, ("aART",)) or artist
+        track_raw = None
+        getter = getattr(getattr(audio, "tags", None), "get", None)
+        if callable(getter):
+            try:
+                track_raw = getter("trkn")
+            except Exception:
+                track_raw = None
+        track_number = _parse_track_number_value(track_raw)
+    elif ext in {".wma", ".asf"}:
+        title = _first_audio_tag_text(audio, ("Title",)) or os.path.splitext(os.path.basename(path))[0]
+        album = _first_audio_tag_text(audio, ("WM/AlbumTitle",)) or "Unknown Album"
+        artist = _first_audio_tag_text(audio, ("Author", "WM/Artist")) or "Unknown Artist"
+        album_artist = _first_audio_tag_text(audio, ("WM/AlbumArtist",)) or artist
+        track_number = _parse_track_number(_first_audio_tag_text(audio, ("WM/TrackNumber",)))
+    elif ext in {".dsf", ".dff"}:
+        title = _first_audio_tag_text(audio, ("TIT2",)) or os.path.splitext(os.path.basename(path))[0]
+        album = _first_audio_tag_text(audio, ("TALB",)) or "Unknown Album"
+        artist = _first_audio_tag_text(audio, ("TPE1",)) or "Unknown Artist"
+        album_artist = _first_audio_tag_text(audio, ("TPE2",)) or artist
+        track_number = _parse_track_number(_first_audio_tag_text(audio, ("TRCK",)))
+    else:
+        title = _first_audio_tag_text(audio, ("title", "TIT2", "©nam", "Title")) or os.path.splitext(os.path.basename(path))[0]
+        album = _first_audio_tag_text(audio, ("album", "TALB", "©alb", "WM/AlbumTitle")) or "Unknown Album"
+        artist = _first_audio_tag_text(audio, ("artist", "TPE1", "©ART", "Author", "WM/Artist")) or "Unknown Artist"
+        album_artist = _first_audio_tag_text(audio, ("albumartist", "album artist", "TPE2", "aART", "WM/AlbumArtist")) or artist
+        track_number = _parse_track_number(
+            _first_audio_tag_text(audio, ("tracknumber", "TRCK", "trkn", "WM/TrackNumber"))
+        )
 
     duration = 0.0
     try:
@@ -465,7 +547,7 @@ def read_audio_metadata(path: str) -> tuple[object, AudioMetadata] | None:
     except (TypeError, ValueError):
         duration = 0.0
 
-    return audio, AudioMetadata(
+    return AudioMetadata(
         title=title,
         album=album,
         artist=artist,
@@ -473,6 +555,22 @@ def read_audio_metadata(path: str) -> tuple[object, AudioMetadata] | None:
         track_number=track_number,
         duration=duration,
     )
+
+
+def read_audio_metadata(path: str) -> tuple[object, AudioMetadata] | None:
+    audio = MutagenFile(path, easy=True)
+    if audio is None:
+        return None
+
+    metadata = read_audio_metadata_from_audio(audio, path)
+    return audio, metadata
+
+
+def read_audio_metadata_for_scan(path: str) -> tuple[object, AudioMetadata] | None:
+    audio = MutagenFile(path, easy=False)
+    if audio is None:
+        return None
+    return audio, read_audio_metadata_from_audio(audio, path)
 
 
 def _safe_sidecar_component(value: str) -> str:

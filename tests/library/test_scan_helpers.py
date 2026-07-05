@@ -421,6 +421,14 @@ class ScanLibraryHelpersTests(unittest.TestCase):
             self.assertEqual(track.txt_lyrics, "embedded plain")
             self.assertEqual(track.lrc_lyrics, "[00:03.00]embedded synced")
             embedded_mock.assert_called_once()
+            with patch("library.scan_library.MutagenFile", return_value=_FakeAudio()), patch(
+                "library.scan_library.read_embedded_lyrics",
+                return_value=("embedded plain", "[00:03.00]embedded synced"),
+            ), patch("library.scan_library._read_sidecar") as sidecar_mock:
+                track = new_fs_track_from_path(str(audio), scan_lyrics_source_mode="embedded_only")
+
+            self.assertIsNotNone(track)
+            sidecar_mock.assert_not_called()
 
 
 class LibraryScannerIncrementalTests(unittest.TestCase):
@@ -475,7 +483,7 @@ class LibraryScannerIncrementalTests(unittest.TestCase):
             with (
                 patch("ui.workers.library_scanner.os.cpu_count", return_value=8),
                 patch("ui.workers.library_scanner.ThreadPoolExecutor", RecordingExecutor),
-                patch("ui.workers.library_scanner.read_audio_metadata", return_value=(object(), fake_metadata)) as read_metadata,
+                patch("ui.workers.library_scanner.read_audio_metadata_for_scan", return_value=(object(), fake_metadata)) as read_metadata,
                 patch("ui.workers.library_scanner.get_audio_file_signature") as signature_mock,
                 patch("ui.workers.library_scanner.new_fs_track_from_path", side_effect=fake_new_fs_track),
             ):
@@ -543,7 +551,7 @@ class LibraryScannerIncrementalTests(unittest.TestCase):
 
             scanner = LibraryScanner(db_path, [str(music_dir)], scan_lyrics_source_mode="both")
             with (
-                patch("ui.workers.library_scanner.read_audio_metadata", return_value=(object(), fake_metadata)),
+                patch("ui.workers.library_scanner.read_audio_metadata_for_scan", return_value=(object(), fake_metadata)),
                 patch("ui.workers.library_scanner.get_audio_file_signature", side_effect=fake_signature),
                 patch("ui.workers.library_scanner.new_fs_track_from_path", side_effect=fake_new_fs_track),
             ):
@@ -607,7 +615,7 @@ class LibraryScannerIncrementalTests(unittest.TestCase):
                 duration=210.0,
             )
             with (
-                patch("ui.workers.library_scanner.read_audio_metadata", return_value=(object(), fake_metadata)) as read_metadata,
+                patch("ui.workers.library_scanner.read_audio_metadata_for_scan", return_value=(object(), fake_metadata)) as read_metadata,
                 patch("ui.workers.library_scanner.new_fs_track_from_path", side_effect=fake_new_fs_track),
             ):
                 scanner.run()
@@ -663,20 +671,22 @@ class LibraryScannerIncrementalTests(unittest.TestCase):
             scanner = LibraryScanner(db_path, [str(music_dir)])
             with self.assertLogs("ui.workers.library_scanner", level="DEBUG") as logs:
                 with (
-                    patch("ui.workers.library_scanner.read_audio_metadata", return_value=(object(), fake_metadata)),
+                    patch("ui.workers.library_scanner.read_audio_metadata_for_scan", return_value=(object(), fake_metadata)),
                     patch("ui.workers.library_scanner.new_fs_track_from_path", side_effect=fake_new_fs_track),
                 ):
                     scanner.run()
 
             joined = "\n".join(logs.output)
             self.assertIn("Library scan summary:", joined)
-            self.assertIn("Library scan path discovery time:", joined)
-            self.assertIn("Library scan audio-only fast path time:", joined)
-            self.assertIn("Library scan signature check time:", joined)
-            self.assertIn("Library scan signature audio stat time:", joined)
-            self.assertIn("Library scan signature sidecar stat time:", joined)
-            self.assertIn("Library scan metadata read time:", joined)
-            self.assertIn("Library scan embedded lyrics read time:", joined)
-            self.assertIn("Library scan sidecar lookup time:", joined)
-            self.assertIn("Library scan DB flush time:", joined)
+            self.assertIn("Library scan timing totals are cumulative worker time", joined)
+            self.assertIn("Library scan cumulative worker time:", joined)
+            self.assertIn("Library scan path discovery cumulative worker time:", joined)
+            self.assertIn("Library scan audio-only fast path cumulative worker time:", joined)
+            self.assertIn("Library scan signature check cumulative worker time:", joined)
+            self.assertIn("Library scan signature audio stat cumulative worker time:", joined)
+            self.assertIn("Library scan signature sidecar stat cumulative worker time:", joined)
+            self.assertIn("Library scan metadata read cumulative worker time:", joined)
+            self.assertIn("Library scan embedded lyrics read cumulative worker time:", joined)
+            self.assertIn("Library scan sidecar lookup cumulative worker time:", joined)
+            self.assertIn("Library scan DB flush cumulative worker time:", joined)
             self.assertIn("Library scan average throughput:", joined)
