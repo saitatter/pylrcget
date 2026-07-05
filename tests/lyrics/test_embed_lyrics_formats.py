@@ -19,6 +19,7 @@ from core.embed_lyrics import (
     embed_lyrics_for_track,
     embed_lyrics_in_file,
 )
+from library.scan_library import read_embedded_lyrics_from_audio
 
 
 class _FakeTagAudio(dict):
@@ -44,6 +45,13 @@ class _FakeID3:
             if getattr(frame, "FrameID", "") != key and f"TXXX:{getattr(frame, 'desc', '')}" != key
         ]
 
+    def getall(self, key):
+        return [frame for frame in self.frames if getattr(frame, "FrameID", "") == key]
+
+    def setall(self, key, frames):
+        self.frames = [frame for frame in self.frames if getattr(frame, "FrameID", "") != key]
+        self.frames.extend(list(frames))
+
     def add(self, frame):
         self.frames.append(frame)
 
@@ -63,6 +71,15 @@ class _FakeMusepackAudio:
 
     def save(self):
         self.saved = True
+
+
+class _FakeFrame(SimpleNamespace):
+    pass
+
+
+class _FakeAudioWithTags:
+    def __init__(self, tags):
+        self.tags = tags
 
 
 class EmbedLyricsFormatTests(unittest.TestCase):
@@ -123,9 +140,7 @@ class EmbedLyricsFormatTests(unittest.TestCase):
         with patch("core.embed_lyrics.ID3", return_value=fake_tags):
             embed_lyrics_in_file("song.mp3", "Plain lyrics", "[00:01.00]Synced lyrics")
 
-        self.assertIn("USLT", fake_tags.deleted)
-        self.assertIn(f"TXXX:{ID3_PLAIN_DESC}", fake_tags.deleted)
-        self.assertIn(f"TXXX:{ID3_SYNCED_DESC}", fake_tags.deleted)
+        self.assertEqual([], fake_tags.deleted)
         self.assertTrue(any(frame.FrameID == "USLT" and frame.text == "Plain lyrics" for frame in fake_tags.frames))
         self.assertTrue(
             any(frame.FrameID == "TXXX" and frame.desc == ID3_PLAIN_DESC and frame.text == ["Plain lyrics"] for frame in fake_tags.frames)
@@ -134,6 +149,38 @@ class EmbedLyricsFormatTests(unittest.TestCase):
             any(frame.FrameID == "TXXX" and frame.desc == ID3_SYNCED_DESC and frame.text == ["[00:01.00]Synced lyrics"] for frame in fake_tags.frames)
         )
         self.assertEqual(fake_tags.saved_path, "song.mp3")
+
+    def test_mp3_preserves_foreign_uslt_frames_while_replacing_managed_ones(self):
+        foreign_frame = _FakeFrame(FrameID="USLT", lang="eng", desc="translation", text="Foreign lyrics")
+        managed_frame = _FakeFrame(FrameID="USLT", lang="und", desc="", text="Old managed lyrics")
+        fake_tags = _FakeID3()
+        fake_tags.frames = [foreign_frame, managed_frame]
+
+        with patch("core.embed_lyrics.ID3", return_value=fake_tags):
+            embed_lyrics_in_file("song.mp3", "Plain lyrics", "[00:01.00]Synced lyrics")
+
+        self.assertTrue(any(frame is foreign_frame for frame in fake_tags.frames))
+        self.assertFalse(
+            any(
+                frame is managed_frame
+                for frame in fake_tags.frames
+            )
+        )
+        self.assertTrue(
+            any(frame.FrameID == "USLT" and frame.lang == "und" and frame.desc == "" and frame.text == "Plain lyrics" for frame in fake_tags.frames)
+        )
+
+    def test_mp3_read_prefers_managed_uslt_frame(self):
+        foreign_frame = _FakeFrame(FrameID="USLT", lang="eng", desc="translation", text="Foreign lyrics")
+        managed_frame = _FakeFrame(FrameID="USLT", lang="und", desc="", text="Plain lyrics")
+        fake_tags = _FakeID3()
+        fake_tags.frames = [foreign_frame, managed_frame]
+        fake_audio = _FakeAudioWithTags(fake_tags)
+
+        plain, synced = read_embedded_lyrics_from_audio(fake_audio, "song.mp3")
+
+        self.assertEqual(plain, "Plain lyrics")
+        self.assertIsNone(synced)
 
     def test_mp3_synced_only_does_not_write_plain_frames(self):
         fake_tags = _FakeID3()

@@ -85,6 +85,23 @@ def _read_vorbis_lyrics(audio) -> tuple[str | None, str | None]:
     return plain, synced
 
 
+def _first_managed_uslt_text(tags: ID3) -> str | None:
+    managed_frames = [
+        frame
+        for frame in tags.getall("USLT")
+        if getattr(frame, "lang", "") == "und" and getattr(frame, "desc", "") == ""
+    ]
+    frames = managed_frames or tags.getall("USLT")
+    if not frames:
+        return None
+    text = getattr(frames[0], "text", None)
+    if isinstance(text, (list, tuple)) and text:
+        return str(text[0])
+    if isinstance(text, str):
+        return text
+    return None
+
+
 def _split_lines(block: str | None) -> list[str]:
     return [line.strip() for line in (block or "").splitlines() if line.strip()]
 
@@ -564,9 +581,7 @@ def read_embedded_lyrics_from_audio(audio, path: str) -> tuple[str | None, str |
             except ID3NoHeaderError:
                 tags = ID3()
 
-            uslt_frames = tags.getall("USLT")
-            if uslt_frames:
-                plain = uslt_frames[0].text if getattr(uslt_frames[0], "text", None) else None
+            plain = _first_managed_uslt_text(tags)
 
             txxx_frames = tags.getall("TXXX")
             for t in txxx_frames:
@@ -581,9 +596,7 @@ def read_embedded_lyrics_from_audio(audio, path: str) -> tuple[str | None, str |
         elif ext in {".dsf", ".dff"}:
             tags = getattr(audio, "tags", None)
             if tags:
-                uslt_frames = tags.getall("USLT")
-                if uslt_frames:
-                    plain = uslt_frames[0].text if getattr(uslt_frames[0], "text", None) else None
+                plain = _first_managed_uslt_text(tags)
 
                 txxx_frames = tags.getall("TXXX")
                 for t in txxx_frames:

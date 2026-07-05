@@ -33,6 +33,7 @@ ASF_PLAIN_KEY = "WM/Lyrics"
 ASF_SYNCED_KEY = "LRCLIB_LRC"
 
 logger = logging.getLogger(__name__)
+_MANAGED_ID3_TXXX_DESCS = {ID3_PLAIN_DESC, ID3_SYNCED_DESC}
 
 
 def _norm(s: str | None) -> str | None:
@@ -41,6 +42,17 @@ def _norm(s: str | None) -> str | None:
         return None
     s = s.strip()
     return s or None
+
+
+def _is_managed_uslt(frame: USLT) -> bool:
+    return getattr(frame, "lang", "") == "und" and getattr(frame, "desc", "") == ""
+
+
+def _prune_managed_id3_frames(tags: ID3) -> None:
+    uslt_frames = [frame for frame in tags.getall("USLT") if not _is_managed_uslt(frame)]
+    tags.setall("USLT", uslt_frames)
+    txxx_frames = [frame for frame in tags.getall("TXXX") if getattr(frame, "desc", "") not in _MANAGED_ID3_TXXX_DESCS]
+    tags.setall("TXXX", txxx_frames)
 
 
 def embed_lyrics_for_track(track: TrackWithLyrics, output_format: str = "both") -> None:
@@ -164,10 +176,8 @@ def _embed_mp3(path: str, plain: str | None, synced: str | None) -> None:
     except ID3NoHeaderError:
         tags = ID3()
 
-    # Remove old frames we manage.
-    tags.delall("USLT")
-    tags.delall(f"TXXX:{ID3_SYNCED_DESC}")
-    tags.delall(f"TXXX:{ID3_PLAIN_DESC}")
+    # Remove only the lyric frames owned by PyLrcGet.
+    _prune_managed_id3_frames(tags)
 
     # Plain lyrics: use USLT. ID3 requires a 3-letter language code, but we avoid
     # a real language and use "und" (undefined).
@@ -204,9 +214,7 @@ def _embed_mp3(path: str, plain: str | None, synced: str | None) -> None:
 
 
 def _write_id3_lyrics(tags: ID3, plain: str | None, synced: str | None) -> None:
-    tags.delall("USLT")
-    tags.delall(f"TXXX:{ID3_SYNCED_DESC}")
-    tags.delall(f"TXXX:{ID3_PLAIN_DESC}")
+    _prune_managed_id3_frames(tags)
 
     if plain:
         tags.add(

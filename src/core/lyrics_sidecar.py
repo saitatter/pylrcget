@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import os
 import re
+import tempfile
 from pathlib import Path
 
 from db.models import Config, Track
@@ -29,13 +31,13 @@ def export_lyrics_sidecars(track: Track, config: Config) -> list[str]:
     lrc_path = base_path.parent / f"{base_path.name}.lrc"
 
     if plain:
-        txt_path.write_text(plain, encoding="utf-8")
+        _write_text_atomic(txt_path, plain)
         written_paths.append(str(txt_path))
     elif txt_path.exists():
         txt_path.unlink()
 
     if synced:
-        lrc_path.write_text(synced, encoding="utf-8")
+        _write_text_atomic(lrc_path, synced)
         written_paths.append(str(lrc_path))
     elif lrc_path.exists():
         lrc_path.unlink()
@@ -103,6 +105,31 @@ def _default_output_name(track: Track) -> str:
             return from_name
 
     return _safe_component(f"{track.artist_name} - {track.title}") or "lyrics"
+
+
+def _write_text_atomic(path: Path, text: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temp_path: Path | None = None
+    with tempfile.NamedTemporaryFile(
+        "w",
+        encoding="utf-8",
+        dir=str(path.parent),
+        prefix=f".{path.name}.",
+        suffix=".tmp",
+        delete=False,
+    ) as handle:
+        temp_path = Path(handle.name)
+        handle.write(text)
+        handle.flush()
+        os.fsync(handle.fileno())
+    try:
+        os.replace(temp_path, path)
+    finally:
+        if temp_path is not None and temp_path.exists():
+            try:
+                temp_path.unlink()
+            except OSError:
+                pass
 
 
 def _safe_component(value: str) -> str:

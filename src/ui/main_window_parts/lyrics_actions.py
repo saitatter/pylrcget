@@ -401,7 +401,7 @@ def export_track_sidecars(window, track_id: int) -> None:
             return
 
         config = get_config(window.app_state.db)
-        export_config = replace(config, save_lyrics_sidecars=True)
+        export_config = replace(config, save_lyrics_sidecars=True, try_embed_lyrics=False)
         result = sync_track_outputs_with_result(track, export_config)
         written_paths = list(result.sidecar_paths)
         if not written_paths:
