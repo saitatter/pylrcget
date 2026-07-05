@@ -4,8 +4,10 @@ from __future__ import annotations
 import os
 import logging
 import re
+import time
 from pathlib import Path
 from dataclasses import dataclass
+from typing import Callable
 
 from mutagen import File as MutagenFile
 from mutagen.asf import ASF
@@ -616,6 +618,7 @@ def new_fs_track_from_path(
     lyrics_lookup_subdir: str | None = None,
     lyrics_file_pattern: str | None = None,
     metadata: AudioMetadata | None = None,
+    timing_hook: Callable[[str, float], None] | None = None,
 ) -> FsTrack | None:
     try:
         metadata_result = None if metadata is not None else read_audio_metadata(path)
@@ -625,17 +628,25 @@ def new_fs_track_from_path(
             _audio, metadata = metadata_result
 
         # Preferred order: embedded, same-folder sidecars, then optional subfolder sidecars.
+        embedded_started = time.perf_counter()
         txt_embedded, lrc_embedded = read_embedded_lyrics(path)
+        if timing_hook is not None:
+            timing_hook("embedded_lyrics_read_s", time.perf_counter() - embedded_started)
+
+        sidecar_started = time.perf_counter()
         txt_sidecar, lrc_sidecar = _read_sidecar(
             path,
             lyrics_lookup_subdir,
             metadata=metadata,
             lyrics_file_pattern=lyrics_file_pattern,
         )
+        if timing_hook is not None:
+            timing_hook("sidecar_lookup_s", time.perf_counter() - sidecar_started)
 
         txt_lyrics = txt_embedded or txt_sidecar
         lrc_lyrics = lrc_embedded or lrc_sidecar
 
+        signature_started = time.perf_counter()
         modified_time, file_size = (
             signature
             if signature is not None
@@ -646,6 +657,8 @@ def new_fs_track_from_path(
                 lyrics_file_pattern=lyrics_file_pattern,
             )
         )
+        if timing_hook is not None and signature is None:
+            timing_hook("sidecar_lookup_s", time.perf_counter() - signature_started)
 
         return FsTrack(
             file_path=path,

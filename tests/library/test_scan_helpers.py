@@ -351,3 +351,55 @@ class LibraryScannerIncrementalTests(unittest.TestCase):
                 self.assertEqual(calls, ["added.mp3"])
             finally:
                 db2.close()
+
+    def test_library_scanner_logs_timing_summary(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db = initialize_database(tmp)
+            db_path = str(Path(tmp) / "pylrcget.db.sqlite3")
+            db.close()
+
+            music_dir = Path(tmp) / "Music"
+            music_dir.mkdir(parents=True, exist_ok=True)
+            track_path = music_dir / "timed.mp3"
+            touch_text(track_path, "timed")
+
+            fake_metadata = AudioMetadata(
+                title="Timed",
+                album="Album",
+                artist="Artist",
+                album_artist="Artist",
+                track_number=1,
+                duration=180.0,
+            )
+
+            def fake_new_fs_track(path: str, *, signature=None, **_kwargs):
+                return FsTrack(
+                    file_path=path,
+                    file_name=Path(path).name,
+                    title="Timed",
+                    album="Album",
+                    artist="Artist",
+                    album_artist="Artist",
+                    duration=180.0,
+                    txt_lyrics=None,
+                    lrc_lyrics=None,
+                    track_number=1,
+                    modified_time=signature[0] if signature else None,
+                    file_size=signature[1] if signature else None,
+                )
+
+            scanner = LibraryScanner(db_path, [str(music_dir)])
+            with self.assertLogs("ui.workers.library_scanner", level="INFO") as logs:
+                with (
+                    patch("ui.workers.library_scanner.read_audio_metadata", return_value=(object(), fake_metadata)),
+                    patch("ui.workers.library_scanner.new_fs_track_from_path", side_effect=fake_new_fs_track),
+                ):
+                    scanner.run()
+
+            joined = "\n".join(logs.output)
+            self.assertIn("Library scan path discovery time:", joined)
+            self.assertIn("Library scan metadata read time:", joined)
+            self.assertIn("Library scan embedded lyrics read time:", joined)
+            self.assertIn("Library scan sidecar lookup time:", joined)
+            self.assertIn("Library scan DB flush time:", joined)
+            self.assertIn("Library scan average throughput:", joined)

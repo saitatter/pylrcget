@@ -4,6 +4,7 @@ import logging
 import os
 import sqlite3
 import time
+import threading
 from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
 from dataclasses import dataclass
 from PySide6.QtCore import QThread, Signal
@@ -29,6 +30,23 @@ LIBRARY_SCAN_MAX_WORKERS = 4
 LIBRARY_SCAN_MAX_PENDING_MULTIPLIER = 4
 
 
+class _ScanTimingStats:
+    def __init__(self) -> None:
+        self.path_discovery_s = 0.0
+        self.metadata_read_s = 0.0
+        self.embedded_lyrics_read_s = 0.0
+        self.sidecar_lookup_s = 0.0
+        self.db_flush_s = 0.0
+        self._lock = threading.Lock()
+
+    def add(self, field_name: str, elapsed_s: float) -> None:
+        if elapsed_s <= 0:
+            return
+        with self._lock:
+            current = getattr(self, field_name)
+            setattr(self, field_name, current + elapsed_s)
+
+
 @dataclass(frozen=True)
 class _ScanTaskResult:
     path: str
@@ -36,12 +54,16 @@ class _ScanTaskResult:
     track: object | None
 
 
-def _read_metadata_for_scan(path: str):
+def _read_metadata_for_scan(path: str, *, timings: _ScanTimingStats | None = None):
+    started_at = time.perf_counter()
     try:
         return read_audio_metadata(path)
     except Exception as exc:
         logger.warning("Skipping unreadable audio file during scan: %s (%s)", path, exc)
         return None
+    finally:
+        if timings is not None:
+            timings.add("metadata_read_s", time.perf_counter() - started_at)
 
 
 def _scan_worker_count() -> int:
@@ -55,23 +77,28 @@ def _scan_track_for_path(
     replace_existing: bool,
     lyrics_lookup_subdir: str,
     lyrics_file_pattern: str,
+    timings: _ScanTimingStats | None = None,
 ) -> _ScanTaskResult:
-    metadata_result = _read_metadata_for_scan(path)
+    metadata_result = _read_metadata_for_scan(path, timings=timings)
     if metadata_result is None:
         return _ScanTaskResult(path=path, replace_existing=replace_existing, track=None)
     _audio, metadata = metadata_result
+    sidecar_started = time.perf_counter()
     signature = get_audio_file_signature(
         path,
         lyrics_lookup_subdir,
         metadata=metadata,
         lyrics_file_pattern=lyrics_file_pattern,
     )
+    if timings is not None:
+        timings.add("sidecar_lookup_s", time.perf_counter() - sidecar_started)
     track = new_fs_track_from_path(
         path,
         signature=signature,
         lyrics_lookup_subdir=lyrics_lookup_subdir,
         lyrics_file_pattern=lyrics_file_pattern,
         metadata=metadata,
+        timing_hook=None if timings is None else timings.add,
     )
     return _ScanTaskResult(path=path, replace_existing=replace_existing, track=track)
 
@@ -101,17 +128,20 @@ class LibraryScanner(QThread):
     def run(self):
         db = None
         started_at = time.perf_counter()
+        timings = _ScanTimingStats()
         try:
             # IMPORTANT: open db connection inside this thread
             db = sqlite3.connect(self.db_path)
             db.row_factory = sqlite3.Row
 
             existing_index = get_library_scan_index(db)
+            discovery_started = time.perf_counter()
             paths = iter_audio_paths(
                 self.directories,
                 excluded_paths=self.excluded_paths,
                 excluded_patterns=self.excluded_patterns,
             )
+            timings.add("path_discovery_s", time.perf_counter() - discovery_started)
             total = len(paths)
             scanned = 0
             unchanged = 0
@@ -146,9 +176,11 @@ class LibraryScanner(QThread):
             def flush_batch(current_path: str) -> None:
                 if not batch and not pending_replacements:
                     return
+                flush_started = time.perf_counter()
                 with db:
                     delete_tracks_by_paths(db, pending_replacements, commit=False)
                     add_tracks(db, batch, commit=False)
+                timings.add("db_flush_s", time.perf_counter() - flush_started)
                 batch.clear()
                 pending_replacements.clear()
                 self.progress_signal.emit(scanned, total, current_path, time.perf_counter() - started_at)
@@ -220,12 +252,14 @@ class LibraryScanner(QThread):
 
                     existing = existing_index.get(p)
                     if existing is not None:
+                        signature_started = time.perf_counter()
                         signature = get_audio_file_signature(
                             p,
                             self.lyrics_lookup_subdir,
                             metadata=existing[1],
                             lyrics_file_pattern=self.lyrics_file_pattern,
                         )
+                        timings.add("sidecar_lookup_s", time.perf_counter() - signature_started)
                         if existing[0] == signature:
                             scanned += 1
                             unchanged += 1
@@ -241,6 +275,7 @@ class LibraryScanner(QThread):
                             replace_existing=existing is not None,
                             lyrics_lookup_subdir=self.lyrics_lookup_subdir,
                             lyrics_file_pattern=self.lyrics_file_pattern,
+                            timings=timings,
                         )
                     ] = None
                     drain_completed(block=False)
@@ -254,15 +289,30 @@ class LibraryScanner(QThread):
                 executor.shutdown(wait=executor_shutdown_wait, cancel_futures=not executor_shutdown_wait)
 
             if batch or pending_replacements:
+                flush_started = time.perf_counter()
                 with db:
                     delete_tracks_by_paths(db, pending_replacements, commit=False)
                     add_tracks(db, batch, commit=False)
+                timings.add("db_flush_s", time.perf_counter() - flush_started)
 
             if removed_paths:
+                flush_started = time.perf_counter()
                 delete_tracks_by_paths(db, removed_paths)
+                timings.add("db_flush_s", time.perf_counter() - flush_started)
 
+            prune_started = time.perf_counter()
             prune_library(db)
+            timings.add("db_flush_s", time.perf_counter() - prune_started)
             self.progress_signal.emit(scanned, total, "", time.perf_counter() - started_at)
+
+            total_elapsed = time.perf_counter() - started_at
+            logger.info("Library scan path discovery time: %.3fs", timings.path_discovery_s)
+            logger.info("Library scan metadata read time: %.3fs", timings.metadata_read_s)
+            logger.info("Library scan embedded lyrics read time: %.3fs", timings.embedded_lyrics_read_s)
+            logger.info("Library scan sidecar lookup time: %.3fs", timings.sidecar_lookup_s)
+            logger.info("Library scan DB flush time: %.3fs", timings.db_flush_s)
+            if total_elapsed > 0:
+                logger.info("Library scan average throughput: %.2f tracks/sec (%d tracks in %.2fs)", scanned / total_elapsed, scanned, total_elapsed)
 
             msg = f"Library scanning complete. Updated {updated}, unchanged {unchanged}, removed {removed}."
             if reattached:
