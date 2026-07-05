@@ -235,6 +235,42 @@ class ScanLibraryHelpersTests(unittest.TestCase):
             self.assertEqual(track_lookup_only.txt_lyrics, "lookup plain")
             self.assertEqual(track_lookup_only.lrc_lyrics, "[00:02.00]lookup synced")
 
+    def test_new_fs_track_from_path_passes_scan_mode_to_signature_lookup(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            audio = Path(tmp) / "track.mp3"
+            touch_text(audio, "audio")
+
+            class _FakeAudio:
+                def __init__(self) -> None:
+                    self.info = type("Info", (), {"length": 180.0})()
+
+                def get(self, key):
+                    mapping = {
+                        "title": ["Track"],
+                        "album": ["Album"],
+                        "artist": ["Artist"],
+                        "albumartist": ["Artist"],
+                    }
+                    return mapping.get(key)
+
+            with patch("library.scan_library.MutagenFile", return_value=_FakeAudio()), patch(
+                "library.scan_library.get_audio_file_signature_with_lookup",
+                return_value=(123.0, 456),
+            ) as signature_mock, patch(
+                "library.scan_library.read_embedded_lyrics",
+                return_value=(None, None),
+            ), patch(
+                "library.scan_library._read_sidecar",
+                return_value=(None, None),
+            ):
+                track = new_fs_track_from_path(
+                    str(audio),
+                    scan_lyrics_source_mode="embedded_only",
+                )
+
+            self.assertIsNotNone(track)
+            self.assertEqual(signature_mock.call_args.kwargs["scan_lyrics_source_mode"], "embedded_only")
+
     def test_new_fs_track_from_path_reads_artist_title_lrc_sidecar(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

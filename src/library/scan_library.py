@@ -831,6 +831,7 @@ def new_fs_track_from_path(
                 lyrics_lookup_subdir,
                 metadata=metadata,
                 lyrics_file_pattern=lyrics_file_pattern,
+                scan_lyrics_source_mode=scan_lyrics_source_mode,
             )
         )
 
