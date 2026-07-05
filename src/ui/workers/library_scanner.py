@@ -135,6 +135,7 @@ def _scan_track_for_path(
         signature=signature,
         lyrics_lookup_subdir=lyrics_lookup_subdir,
         lyrics_file_pattern=lyrics_file_pattern,
+        scan_lyrics_source_mode=scan_lyrics_source_mode,
         metadata=metadata,
         audio=audio,
         timing_hook=None if timings is None else timings.record,
@@ -178,6 +179,14 @@ class LibraryScanner(QThread):
             # IMPORTANT: open db connection inside this thread
             db = sqlite3.connect(self.db_path)
             db.row_factory = sqlite3.Row
+            config_row = db.execute(
+                "SELECT scan_lyrics_source_mode FROM config_data LIMIT 1"
+            ).fetchone()
+            if config_row is not None:
+                self.scan_lyrics_source_mode = str(
+                    config_row["scan_lyrics_source_mode"] or self.scan_lyrics_source_mode or "both"
+                )
+            logger.info("Library scan lyrics source mode: %s", self.scan_lyrics_source_mode)
 
             existing_index = get_library_scan_index(db)
             discovery_started = time.perf_counter()

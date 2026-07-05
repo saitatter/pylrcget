@@ -815,6 +815,7 @@ class MainWindow(QMainWindow):
                 file_path,
                 lyrics_lookup_subdir=config.lyrics_lookup_subdir,
                 lyrics_file_pattern=config.lyrics_file_pattern,
+                scan_lyrics_source_mode=getattr(config, "scan_lyrics_source_mode", "both"),
             )
             if fs_track is None:
                 skipped += 1

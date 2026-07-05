@@ -5,13 +5,14 @@ import os
 import tempfile
 import time
 import unittest
+from dataclasses import replace
 from concurrent.futures import ThreadPoolExecutor as RealThreadPoolExecutor
 from pathlib import Path
 from unittest.mock import patch
 
 from tests import test_support as _test_support  # noqa: F401
 from tests.test_support import make_fs_track, touch_text
-from db.database import add_tracks, get_library_file_index, initialize_database
+from db.database import add_tracks, get_config, get_library_file_index, initialize_database, set_config
 from library.scan_library import (
     AudioMetadata,
     MutagenError,
@@ -409,6 +410,60 @@ class LibraryScannerIncrementalTests(unittest.TestCase):
 
             self.assertEqual(created_workers, [expected_workers])
             self.assertEqual(read_metadata.call_count, 2)
+
+    def test_library_scanner_prefers_scan_mode_from_database(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db = initialize_database(tmp)
+            config = get_config(db)
+            set_config(db, replace(config, scan_lyrics_source_mode="embedded_only"))
+            db_path = str(Path(tmp) / "pylrcget.db.sqlite3")
+            db.close()
+
+            music_dir = Path(tmp) / "Music"
+            music_dir.mkdir(parents=True, exist_ok=True)
+            track_path = music_dir / "mode.mp3"
+            touch_text(track_path, "mode")
+
+            fake_metadata = AudioMetadata(
+                title="Mode",
+                album="Album",
+                artist="Artist",
+                album_artist="Artist",
+                track_number=None,
+                duration=120.0,
+            )
+            seen_modes: list[str | None] = []
+
+            def fake_signature(path: str, lyrics_lookup_subdir: str | None = None, **kwargs):
+                seen_modes.append(kwargs.get("scan_lyrics_source_mode"))
+                return (track_path.stat().st_mtime, track_path.stat().st_size)
+
+            def fake_new_fs_track(path: str, *, scan_lyrics_source_mode=None, signature=None, **_kwargs):
+                seen_modes.append(scan_lyrics_source_mode)
+                return FsTrack(
+                    file_path=path,
+                    file_name=Path(path).name,
+                    title="Mode",
+                    album="Album",
+                    artist="Artist",
+                    album_artist="Artist",
+                    duration=120.0,
+                    txt_lyrics=None,
+                    lrc_lyrics=None,
+                    track_number=None,
+                    modified_time=signature[0] if signature else None,
+                    file_size=signature[1] if signature else None,
+                )
+
+            scanner = LibraryScanner(db_path, [str(music_dir)], scan_lyrics_source_mode="both")
+            with (
+                patch("ui.workers.library_scanner.read_audio_metadata", return_value=(object(), fake_metadata)),
+                patch("ui.workers.library_scanner.get_audio_file_signature", side_effect=fake_signature),
+                patch("ui.workers.library_scanner.new_fs_track_from_path", side_effect=fake_new_fs_track),
+            ):
+                scanner.run()
+
+            self.assertEqual(seen_modes, ["embedded_only", "embedded_only"])
 
     def test_library_scanner_skips_unchanged_reindexes_new_and_removes_missing(self):
         with tempfile.TemporaryDirectory() as tmp:
