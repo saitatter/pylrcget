@@ -33,6 +33,7 @@ LIBRARY_SCAN_MAX_PENDING_MULTIPLIER = 4
 class _ScanTimingStats:
     def __init__(self) -> None:
         self.path_discovery_s = 0.0
+        self.audio_fast_path_s = 0.0
         self.signature_check_s = 0.0
         self.signature_audio_stat_s = 0.0
         self.signature_sidecar_stat_s = 0.0
@@ -41,6 +42,8 @@ class _ScanTimingStats:
         self.sidecar_lookup_s = 0.0
         self.db_flush_s = 0.0
         self.path_discovery_count = 0
+        self.audio_fast_path_count = 0
+        self.audio_fast_path_hit_count = 0
         self.signature_check_count = 0
         self.signature_sidecar_candidate_count = 0
         self.metadata_read_count = 0
@@ -57,6 +60,10 @@ class _ScanTimingStats:
             setattr(self, field_name, current + elapsed_s)
             if field_name == "path_discovery_s":
                 self.path_discovery_count += 1
+            elif field_name == "audio_fast_path_s":
+                self.audio_fast_path_count += 1
+            elif field_name == "audio_fast_path_hit_count":
+                self.audio_fast_path_hit_count += int(elapsed_s)
             elif field_name == "signature_check_s":
                 self.signature_check_count += 1
             elif field_name == "signature_sidecar_candidate_count":
@@ -280,17 +287,39 @@ class LibraryScanner(QThread):
 
                     existing = existing_index.get(p)
                     if existing is not None:
+                        existing_signature, existing_metadata, existing_has_content = existing
+                        if not existing_has_content:
+                            fast_started = time.perf_counter()
+                            try:
+                                stat = os.stat(p)
+                            except OSError:
+                                stat = None
+                            timings.record("audio_fast_path_s", time.perf_counter() - fast_started)
+                            timings.record("audio_fast_path_count", 1)
+                            current_signature = (
+                                float(stat.st_mtime) if stat is not None else None,
+                                int(stat.st_size) if stat is not None else None,
+                            )
+                            if existing_signature == current_signature:
+                                timings.record("audio_fast_path_hit_count", 1)
+                                scanned += 1
+                                unchanged += 1
+                                if scanned % 200 == 0:
+                                    self.progress_signal.emit(scanned, total, p, time.perf_counter() - started_at)
+                                drain_completed(block=False)
+                                continue
+
                         signature_started = time.perf_counter()
                         signature = get_audio_file_signature(
                             p,
                             self.lyrics_lookup_subdir,
-                            metadata=existing[1],
+                            metadata=existing_metadata,
                             lyrics_file_pattern=self.lyrics_file_pattern,
                             timing_hook=timings.record,
                             count_hook=timings.record,
                         )
                         timings.record("signature_check_s", time.perf_counter() - signature_started)
-                        if existing[0] == signature:
+                        if existing_signature == signature:
                             scanned += 1
                             unchanged += 1
                             if scanned % 200 == 0:
@@ -346,6 +375,12 @@ class LibraryScanner(QThread):
                 worker_failures,
             )
             logger.info("Library scan path discovery time: %.3fs", timings.path_discovery_s)
+            logger.info(
+                "Library scan audio-only fast path time: %.3fs (%d attempts, %d hits)",
+                timings.audio_fast_path_s,
+                timings.audio_fast_path_count,
+                timings.audio_fast_path_hit_count,
+            )
             logger.info(
                 "Library scan signature check time: %.3fs (%d checks)",
                 timings.signature_check_s,

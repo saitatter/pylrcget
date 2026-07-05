@@ -399,6 +399,7 @@ class LibraryScannerIncrementalTests(unittest.TestCase):
             joined = "\n".join(logs.output)
             self.assertIn("Library scan summary:", joined)
             self.assertIn("Library scan path discovery time:", joined)
+            self.assertIn("Library scan audio-only fast path time:", joined)
             self.assertIn("Library scan signature check time:", joined)
             self.assertIn("Library scan signature audio stat time:", joined)
             self.assertIn("Library scan signature sidecar stat time:", joined)

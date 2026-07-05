@@ -105,7 +105,7 @@ def get_library_file_index(db: sqlite3.Connection) -> dict[str, tuple[float | No
 
 def get_library_scan_index(
     db: sqlite3.Connection,
-) -> dict[str, tuple[tuple[float | None, int | None], scan_library.AudioMetadata]]:
+) -> dict[str, tuple[tuple[float | None, int | None], scan_library.AudioMetadata, bool]]:
     rows = db.execute(
         """
         SELECT
@@ -115,6 +115,9 @@ def get_library_scan_index(
             tracks.title,
             tracks.duration,
             tracks.track_number,
+            tracks.txt_lyrics,
+            tracks.lrc_lyrics,
+            tracks.instrumental,
             artists.name AS artist_name,
             albums.name AS album_name,
             COALESCE(NULLIF(albums.album_artist_name, ''), artists.name, '') AS album_artist_name
@@ -137,6 +140,7 @@ def get_library_scan_index(
                 track_number=int(row["track_number"]) if row["track_number"] is not None else None,
                 duration=float(row["duration"] or 0.0),
             ),
+            bool(row["txt_lyrics"] or row["lrc_lyrics"] or row["instrumental"]),
         )
         for row in rows
     }
