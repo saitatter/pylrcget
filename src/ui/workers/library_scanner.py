@@ -435,6 +435,13 @@ class LibraryScanner(QThread):
                 cumulative_worker_s,
                 (cumulative_worker_s / total_elapsed) if total_elapsed > 0 else 0.0,
             )
+            if total_elapsed > 0:
+                logger.info(
+                    "Library scan average throughput: %.2f tracks/sec (%d tracks in %.2fs wall time)",
+                    scanned / total_elapsed,
+                    scanned,
+                    total_elapsed,
+                )
             logger.debug("Library scan path discovery cumulative worker time: %.3fs", timings.path_discovery_s)
             logger.debug(
                 "Library scan audio-only fast path cumulative worker time: %.3fs (%d attempts, %d hits)",
@@ -487,14 +494,6 @@ class LibraryScanner(QThread):
                     "Library scan recorded sidecar timing while scan mode=%s; this suggests a caller/config mismatch.",
                     self.scan_lyrics_source_mode,
                 )
-            if total_elapsed > 0:
-                logger.debug(
-                    "Library scan average throughput: %.2f tracks/sec (%d tracks in %.2fs wall time)",
-                    scanned / total_elapsed,
-                    scanned,
-                    total_elapsed,
-                )
-
             msg = f"Library scanning complete. Updated {updated}, unchanged {unchanged}, removed {removed}."
             if reattached:
                 msg += f" Reattached lyrics for {reattached} moved file(s)."
