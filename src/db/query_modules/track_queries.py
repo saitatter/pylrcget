@@ -292,6 +292,112 @@ def get_track_rows(
     return db.execute(query, params).fetchall()
 
 
+def get_track_list_rows(
+    db: sqlite3.Connection,
+    search_query: str,
+    synced_lyrics_tracks: bool,
+    plain_lyrics_tracks: bool,
+    instrumental_tracks: bool,
+    no_lyrics_tracks: bool,
+    unsaved_draft_only: bool = False,
+    limit: int | None = None,
+    offset: int = 0,
+    artist_id: int | None = None,
+    album_id: int | None = None,
+    artist_ids: list[int] | None = None,
+    album_ids: list[int] | None = None,
+    sort_column: int = 0,
+    sort_order: str = "asc",
+) -> list[sqlite3.Row]:
+    conditions: list[str] = []
+    params: list[object] = []
+
+    q = prepare_input(search_query or "")
+    if q:
+        conditions.append(
+            "(tracks.title_lower LIKE ? ESCAPE '\\' OR artists.name_lower LIKE ? ESCAPE '\\' OR albums.name_lower LIKE ? ESCAPE '\\' OR albums.album_artist_name_lower LIKE ? ESCAPE '\\')"
+        )
+        like = f"%{escape_like(q)}%"
+        params.extend([like, like, like, like])
+
+    if unsaved_draft_only:
+        conditions.append("tracks.dirty_lyrics_present = 1")
+    else:
+        if not synced_lyrics_tracks:
+            conditions.append("(tracks.lrc_lyrics IS NULL OR tracks.lrc_lyrics = '[au: instrumental]')")
+        if not plain_lyrics_tracks:
+            conditions.append("(tracks.txt_lyrics IS NULL OR tracks.lrc_lyrics IS NOT NULL)")
+        if not instrumental_tracks:
+            conditions.append("tracks.instrumental = 0")
+        if not no_lyrics_tracks:
+            conditions.append("(tracks.txt_lyrics IS NOT NULL OR tracks.lrc_lyrics IS NOT NULL OR tracks.instrumental = 1)")
+
+    if artist_ids:
+        placeholders = ", ".join("?" for _ in artist_ids)
+        conditions.append(f"tracks.artist_id IN ({placeholders})")
+        params.extend(int(v) for v in artist_ids)
+    elif artist_id is not None:
+        conditions.append("tracks.artist_id = ?")
+        params.append(int(artist_id))
+
+    if album_ids:
+        placeholders = ", ".join("?" for _ in album_ids)
+        conditions.append(f"tracks.album_id IN ({placeholders})")
+        params.extend(int(v) for v in album_ids)
+    elif album_id is not None:
+        conditions.append("tracks.album_id = ?")
+        params.append(int(album_id))
+
+    where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+    order = "DESC" if str(sort_order).lower() == "desc" else "ASC"
+    order_map = {
+        0: (
+            f"tracks.track_number IS NULL ASC, tracks.track_number {order}, "
+            f"tracks.title_lower {order}, tracks.id {order}"
+        ),
+        1: f"artists.name_lower {order}, tracks.title_lower {order}, tracks.id {order}",
+        2: f"tracks.duration IS NULL ASC, tracks.duration {order}, tracks.id {order}",
+        3: (
+            "CASE "
+            "WHEN tracks.lrc_lyrics IS NOT NULL AND tracks.lrc_lyrics != '[au: instrumental]' THEN 0 "
+            "WHEN tracks.txt_lyrics IS NOT NULL THEN 1 "
+            "WHEN tracks.instrumental = 1 THEN 2 "
+            "ELSE 3 END "
+            f"{order}, tracks.title_lower {order}, tracks.id {order}"
+        ),
+        4: f"tracks.title_lower {order}, tracks.id {order}",
+    }
+    col = int(sort_column) if int(sort_column) in order_map else 0
+    order_clause = order_map[col]
+    limit_clause = f"LIMIT {int(limit)} OFFSET {max(0, int(offset))}" if limit else ""
+
+    query = f"""
+        SELECT
+            tracks.id,
+            tracks.title,
+            tracks.artist_id,
+            tracks.album_id,
+            artists.name AS artist_name,
+            albums.name AS album_name,
+            tracks.track_number,
+            tracks.duration,
+            tracks.instrumental,
+            tracks.lrc_lyrics IS NOT NULL AS has_lrc_lyrics,
+            tracks.txt_lyrics IS NOT NULL AS has_txt_lyrics,
+            tracks.lrc_lyrics = '[au: instrumental]' AS has_instrumental_marker,
+            tracks.dirty_txt_lyrics,
+            tracks.dirty_lrc_lyrics,
+            tracks.dirty_lyrics_present
+        FROM tracks
+        JOIN artists ON tracks.artist_id = artists.id
+        JOIN albums ON tracks.album_id = albums.id
+        {where_clause}
+        ORDER BY {order_clause}
+        {limit_clause}
+    """
+    return db.execute(query, params).fetchall()
+
+
 def update_track_synced_lyrics(db: sqlite3.Connection, track_id: int, synced_lyrics: str, plain_lyrics: str) -> None:
     synced_lyrics = (synced_lyrics or "").strip() or None
     plain_lyrics = (plain_lyrics or "").strip() or None

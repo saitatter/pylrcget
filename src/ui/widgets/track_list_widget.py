@@ -21,7 +21,7 @@ from PySide6.QtWidgets import (
     QWidgetAction,
 )
 
-from db.database import get_directories, get_duplicate_track_ids, get_track_by_id, get_track_rows
+from db.database import get_directories, get_duplicate_track_ids, get_track_by_id, get_track_list_rows
 from ui.library_routes import LibraryRoute, albums_detail, artists_detail
 from ui.widgets.empty_state_widget import EmptyStateWidget
 from ui.models.track_table_model import TrackTableModel
@@ -289,7 +289,7 @@ class TrackListWidget(QWidget):
             )
             return
 
-        rows = get_track_rows(
+        rows = get_track_list_rows(
             db=db,
             search_query=self._search,
             synced_lyrics_tracks=self._filters["synced"],

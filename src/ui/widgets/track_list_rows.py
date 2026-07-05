@@ -10,16 +10,21 @@ def build_track_list_rows(
 ) -> list[TrackListRow]:
     ui_rows: list[TrackListRow] = []
     for row in rows:
+        keys = set(row.keys()) if hasattr(row, "keys") else set()
         instrumental = bool(row["instrumental"])
-        lrc = row["lrc_lyrics"]
-        txt = row["txt_lyrics"]
+        if "has_instrumental_marker" in keys:
+            instrumental = instrumental or bool(row["has_instrumental_marker"])
+        lrc = row["lrc_lyrics"] if "lrc_lyrics" in keys else None
+        txt = row["txt_lyrics"] if "txt_lyrics" in keys else None
+        has_lrc = bool(row["has_lrc_lyrics"]) if "has_lrc_lyrics" in keys else bool(lrc)
+        has_txt = bool(row["has_txt_lyrics"]) if "has_txt_lyrics" in keys else bool(txt)
         has_dirty_lyrics = bool(row["dirty_lyrics_present"] and (row["dirty_lrc_lyrics"] or row["dirty_txt_lyrics"]))
 
         if instrumental or lrc == "[au: instrumental]":
             state = LyricsState.INSTRUMENTAL
-        elif lrc:
+        elif has_lrc:
             state = LyricsState.SYNCED
-        elif txt:
+        elif has_txt:
             state = LyricsState.PLAIN
         else:
             state = LyricsState.NONE

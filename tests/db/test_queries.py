@@ -19,6 +19,7 @@ from db.queries import (
     get_download_history_rows,
     get_publish_history_rows,
     get_similar_lyrics_track_rows,
+    get_track_list_rows,
     get_track_rows,
     get_track_by_id,
     refresh_track_from_file,
@@ -88,6 +89,41 @@ class ArtistAlbumQueryTests(unittest.TestCase):
 
                 self.assertEqual([row["title"] for row in rows], ["Second", "First", "Unknown"])
                 self.assertEqual([row["track_number"] for row in rows], [1, 2, None])
+            finally:
+                db.close()
+
+    def test_get_track_list_rows_exposes_lightweight_lyrics_flags(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db = initialize_database(tmp)
+            try:
+                audio = Path(tmp) / "song.mp3"
+                touch_text(audio, "a")
+                add_tracks(
+                    db,
+                    [
+                        replace(
+                            make_fs_track(audio, artist="Artist", album="Album", title="Song"),
+                            txt_lyrics="plain lyrics",
+                            lrc_lyrics=None,
+                        )
+                    ],
+                )
+
+                rows = get_track_list_rows(
+                    db,
+                    search_query="",
+                    synced_lyrics_tracks=True,
+                    plain_lyrics_tracks=True,
+                    instrumental_tracks=True,
+                    no_lyrics_tracks=True,
+                    sort_column=0,
+                    sort_order="asc",
+                )
+
+                self.assertEqual(len(rows), 1)
+                self.assertTrue(bool(rows[0]["has_txt_lyrics"]))
+                self.assertFalse(bool(rows[0]["has_lrc_lyrics"]))
+                self.assertFalse(bool(rows[0]["has_instrumental_marker"]))
             finally:
                 db.close()
 

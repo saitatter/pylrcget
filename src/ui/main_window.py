@@ -33,7 +33,6 @@ from db.queries import (
     get_directories,
     get_existing_file_paths,
     get_similar_lyrics_track_rows,
-    refresh_track_from_file,
     get_track_by_id,
     mark_tracks_instrumental,
     set_config,
@@ -125,6 +124,7 @@ class MainWindow(QMainWindow):
         self._pending_playback_speed: float | None = None
         self._pending_playback_volume: float | None = None
         self._ai_sync_worker = None
+        self._track_refresh_worker = None
         self._dirty_lyrics_timer = QTimer(self)
         self._dirty_lyrics_timer.setSingleShot(True)
         self._dirty_lyrics_timer.setInterval(DIRTY_LYRICS_FLUSH_MS)
@@ -1202,59 +1202,7 @@ class MainWindow(QMainWindow):
         self.on_refresh_tracks([int(track_id)])
 
     def on_refresh_tracks(self, track_ids: list[int]) -> None:
-        track_ids = [int(track_id) for track_id in track_ids if track_id is not None]
-        if not track_ids:
-            return
-
-        selected_before = set(track_ids)
-        refreshed_tracks = {}
-        removed_ids: set[int] = set()
-
-        for track_id in track_ids:
-            try:
-                refreshed = refresh_track_from_file(self.app_state.db, int(track_id))
-            except (sqlite3.Error, OSError, ValueError) as exc:
-                log_and_notify(
-                    self.app_state,
-                    logger,
-                    logging.ERROR,
-                    exception_message("Failed to refresh track from disk", exc),
-                    "error",
-                    show_status=self._show_status_message,
-                    status_timeout_ms=4000,
-                )
-                continue
-
-            if refreshed is None:
-                removed_ids.add(int(track_id))
-            else:
-                refreshed_tracks[int(track_id)] = refreshed
-
-        self._refresh_visible_library_view_after_downloads()
-        self.track_list.restore_selection(selected_before - removed_ids)
-
-        current_track_id = self._current_player_track_id()
-        if current_track_id in removed_ids:
-            self._clear_current_player_track()
-        elif current_track_id in refreshed_tracks:
-            refreshed = refreshed_tracks[current_track_id]
-            self._update_current_player_track_meta(refreshed)
-            self._set_track_lyrics_views(refreshed)
-
-        refreshed_count = len(refreshed_tracks)
-        removed_count = len(removed_ids)
-        if removed_count:
-            notify_user(
-                self.app_state,
-                f"Refreshed {refreshed_count} track(s). Removed {removed_count} missing track(s).",
-                "warning",
-                show_status=self._show_status_message,
-                status_timeout_ms=3500,
-            )
-            return
-
-        suffix = "s" if refreshed_count != 1 else ""
-        self._show_status_message(f"Refreshed {refreshed_count} track{suffix} from disk.", 2500)
+        library_actions.refresh_tracks(self, track_ids)
 
     def play_next(self):
         if not self._queue_ids:

@@ -7,10 +7,17 @@ import sqlite3
 from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QMessageBox
 
-from db.queries import get_config, get_directories, mark_tracks_instrumental, unmark_tracks_instrumental
+from db.queries import (
+    get_config,
+    get_directories,
+    get_track_by_id,
+    mark_tracks_instrumental,
+    unmark_tracks_instrumental,
+)
 from ui.constants import FEEDBACK_RESET_MS
 from ui.services.feedback import exception_message, log_and_notify, notify_user
 from ui.workers.library_scanner import LibraryScanner
+from ui.workers.track_refresh_worker import TrackRefreshWorker
 
 logger = logging.getLogger(__name__)
 
@@ -162,6 +169,71 @@ def on_bulk_download_requested(window, track_ids: list[int], mode: str) -> None:
 
 def download_missing_lyrics(window) -> None:
     window.downloads.download_missing()
+
+
+def refresh_track(window, track_id: int) -> None:
+    refresh_tracks(window, [int(track_id)])
+
+
+def refresh_tracks(window, track_ids: list[int]) -> None:
+    track_ids = [int(track_id) for track_id in track_ids if track_id is not None]
+    if not track_ids:
+        return
+
+    worker = getattr(window, "_track_refresh_worker", None)
+    if worker is not None and worker.isRunning():
+        return
+
+    selected_before = set(track_ids)
+    active_track_list = window._active_track_list_widget()
+    window._track_refresh_worker = TrackRefreshWorker(window.app_state.db_path, track_ids, parent=window)
+
+    def _on_progress(current: int, total: int, label: str, status: str) -> None:
+        del current, total, label
+        window._show_status_message(status, 1500)
+
+    def _on_finished(ok: bool, summary: str, stats: dict) -> None:
+        del ok
+        worker_obj = window._track_refresh_worker
+        window._track_refresh_worker = None
+        if worker_obj is not None:
+            worker_obj.deleteLater()
+
+        refreshed_ids = {int(track_id) for track_id in stats.get("refreshed", [])}
+        removed_ids = {int(track_id) for track_id in stats.get("removed", [])}
+        failed_ids = {int(track_id) for track_id in stats.get("failed", [])}
+
+        window._refresh_visible_library_view_after_downloads()
+        if active_track_list is not None:
+            active_track_list.restore_selection(selected_before - removed_ids)
+
+        current_track_id = window._current_player_track_id()
+        if current_track_id in removed_ids:
+            window._clear_current_player_track()
+        elif current_track_id in refreshed_ids:
+            try:
+                refreshed = get_track_by_id(window.app_state.db, int(current_track_id))
+                window._update_current_player_track_meta(refreshed)
+                window._set_track_lyrics_views(refreshed)
+            except (sqlite3.Error, AttributeError, TypeError) as exc:
+                logger.warning("Failed to refresh active track after disk refresh: %s", exc)
+
+        if removed_ids or failed_ids:
+            message = summary
+            notify_user(
+                window.app_state,
+                message,
+                "warning",
+                show_status=window._show_status_message,
+                status_timeout_ms=4000,
+            )
+        else:
+            window._show_status_message(summary, 2500)
+
+    window._track_refresh_worker.progress.connect(_on_progress)
+    window._track_refresh_worker.finishedRefresh.connect(_on_finished)
+    window._show_status_message(f"Refreshing {len(track_ids)} track(s) from disk...", 2500)
+    window._track_refresh_worker.start()
 
 
 def set_track_download_state_all(window, track_id: int, state: str) -> None:

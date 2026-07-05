@@ -238,8 +238,10 @@ def get_similar_lyrics_track_rows(
         JOIN albums ON tracks.album_id = albums.id
         JOIN artists ON tracks.artist_id = artists.id
         WHERE tracks.id != ?
+          AND tracks.title_lower = ?
+          AND artists.name_lower = ?
         """,
-        (int(source_track_id),),
+        (int(source_track_id), source_title, source_artist),
     ).fetchall()
 
     matches: list[dict] = []
