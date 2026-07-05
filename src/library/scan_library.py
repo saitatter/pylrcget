@@ -152,38 +152,50 @@ def _iter_audio_paths_core(
     for root in directories:
         if not root or not os.path.isdir(root):
             continue
-        for dirpath, dirnames, filenames in os.walk(root):
+        stack = [root]
+        while stack:
+            dirpath = stack.pop()
             normalized_dir, posix_dir = _path_variants(dirpath)
             if _is_path_excluded_variants(dirpath, normalized_dir, posix_dir, excluded_roots, compiled_patterns):
-                dirnames[:] = []
                 continue
 
-            kept_dirnames: list[str] = []
-            for dirname in dirnames:
-                child_path = os.path.join(dirpath, dirname)
-                child_normalized, child_posix = _join_normalized_path(normalized_dir, dirname)
-                if _is_path_excluded_variants(child_path, child_normalized, child_posix, excluded_roots, compiled_patterns):
-                    continue
-                kept_dirnames.append(dirname)
-            dirnames[:] = kept_dirnames
+            child_dirs: list[str] = []
+            try:
+                with os.scandir(dirpath) as it:
+                    for entry in it:
+                        try:
+                            is_dir = entry.is_dir(follow_symlinks=False)
+                        except OSError:
+                            continue
 
-            for fn in filenames:
-                ext = os.path.splitext(fn)[1].lower()
-                if ext not in AUDIO_EXTS:
-                    continue
-                file_path = os.path.join(dirpath, fn)
-                normalized, posix_path = _join_normalized_path(normalized_dir, fn)
-                if normalized in seen:
-                    continue
-                if not _is_path_excluded_variants(file_path, normalized, posix_path, excluded_roots, compiled_patterns):
-                    seen.add(normalized)
-                    paths.append(file_path)
-                    try:
-                        stat = os.stat(file_path)
-                    except OSError:
-                        pass
-                    else:
-                        signatures[file_path] = (float(stat.st_mtime), int(stat.st_size))
+                        if is_dir:
+                            child_path = entry.path
+                            child_normalized, child_posix = _join_normalized_path(normalized_dir, entry.name)
+                            if _is_path_excluded_variants(child_path, child_normalized, child_posix, excluded_roots, compiled_patterns):
+                                continue
+                            child_dirs.append(child_path)
+                            continue
+
+                        ext = os.path.splitext(entry.name)[1].lower()
+                        if ext not in AUDIO_EXTS:
+                            continue
+                        file_path = entry.path
+                        normalized, posix_path = _join_normalized_path(normalized_dir, entry.name)
+                        if normalized in seen:
+                            continue
+                        if not _is_path_excluded_variants(file_path, normalized, posix_path, excluded_roots, compiled_patterns):
+                            seen.add(normalized)
+                            paths.append(file_path)
+                            try:
+                                stat = entry.stat(follow_symlinks=False)
+                            except OSError:
+                                pass
+                            else:
+                                signatures[file_path] = (float(stat.st_mtime), int(stat.st_size))
+            except OSError:
+                continue
+
+            stack.extend(reversed(child_dirs))
     return paths, signatures
 
 
