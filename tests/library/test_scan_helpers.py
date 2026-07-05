@@ -18,6 +18,7 @@ from library.scan_library import (
     SidecarLookupCache,
     get_audio_file_signature,
     iter_audio_paths,
+    iter_audio_paths_with_signatures,
     new_fs_track_from_path,
     preview_audio_path_exclusions,
 )
@@ -130,6 +131,18 @@ class ScanLibraryHelpersTests(unittest.TestCase):
             )
             self.assertEqual({Path(p).name for p in included}, {"keep.mp3", "keep.flac"})
             self.assertEqual({Path(p).name for p in excluded}, {"demo_track.mp3"})
+
+    def test_iter_audio_paths_with_signatures_returns_audio_stats(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            audio = root / "track.mp3"
+            touch_text(audio, "audio")
+
+            paths, signatures = iter_audio_paths_with_signatures([str(root)])
+
+            self.assertEqual([str(audio)], paths)
+            self.assertIn(str(audio), signatures)
+            self.assertEqual(signatures[str(audio)][1], audio.stat().st_size)
 
     def test_new_fs_track_from_path_skips_corrupt_files(self):
         with tempfile.TemporaryDirectory() as tmp:

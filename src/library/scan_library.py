@@ -138,15 +138,16 @@ def _is_path_excluded_variants(
     return False
 
 
-def iter_audio_paths(
+def _iter_audio_paths_core(
     directories: list[str],
     *,
     excluded_paths: str | None = None,
     excluded_patterns: str | None = None,
-) -> list[str]:
+) -> tuple[list[str], dict[str, tuple[float | None, int | None]]]:
     excluded_roots = _normalize_excluded_paths(excluded_paths)
     compiled_patterns = _compile_excluded_patterns(excluded_patterns)
     paths: list[str] = []
+    signatures: dict[str, tuple[float | None, int | None]] = {}
     seen: set[str] = set()
     for root in directories:
         if not root or not os.path.isdir(root):
@@ -177,7 +178,40 @@ def iter_audio_paths(
                 if not _is_path_excluded_variants(file_path, normalized, posix_path, excluded_roots, compiled_patterns):
                     seen.add(normalized)
                     paths.append(file_path)
+                    try:
+                        stat = os.stat(file_path)
+                    except OSError:
+                        pass
+                    else:
+                        signatures[file_path] = (float(stat.st_mtime), int(stat.st_size))
+    return paths, signatures
+
+
+def iter_audio_paths(
+    directories: list[str],
+    *,
+    excluded_paths: str | None = None,
+    excluded_patterns: str | None = None,
+) -> list[str]:
+    paths, _signatures = _iter_audio_paths_core(
+        directories,
+        excluded_paths=excluded_paths,
+        excluded_patterns=excluded_patterns,
+    )
     return paths
+
+
+def iter_audio_paths_with_signatures(
+    directories: list[str],
+    *,
+    excluded_paths: str | None = None,
+    excluded_patterns: str | None = None,
+) -> tuple[list[str], dict[str, tuple[float | None, int | None]]]:
+    return _iter_audio_paths_core(
+        directories,
+        excluded_paths=excluded_paths,
+        excluded_patterns=excluded_patterns,
+    )
 
 
 def preview_audio_path_exclusions(

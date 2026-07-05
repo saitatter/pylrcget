@@ -12,7 +12,7 @@ from PySide6.QtCore import QThread, Signal
 from core.utils import prepare_input
 from library.scan_library import (
     get_audio_file_signature,
-    iter_audio_paths,
+    iter_audio_paths_with_signatures,
     new_fs_track_from_path,
     SidecarLookupCache,
     read_audio_metadata,
@@ -171,7 +171,7 @@ class LibraryScanner(QThread):
 
             existing_index = get_library_scan_index(db)
             discovery_started = time.perf_counter()
-            paths = iter_audio_paths(
+            paths, discovered_signatures = iter_audio_paths_with_signatures(
                 self.directories,
                 excluded_paths=self.excluded_paths,
                 excluded_patterns=self.excluded_patterns,
@@ -292,16 +292,9 @@ class LibraryScanner(QThread):
                         existing_signature, existing_metadata, existing_has_content = existing
                         if not existing_has_content:
                             fast_started = time.perf_counter()
-                            try:
-                                stat = os.stat(p)
-                            except OSError:
-                                stat = None
+                            current_signature = discovered_signatures.get(p)
                             timings.record("audio_fast_path_s", time.perf_counter() - fast_started)
                             timings.record("audio_fast_path_count", 1)
-                            current_signature = (
-                                float(stat.st_mtime) if stat is not None else None,
-                                int(stat.st_size) if stat is not None else None,
-                            )
                             if existing_signature == current_signature:
                                 timings.record("audio_fast_path_hit_count", 1)
                                 scanned += 1
