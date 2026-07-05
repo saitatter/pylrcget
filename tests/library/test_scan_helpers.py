@@ -236,6 +236,40 @@ class ScanLibraryHelpersTests(unittest.TestCase):
             self.assertEqual(track_lookup_only.txt_lyrics, "lookup plain")
             self.assertEqual(track_lookup_only.lrc_lyrics, "[00:02.00]lookup synced")
 
+    def test_new_fs_track_from_path_reuses_sidecar_directory_cache(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            audio = root / "track.mp3"
+            sidecar = root / "track.txt"
+            touch_text(audio, "audio")
+            touch_text(sidecar, "plain sidecar")
+
+            class _FakeAudio:
+                def __init__(self) -> None:
+                    self.info = type("Info", (), {"length": 180.0})()
+
+                def get(self, key):
+                    mapping = {
+                        "title": ["Track"],
+                        "album": ["Album"],
+                        "artist": ["Artist"],
+                        "albumartist": ["Artist"],
+                    }
+                    return mapping.get(key)
+
+            cache = SidecarLookupCache()
+            with (
+                patch("library.scan_library.MutagenFile", return_value=_FakeAudio()),
+                patch("library.scan_library.read_embedded_lyrics", return_value=(None, None)),
+                patch("library.scan_library.os.listdir", wraps=os.listdir) as listdir_mock,
+            ):
+                first = new_fs_track_from_path(str(audio), sidecar_lookup_cache=cache)
+                second = new_fs_track_from_path(str(audio), sidecar_lookup_cache=cache)
+
+            self.assertIsNotNone(first)
+            self.assertIsNotNone(second)
+            self.assertEqual(listdir_mock.call_count, 1)
+
     def test_new_fs_track_from_path_passes_scan_mode_to_signature_lookup(self):
         with tempfile.TemporaryDirectory() as tmp:
             audio = Path(tmp) / "track.mp3"
@@ -271,6 +305,43 @@ class ScanLibraryHelpersTests(unittest.TestCase):
 
             self.assertIsNotNone(track)
             self.assertEqual(signature_mock.call_args.kwargs["scan_lyrics_source_mode"], "embedded_only")
+
+    def test_new_fs_track_from_path_uses_audio_signature_when_signature_missing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            audio = Path(tmp) / "track.mp3"
+            touch_text(audio, "audio")
+
+            class _FakeAudio:
+                def __init__(self) -> None:
+                    self.info = type("Info", (), {"length": 180.0})()
+
+                def get(self, key):
+                    mapping = {
+                        "title": ["Track"],
+                        "album": ["Album"],
+                        "artist": ["Artist"],
+                        "albumartist": ["Artist"],
+                    }
+                    return mapping.get(key)
+
+            audio_signature = (123.0, 456)
+            with patch("library.scan_library.MutagenFile", return_value=_FakeAudio()), patch(
+                "library.scan_library.get_audio_file_signature_with_lookup",
+                return_value=audio_signature,
+            ) as signature_mock, patch(
+                "library.scan_library.read_embedded_lyrics",
+                return_value=(None, None),
+            ):
+                track = new_fs_track_from_path(
+                    str(audio),
+                    audio_signature=audio_signature,
+                )
+
+            self.assertIsNotNone(track)
+            assert track is not None
+            self.assertEqual(track.modified_time, audio_signature[0])
+            self.assertEqual(track.file_size, audio_signature[1])
+            self.assertEqual(signature_mock.call_args.kwargs["audio_signature"], audio_signature)
 
     def test_new_fs_track_from_path_reads_artist_title_lrc_sidecar(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -367,13 +438,15 @@ class LibraryScannerIncrementalTests(unittest.TestCase):
             touch_text(second, "second")
 
             created_workers: list[int] = []
+            seen_track_kwargs: list[dict] = []
 
             class RecordingExecutor(RealThreadPoolExecutor):
                 def __init__(self, *args, max_workers=None, **kwargs):
                     created_workers.append(int(max_workers or 0))
                     super().__init__(*args, max_workers=max_workers, **kwargs)
 
-            def fake_new_fs_track(path: str, *, signature=None, **_kwargs):
+            def fake_new_fs_track(path: str, *, signature=None, **kwargs):
+                seen_track_kwargs.append(kwargs)
                 name = Path(path).stem
                 return FsTrack(
                     file_path=path,
@@ -403,13 +476,26 @@ class LibraryScannerIncrementalTests(unittest.TestCase):
                 patch("ui.workers.library_scanner.os.cpu_count", return_value=8),
                 patch("ui.workers.library_scanner.ThreadPoolExecutor", RecordingExecutor),
                 patch("ui.workers.library_scanner.read_audio_metadata", return_value=(object(), fake_metadata)) as read_metadata,
+                patch("ui.workers.library_scanner.get_audio_file_signature") as signature_mock,
                 patch("ui.workers.library_scanner.new_fs_track_from_path", side_effect=fake_new_fs_track),
             ):
                 expected_workers = _scan_worker_count()
+                signature_mock.side_effect = lambda path, lyrics_lookup_subdir=None, **kwargs: (
+                    first.stat().st_mtime if Path(path).name == "first.mp3" else second.stat().st_mtime,
+                    first.stat().st_size if Path(path).name == "first.mp3" else second.stat().st_size,
+                )
                 scanner.run()
 
             self.assertEqual(created_workers, [expected_workers])
             self.assertEqual(read_metadata.call_count, 2)
+            self.assertEqual(signature_mock.call_count, 2)
+            for call in signature_mock.call_args_list:
+                self.assertIsNotNone(call.kwargs["audio_signature"])
+                self.assertIsNotNone(call.kwargs["sidecar_lookup_cache"])
+            self.assertEqual(len(seen_track_kwargs), 2)
+            for kwargs in seen_track_kwargs:
+                self.assertIsNotNone(kwargs["audio_signature"])
+                self.assertIsNotNone(kwargs["sidecar_lookup_cache"])
 
     def test_library_scanner_prefers_scan_mode_from_database(self):
         with tempfile.TemporaryDirectory() as tmp:

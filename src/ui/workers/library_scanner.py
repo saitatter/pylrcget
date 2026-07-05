@@ -115,6 +115,8 @@ def _scan_track_for_path(
     lyrics_lookup_subdir: str,
     lyrics_file_pattern: str,
     scan_lyrics_source_mode: str,
+    audio_signature: tuple[float | None, int | None] | None = None,
+    sidecar_lookup_cache: SidecarLookupCache | None = None,
     timings: _ScanTimingStats | None = None,
 ) -> _ScanTaskResult:
     metadata_result = _read_metadata_for_scan(path, timings=timings)
@@ -128,6 +130,8 @@ def _scan_track_for_path(
         metadata=metadata,
         lyrics_file_pattern=lyrics_file_pattern,
         scan_lyrics_source_mode=scan_lyrics_source_mode,
+        audio_signature=audio_signature,
+        sidecar_lookup_cache=sidecar_lookup_cache,
         timing_hook=None if timings is None else timings.record,
         count_hook=None if timings is None else timings.record,
     )
@@ -136,9 +140,11 @@ def _scan_track_for_path(
     track = new_fs_track_from_path(
         path,
         signature=signature,
+        audio_signature=audio_signature,
         lyrics_lookup_subdir=lyrics_lookup_subdir,
         lyrics_file_pattern=lyrics_file_pattern,
         scan_lyrics_source_mode=scan_lyrics_source_mode,
+        sidecar_lookup_cache=sidecar_lookup_cache,
         metadata=metadata,
         audio=audio,
         timing_hook=None if timings is None else timings.record,
@@ -361,6 +367,8 @@ class LibraryScanner(QThread):
                             lyrics_lookup_subdir=self.lyrics_lookup_subdir,
                             lyrics_file_pattern=self.lyrics_file_pattern,
                             scan_lyrics_source_mode=self.scan_lyrics_source_mode,
+                            audio_signature=discovered_signatures.get(p),
+                            sidecar_lookup_cache=sidecar_lookup_cache,
                             timings=timings,
                         )
                     ] = None

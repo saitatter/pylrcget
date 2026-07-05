@@ -62,9 +62,12 @@ class SidecarLookupCache:
         return os.path.normcase(os.path.abspath(directory))
 
     def candidate_exists(self, candidate: str) -> bool:
+        return self.resolve_existing(candidate) is not None
+
+    def resolve_existing(self, candidate: str) -> str | None:
         directory, filename = os.path.split(candidate)
         if not directory or not filename:
-            return False
+            return None
 
         dir_key = self._dir_key(directory)
         with self._lock:
@@ -77,7 +80,10 @@ class SidecarLookupCache:
             entries = {os.path.normcase(name): name for name in names}
             with self._lock:
                 self._dir_entries.setdefault(dir_key, entries)
-        return os.path.normcase(filename) in entries
+        actual_name = entries.get(os.path.normcase(filename))
+        if actual_name is None:
+            return None
+        return os.path.join(directory, actual_name)
 
 
 def _read_vorbis_lyrics(audio) -> tuple[str | None, str | None]:
@@ -567,6 +573,7 @@ def _read_sidecar(
     *,
     metadata: AudioMetadata | None = None,
     lyrics_file_pattern: str | None = None,
+    sidecar_lookup_cache: SidecarLookupCache | None = None,
 ) -> tuple[str | None, str | None]:
     txt = None
     lrc = None
@@ -580,15 +587,25 @@ def _read_sidecar(
         txt_path = base + ".txt"
         lrc_path = base + ".lrc"
 
-        if txt is None and os.path.isfile(txt_path):
+        resolved_txt_path = (
+            sidecar_lookup_cache.resolve_existing(txt_path)
+            if sidecar_lookup_cache is not None
+            else txt_path if os.path.isfile(txt_path) else None
+        )
+        if txt is None and resolved_txt_path is not None:
             try:
-                txt = Path(txt_path).read_text(encoding="utf-8", errors="replace")
+                txt = Path(resolved_txt_path).read_text(encoding="utf-8", errors="replace")
             except OSError:
                 txt = None
 
-        if lrc is None and os.path.isfile(lrc_path):
+        resolved_lrc_path = (
+            sidecar_lookup_cache.resolve_existing(lrc_path)
+            if sidecar_lookup_cache is not None
+            else lrc_path if os.path.isfile(lrc_path) else None
+        )
+        if lrc is None and resolved_lrc_path is not None:
             try:
-                lrc = Path(lrc_path).read_text(encoding="utf-8", errors="replace")
+                lrc = Path(resolved_lrc_path).read_text(encoding="utf-8", errors="replace")
             except OSError:
                 lrc = None
 
@@ -777,9 +794,11 @@ def new_fs_track_from_path(
     path: str,
     *,
     signature: tuple[float | None, int | None] | None = None,
+    audio_signature: tuple[float | None, int | None] | None = None,
     lyrics_lookup_subdir: str | None = None,
     lyrics_file_pattern: str | None = None,
     scan_lyrics_source_mode: str | None = None,
+    sidecar_lookup_cache: SidecarLookupCache | None = None,
     metadata: AudioMetadata | None = None,
     audio=None,
     timing_hook: Callable[[str, float], None] | None = None,
@@ -812,6 +831,7 @@ def new_fs_track_from_path(
                 lyrics_lookup_subdir,
                 metadata=metadata,
                 lyrics_file_pattern=lyrics_file_pattern,
+                sidecar_lookup_cache=sidecar_lookup_cache,
             )
             if timing_hook is not None:
                 timing_hook("sidecar_lookup_s", time.perf_counter() - sidecar_started)
@@ -823,7 +843,7 @@ def new_fs_track_from_path(
         txt_lyrics = txt_embedded or txt_sidecar
         lrc_lyrics = lrc_embedded or lrc_sidecar
 
-        modified_time, file_size = (
+        signature_source = (
             signature
             if signature is not None
             else get_audio_file_signature_with_lookup(
@@ -832,8 +852,11 @@ def new_fs_track_from_path(
                 metadata=metadata,
                 lyrics_file_pattern=lyrics_file_pattern,
                 scan_lyrics_source_mode=scan_lyrics_source_mode,
+                audio_signature=audio_signature,
+                sidecar_lookup_cache=sidecar_lookup_cache,
             )
         )
+        modified_time, file_size = signature_source
 
         return FsTrack(
             file_path=path,
