@@ -226,7 +226,7 @@ class MigrationTests(unittest.TestCase):
             finally:
                 db.close()
 
-    def test_v5_database_upgrades_scan_lyrics_source_mode_column(self):
+    def test_v4_database_upgrades_scan_lyrics_source_mode_column(self):
         with tempfile.TemporaryDirectory() as tmp:
             db_path = Path(tmp) / "pylrcget.db.sqlite3"
             db = sqlite3.connect(str(db_path))
@@ -247,15 +247,16 @@ class MigrationTests(unittest.TestCase):
                     """
                 )
                 db.execute("INSERT INTO config_data (id) VALUES (1)")
-                db.execute("PRAGMA user_version=5")
+                db.execute("PRAGMA user_version=4")
                 db.commit()
 
-                upgrade_database_if_needed(db, 5)
+                upgrade_database_if_needed(db, 4)
 
                 version = int(db.execute("PRAGMA user_version").fetchone()[0])
                 self.assertEqual(version, CURRENT_DB_VERSION)
                 columns = {row["name"] for row in db.execute("PRAGMA table_info(config_data)").fetchall()}
                 self.assertIn("scan_lyrics_source_mode", columns)
+                self.assertIn("scan_worker_count", columns)
                 row = db.execute(
                     "SELECT scan_lyrics_source_mode FROM config_data LIMIT 1"
                 ).fetchone()
