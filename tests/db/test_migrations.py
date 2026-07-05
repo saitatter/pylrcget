@@ -29,6 +29,7 @@ class MigrationTests(unittest.TestCase):
                     {
                         "download_lyrics_mode",
                         "lyrics_lookup_subdir",
+                        "scan_worker_count",
                         "ui_scale_percent",
                         "font_size_mode",
                         "show_album_art",
@@ -53,6 +54,7 @@ class MigrationTests(unittest.TestCase):
                     """
                     SELECT download_lyrics_mode,
                            lyrics_lookup_subdir,
+                           scan_worker_count,
                            ui_scale_percent,
                            font_size_mode,
                            show_album_art,
@@ -68,6 +70,7 @@ class MigrationTests(unittest.TestCase):
                 self.assertIsNotNone(row)
                 self.assertEqual(row["download_lyrics_mode"], "prefer_synced")
                 self.assertEqual(row["lyrics_lookup_subdir"], "")
+                self.assertEqual(int(row["scan_worker_count"]), 4)
                 self.assertEqual(int(row["ui_scale_percent"]), 100)
                 self.assertEqual(row["font_size_mode"], "normal")
                 self.assertEqual(int(row["show_album_art"]), 1)

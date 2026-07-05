@@ -37,7 +37,7 @@ def refresh_library(window) -> None:
     window.top_bar.set_actions_label("Scanning Library")
     window.top_bar.set_button_feedback(window.top_bar.btn_refresh, "loading")
     window.scan_overlay.start_batch(f"{len(directories)} folder(s)", 0)
-    window.scan_overlay.update_progress(0, 0, "Library scan", "Counting tracks in selected folders...")
+    window.scan_overlay.update_progress(0, 0, "Library scan", "Discovering audio files...")
     window.btn_cancel_scan.setEnabled(True)
 
     config = get_config(window.app_state.db)
@@ -48,6 +48,7 @@ def refresh_library(window) -> None:
         excluded_patterns=config.scan_excluded_patterns,
         lyrics_lookup_subdir=config.lyrics_lookup_subdir,
         lyrics_file_pattern=config.lyrics_file_pattern,
+        scan_worker_count=getattr(config, "scan_worker_count", 4),
     )
     window.scanner.progress_signal.connect(window._update_scan_progress)
     window.scanner.finished_signal.connect(window._scan_finished)
@@ -65,8 +66,8 @@ def update_scan_progress(window, scanned: int, total: int, current_path: str, el
     if total <= 0:
         window.progress_bar.setRange(0, 0)
         window.scan_label.setText("Scanning…")
-        window.scan_details.setText("Counting tracks in selected folders…")
-        window.scan_overlay.update_progress(0, 0, "Library scan", "Counting tracks in selected folders...")
+        window.scan_details.setText("Discovering audio files…")
+        window.scan_overlay.update_progress(0, 0, "Library scan", "Discovering audio files...")
         return
 
     if window.progress_bar.maximum() == 0:

@@ -110,6 +110,21 @@ def upgrade_database_if_needed(db: sqlite3.Connection, existing_version: int) ->
         db.commit()
         current_version = 4
 
+    if current_version < 5:
+        logger.info("Upgrade database version %d -> 5...", current_version)
+        config_table = db.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='config_data'"
+        ).fetchone()
+        if config_table is not None:
+            config_columns = {
+                row["name"] for row in db.execute("PRAGMA table_info(config_data)").fetchall()
+            }
+            if "scan_worker_count" not in config_columns:
+                db.execute("ALTER TABLE config_data ADD COLUMN scan_worker_count INTEGER DEFAULT 4")
+        db.execute("PRAGMA user_version=5")
+        db.commit()
+        current_version = 5
+
     if current_version == CURRENT_DB_VERSION:
         return
 

@@ -8,7 +8,7 @@ into migrations + queries.
 from __future__ import annotations
 
 # Public DB version (single source of truth for the app)
-CURRENT_DB_VERSION = 4
+CURRENT_DB_VERSION = 5
 
 from db.migrations import initialize_database, upgrade_database_if_needed
 from db.queries import *  # noqa: F403

@@ -550,19 +550,8 @@ def _read_sidecar(
     lrc = lrc.strip() if lrc else None
     return txt, lrc
 
-def read_embedded_lyrics(path: str) -> tuple[str | None, str | None]:
-    """
-    Read embedded plain lyrics and synced LRC (if present) from an audio file.
-    Returns (plain_lyrics_or_None, synced_lrc_or_None).
 
-    Implementation notes:
-      - MP3: reads ID3 USLT for plain lyrics and a TXXX with desc 'LYRICS' for synced.
-      - FLAC/Vorbis/Ogg: reads 'LYRICS' and 'LRCLIB_LRC' vorbis comments.
-      - MP4/M4A: reads '\xa9lyr' and '----:com.lrclib:lrc' (custom atom, bytes).
-      - WMA/ASF: reads ASF string attributes for plain and synced lyrics.
-      - DSF/DSDIFF (.dff): reads ID3 lyrics frames.
-      - Fallback: tries MutagenFile() and some common keys.
-    """
+def read_embedded_lyrics_from_audio(audio, path: str) -> tuple[str | None, str | None]:
     p = Path(path)
     ext = p.suffix.lower()
     plain: str | None = None
@@ -571,21 +560,17 @@ def read_embedded_lyrics(path: str) -> tuple[str | None, str | None]:
     try:
         if ext == ".mp3":
             try:
-                tags = ID3(path)
+                tags = audio if isinstance(audio, ID3) else getattr(audio, "tags", None) or ID3(path)
             except ID3NoHeaderError:
-                tags = ID3()  # empty
+                tags = ID3()
 
-            # USLT frames: use first available
             uslt_frames = tags.getall("USLT")
             if uslt_frames:
-                # USLT.text can be a str
                 plain = uslt_frames[0].text if getattr(uslt_frames[0], "text", None) else None
 
-            # TXXX custom frames: find one with desc == LRCLIB_LRC (case-sensitive)
             txxx_frames = tags.getall("TXXX")
             for t in txxx_frames:
                 if getattr(t, "desc", "") == ID3_SYNCED_DESC:
-                    # TXXX.text is usually a list-like (mutagen uses [text]) but can be str
                     txt = getattr(t, "text", None)
                     if isinstance(txt, (list, tuple)) and txt:
                         synced = str(txt[0])
@@ -594,9 +579,7 @@ def read_embedded_lyrics(path: str) -> tuple[str | None, str | None]:
                     break
 
         elif ext in {".dsf", ".dff"}:
-            audio = DSF(path) if ext == ".dsf" else DSDIFF(path)
             tags = getattr(audio, "tags", None)
-
             if tags:
                 uslt_frames = tags.getall("USLT")
                 if uslt_frames:
@@ -613,31 +596,22 @@ def read_embedded_lyrics(path: str) -> tuple[str | None, str | None]:
                         break
 
         elif ext in {".flac"}:
-            audio = FLAC(path)
             plain, synced = _read_vorbis_lyrics(audio)
         elif ext in {".ogg", ".oga"}:
-            audio = OggVorbis(path)
             plain, synced = _read_vorbis_lyrics(audio)
-
         elif ext == ".opus":
-            audio = OggOpus(path)
             plain, synced = _read_vorbis_lyrics(audio)
 
         elif ext in {".m4a", ".mp4"}:
-            audio = MP4(path)
-            # plain lyrics: '\xa9lyr'
             plain_list = audio.get(MP4_PLAIN_KEY)
             if isinstance(plain_list, (list, tuple)) and plain_list:
                 plain = str(plain_list[0])
             elif isinstance(plain_list, str):
                 plain = plain_list
 
-            # synced: custom atom '----:com.lrclib:lrc' -> stored as bytes inside a list
-            key = MP4_SYNCED_KEY
-            atom = audio.get(key)
+            atom = audio.get(MP4_SYNCED_KEY)
             if isinstance(atom, (list, tuple)) and atom:
                 first = atom[0]
-                # MP4 custom atom often stores bytes; attempt decode if so
                 if isinstance(first, (bytes, bytearray)):
                     try:
                         synced = first.decode("utf-8", errors="replace")
@@ -647,8 +621,6 @@ def read_embedded_lyrics(path: str) -> tuple[str | None, str | None]:
                     synced = str(first)
 
         elif ext in {".wma", ".asf"}:
-            audio = ASF(path)
-
             def _first_asf_text(keys: tuple[str, ...]) -> str | None:
                 for key in keys:
                     values = audio.get(key)
@@ -667,7 +639,6 @@ def read_embedded_lyrics(path: str) -> tuple[str | None, str | None]:
             synced = _first_asf_text(ASF_SYNCED_KEYS)
 
         elif ext == ".mpc":
-            audio = Musepack(path)
             tags = getattr(audio, "tags", None)
 
             def _first_ape_text(keys: tuple[str, ...]) -> str | None:
@@ -689,27 +660,32 @@ def read_embedded_lyrics(path: str) -> tuple[str | None, str | None]:
             synced = _first_ape_text(APE_SYNCED_KEYS)
 
         else:
-            # Fallback generic MutagenFile with common keys
-            audio = MutagenFile(path, easy=False)
-            if audio is not None:
-                # Try common keys (case-sensitive and lowercase)
-                for key in (VORBIS_SYNCED_KEY, VORBIS_PLAIN_KEY, "USLT", MP4_PLAIN_KEY, MP4_SYNCED_KEY, *ASF_PLAIN_KEYS, *ASF_SYNCED_KEYS, "lyrics", "LYRICS", "LYRICS_SYNCD"):
-                    val = audio.tags.get(key) if getattr(audio, "tags", None) else None
-                    if val:
-                        # val could be list or frame; handle politely
-                        if isinstance(val, (list, tuple)):
-                            plain = str(val[0])
-                        else:
-                            try:
-                                plain = str(val)
-                            except (TypeError, ValueError):
-                                plain = None
-                        if plain:
-                            break
+            for key in (
+                VORBIS_SYNCED_KEY,
+                VORBIS_PLAIN_KEY,
+                "USLT",
+                MP4_PLAIN_KEY,
+                MP4_SYNCED_KEY,
+                *ASF_PLAIN_KEYS,
+                *ASF_SYNCED_KEYS,
+                "lyrics",
+                "LYRICS",
+                "LYRICS_SYNCD",
+            ):
+                val = audio.tags.get(key) if getattr(audio, "tags", None) else None
+                if val:
+                    if isinstance(val, (list, tuple)):
+                        plain = str(val[0])
+                    else:
+                        try:
+                            plain = str(val)
+                        except (TypeError, ValueError):
+                            plain = None
+                    if plain:
+                        break
     except (MutagenError, Exception) as e:
         logger.exception("Failed to read embedded lyrics from %s: %s", path, e)
-        # return whatever we have (likely None, None)
-    # Normalize blank -> None and strip
+
     def _norm(s: str | None) -> str | None:
         if s is None:
             return None
@@ -717,6 +693,37 @@ def read_embedded_lyrics(path: str) -> tuple[str | None, str | None]:
         return s2 or None
 
     return _norm(plain), _norm(synced)
+
+def read_embedded_lyrics(path: str) -> tuple[str | None, str | None]:
+    """
+    Read embedded plain lyrics and synced LRC (if present) from an audio file.
+    Returns (plain_lyrics_or_None, synced_lrc_or_None).
+
+    Implementation notes:
+      - MP3: reads ID3 USLT for plain lyrics and a TXXX with desc 'LYRICS' for synced.
+      - FLAC/Vorbis/Ogg: reads 'LYRICS' and 'LRCLIB_LRC' vorbis comments.
+      - MP4/M4A: reads '\xa9lyr' and '----:com.lrclib:lrc' (custom atom, bytes).
+      - WMA/ASF: reads ASF string attributes for plain and synced lyrics.
+      - DSF/DSDIFF (.dff): reads ID3 lyrics frames.
+      - Fallback: tries MutagenFile() and some common keys.
+    """
+    plain: str | None = None
+    synced: str | None = None
+    ext = Path(path).suffix.lower()
+    try:
+        audio = MutagenFile(path, easy=False)
+        if audio is not None:
+            plain, synced = read_embedded_lyrics_from_audio(audio, path)
+    except (MutagenError, Exception) as e:
+        if ext == ".mpc":
+            try:
+                audio = Musepack(path)
+                plain, synced = read_embedded_lyrics_from_audio(audio, path)
+            except (MutagenError, Exception) as inner_exc:
+                logger.exception("Failed to read embedded lyrics from %s: %s", path, inner_exc)
+        else:
+            logger.exception("Failed to read embedded lyrics from %s: %s", path, e)
+    return plain, synced
 
 
 def new_fs_track_from_path(
@@ -726,6 +733,7 @@ def new_fs_track_from_path(
     lyrics_lookup_subdir: str | None = None,
     lyrics_file_pattern: str | None = None,
     metadata: AudioMetadata | None = None,
+    audio=None,
     timing_hook: Callable[[str, float], None] | None = None,
 ) -> FsTrack | None:
     try:
@@ -737,7 +745,12 @@ def new_fs_track_from_path(
 
         # Preferred order: embedded, same-folder sidecars, then optional subfolder sidecars.
         embedded_started = time.perf_counter()
-        txt_embedded, lrc_embedded = read_embedded_lyrics(path)
+        txt_embedded: str | None
+        lrc_embedded: str | None
+        if audio is not None:
+            txt_embedded, lrc_embedded = read_embedded_lyrics_from_audio(audio, path)
+        else:
+            txt_embedded, lrc_embedded = read_embedded_lyrics(path)
         if timing_hook is not None:
             timing_hook("embedded_lyrics_read_s", time.perf_counter() - embedded_started)
 

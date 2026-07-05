@@ -296,6 +296,20 @@ class MusicFoldersDialog(QDialog):
         lookup_layout.addWidget(lookup_hint, 1, 0, 1, 4)
         lyrics_files_layout.addWidget(lookup_box)
 
+        scan_box = QGroupBox("Library Scan")
+        scan_layout = QGridLayout(scan_box)
+        self.scan_worker_spin = QSpinBox()
+        self.scan_worker_spin.setRange(1, 16)
+        self.scan_worker_spin.setSuffix(" workers")
+        scan_layout.addWidget(QLabel("Parallel workers"), 0, 0)
+        scan_layout.addWidget(self.scan_worker_spin, 0, 1)
+        scan_hint = QLabel(
+            "Higher values can speed up SSD scans, while lower values may be better for HDDs or network shares."
+        )
+        scan_hint.setWordWrap(True)
+        scan_layout.addWidget(scan_hint, 1, 0, 1, 2)
+        lyrics_files_layout.addWidget(scan_box)
+
         embed_box = QGroupBox("Audio File")
         embed_layout = QGridLayout(embed_box)
         self.embed_chk = QCheckBox("Embed lyrics into the audio file")
@@ -430,6 +444,7 @@ class MusicFoldersDialog(QDialog):
         self.output_dir_edit.setText(config.lyrics_output_dir)
         self.pattern_edit.setText(config.lyrics_file_pattern or "")
         self.lookup_subdir_edit.setText(config.lyrics_lookup_subdir or "")
+        self.scan_worker_spin.setValue(int(getattr(config, "scan_worker_count", 4) or 4))
         self.embed_chk.setChecked(config.try_embed_lyrics)
         embed_format_idx = self.embed_format_combo.findData(getattr(config, "lyrics_embed_format", "both") or "both")
         self.embed_format_combo.setCurrentIndex(max(0, embed_format_idx))
@@ -830,6 +845,7 @@ class MusicFoldersDialog(QDialog):
             lyrics_lookup_subdir=self._normalized_lookup_subdir(),
             scan_excluded_paths=self.excluded_paths_edit.toPlainText().strip(),
             scan_excluded_patterns=self.excluded_patterns_edit.toPlainText().strip(),
+            scan_worker_count=int(self.scan_worker_spin.value()),
             reaction_delay_ms=int(self.reaction_delay_spin.value()),
             lrclib_instance=self.lrclib_instance_edit.text().strip() or "https://lrclib.net",
             hotkey_bindings_json=serialize_hotkey_bindings(hotkey_bindings),

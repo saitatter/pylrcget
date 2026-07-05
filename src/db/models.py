@@ -125,3 +125,4 @@ class Config:
     last_library_route: str
     hotkey_bindings_json: str = ""
     ui_state_json: str = ""
+    scan_worker_count: int = 4

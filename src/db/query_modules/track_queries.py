@@ -89,50 +89,36 @@ def add_track(db: sqlite3.Connection, track: FsTrack, *, commit: bool = True) ->
         db.commit()
 
 
-def get_existing_file_paths(db: sqlite3.Connection, paths: list[str]) -> set[str]:
-    result: set[str] = set()
-    chunk_size = 500
-    for i in range(0, len(paths), chunk_size):
-        chunk = paths[i : i + chunk_size]
-        placeholders = ",".join("?" for _ in chunk)
-        rows = db.execute(
-            f"SELECT file_path FROM tracks WHERE file_path IN ({placeholders})",
-            chunk,
-        ).fetchall()
-        result.update(row["file_path"] for row in rows)
-    return result
-
-
-def add_tracks(db: sqlite3.Connection, tracks: list[FsTrack], *, commit: bool = True) -> None:
-    if not tracks:
-        return
-
-    def _do_add() -> None:
-        artist_cache: dict[str, int] = {
+class TrackBatchInserter:
+    def __init__(self, db: sqlite3.Connection):
+        self.db = db
+        self.artist_cache: dict[str, int] = {
             row[1]: row[0]
             for row in db.execute("SELECT id, name_lower FROM artists").fetchall()
         }
-        album_cache: dict[tuple[str, str], int] = {
+        self.album_cache: dict[tuple[str, str], int] = {
             (row[1], row[2]): row[0]
             for row in db.execute("SELECT id, name_lower, album_artist_name_lower FROM albums").fetchall()
         }
+
+    def add_tracks(self, tracks: list[FsTrack]) -> None:
         for track in tracks:
             artist_key = prepare_input(track.artist)
-            artist_id = artist_cache.get(artist_key)
+            artist_id = self.artist_cache.get(artist_key)
             if artist_id is None:
-                artist_id = add_artist(db, track.artist, commit=False)
-                artist_cache[artist_key] = artist_id
+                artist_id = add_artist(self.db, track.artist, commit=False)
+                self.artist_cache[artist_key] = artist_id
 
             album_key = (prepare_input(track.album), prepare_input(track.album_artist))
-            album_id = album_cache.get(album_key)
+            album_id = self.album_cache.get(album_key)
             if album_id is None:
-                album_id = add_album(db, track.album, track.album_artist, commit=False)
-                album_cache[album_key] = album_id
+                album_id = add_album(self.db, track.album, track.album_artist, commit=False)
+                self.album_cache[album_key] = album_id
 
             is_instrumental = track.instrumental or bool(
                 track.lrc_lyrics and re.search(r"\[au:\s*instrumental\]", track.lrc_lyrics)
             )
-            db.execute(
+            self.db.execute(
                 """
                 INSERT OR IGNORE INTO tracks (
                     file_path, file_name, title, title_lower,
@@ -157,11 +143,30 @@ def add_tracks(db: sqlite3.Connection, tracks: list[FsTrack], *, commit: bool = 
                 ),
             )
 
+
+def get_existing_file_paths(db: sqlite3.Connection, paths: list[str]) -> set[str]:
+    result: set[str] = set()
+    chunk_size = 500
+    for i in range(0, len(paths), chunk_size):
+        chunk = paths[i : i + chunk_size]
+        placeholders = ",".join("?" for _ in chunk)
+        rows = db.execute(
+            f"SELECT file_path FROM tracks WHERE file_path IN ({placeholders})",
+            chunk,
+        ).fetchall()
+        result.update(row["file_path"] for row in rows)
+    return result
+
+
+def add_tracks(db: sqlite3.Connection, tracks: list[FsTrack], *, commit: bool = True) -> None:
+    if not tracks:
+        return
+
     if commit:
         with db:
-            _do_add()
+            TrackBatchInserter(db).add_tracks(tracks)
     else:
-        _do_add()
+        TrackBatchInserter(db).add_tracks(tracks)
 
 
 def get_tracks(db: sqlite3.Connection) -> list[Track]:

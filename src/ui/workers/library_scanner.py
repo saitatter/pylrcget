@@ -18,17 +18,19 @@ from library.scan_library import (
     read_audio_metadata,
 )
 from db.database import (
-    add_tracks,
     delete_tracks_by_paths,
     get_library_scan_index,
     get_orphan_lyrics_index,
     prune_library,
 )
+from db.query_modules.track_queries import TrackBatchInserter
 
 
 logger = logging.getLogger(__name__)
 LIBRARY_SCAN_MAX_WORKERS = 4
 LIBRARY_SCAN_MAX_PENDING_MULTIPLIER = 4
+LIBRARY_SCAN_PROGRESS_INTERVAL_S = 0.75
+LIBRARY_SCAN_BATCH_SIZE = 500
 
 
 class _ScanTimingStats:
@@ -114,7 +116,7 @@ def _scan_track_for_path(
     metadata_result = _read_metadata_for_scan(path, timings=timings)
     if metadata_result is None:
         return _ScanTaskResult(path=path, replace_existing=replace_existing, track=None)
-    _audio, metadata = metadata_result
+    audio, metadata = metadata_result
     sidecar_started = time.perf_counter()
     signature = get_audio_file_signature(
         path,
@@ -132,6 +134,7 @@ def _scan_track_for_path(
         lyrics_lookup_subdir=lyrics_lookup_subdir,
         lyrics_file_pattern=lyrics_file_pattern,
         metadata=metadata,
+        audio=audio,
         timing_hook=None if timings is None else timings.record,
     )
     return _ScanTaskResult(path=path, replace_existing=replace_existing, track=track)
@@ -150,6 +153,7 @@ class LibraryScanner(QThread):
         excluded_patterns: str = "",
         lyrics_lookup_subdir: str = "",
         lyrics_file_pattern: str = "",
+        scan_worker_count: int = LIBRARY_SCAN_MAX_WORKERS,
     ):
         super().__init__()
         self.db_path = db_path
@@ -158,12 +162,14 @@ class LibraryScanner(QThread):
         self.excluded_patterns = excluded_patterns
         self.lyrics_lookup_subdir = lyrics_lookup_subdir
         self.lyrics_file_pattern = lyrics_file_pattern
+        self.scan_worker_count = max(1, int(scan_worker_count or LIBRARY_SCAN_MAX_WORKERS))
 
     def run(self):
         db = None
         started_at = time.perf_counter()
         timings = _ScanTimingStats()
         sidecar_lookup_cache = SidecarLookupCache()
+        last_progress_emit = started_at
         try:
             # IMPORTANT: open db connection inside this thread
             db = sqlite3.connect(self.db_path)
@@ -195,11 +201,12 @@ class LibraryScanner(QThread):
 
             batch = []
             pending_replacements: list[str] = []
-            max_workers = _scan_worker_count()
+            max_workers = self.scan_worker_count
             max_pending = max_workers * LIBRARY_SCAN_MAX_PENDING_MULTIPLIER
             futures: dict[Future[_ScanTaskResult], None] = {}
             executor = ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="library-scan")
             executor_shutdown_wait = True
+            batch_inserter = TrackBatchInserter(db)
 
             def cancel_scan() -> None:
                 nonlocal executor_shutdown_wait
@@ -215,11 +222,19 @@ class LibraryScanner(QThread):
                 flush_started = time.perf_counter()
                 with db:
                     delete_tracks_by_paths(db, pending_replacements, commit=False)
-                    add_tracks(db, batch, commit=False)
+                    batch_inserter.add_tracks(batch)
                 timings.record("db_flush_s", time.perf_counter() - flush_started)
                 batch.clear()
                 pending_replacements.clear()
                 self.progress_signal.emit(scanned, total, current_path, time.perf_counter() - started_at)
+
+            def maybe_emit_progress(current_path: str) -> None:
+                nonlocal last_progress_emit
+                now = time.perf_counter()
+                if now - last_progress_emit < LIBRARY_SCAN_PROGRESS_INTERVAL_S:
+                    return
+                last_progress_emit = now
+                self.progress_signal.emit(scanned, total, current_path, now - started_at)
 
             def handle_scan_result(result: _ScanTaskResult) -> None:
                 nonlocal reattached, updated
@@ -266,14 +281,13 @@ class LibraryScanner(QThread):
                     except Exception as exc:
                         worker_failures += 1
                         logger.warning("Skipping audio file during scan worker failure: %s", exc)
-                        if scanned % 200 == 0:
-                            self.progress_signal.emit(scanned, total, "", time.perf_counter() - started_at)
+                        maybe_emit_progress("")
                         continue
                     handle_scan_result(result)
-                    if len(batch) >= 100:
+                    if len(batch) >= LIBRARY_SCAN_BATCH_SIZE:
                         flush_batch(result.path)
-                    elif scanned % 200 == 0:
-                        self.progress_signal.emit(scanned, total, result.path, time.perf_counter() - started_at)
+                    else:
+                        maybe_emit_progress(result.path)
 
             try:
                 for p in paths:
@@ -299,8 +313,7 @@ class LibraryScanner(QThread):
                                 timings.record("audio_fast_path_hit_count", 1)
                                 scanned += 1
                                 unchanged += 1
-                                if scanned % 200 == 0:
-                                    self.progress_signal.emit(scanned, total, p, time.perf_counter() - started_at)
+                                maybe_emit_progress(p)
                                 drain_completed(block=False)
                                 continue
 
@@ -319,8 +332,7 @@ class LibraryScanner(QThread):
                         if existing_signature == signature:
                             scanned += 1
                             unchanged += 1
-                            if scanned % 200 == 0:
-                                self.progress_signal.emit(scanned, total, p, time.perf_counter() - started_at)
+                            maybe_emit_progress(p)
                             drain_completed(block=False)
                             continue
 
@@ -348,7 +360,7 @@ class LibraryScanner(QThread):
                 flush_started = time.perf_counter()
                 with db:
                     delete_tracks_by_paths(db, pending_replacements, commit=False)
-                    add_tracks(db, batch, commit=False)
+                    batch_inserter.add_tracks(batch)
                 timings.record("db_flush_s", time.perf_counter() - flush_started)
 
             if removed_paths:
