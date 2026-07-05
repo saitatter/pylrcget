@@ -86,12 +86,15 @@ def _read_vorbis_lyrics(audio) -> tuple[str | None, str | None]:
 
 
 def _first_managed_uslt_text(tags: ID3) -> str | None:
+    getall = getattr(tags, "getall", None)
+    if not callable(getall):
+        return None
     managed_frames = [
         frame
-        for frame in tags.getall("USLT")
+        for frame in getall("USLT")
         if getattr(frame, "lang", "") == "und" and getattr(frame, "desc", "") == ""
     ]
-    frames = managed_frames or tags.getall("USLT")
+    frames = managed_frames or getall("USLT")
     if not frames:
         return None
     text = getattr(frames[0], "text", None)
@@ -577,7 +580,9 @@ def read_embedded_lyrics_from_audio(audio, path: str) -> tuple[str | None, str |
     try:
         if ext == ".mp3":
             try:
-                tags = audio if isinstance(audio, ID3) else getattr(audio, "tags", None) or ID3(path)
+                tags = audio if callable(getattr(audio, "getall", None)) else getattr(audio, "tags", None) or ID3(path)
+                if not callable(getattr(tags, "getall", None)):
+                    tags = ID3(path)
             except ID3NoHeaderError:
                 tags = ID3()
 

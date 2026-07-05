@@ -182,6 +182,18 @@ class EmbedLyricsFormatTests(unittest.TestCase):
         self.assertEqual(plain, "Plain lyrics")
         self.assertIsNone(synced)
 
+    def test_mp3_read_falls_back_when_easy_tags_do_not_expose_getall(self):
+        managed_frame = _FakeFrame(FrameID="USLT", lang="und", desc="", text="Plain lyrics")
+        fake_tags = _FakeID3()
+        fake_tags.frames = [managed_frame]
+        fake_audio = _FakeAudioWithTags(SimpleNamespace(get=lambda *_args, **_kwargs: None))
+
+        with patch("library.scan_library.ID3", return_value=fake_tags):
+            plain, synced = read_embedded_lyrics_from_audio(fake_audio, "song.mp3")
+
+        self.assertEqual(plain, "Plain lyrics")
+        self.assertIsNone(synced)
+
     def test_mp3_synced_only_does_not_write_plain_frames(self):
         fake_tags = _FakeID3()
         track = SimpleNamespace(
