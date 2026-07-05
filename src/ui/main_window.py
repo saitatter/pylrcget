@@ -46,8 +46,10 @@ from db.queries import (
 )
 from library.scan_library import AUDIO_EXTS, new_fs_track_from_path
 from ui.controllers.lyrics_download_controller import LyricsDownloadController
+from ui.controllers.lyrics_output_controller import LyricsOutputController
 from ui.controllers.navigation_controller import NavigationController
 from ui.controllers.publish_history_controller import PublishHistoryController
+from ui.controllers.track_maintenance_controller import TrackMaintenanceController
 from ui.controllers.top_bar_controller import TopBarController
 from ui.ai_sync_settings import load_ai_sync_settings
 from ui.hotkeys import HOTKEY_SPECS, effective_hotkey_text, parse_hotkey_bindings
@@ -355,6 +357,22 @@ class MainWindow(QMainWindow):
             refresh_history=self.mylrclib_tab.refresh,
             show_status=self._show_status_message,
             publish_overlay=self.publish_overlay,
+            parent=self,
+        )
+        self.lyrics_output = LyricsOutputController(
+            self.app_state,
+            show_status=self._show_status_message,
+            lyrics_views=self._all_lyrics_views,
+            parent=self,
+        )
+        self.track_maintenance = TrackMaintenanceController(
+            self.app_state,
+            window=self,
+            confirm_bulk=self._confirm_bulk,
+            active_track_list_widget=self._active_track_list_widget,
+            refresh_visible_library_view=self._refresh_visible_library_view_after_downloads,
+            show_status=self._show_status_message,
+            normalize_lrclib_base=self._normalize_lrclib_base,
             parent=self,
         )
         self.publish_overlay.cancelRequested.connect(self._cancel_bulk_publish)
@@ -1629,34 +1647,47 @@ class MainWindow(QMainWindow):
             u += "/api"
         return u
 
-    def _sync_track_lyrics_outputs(self, track) -> None:
-        config = get_config(self.app_state.db)
-        result = sync_track_outputs_with_result(track, config)
-        if result.sidecar_error is not None:
-            log_and_notify(
-                self.app_state,
-                logger,
-                logging.ERROR,
-                exception_message("Failed to export lyrics files", result.sidecar_error),
-                "error",
-                show_status=self._show_status_message,
-                status_timeout_ms=4000,
-            )
-        elif result.sidecar_paths:
-            self._show_status_message(f"Lyrics exported to {os.path.dirname(result.sidecar_paths[0])}", 3000)
+    def _sync_track_lyrics_outputs(self, track) -> bool:
+        return self.lyrics_output.sync_tracks(
+            [int(track.id)],
+            on_item_finished=self._on_track_lyrics_output_synced,
+            on_finished=self._on_track_lyrics_output_sync_finished,
+        )
 
-        if result.embed_error is not None:
+    def _on_track_lyrics_output_synced(self, track_id: int, payload: dict) -> None:
+        if payload.get("sidecar_error") is not None:
             log_and_notify(
                 self.app_state,
                 logger,
                 logging.ERROR,
-                exception_message("Failed to embed lyrics", result.embed_error),
+                exception_message("Failed to export lyrics files", payload["sidecar_error"]),
                 "error",
                 show_status=self._show_status_message,
                 status_timeout_ms=4000,
             )
-        elif result.embedded:
+            return
+
+        sidecar_paths = payload.get("sidecar_paths") or ()
+        if sidecar_paths:
+            self._show_status_message(f"Lyrics exported to {os.path.dirname(sidecar_paths[0])}", 3000)
+
+        if payload.get("embed_error") is not None:
+            log_and_notify(
+                self.app_state,
+                logger,
+                logging.ERROR,
+                exception_message("Failed to embed lyrics", payload["embed_error"]),
+                "error",
+                show_status=self._show_status_message,
+                status_timeout_ms=4000,
+            )
+        elif payload.get("embedded"):
             self._show_status_message("Lyrics embedded into the audio file.", 3000)
+
+    def _on_track_lyrics_output_sync_finished(self, ok: bool, summary: str, stats: dict) -> None:
+        del ok, stats
+        if summary:
+            self._show_status_message(summary, 2500)
 
     def _apply_saved_playback_speed(self) -> None:
         config = get_config(self.app_state.db)
@@ -2090,9 +2121,17 @@ class MainWindow(QMainWindow):
 
 
     def _on_mark_instrumental(self, track_ids: list[int]):
+        controller = getattr(self, "track_maintenance", None)
+        if controller is not None:
+            controller.mark_instrumental(track_ids)
+            return
         library_actions.on_mark_instrumental(self, track_ids, mark_tracks=mark_tracks_instrumental)
 
     def _on_unmark_instrumental(self, track_ids: list[int]):
+        controller = getattr(self, "track_maintenance", None)
+        if controller is not None:
+            controller.unmark_instrumental(track_ids)
+            return
         library_actions.on_unmark_instrumental(self, track_ids, unmark_tracks=unmark_tracks_instrumental)
 
     def _cancel_bulk_publish(self) -> None:
@@ -2128,4 +2167,8 @@ class MainWindow(QMainWindow):
                 break
 
     def _publish_instrumental_to_lrclib(self, track_ids: list[int]) -> None:
+        controller = getattr(self, "track_maintenance", None)
+        if controller is not None:
+            controller.publish_instrumental(track_ids)
+            return
         library_actions.publish_instrumental_to_lrclib(self, track_ids)

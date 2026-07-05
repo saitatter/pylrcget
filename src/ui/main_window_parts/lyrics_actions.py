@@ -88,7 +88,6 @@ def on_lyrics_save_requested(window, lrc: str, txt: str) -> None:
 
         track = get_track_by_id(window.app_state.db, track_id)
         window._editing_saved_lyrics = canonical_lyrics_pair(track.lrc_lyrics, track.txt_lyrics)
-        window._sync_track_lyrics_outputs(track)
         window._set_track_lyrics_views(track)
         window._mark_track_lyrics_clean(track)
         window._update_single_track_lyrics_state(track)
@@ -96,6 +95,8 @@ def on_lyrics_save_requested(window, lrc: str, txt: str) -> None:
         window.toasts.show_toast("Lyrics saved.", "success")
         for view in window._all_lyrics_views():
             view.set_save_feedback("success", "Saved")
+        if not window._sync_track_lyrics_outputs(track):
+            window._show_status_message("Lyrics output sync is already running.", 3000)
     except (sqlite3.Error, OSError, ValueError) as exc:
         log_and_notify(
             window.app_state,
@@ -193,19 +194,23 @@ def on_propagate_lyrics_requested(window, lrc: str, txt: str) -> None:
 
         applied_ids = [int(source_track_id), *[int(track_id) for track_id in target_ids]]
         output_errors: list[str] = []
+        synced_track_ids: list[int] = []
         for track_id in applied_ids:
             track = window._save_lyrics_text_to_track(track_id, lrc_text, txt_text)
-            result = sync_track_outputs_with_result(track, get_config(window.app_state.db))
-            if result.sidecar_error is not None:
-                output_errors.append(f"{track.title}: {result.sidecar_error}")
-            if result.embed_error is not None:
-                output_errors.append(f"{track.title}: {result.embed_error}")
             window._mark_track_lyrics_clean(track)
             window._update_single_track_lyrics_state(track)
+            synced_track_ids.append(int(track.id))
 
         source_track = get_track_by_id(window.app_state.db, int(source_track_id))
         window._editing_saved_lyrics = canonical_lyrics_pair(source_track.lrc_lyrics, source_track.txt_lyrics)
         window._set_track_lyrics_views(source_track)
+
+        if not window.lyrics_output.sync_tracks(
+            synced_track_ids,
+            on_item_finished=window._on_track_lyrics_output_synced,
+            on_finished=window._on_track_lyrics_output_sync_finished,
+        ):
+            output_errors.append("Lyrics output sync is already running.")
 
         synced_count = len(target_ids)
         message = f"Lyrics synced to {synced_count} similar track(s)."
@@ -359,9 +364,10 @@ def search_current_track_lyrics(window) -> None:
             return
 
         refreshed_track = get_track_by_id(window.app_state.db, track_id)
-        window._sync_track_lyrics_outputs(refreshed_track)
         window._set_track_lyrics_views(refreshed_track)
         window._show_status_message("Lyrics applied from search.", 3000)
+        if not window._sync_track_lyrics_outputs(refreshed_track):
+            window._show_status_message("Lyrics output sync is already running.", 3000)
 
     dialog.lyricsSelected.connect(_on_lyrics_selected)
     dialog.exec()
