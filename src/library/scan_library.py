@@ -646,7 +646,6 @@ def new_fs_track_from_path(
         txt_lyrics = txt_embedded or txt_sidecar
         lrc_lyrics = lrc_embedded or lrc_sidecar
 
-        signature_started = time.perf_counter()
         modified_time, file_size = (
             signature
             if signature is not None
@@ -657,8 +656,6 @@ def new_fs_track_from_path(
                 lyrics_file_pattern=lyrics_file_pattern,
             )
         )
-        if timing_hook is not None and signature is None:
-            timing_hook("sidecar_lookup_s", time.perf_counter() - signature_started)
 
         return FsTrack(
             file_path=path,

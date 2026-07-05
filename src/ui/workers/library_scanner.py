@@ -33,18 +33,37 @@ LIBRARY_SCAN_MAX_PENDING_MULTIPLIER = 4
 class _ScanTimingStats:
     def __init__(self) -> None:
         self.path_discovery_s = 0.0
+        self.signature_check_s = 0.0
         self.metadata_read_s = 0.0
         self.embedded_lyrics_read_s = 0.0
         self.sidecar_lookup_s = 0.0
         self.db_flush_s = 0.0
+        self.path_discovery_count = 0
+        self.signature_check_count = 0
+        self.metadata_read_count = 0
+        self.embedded_lyrics_read_count = 0
+        self.sidecar_lookup_count = 0
+        self.db_flush_count = 0
         self._lock = threading.Lock()
 
-    def add(self, field_name: str, elapsed_s: float) -> None:
+    def record(self, field_name: str, elapsed_s: float) -> None:
         if elapsed_s <= 0:
             return
         with self._lock:
             current = getattr(self, field_name)
             setattr(self, field_name, current + elapsed_s)
+            if field_name == "path_discovery_s":
+                self.path_discovery_count += 1
+            elif field_name == "signature_check_s":
+                self.signature_check_count += 1
+            elif field_name == "metadata_read_s":
+                self.metadata_read_count += 1
+            elif field_name == "embedded_lyrics_read_s":
+                self.embedded_lyrics_read_count += 1
+            elif field_name == "sidecar_lookup_s":
+                self.sidecar_lookup_count += 1
+            elif field_name == "db_flush_s":
+                self.db_flush_count += 1
 
 
 @dataclass(frozen=True)
@@ -63,7 +82,7 @@ def _read_metadata_for_scan(path: str, *, timings: _ScanTimingStats | None = Non
         return None
     finally:
         if timings is not None:
-            timings.add("metadata_read_s", time.perf_counter() - started_at)
+            timings.record("metadata_read_s", time.perf_counter() - started_at)
 
 
 def _scan_worker_count() -> int:
@@ -91,14 +110,14 @@ def _scan_track_for_path(
         lyrics_file_pattern=lyrics_file_pattern,
     )
     if timings is not None:
-        timings.add("sidecar_lookup_s", time.perf_counter() - sidecar_started)
+        timings.record("sidecar_lookup_s", time.perf_counter() - sidecar_started)
     track = new_fs_track_from_path(
         path,
         signature=signature,
         lyrics_lookup_subdir=lyrics_lookup_subdir,
         lyrics_file_pattern=lyrics_file_pattern,
         metadata=metadata,
-        timing_hook=None if timings is None else timings.add,
+        timing_hook=None if timings is None else timings.record,
     )
     return _ScanTaskResult(path=path, replace_existing=replace_existing, track=track)
 
@@ -141,12 +160,13 @@ class LibraryScanner(QThread):
                 excluded_paths=self.excluded_paths,
                 excluded_patterns=self.excluded_patterns,
             )
-            timings.add("path_discovery_s", time.perf_counter() - discovery_started)
+            timings.record("path_discovery_s", time.perf_counter() - discovery_started)
             total = len(paths)
             scanned = 0
             unchanged = 0
             updated = 0
             removed = 0
+            worker_failures = 0
 
             current_path_set = set(paths)
             removed_paths = [path for path in existing_index.keys() if path not in current_path_set]
@@ -180,7 +200,7 @@ class LibraryScanner(QThread):
                 with db:
                     delete_tracks_by_paths(db, pending_replacements, commit=False)
                     add_tracks(db, batch, commit=False)
-                timings.add("db_flush_s", time.perf_counter() - flush_started)
+                timings.record("db_flush_s", time.perf_counter() - flush_started)
                 batch.clear()
                 pending_replacements.clear()
                 self.progress_signal.emit(scanned, total, current_path, time.perf_counter() - started_at)
@@ -228,6 +248,7 @@ class LibraryScanner(QThread):
                     try:
                         result = future.result()
                     except Exception as exc:
+                        worker_failures += 1
                         logger.warning("Skipping audio file during scan worker failure: %s", exc)
                         if scanned % 200 == 0:
                             self.progress_signal.emit(scanned, total, "", time.perf_counter() - started_at)
@@ -259,7 +280,7 @@ class LibraryScanner(QThread):
                             metadata=existing[1],
                             lyrics_file_pattern=self.lyrics_file_pattern,
                         )
-                        timings.add("sidecar_lookup_s", time.perf_counter() - signature_started)
+                        timings.record("signature_check_s", time.perf_counter() - signature_started)
                         if existing[0] == signature:
                             scanned += 1
                             unchanged += 1
@@ -293,26 +314,61 @@ class LibraryScanner(QThread):
                 with db:
                     delete_tracks_by_paths(db, pending_replacements, commit=False)
                     add_tracks(db, batch, commit=False)
-                timings.add("db_flush_s", time.perf_counter() - flush_started)
+                timings.record("db_flush_s", time.perf_counter() - flush_started)
 
             if removed_paths:
                 flush_started = time.perf_counter()
                 delete_tracks_by_paths(db, removed_paths)
-                timings.add("db_flush_s", time.perf_counter() - flush_started)
+                timings.record("db_flush_s", time.perf_counter() - flush_started)
 
             prune_started = time.perf_counter()
             prune_library(db)
-            timings.add("db_flush_s", time.perf_counter() - prune_started)
+            timings.record("db_flush_s", time.perf_counter() - prune_started)
             self.progress_signal.emit(scanned, total, "", time.perf_counter() - started_at)
 
             total_elapsed = time.perf_counter() - started_at
+            logger.info(
+                "Library scan summary: %d discovered, %d scanned, %d unchanged, %d updated, %d removed, %d worker failures",
+                total,
+                scanned,
+                unchanged,
+                updated,
+                removed,
+                worker_failures,
+            )
             logger.info("Library scan path discovery time: %.3fs", timings.path_discovery_s)
-            logger.info("Library scan metadata read time: %.3fs", timings.metadata_read_s)
-            logger.info("Library scan embedded lyrics read time: %.3fs", timings.embedded_lyrics_read_s)
-            logger.info("Library scan sidecar lookup time: %.3fs", timings.sidecar_lookup_s)
-            logger.info("Library scan DB flush time: %.3fs", timings.db_flush_s)
+            logger.info(
+                "Library scan signature check time: %.3fs (%d checks)",
+                timings.signature_check_s,
+                timings.signature_check_count,
+            )
+            logger.info(
+                "Library scan metadata read time: %.3fs (%d reads)",
+                timings.metadata_read_s,
+                timings.metadata_read_count,
+            )
+            logger.info(
+                "Library scan embedded lyrics read time: %.3fs (%d reads)",
+                timings.embedded_lyrics_read_s,
+                timings.embedded_lyrics_read_count,
+            )
+            logger.info(
+                "Library scan sidecar lookup time: %.3fs (%d lookups)",
+                timings.sidecar_lookup_s,
+                timings.sidecar_lookup_count,
+            )
+            logger.info(
+                "Library scan DB flush time: %.3fs (%d flushes)",
+                timings.db_flush_s,
+                timings.db_flush_count,
+            )
             if total_elapsed > 0:
-                logger.info("Library scan average throughput: %.2f tracks/sec (%d tracks in %.2fs)", scanned / total_elapsed, scanned, total_elapsed)
+                logger.info(
+                    "Library scan average throughput: %.2f tracks/sec (%d tracks in %.2fs)",
+                    scanned / total_elapsed,
+                    scanned,
+                    total_elapsed,
+                )
 
             msg = f"Library scanning complete. Updated {updated}, unchanged {unchanged}, removed {removed}."
             if reattached:
