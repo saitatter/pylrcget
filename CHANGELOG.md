@@ -1,4 +1,91 @@
 # Changelog
+## v1.13.0 (2026-07-06)
+
+### ✨ Features
+* Improve export button and behavior ([c7952e4](https://github.com/saitatter/pylrcget/commit/c7952e4069fce1e34130081de41a32727d047644))
+  Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+* Improve macos packaging and updates ([b2ad430](https://github.com/saitatter/pylrcget/commit/b2ad430709bd48b24ccab7466bc942fc1c88e3d4))
+  Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+* Add configurable logging verbosity ([2ece6bc](https://github.com/saitatter/pylrcget/commit/2ece6bc1e9031f9be0be62f19a9d7e38cac38c18))
+  Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+* Add scan lyrics source mode ([2eb04ba](https://github.com/saitatter/pylrcget/commit/2eb04ba9629aefa6d2db352c6f67bfcebd3acb3f))
+  Let library scans choose embedded-only, sidecar-only, or both sources, and persist the setting through config and migrations.
+  Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+* Tune large library scan pipeline ([c2972d1](https://github.com/saitatter/pylrcget/commit/c2972d148687823caea7e889b5f510980dae8800))
+* Reuse discovered audio signatures ([185a1cf](https://github.com/saitatter/pylrcget/commit/185a1cfe979a9b652c8da99deec5ff89006a0ff0))
+* Speed up audio path discovery ([281d798](https://github.com/saitatter/pylrcget/commit/281d7982137a8bdd57560e2eaf2d8e614e783505))
+* Cache discovered audio signatures ([83a8b36](https://github.com/saitatter/pylrcget/commit/83a8b36946b689988a12ee02e54ca16ee63c95ca))
+* Cache sidecar lookup listings ([070722b](https://github.com/saitatter/pylrcget/commit/070722b3cb7112cc7dc619618d594a91f626f01f))
+* Add audio-only scan fast path ([55d3a06](https://github.com/saitatter/pylrcget/commit/55d3a066b8aee1b1d8d25d770c5dfe4d165e6f1c))
+* Break out scan signature timings ([6f1618e](https://github.com/saitatter/pylrcget/commit/6f1618efa2a9286059851fbc248d10e38738c451))
+* Expand library scan timing logs ([52e3506](https://github.com/saitatter/pylrcget/commit/52e3506f70c4835135912baace4e3879480be70d))
+* Add library scan timing instrumentation ([81b1045](https://github.com/saitatter/pylrcget/commit/81b1045b6901495e5a1c3439a7eea7e19a7f51f5))
+
+### 🐛 Fixes
+* Restore scan throughput log ([2abfec8](https://github.com/saitatter/pylrcget/commit/2abfec817eb540cd412c7ef034591afd75107727))
+  Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+* Clarify scan timing logs ([3bdd1d1](https://github.com/saitatter/pylrcget/commit/3bdd1d192ce09a3f1313d5ac9483597e1ef77f79))
+  Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+* Propagate scan lyrics source mode through library scan ([e6b7452](https://github.com/saitatter/pylrcget/commit/e6b745222c95bff1333f948191c56edecf832810))
+  Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+* Honor scan lyrics source mode in fallback signature lookup ([da688de](https://github.com/saitatter/pylrcget/commit/da688def4e5bda81856e85d12a285efc9ab2547f))
+  Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+* Keep database version at 5 ([f96dc40](https://github.com/saitatter/pylrcget/commit/f96dc40f01e97b7596c10420e2e7f5866ae45bee))
+  Move the scan lyrics source mode column into the v5 upgrade path instead of introducing a new database version.
+  Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+* Tolerate easyid3 during mp3 lyric scan ([06e7970](https://github.com/saitatter/pylrcget/commit/06e7970eeb9588f32e9c143bf7bd243ca0a5e1dc))
+  Guard embedded-lyrics reads against EasyID3 objects and fall back to raw ID3 frames when needed.
+  Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+* Keep lyrics export sidecar-only ([1b412f7](https://github.com/saitatter/pylrcget/commit/1b412f7d4b33e186dfbddb836467b69f8aba8f7d))
+  Disable audio embedding for bulk and selected exports, and forward worker progress to the export overlay.
+  Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+* Move bulk lyrics export off the gui thread ([46167d8](https://github.com/saitatter/pylrcget/commit/46167d8db88d8ef6755b52c3d7f549340c6dac5d))
+  Add a cancellable export worker with progress and summaries, wire a Global Actions export button, and reuse the same worker for selected exports.
+  Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+* Protect lyrics export semantics ([b76c8c0](https://github.com/saitatter/pylrcget/commit/b76c8c0fc16f121d491dbafb7102bb75f8bccf24))
+  - preserve foreign MP3 USLT frames while managing our own lyrics tags
+- make explicit sidecar export sidecar-only and atomic
+- add regression coverage for write/read/export behavior
+  Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+* **release:** Skip oversized linux ai asset upload\n\nlinux ai portable exceeds github's 2gb asset limit, so keep building it as a\nworkflow artifact but skip publishing it as a release asset. update the readme\nto reflect the actual published ai portable set.\n\nco-authored-by: copilot <223556219+copilot@users.noreply.github.com> ([6d96c76](https://github.com/saitatter/pylrcget/commit/6d96c76db1b2788419d98a18b0003ccab03a2195))
+
+### ♻️ Refactors
+* Move lyrics outputs off ui thread ([22b8c60](https://github.com/saitatter/pylrcget/commit/22b8c605c0bd83a5d3b4e20981cf0bdd062fb93d))
+  - add a controller and worker for lyrics output sync
+- route save, propagate, and search flows through async output sync
+- isolate instrumental maintenance into its own controller
+- keep main window wrappers compatible for older call sites and tests
+  Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+* Split refresh and light track queries ([cdf1d5b](https://github.com/saitatter/pylrcget/commit/cdf1d5b2a1acd4ed66b767ccd3982f3ec9848ba2))
+  - move selected track refresh into a worker-backed library action
+- add a lightweight track list query and accept summary rows in the renderer
+- prefilter similar-lyrics candidates by normalized title and artist
+- add regression coverage for the new query shapes and worker path
+  Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+
+### 🧰 CI & Build
+* **deps:** Bump python-semantic-release/python-semantic-release ([90c5ddc](https://github.com/saitatter/pylrcget/commit/90c5ddc66ec6a784fc6fea728fbf214c6ad716b5))
+  Bumps the github-actions group with 1 update: [python-semantic-release/python-semantic-release](https://github.com/python-semantic-release/python-semantic-release).
+  Updates `python-semantic-release/python-semantic-release` from 10.5.3 to 10.6.0
+- [Release notes](https://github.com/python-semantic-release/python-semantic-release/releases)
+- [Changelog](https://github.com/python-semantic-release/python-semantic-release/blob/master/CHANGELOG.rst)
+- [Commits](https://github.com/python-semantic-release/python-semantic-release/compare/v10.5.3...v10.6.0)
+  ---
+updated-dependencies:
+- dependency-name: python-semantic-release/python-semantic-release dependency-version: 10.6.0
+  dependency-type: direct:production
+  update-type: version-update:semver-minor
+  dependency-group: github-actions ...
+  Signed-off-by: dependabot[bot] <support@github.com>
+
+### 📚 Docs
+* Update ai sync readme for whisperx\n\nremove outdated demucs references and describe the current whisperx-based\nai sync workflow and install instructions.\n\nco-authored-by: copilot <223556219+copilot@users.noreply.github.com> ([87a6c89](https://github.com/saitatter/pylrcget/commit/87a6c890f648298bd8f35e8716532030100fcc40))
+
+### 🔧 Other Changes
+* Reduce first scan i/o ([ec092a1](https://github.com/saitatter/pylrcget/commit/ec092a1312dc98ce4ee8d22f8a5c5ce0f4ba1c83))
+  Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+
+
 ## v1.12.0 (2026-07-01)
 
 ### ✨ Features
