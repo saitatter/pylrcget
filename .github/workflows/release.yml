@@ -108,7 +108,12 @@ jobs:
 
       - name: Package archive (Unix)
         if: runner.os != 'Windows'
-        run: tar -czf "${{ matrix.archive_name }}" -C dist pylrcget
+        run: |
+          if [ "$RUNNER_OS" = "macOS" ]; then
+            tar -czf "${{ matrix.archive_name }}" -C dist PyLrcGet.app
+          else
+            tar -czf "${{ matrix.archive_name }}" -C dist pylrcget
+          fi
 
       - name: Build Windows installer (Inno Setup)
         if: runner.os == 'Windows'
@@ -172,12 +177,54 @@ jobs:
       - name: Build macOS installer (.pkg)
         if: runner.os == 'macOS'
         run: |
-          mkdir -p pkgroot/usr/local/lib/PyLrcGet
+          mkdir -p pkgroot/Applications/PyLrcGet.app/Contents/MacOS
           mkdir -p pkgroot/usr/local/bin
-          cp -R dist/pylrcget/. pkgroot/usr/local/lib/PyLrcGet/
-          ln -s ../lib/PyLrcGet/pylrcget pkgroot/usr/local/bin/pylrcget
+          mkdir -p pkgroot-scripts
+          cat > pkgroot/Applications/PyLrcGet.app/Contents/Info.plist <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>CFBundleDisplayName</key>
+            <string>PyLrcGet</string>
+            <key>CFBundleExecutable</key>
+            <string>pylrcget</string>
+            <key>CFBundleIdentifier</key>
+            <string>com.saitatter.pylrcget</string>
+            <key>CFBundleName</key>
+            <string>PyLrcGet</string>
+            <key>CFBundlePackageType</key>
+            <string>APPL</string>
+            <key>CFBundleShortVersionString</key>
+            <string>${{ needs.release.outputs.version }}</string>
+            <key>CFBundleVersion</key>
+            <string>${{ needs.release.outputs.version }}</string>
+            <key>LSMinimumSystemVersion</key>
+            <string>11.0</string>
+            <key>NSHighResolutionCapable</key>
+            <true/>
+          </dict>
+          </plist>
+          EOF
+          cp -R dist/pylrcget/. pkgroot/Applications/PyLrcGet.app/Contents/MacOS/
+          cat > pkgroot/usr/local/bin/pylrcget <<'EOF'
+          #!/bin/sh
+          exec open -a "/Applications/PyLrcGet.app" --args "$@"
+          EOF
+          chmod +x pkgroot/usr/local/bin/pylrcget
+          cat > pkgroot-scripts/postinstall <<'EOF'
+          #!/bin/sh
+          set -e
+          APP_PATH="/Applications/PyLrcGet.app"
+          if [ -d "$APP_PATH" ]; then
+            /usr/bin/open -a "$APP_PATH" >/dev/null 2>&1 &
+          fi
+          exit 0
+          EOF
+          chmod +x pkgroot-scripts/postinstall
           pkgbuild \
             --root pkgroot \
+            --scripts pkgroot-scripts \
             --identifier com.saitatter.pylrcget \
             --version "${{ needs.release.outputs.version }}" \
             --install-location / \

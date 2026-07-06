@@ -319,6 +319,59 @@ class UpdateServiceTests(unittest.TestCase):
             info = update_service.check_for_updates(session=_FakeSession(payload))
         self.assertTrue(info.install_supported)
 
+    def test_check_for_updates_macos_prefers_pkg_over_dmg(self):
+        payload = {
+            "tag_name": "v1.0.0",
+            "name": "v1.0.0",
+            "html_url": "https://example.com",
+            "body": "",
+            "published_at": "2026-04-12T10:00:00Z",
+            "assets": [
+                {
+                    "name": "pylrcget-macos.dmg",
+                    "browser_download_url": "https://example.com/pylrcget-macos.dmg",
+                    "size": 1234,
+                    "content_type": "application/octet-stream",
+                },
+                {
+                    "name": "pylrcget-macos.pkg",
+                    "browser_download_url": "https://example.com/pylrcget-macos.pkg",
+                    "size": 2345,
+                    "content_type": "application/octet-stream",
+                },
+            ],
+        }
+        with patch.object(update_service, "current_app_version", return_value="0.9.0"), patch.object(
+            update_service.sys, "platform", "darwin"
+        ), patch.object(update_service.sys, "frozen", True, create=True):
+            info = update_service.check_for_updates(session=_FakeSession(payload))
+        self.assertIsNotNone(info.asset)
+        assert info.asset is not None
+        self.assertEqual(info.asset.name, "pylrcget-macos.pkg")
+        self.assertTrue(info.install_supported)
+
+    def test_check_for_updates_macos_dmg_only_is_download_only(self):
+        payload = {
+            "tag_name": "v1.0.0",
+            "name": "v1.0.0",
+            "html_url": "https://example.com",
+            "body": "",
+            "published_at": "2026-04-12T10:00:00Z",
+            "assets": [
+                {
+                    "name": "pylrcget-macos.dmg",
+                    "browser_download_url": "https://example.com/pylrcget-macos.dmg",
+                    "size": 1234,
+                    "content_type": "application/octet-stream",
+                }
+            ],
+        }
+        with patch.object(update_service, "current_app_version", return_value="0.9.0"), patch.object(
+            update_service.sys, "platform", "darwin"
+        ), patch.object(update_service.sys, "frozen", True, create=True):
+            info = update_service.check_for_updates(session=_FakeSession(payload))
+        self.assertFalse(info.install_supported)
+
     def test_check_for_updates_linux_appimage_enables_install(self):
         payload = {
             "tag_name": "v1.0.0",

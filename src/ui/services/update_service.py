@@ -159,8 +159,8 @@ def platform_asset_names() -> list[str]:
         ]
     if sys.platform == "darwin":
         return [
-            "pylrcget-macos.dmg",
             "pylrcget-macos.pkg",
+            "pylrcget-macos.dmg",
             "pylrcget-macos.tar.gz",
         ]
     if sys.platform.startswith("linux"):
@@ -201,7 +201,7 @@ def is_macos_installer_asset(asset: ReleaseAssetInfo | None) -> bool:
     if asset is None:
         return False
     name = str(asset.name).lower()
-    return name.endswith(".dmg") or name.endswith(".pkg")
+    return name.endswith(".pkg")
 
 
 def is_linux_installer_asset(asset: ReleaseAssetInfo | None) -> bool:
@@ -316,8 +316,8 @@ def launch_platform_installer(installer_path: Path) -> None:
         return
 
     if sys.platform == "darwin":
-        if not (lower_name.endswith(".dmg") or lower_name.endswith(".pkg")):
-            raise RuntimeError("macOS auto-install supports only .dmg and .pkg assets.")
+        if not lower_name.endswith(".pkg"):
+            raise RuntimeError("macOS auto-install supports only .pkg assets.")
         subprocess.Popen(
             ["open", str(installer_path)],
             start_new_session=True,

@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 from pathlib import Path
+import sys
 
 from PySide6.QtCore import QTimer, QUrl
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
+    QApplication,
     QDialog,
     QHBoxLayout,
     QLabel,
@@ -203,6 +205,13 @@ class AboutDialog(QDialog):
                 launch_platform_installer(download_path)
             except (RuntimeError, FileNotFoundError, OSError) as exc:
                 self.status_label.setText(f"Could not stage the update: {exc}")
+                return
+
+            if sys.platform == "darwin":
+                app = QApplication.instance()
+                if app is not None:
+                    QTimer.singleShot(0, app.quit)
+                self.status_label.setText("Waiting for installer…")
                 return
 
             # Do NOT quit here — let the Inno Setup installer close the app

@@ -239,6 +239,7 @@ Uses **semantic-release** with Conventional Commits. On every push to `main`, CI
 - Shared Linux packaging assets live in `packaging/linux/` so future `.deb`/`.rpm`/AppImage packaging can reuse the same launcher metadata
 - Installer assets are published for automatic update/install flows: `pylrcget-windows-installer.exe`, `pylrcget-linux.deb`, and `pylrcget-macos.pkg`
 - The Linux `.deb` installs a desktop launcher (`pylrcget.desktop`) and app icon under the standard XDG locations
+- The macOS `.pkg` installs `PyLrcGet.app` into `/Applications` and exposes a `pylrcget` launcher in `/usr/local/bin`
 - Folder-based archives are published as `pylrcget-windows.zip`, `pylrcget-linux.tar.gz`, and `pylrcget-macos.tar.gz`
 - Portable single-file executables are also published as `pylrcget-windows-portable.exe`, `pylrcget-linux-portable`, and `pylrcget-macos-portable`
 - AI-enabled portable builds are published as `pylrcget-windows-portable-ai.exe` and `pylrcget-macos-portable-ai`
