@@ -1,4 +1,11 @@
 # Changelog
+## v1.13.1 (2026-07-06)
+
+### 🐛 Fixes
+* Package macos app bundle in release ([72866f4](https://github.com/saitatter/pylrcget/commit/72866f4142ce57d11d9fdf8f88d3b44f25de834f))
+  Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+
+
 ## v1.13.0 (2026-07-06)
 
 ### ✨ Features
