@@ -113,7 +113,6 @@ class LyricsOutputController(QObject):
                 worker.deleteLater()
             if self._export_overlay is not None:
                 self._export_overlay.finish_batch(summary, cancelled=bool(stats.get("cancelled")))
-                self._export_overlay.queue_auto_close(2500 if ok else 4000)
             if on_finished is not None:
                 on_finished(bool(ok), summary, stats)
 

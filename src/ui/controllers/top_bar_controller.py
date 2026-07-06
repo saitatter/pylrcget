@@ -159,13 +159,13 @@ class TopBarController(QWidget):
             on_download_missing,
         )
         self.btn_export_library = self._make_action_button(
-            "download.svg",
+            "export.svg",
             "Export lyrics",
             "Export lyrics",
             on_export_library,
         )
-        self.btn_export_library.setText("Export")
-        self.btn_export_library.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        self.btn_export_library.setText("")
+        self.btn_export_library.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
         self.btn_config = self._make_action_button(
             "settings-2.svg",
             "Settings",

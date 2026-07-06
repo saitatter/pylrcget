@@ -24,7 +24,7 @@ class SharedUiComponentTests(unittest.TestCase):
             widget.set_download_missing_mode("prefer_synced")
             self.assertIn("Download missing lyrics", widget.btn_download_missing.toolTip())
             self.assertEqual(widget.btn_download_missing.statusTip(), "")
-            self.assertEqual(widget.btn_export_library.text(), "Export")
+            self.assertEqual(widget.btn_export_library.text(), "")
         finally:
             widget.deleteLater()
 
