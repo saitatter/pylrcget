@@ -178,28 +178,20 @@ QComboBox:disabled {
 QComboBox::drop-down {
     subcontrol-origin: padding;
     subcontrol-position: center right;
-    width: 24px;
+    width: 28px;
     border: none;
     background: transparent;
 }
 
 QComboBox::down-arrow {
-    subcontrol-origin: content;
-    subcontrol-position: center;
-    width: 0px;
-    height: 0px;
-    border-left: 4px solid transparent;
-    border-right: 4px solid transparent;
-    border-top: 5px solid {{color-text-muted}};
-    margin-right: 4px;
-}
-
-QComboBox::down-arrow:hover {
-    border-top-color: {{color-accent}};
+    image: url("{{asset-url}}/assets/icons/chevron-down.svg");
+    width: 12px;
+    height: 12px;
+    margin-right: 8px;
 }
 
 QComboBox::down-arrow:disabled {
-    border-top-color: {{color-disabled-border}};
+    opacity: 0.4;
 }
 
 /* Combobox Popup List */
