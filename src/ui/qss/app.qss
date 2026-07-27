@@ -153,8 +153,8 @@ QComboBox {
     background-color: {{color-bg-panel}};
     color: {{color-text}};
     border: 1px solid {{color-border}};
-    border-radius: {{radius-lg}};
-    padding: 4px 36px 4px 14px;
+    border-radius: {{radius-md}};
+    padding: 4px 32px 4px 12px;
     min-height: 38px;
     selection-background-color: {{color-accent}};
     selection-color: {{color-bg-app}};
@@ -184,37 +184,29 @@ QComboBox::drop-down {
 }
 
 QComboBox::down-arrow {
-    width: 0;
-    height: 0;
-    border-left: 5px solid transparent;
-    border-right: 5px solid transparent;
-    border-top: 5px solid {{color-text-muted}};
-    margin-right: 10px;
-}
-
-QComboBox::down-arrow:hover {
-    border-top-color: {{color-accent}};
+    image: url("{{asset-url}}/assets/icons/chevron-down.svg");
+    width: 12px;
+    height: 12px;
+    margin-right: 8px;
 }
 
 QComboBox::down-arrow:disabled {
-    border-top-color: {{color-disabled-text}};
+    opacity: 0.4;
 }
 
 /* Combobox Popup Frame Container & List */
 QComboBox QFrame {
-    border: 1px solid {{color-border-strong}};
-    border-radius: {{radius-md}};
-    background-color: {{color-bg-elevated}};
-    padding: 2px;
+    background-color: transparent;
+    border: none;
 }
 
 QComboBox QListView,
 QComboBox QAbstractItemView {
-    background-color: transparent;
+    background-color: {{color-bg-elevated}};
     color: {{color-text}};
-    border: none;
+    border: 1px solid {{color-border-strong}};
     border-radius: {{radius-md}};
-    padding: 2px;
+    padding: 4px;
     margin: 0px;
     outline: 0;
     selection-background-color: {{color-selection-bg}};
