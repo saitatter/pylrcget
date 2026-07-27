@@ -129,16 +129,16 @@ class LyricsEditorWidget(QWidget):
         self._redo_stack: list[list[tuple[int, str]]] = []
 
         root = QVBoxLayout(self)
-        set_layout_spacing(root, margins=SPACE_3, spacing=SPACE_2)
+        set_layout_spacing(root, margins=(SPACE_3, 6, SPACE_3, SPACE_3), spacing=SPACE_2)
 
         # --- header ---
         self.header_widget = _HeightForWidthWidget()
         self.header_widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         header = QVBoxLayout(self.header_widget)
-        set_layout_spacing(header, spacing=SPACE_2)
+        set_layout_spacing(header, margins=0, spacing=SPACE_2)
 
         title_row = QHBoxLayout()
-        set_layout_spacing(title_row, spacing=SPACE_2)
+        set_layout_spacing(title_row, margins=0, spacing=SPACE_2)
 
         self.title = QLabel("Lyrics")
         self.title.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
