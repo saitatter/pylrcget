@@ -1363,6 +1363,8 @@ class LyricsEditorWidget(QWidget):
         return self.table.rowCount()
 
     def _auto_edit_on_add_line(self) -> bool:
+        if hasattr(self, "_auto_edit_override") and self._auto_edit_override is not None:
+            return bool(self._auto_edit_override)
         if not hasattr(self, "app_state") or not self.app_state:
             return False
         config = get_config(self.app_state.db)

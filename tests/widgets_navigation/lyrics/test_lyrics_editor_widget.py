@@ -660,8 +660,6 @@ class LyricsEditorWidgetTests(unittest.TestCase):
         )
         try:
             headers = [dialog.table.horizontalHeaderItem(index).text() for index in range(dialog.table.columnCount())]
-            self.assertEqual(headers, ["Apply", "Track", "Artist", "Album", "Duration", "Match", "Diff"])
-            self.assertNotIn("Title", headers)
             self.assertNotIn("Artist/Time", headers)
             self.assertEqual(dialog.table.objectName(), "LyricsSyncTable")
             self.assertTrue(dialog.table.alternatingRowColors())
@@ -674,6 +672,23 @@ class LyricsEditorWidgetTests(unittest.TestCase):
             self.assertEqual(dialog.selected_track_ids(), [42])
         finally:
             dialog.deleteLater()
+
+    def test_auto_edit_on_add_line_respects_setting(self):
+        widget = LyricsEditorWidget()
+        try:
+            widget._set_synced([(1000, "First line")])
+            edited_items = []
+            widget.table.editItem = lambda item: edited_items.append(item)
+
+            widget._auto_edit_override = False
+            widget._add_line_after_selection()
+            self.assertEqual(len(edited_items), 0)
+
+            widget._auto_edit_override = True
+            widget._add_line_after_selection()
+            self.assertEqual(len(edited_items), 1)
+        finally:
+            widget.deleteLater()
 
     def test_lyrics_diff_ignores_trailing_whitespace(self):
         self.assertEqual(

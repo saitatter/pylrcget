@@ -1905,6 +1905,7 @@ class MainWindow(QMainWindow):
         preferences.register_hotkey_hints(self, bindings)
 
     def _wire_lyrics_view(self, view: LyricsEditorWidget) -> None:
+        view.app_state = self.app_state
         view.saveRequested.connect(self._on_lyrics_save_requested)
         view.propagateRequested.connect(self._on_propagate_lyrics_requested)
         view.dirtyDraftChanged.connect(self._on_dirty_lyrics_changed)
