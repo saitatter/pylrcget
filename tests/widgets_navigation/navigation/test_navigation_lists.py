@@ -27,7 +27,7 @@ class NavigationBucketTests(unittest.TestCase):
 
             na_row = names.index("N/A")
             bucket_ids = widget.model.index(na_row, 0).data(role=Qt.ItemDataRole.UserRole)
-            self.assertEqual(bucket_ids, (1, 2))
+            self.assertEqual(list(bucket_ids), [1, 2])
             self.assertEqual(widget.model.index(na_row, 2).data(), "5")
         finally:
             widget.deleteLater()
@@ -53,7 +53,7 @@ class NavigationBucketTests(unittest.TestCase):
 
             na_row = names.index("N/A")
             bucket_ids = widget.model.index(na_row, 0).data(role=Qt.ItemDataRole.UserRole)
-            self.assertEqual(bucket_ids, (1, 2))
+            self.assertEqual(list(bucket_ids), [1, 2])
             self.assertEqual(widget.model.index(na_row, 2).data(), "7")
         finally:
             widget.deleteLater()

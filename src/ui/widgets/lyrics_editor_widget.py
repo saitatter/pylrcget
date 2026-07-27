@@ -3,7 +3,9 @@ from __future__ import annotations
 
 import logging
 import re
+import json
 from bisect import bisect_right
+from db.queries import get_config
 
 from PySide6.QtCore import QEvent, Qt, Signal, QTimer
 from PySide6.QtGui import QColor, QKeySequence, QShortcut, QTextCursor
@@ -1347,17 +1349,39 @@ class LyricsEditorWidget(QWidget):
         self._set_dirty_badge(has_changes)
         self.dirtyDraftChanged.emit(lrc, txt)
 
+    def _chronological_insert_index(self, ms: int) -> int:
+        for r in range(self.table.rowCount()):
+            it = self.table.item(r, 0)
+            if it:
+                row_ms = it.data(TIMESTAMP_MS_ROLE)
+                if row_ms is not None and int(row_ms) > ms:
+                    return r
+        return self.table.rowCount()
+
+    def _auto_edit_on_add_line(self) -> bool:
+        if not hasattr(self, "app_state") or not self.app_state:
+            return False
+        config = get_config(self.app_state.db)
+        try:
+            ui_state = json.loads(config.ui_state_json or "{}")
+        except (TypeError, ValueError, json.JSONDecodeError):
+            ui_state = {}
+        if not isinstance(ui_state, dict):
+            ui_state = {}
+        return bool(ui_state.get("editor_auto_edit_on_add_line", False))
+
+
     def _add_line_after_selection(self):
-        row = self.table.currentRow()
-        insert_at = row + 1 if row >= 0 else self.table.rowCount()
-        self._insert_line_at(insert_at)
+        ms = int(self._current_playback_ms())
+        insert_at = self._chronological_insert_index(ms)
+        self._insert_line_at(insert_at, ms)
 
     def _add_line_before_selection(self):
-        row = self.table.currentRow()
-        insert_at = row if row >= 0 else 0
-        self._insert_line_at(insert_at)
+        ms = int(self._current_playback_ms())
+        insert_at = self._chronological_insert_index(ms)
+        self._insert_line_at(insert_at, ms)
 
-    def _insert_line_at(self, insert_at: int):
+    def _insert_line_at(self, insert_at: int, ms: int | None = None):
         self._push_undo()
         insert_at = max(0, min(int(insert_at), self.table.rowCount()))
         top_visible_row = self.table.rowAt(0)
@@ -1365,7 +1389,8 @@ class LyricsEditorWidget(QWidget):
         self.table.setAutoScroll(False)
 
         # default time: current playback time
-        ms = int(self._current_playback_ms())
+        if ms is None:
+            ms = int(self._current_playback_ms())
 
         self.table.blockSignals(True)
         self.table.insertRow(insert_at)
@@ -1390,6 +1415,15 @@ class LyricsEditorWidget(QWidget):
         self._emit_dirty_draft_changed()
         self.table.setAutoScroll(auto_scroll)
 
+        # Select the newly added row
+        self.table.setCurrentCell(insert_at, TEXT_COLUMN)
+        self.table.scrollToItem(it_text, self.table.ScrollHint.EnsureVisible)
+        self.table.setFocus()
+
+        # Automatically enter editing mode if enabled
+        if self._auto_edit_on_add_line():
+            self.table.editItem(it_text)
+
     def _delete_selected_line(self):
         rows = self._selected_rows()
         if not rows:
@@ -1412,6 +1446,7 @@ class LyricsEditorWidget(QWidget):
         self._refresh_row_styles()
         self._emit_dirty_draft_changed()
         self.table.setAutoScroll(auto_scroll)
+        self.table.setFocus()
 
     def _snap_selected_line_to_current_time(self):
         row = self.table.currentRow()
@@ -1443,6 +1478,7 @@ class LyricsEditorWidget(QWidget):
                 self._set_validation_message("Snapped selected line to current playback time.", state="success")
         self._refresh_row_styles()
         self._emit_dirty_draft_changed()
+        self.table.setFocus()
 
     def _shift_selected_lines_by_custom_amount(self):
         delta_ms = int(round(float(self.shift_spin.value()) * 1000.0))
@@ -1460,6 +1496,7 @@ class LyricsEditorWidget(QWidget):
             f"Shifted {len(rows)} selected {line_word} by {rendered}.",
             state="success",
         )
+        self.table.setFocus()
 
     def _shift_all_lines_from_first_delta(self):
         if self.table.rowCount() <= 0:
@@ -1479,6 +1516,7 @@ class LyricsEditorWidget(QWidget):
             f"Shifted all lines by {delta_ms:+d} ms using the first line as reference.",
             state="success",
         )
+        self.table.setFocus()
 
     def _apply_delta_to_rows(self, rows: list[int], delta_ms: int) -> bool:
         if not rows:

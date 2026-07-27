@@ -12,32 +12,43 @@ def _optional_collect_data_files(package: str):
     except Exception:
         return []
 
-AI_DATAS = _optional_collect_data_files("whisper") + _optional_collect_data_files("demucs")
+AI_DATAS = []
+AI_BINARIES = []
+AI_HIDDENIMPORTS = [
+    "whisperx",
+    "whisperx.asr",
+    "whisperx.alignment",
+    "whisperx.audio",
+    "whisperx.diarize",
+    "whisperx.types",
+    "whisperx.utils",
+    "whisperx.vad",
+]
 
-def _optional_package_subdir(package: str, subdir: str):
+def _collect_ai_package(package: str):
+    global AI_DATAS, AI_BINARIES, AI_HIDDENIMPORTS
     try:
-        mod = import_module(package)
-        base = Path(mod.__file__).resolve().parent
-        path = base / subdir
-        if path.is_dir():
-            return [(str(path), f"{package}/{subdir}")]
+        datas, binaries, hiddenimports = collect_all(package)
+        AI_DATAS.extend(datas)
+        AI_BINARIES.extend(binaries)
+        AI_HIDDENIMPORTS.extend(hiddenimports)
     except Exception:
-        return []
-    return []
+        pass
 
-AI_DATAS += _optional_package_subdir("whisper", "assets")
+for pkg in ["whisperx", "faster_whisper", "ctranslate2", "soundfile", "torchaudio"]:
+    _collect_ai_package(pkg)
 
 
 a = Analysis(
     ["main.py"],
     pathex=[str(ROOT), str(ROOT / "src")],
-    binaries=[],
+    binaries=AI_BINARIES,
     datas=[
         (str(ROOT / "src" / "ui" / "qss"), "ui/qss"),
         (str(ROOT / "src" / "ui" / "assets"), "ui/assets"),
         (str(ROOT / "pyproject.toml"), "."),
     ] + AI_DATAS,
-    hiddenimports=[],
+    hiddenimports=AI_HIDDENIMPORTS,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

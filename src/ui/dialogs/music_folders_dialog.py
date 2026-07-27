@@ -403,9 +403,20 @@ class MusicFoldersDialog(QDialog):
         lyrics_files_layout.addStretch(1)
         lyrics_embed_layout.addStretch(1)
 
+        # Editor Settings
+        lyrics_editor_tab = QWidget()
+        lyrics_editor_layout = QVBoxLayout(lyrics_editor_tab)
+        editor_box = QGroupBox("Lyrics Editor")
+        editor_layout = QGridLayout(editor_box)
+        self.auto_edit_on_add_line_chk = QCheckBox("Automatically enter editing mode when a new line is added")
+        editor_layout.addWidget(self.auto_edit_on_add_line_chk, 0, 0, 1, 2)
+        lyrics_editor_layout.addWidget(editor_box)
+        lyrics_editor_layout.addStretch(1)
+
         self.lyrics_sections_tabs.addTab(lyrics_download_tab, "Download")
         self.lyrics_sections_tabs.addTab(lyrics_files_tab, "Files")
         self.lyrics_sections_tabs.addTab(lyrics_embed_tab, "Embed")
+        self.lyrics_sections_tabs.addTab(lyrics_editor_tab, "Editor")
         lyrics_tab_layout.addStretch(1)
 
         self.tabs.addTab(library_tab, "Library")
@@ -471,6 +482,15 @@ class MusicFoldersDialog(QDialog):
         embed_format_idx = self.embed_format_combo.findData(getattr(config, "lyrics_embed_format", "both") or "both")
         self.embed_format_combo.setCurrentIndex(max(0, embed_format_idx))
         self.reaction_delay_spin.setValue(int(config.reaction_delay_ms or 0))
+
+        try:
+            ui_state = json.loads(config.ui_state_json or "{}")
+        except (TypeError, ValueError, json.JSONDecodeError):
+            ui_state = {}
+        if not isinstance(ui_state, dict):
+            ui_state = {}
+        self.auto_edit_on_add_line_chk.setChecked(bool(ui_state.get("editor_auto_edit_on_add_line", False)))
+
         ai_settings = load_ai_sync_settings(getattr(config, "ui_state_json", ""))
         ai_device_idx = self.ai_device_combo.findData(str(ai_settings.get("device") or "auto"))
         self.ai_device_combo.setCurrentIndex(max(0, ai_device_idx))
@@ -841,8 +861,17 @@ class MusicFoldersDialog(QDialog):
             return
 
         config = get_config(self.app_state.db)
+
+        try:
+            ui_state = json.loads(config.ui_state_json or "{}")
+        except (TypeError, ValueError, json.JSONDecodeError):
+            ui_state = {}
+        if not isinstance(ui_state, dict):
+            ui_state = {}
+        ui_state["editor_auto_edit_on_add_line"] = self.auto_edit_on_add_line_chk.isChecked()
+
         ai_state_json = merge_ai_sync_settings(
-            getattr(config, "ui_state_json", ""),
+            json.dumps(ui_state, ensure_ascii=True, separators=(",", ":")),
             {
                 "device": str(self.ai_device_combo.currentData() or "auto"),
                 "language": str(self.ai_language_combo.currentData() or "auto"),

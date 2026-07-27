@@ -5,6 +5,9 @@ from dataclasses import dataclass
 
 def _normalize_autofix_line(text: str) -> str:
     cleaned = (text or "").strip()
+    # Strip trailing commas and dots (except ellipsis)
+    while cleaned.endswith(",") or (cleaned.endswith(".") and not cleaned.endswith("...")):
+        cleaned = cleaned[:-1].rstrip()
     if not cleaned:
         return ""
 
@@ -24,6 +27,47 @@ class LyricsValidationProblem:
     fixable: bool = False
 
 
+def _validate_line_text(content: str, line_no: int, is_synced: bool = False) -> list[LyricsValidationProblem]:
+    problems: list[LyricsValidationProblem] = []
+    if not content:
+        return problems
+
+    if not is_synced and content.startswith("["):
+        problems.append(
+            LyricsValidationProblem(
+                line=line_no,
+                message="Line cannot start with an opening square bracket.",
+            )
+        )
+        return problems
+
+    if (content.endswith(".") and not content.endswith("...")) or content.endswith(","):
+        problems.append(
+            LyricsValidationProblem(
+                line=line_no,
+                message="Line should not end with punctuation such as comma or dot.",
+                fixable=True,
+            )
+        )
+
+    first_alpha_lower = False
+    for char in content:
+        if char.isalpha():
+            if char.islower():
+                first_alpha_lower = True
+            break
+    if first_alpha_lower:
+        problems.append(
+            LyricsValidationProblem(
+                line=line_no,
+                message="Line should start with an uppercase letter.",
+                fixable=True,
+            )
+        )
+
+    return problems
+
+
 def validate_plain_lyrics(text: str) -> list[LyricsValidationProblem]:
     lines = (text or "").splitlines()
     trimmed = [line.strip() for line in lines]
@@ -35,13 +79,7 @@ def validate_plain_lyrics(text: str) -> list[LyricsValidationProblem]:
     for index, content in enumerate(trimmed):
         line_no = index + 1
         if content:
-            if content.startswith("["):
-                problems.append(
-                    LyricsValidationProblem(
-                        line=line_no,
-                        message="Line cannot start with an opening square bracket.",
-                    )
-                )
+            problems.extend(_validate_line_text(content, line_no, is_synced=False))
             continue
 
         if (index == 0 and len(trimmed) > 1) or (index > 0 and not trimmed[index - 1]):
@@ -95,14 +133,7 @@ def validate_synced_lyrics(pairs: list[tuple[int, str]]) -> list[LyricsValidatio
         previous_ms = current_ms
 
         if content:
-            if (content.endswith(".") and not content.endswith("...")) or content.endswith(","):
-                problems.append(
-                    LyricsValidationProblem(
-                        line=line_no,
-                        message="Line should not end with punctuation such as comma or dot.",
-                        fixable=True,
-                    )
-                )
+            problems.extend(_validate_line_text(content, line_no, is_synced=True))
             last_non_empty_line = (line_no, current_ms, content)
             previous_empty_line = None
         else:
@@ -146,10 +177,7 @@ def autofix_synced_lyrics(pairs: list[tuple[int, str]]) -> list[tuple[int, str]]
     fixed: list[tuple[int, str]] = []
     previous_ms: int | None = None
     for ms, text in sorted(((int(ms), text or "") for ms, text in pairs), key=lambda item: item[0]):
-        stripped = (text or "").strip()
-        while stripped.endswith(",") or (stripped.endswith(".") and not stripped.endswith("...")):
-            stripped = stripped[:-1].rstrip()
-        stripped = _normalize_autofix_line(stripped)
+        stripped = _normalize_autofix_line(text)
         if not stripped and fixed and not fixed[-1][1].strip():
             continue
         fixed_ms = ms if previous_ms is None else max(ms, previous_ms + 50)

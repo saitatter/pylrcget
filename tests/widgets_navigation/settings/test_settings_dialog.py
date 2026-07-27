@@ -69,7 +69,7 @@ class SettingsDialogTests(unittest.TestCase):
                 dialog = MusicFoldersDialog(app_state)
                 try:
                     labels = [dialog.lyrics_sections_tabs.tabText(index) for index in range(dialog.lyrics_sections_tabs.count())]
-                    self.assertEqual(labels, ["Download", "Files", "Embed"])
+                    self.assertEqual(labels, ["Download", "Files", "Embed", "Editor"])
                 finally:
                     dialog.deleteLater()
             finally:

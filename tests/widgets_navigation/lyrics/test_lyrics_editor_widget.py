@@ -248,7 +248,7 @@ class LyricsEditorWidgetTests(unittest.TestCase):
             self.assertEqual(widget.table.rowCount(), 3)
             self.assertEqual(widget.table.item(0, 0).text(), "00:00.50")
             self.assertEqual(widget.table.item(0, 1).text(), "")
-            self.assertEqual(widget.table.currentRow(), 1)
+            self.assertEqual(widget.table.currentRow(), 0)
             self.assertEqual(widget.table.currentColumn(), 1)
             self.assertEqual(widget.table.item(1, 1).text(), "First line")
         finally:

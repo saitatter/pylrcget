@@ -68,3 +68,36 @@ def test_synced_autofix_separates_duplicate_timestamps():
         (1300, "Third"),
         (6300, ""),
     ]
+
+
+def test_validator_detects_lowercase_start():
+    # plain validation
+    problems_plain = validate_plain_lyrics("hello\nWorld")
+    assert len(problems_plain) == 1
+    assert problems_plain[0].line == 1
+    assert "uppercase" in problems_plain[0].message
+    assert problems_plain[0].fixable
+
+    # synced validation
+    problems_synced = validate_synced_lyrics([(1000, "hello"), (2000, "World")])
+    # might have lowercase problem and end marker problem
+    lowercase_problem = [p for p in problems_synced if "uppercase" in p.message]
+    assert len(lowercase_problem) == 1
+    assert lowercase_problem[0].line == 1
+    assert lowercase_problem[0].fixable
+
+
+def test_plain_validator_and_autofix_handles_punctuation():
+    problems = validate_plain_lyrics("First line.\nsecond line,")
+    # line 1: ends with dot
+    # line 2: ends with comma AND starts with lowercase
+    assert [p.line for p in problems] == [1, 2, 2]
+    
+    punctuation_problems = [p for p in problems if "punctuation" in p.message]
+    assert len(punctuation_problems) == 2
+    
+    lowercase_problems = [p for p in problems if "uppercase" in p.message]
+    assert len(lowercase_problems) == 1
+    assert lowercase_problems[0].line == 2
+
+    assert autofix_plain_lyrics("First line.\nsecond line,") == "First line\nSecond line"
