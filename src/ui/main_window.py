@@ -994,6 +994,7 @@ class MainWindow(QMainWindow):
     # ------------------ filters ------------------
     def _apply_track_filters(self):
         library_filters.apply_track_filters(self)
+        self._validate_current_selected_track()
 
     def _schedule_library_search(self):
         library_filters.schedule_library_search(self)
@@ -1015,10 +1016,17 @@ class MainWindow(QMainWindow):
             )
             for view in self._all_lyrics_views():
                 view.set_reaction_delay_ms(updated_config.reaction_delay_ms)
-            self._apply_track_filters()
             after_dirs = get_directories(self.app_state.db)
-            if dlg.directories_changed and after_dirs:
-                self.refresh_library()
+            if dlg.directories_changed:
+                if after_dirs:
+                    self.refresh_library()
+                else:
+                    from db.database import purge_all_tracks
+                    purge_all_tracks(self.app_state.db)
+                    self._apply_track_filters()
+            else:
+                self._apply_track_filters()
+            self._validate_current_selected_track()
 
     def _sync_download_mode_ui(self) -> None:
         config = get_config(self.app_state.db)
@@ -1131,17 +1139,51 @@ class MainWindow(QMainWindow):
 
         self._set_track_lyrics_views(track)
 
-    def _preview_track(self, track_id: int) -> None:
+    def _preview_track(self, track_id: int | None) -> None:
+        if track_id is None:
+            self._clear_selected_track_views()
+            return
         if self._dirty_lyrics_timer.isActive():
             self._dirty_lyrics_timer.stop()
             self._flush_dirty_lyrics()
         try:
             track = get_track_by_id(self.app_state.db, int(track_id))
-        except (sqlite3.Error, KeyError):
+        except (sqlite3.Error, KeyError, ValueError):
+            self._clear_selected_track_views()
             return
         self._editing_track_id = int(track_id)
         self._editing_saved_lyrics = canonical_lyrics_pair(track.lrc_lyrics, track.txt_lyrics)
         self._set_track_lyrics_views(track)
+
+    def _validate_current_selected_track(self) -> None:
+        editing_id = getattr(self, "_editing_track_id", None)
+        if editing_id is None:
+            return
+        try:
+            get_track_by_id(self.app_state.db, int(editing_id))
+        except (sqlite3.Error, KeyError, ValueError, AttributeError):
+            self._clear_selected_track_views()
+
+    def _clear_selected_track_views(self) -> None:
+        self._editing_track_id = None
+        self._editing_saved_lyrics = ("", "")
+        for view in self._all_lyrics_views():
+            view.set_track_lyrics(
+                title="No Track Selected",
+                txt_lyrics="",
+                lrc_lyrics="",
+                instrumental=False,
+                dirty_txt_lyrics=None,
+                dirty_lrc_lyrics=None,
+                dirty_lyrics_present=False,
+            )
+        for track_list in (
+            getattr(self, "track_list", None),
+            getattr(getattr(self, "albums_tab", None), "track_list", None),
+            getattr(getattr(getattr(self, "artists_tab", None), "album_browser", None), "track_list", None),
+        ):
+            if track_list and hasattr(track_list, "table") and track_list.table.selectionModel():
+                track_list.table.selectionModel().clearSelection()
 
     def _normalize_dirty_lyrics_state(self, track):
         if not bool(getattr(track, "dirty_lyrics_present", False)):

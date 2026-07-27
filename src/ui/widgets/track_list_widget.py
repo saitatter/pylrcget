@@ -357,6 +357,8 @@ class TrackListWidget(QWidget):
         track_id = self.selected_track_id()
         if track_id is not None:
             self.previewTrack.emit(int(track_id))
+        else:
+            self.previewTrack.emit(None)
 
     def _on_context_menu(self, pos):
         idx = self.table.indexAt(pos)

@@ -115,6 +115,8 @@ def scan_finished(window, ok: bool, msg: str) -> None:
 
     if ok:
         window._apply_track_filters()
+        if hasattr(window, "_validate_current_selected_track"):
+            window._validate_current_selected_track()
         window.scan_overlay.append_result("Library scan", msg or "Library scan finished successfully.", True)
         notify_user(
             window.app_state,

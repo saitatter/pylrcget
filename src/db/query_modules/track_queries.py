@@ -627,3 +627,9 @@ def prune_library(db: sqlite3.Connection) -> None:
     db.execute("DELETE FROM albums WHERE NOT EXISTS (SELECT 1 FROM tracks WHERE tracks.album_id = albums.id)")
     db.execute("DELETE FROM artists WHERE NOT EXISTS (SELECT 1 FROM tracks WHERE tracks.artist_id = artists.id)")
     db.commit()
+
+
+def purge_all_tracks(db: sqlite3.Connection) -> None:
+    db.execute("DELETE FROM tracks")
+    prune_library(db)
+    db.commit()

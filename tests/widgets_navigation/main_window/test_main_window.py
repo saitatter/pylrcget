@@ -735,3 +735,28 @@ class MainWindowInstrumentalTests(unittest.TestCase):
 
         self.assertEqual(statuses[-1], "Performing alignment (forced alignment)...")
         self.assertEqual(updates[-1], (4, 8, "AI Auto-Sync", "Performing alignment (forced alignment)..."))
+
+    def test_validate_current_selected_track_clears_deleted_track(self):
+        with TemporaryDirectory() as tmp:
+            app_state = simple_app_state(initialize_database(tmp))
+            try:
+                window = MainWindow.__new__(MainWindow)
+                window.app_state = app_state
+                window._editing_track_id = 99999  # non-existent ID
+                window._editing_saved_lyrics = ("synced", "plain")
+                cleared_views = []
+                window._all_lyrics_views = lambda: [
+                    SimpleNamespace(set_track_lyrics=lambda **kwargs: cleared_views.append(kwargs))
+                ]
+                window.track_list = SimpleNamespace(table=SimpleNamespace(selectionModel=lambda: None))
+                window.albums_tab = SimpleNamespace(track_list=None)
+                window.artists_tab = SimpleNamespace(album_browser=SimpleNamespace(track_list=None))
+
+                MainWindow._validate_current_selected_track(window)
+
+                self.assertIsNone(window._editing_track_id)
+                self.assertEqual(window._editing_saved_lyrics, ("", ""))
+                self.assertEqual(len(cleared_views), 1)
+                self.assertEqual(cleared_views[0]["title"], "No Track Selected")
+            finally:
+                app_state.db.close()
