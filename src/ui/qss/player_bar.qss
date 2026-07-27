@@ -230,46 +230,23 @@ QComboBox#SpeedCombo {
     font-size: 11px;
 }
 
-QLabel#SpeedComboPrefix {
-    background: transparent;
-    color: {{color-text-muted}};
-    font-size: 11px;
-    font-weight: 700;
-}
-
-QSlider#VolumeSlider::groove:horizontal {
-    height: 5px;
-    background: {{color-bg-pressed}};
-    border-radius: 999px;
-    margin: 0;
-}
-
-QSlider#VolumeSlider::sub-page:horizontal {
-    background: {{color-accent}};
-    border-radius: 999px;
-}
-
-QSlider#VolumeSlider::add-page:horizontal {
-    background: {{color-bg-pressed}};
-    border-radius: 999px;
-}
-
-QSlider#VolumeSlider::handle:horizontal {
-    width: 10px;
-    height: 10px;
-    margin: -3px 0;
-    border-radius: 999px;
-    background: {{color-text-strong}};
-    border: 1px solid {{color-slider-handle-border}};
-}
-
 QComboBox#SpeedCombo:hover {
     border-color: {{color-accent}};
 }
 
 QComboBox#SpeedCombo::drop-down {
+    subcontrol-origin: padding;
+    subcontrol-position: center right;
+    width: 20px;
     border: none;
-    width: 0;
+    background: transparent;
+}
+
+QComboBox#SpeedCombo::down-arrow {
+    image: url("{{asset-url}}/assets/icons/chevron-down.svg");
+    width: 10px;
+    height: 10px;
+    margin-right: 4px;
 }
 
 QToolButton#SpeedAdjustButton {

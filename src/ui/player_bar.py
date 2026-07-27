@@ -398,6 +398,7 @@ class PlayerBar(QWidget):
         self.slider.sliderReleased.connect(self._on_slider_released)
         self.slider.sliderMoved.connect(self._on_slider_moved)
         self.cmb_speed.activated.connect(self._on_speed_preset_selected)
+        self.cmb_speed.currentIndexChanged.connect(self._on_speed_preset_selected)
         self.cmb_speed.lineEdit().editingFinished.connect(self._on_custom_speed_committed)
         self.cmb_speed.lineEdit().textEdited.connect(self._on_custom_speed_edited)
         self.btn_speed_down.clicked.connect(lambda: self._step_speed(-self._speed_step))
