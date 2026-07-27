@@ -320,6 +320,48 @@ def appearance_scale(ui_scale_percent: int) -> float:
     return max(0.85, min(1.5, float(int(ui_scale_percent or 100)) / 100.0))
 
 
+def reapply_theme_styles(window) -> None:
+    if hasattr(window, "setStyleSheet"):
+        apply_styles(window)
+    if hasattr(window, "player_bar") and hasattr(window.player_bar, "_apply_styles"):
+        window.player_bar._apply_styles()
+    if hasattr(window, "track_list") and hasattr(window.track_list, "_apply_styles"):
+        window.track_list._apply_styles()
+        if hasattr(window.track_list, "model") and hasattr(window.track_list.model, "layoutChanged"):
+            window.track_list.model.layoutChanged.emit()
+        if hasattr(window.track_list, "table"):
+            window.track_list.table.viewport().update()
+        if hasattr(window.track_list, "empty_state") and hasattr(window.track_list.empty_state, "_apply_styles"):
+            window.track_list.empty_state._apply_styles()
+    if hasattr(window, "albums_tab") and hasattr(window.albums_tab, "_apply_styles"):
+        window.albums_tab._apply_styles()
+        if hasattr(window.albums_tab, "empty_state") and hasattr(window.albums_tab.empty_state, "_apply_styles"):
+            window.albums_tab.empty_state._apply_styles()
+    if hasattr(window, "artists_tab"):
+        if hasattr(window.artists_tab, "_apply_styles"):
+            window.artists_tab._apply_styles()
+        if hasattr(window.artists_tab, "empty_state") and hasattr(window.artists_tab.empty_state, "_apply_styles"):
+            window.artists_tab.empty_state._apply_styles()
+        if hasattr(window.artists_tab, "album_browser") and hasattr(window.artists_tab.album_browser, "_apply_styles"):
+            window.artists_tab.album_browser._apply_styles()
+            if hasattr(window.artists_tab.album_browser, "empty_state") and hasattr(window.artists_tab.album_browser.empty_state, "_apply_styles"):
+                window.artists_tab.album_browser.empty_state._apply_styles()
+    if hasattr(window, "lrclib_browser_tab") and hasattr(window.lrclib_browser_tab, "_apply_styles"):
+        window.lrclib_browser_tab._apply_styles()
+    if hasattr(window, "mylrclib_tab") and hasattr(window.mylrclib_tab, "_apply_styles"):
+        window.mylrclib_tab._apply_styles()
+    if hasattr(window, "_all_lyrics_views"):
+        for view in window._all_lyrics_views():
+            if hasattr(view, "_apply_styles"):
+                view._apply_styles()
+            if hasattr(view, "_refresh_row_styles"):
+                view._refresh_row_styles()
+            if hasattr(view, "table"):
+                view.table.viewport().update()
+            if hasattr(view, "empty_state") and hasattr(view.empty_state, "_apply_styles"):
+                view.empty_state._apply_styles()
+
+
 def apply_appearance_preferences(window, config) -> None:
     app = QApplication.instance()
     if app is not None:
@@ -329,6 +371,8 @@ def apply_appearance_preferences(window, config) -> None:
             ui_scale_percent=config.ui_scale_percent,
             font_size_mode=config.font_size_mode,
         )
+
+    reapply_theme_styles(window)
 
     scale = appearance_scale(config.ui_scale_percent)
     if hasattr(window, "player_bar"):
@@ -340,5 +384,6 @@ def apply_appearance_preferences(window, config) -> None:
         window.albums_tab.set_ui_scale(scale)
     if hasattr(window, "artists_tab"):
         window.artists_tab.set_ui_scale(scale)
-    for view in window._all_lyrics_views():
-        view.set_ui_scale(scale)
+    if hasattr(window, "_all_lyrics_views"):
+        for view in window._all_lyrics_views():
+            view.set_ui_scale(scale)

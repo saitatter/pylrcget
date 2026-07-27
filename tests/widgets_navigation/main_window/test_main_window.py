@@ -760,3 +760,33 @@ class MainWindowInstrumentalTests(unittest.TestCase):
                 self.assertEqual(cleared_views[0]["title"], "No Track Selected")
             finally:
                 app_state.db.close()
+
+    def test_reapply_theme_styles_calls_apply_styles_on_all_components(self):
+        from ui.main_window_parts.preferences import reapply_theme_styles
+        called = []
+        window = SimpleNamespace(
+            setStyleSheet=lambda s: called.append("window"),
+            player_bar=SimpleNamespace(_apply_styles=lambda: called.append("player_bar")),
+            track_list=SimpleNamespace(
+                _apply_styles=lambda: called.append("track_list"),
+                model=SimpleNamespace(layoutChanged=SimpleNamespace(emit=lambda: None)),
+                table=SimpleNamespace(viewport=lambda: SimpleNamespace(update=lambda: None)),
+            ),
+            albums_tab=SimpleNamespace(_apply_styles=lambda: called.append("albums_tab")),
+            artists_tab=SimpleNamespace(_apply_styles=lambda: called.append("artists_tab")),
+            lrclib_browser_tab=SimpleNamespace(_apply_styles=lambda: called.append("lrclib_browser_tab")),
+            mylrclib_tab=SimpleNamespace(_apply_styles=lambda: called.append("mylrclib_tab")),
+            top_bar=SimpleNamespace(_apply_styles=lambda: called.append("top_bar")),
+            _all_lyrics_views=lambda: [
+                SimpleNamespace(_apply_styles=lambda: called.append("lyrics_view"))
+            ],
+        )
+
+        with patch("ui.main_window_parts.preferences.load_stylesheet", return_value=""):
+            reapply_theme_styles(window)
+
+        self.assertIn("player_bar", called)
+        self.assertIn("track_list", called)
+        self.assertIn("albums_tab", called)
+        self.assertIn("artists_tab", called)
+        self.assertIn("lyrics_view", called)
