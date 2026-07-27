@@ -21,7 +21,11 @@ def load_stylesheet(name: str, **replacements: str) -> str:
     asset_url = asset_path().as_posix()
     content = content.replace("{{asset-url}}", asset_url)
     for key, value in STYLE_TOKENS.items():
-        content = content.replace(f"{{{{{key}}}}}", value)
+        content = content.replace("{{" + key + "}}", value)
+        if isinstance(value, str) and value.startswith("#"):
+            content = content.replace("{{" + key + "-enc}}", value.replace("#", "%23"))
     for key, value in replacements.items():
-        content = content.replace(f"{{{{{key}}}}}", value)
+        content = content.replace("{{" + key + "}}", value)
+        if isinstance(value, str) and value.startswith("#"):
+            content = content.replace("{{" + key + "-enc}}", value.replace("#", "%23"))
     return content
