@@ -153,8 +153,8 @@ QComboBox {
     background-color: {{color-bg-panel}};
     color: {{color-text}};
     border: 1px solid {{color-border}};
-    border-radius: {{radius-md}};
-    padding: 4px 32px 4px 12px;
+    border-radius: {{radius-lg}};
+    padding: 4px 36px 4px 14px;
     min-height: 38px;
     selection-background-color: {{color-accent}};
     selection-color: {{color-bg-app}};
@@ -165,7 +165,7 @@ QComboBox:hover {
     background-color: {{color-bg-elevated}};
 }
 
-QComboBox:focus {
+QComboBox:focus, QComboBox:on {
     border-color: {{color-accent}};
 }
 
@@ -189,7 +189,7 @@ QComboBox::down-arrow {
     border-left: 5px solid transparent;
     border-right: 5px solid transparent;
     border-top: 5px solid {{color-text-muted}};
-    margin-right: 8px;
+    margin-right: 10px;
 }
 
 QComboBox::down-arrow:hover {
@@ -200,13 +200,21 @@ QComboBox::down-arrow:disabled {
     border-top-color: {{color-disabled-text}};
 }
 
+/* Combobox Popup Frame Container & List */
+QComboBox QFrame {
+    border: 1px solid {{color-border-strong}};
+    border-radius: {{radius-md}};
+    background-color: {{color-bg-elevated}};
+    padding: 2px;
+}
+
 QComboBox QListView,
 QComboBox QAbstractItemView {
-    background-color: {{color-bg-elevated}};
+    background-color: transparent;
     color: {{color-text}};
-    border: 1px solid {{color-border-strong}};
-    border-radius: 0px;
-    padding: 4px;
+    border: none;
+    border-radius: {{radius-md}};
+    padding: 2px;
     margin: 0px;
     outline: 0;
     selection-background-color: {{color-selection-bg}};
@@ -215,8 +223,8 @@ QComboBox QAbstractItemView {
 
 QComboBox QListView::item,
 QComboBox QAbstractItemView::item {
-    min-height: 26px;
-    padding: 4px 8px;
+    min-height: 28px;
+    padding: 4px 10px;
     border-radius: {{radius-sm}};
 }
 
