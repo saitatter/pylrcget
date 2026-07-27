@@ -54,8 +54,9 @@ class _ComboboxPopupEventFilter(QObject):
                 view = watched.view()
                 if view:
                     popup = view.window()
-                    if popup and not popup.testAttribute(Qt.WidgetAttribute.WA_TranslucentBackground):
+                    if popup:
                         popup.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
+                        popup.setStyleSheet("background: transparent; border: none; outline: 0;")
             except Exception:
                 pass
         return super().eventFilter(watched, event)
