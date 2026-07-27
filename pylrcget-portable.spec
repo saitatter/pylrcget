@@ -1,6 +1,6 @@
 from pathlib import Path
 from importlib import import_module
-from PyInstaller.utils.hooks import collect_data_files
+from PyInstaller.utils.hooks import collect_all, collect_data_files
 
 
 SPEC_PATH = Path(globals().get("__file__", "pylrcget-portable.spec")).resolve()
@@ -23,6 +23,11 @@ AI_HIDDENIMPORTS = [
     "whisperx.types",
     "whisperx.utils",
     "whisperx.vad",
+    "soundfile",
+    "_soundfile",
+    "_soundfile_data",
+    "cffi",
+    "_cffi_backend",
 ]
 
 def _collect_ai_package(package: str):
@@ -32,10 +37,11 @@ def _collect_ai_package(package: str):
         AI_DATAS.extend(datas)
         AI_BINARIES.extend(binaries)
         AI_HIDDENIMPORTS.extend(hiddenimports)
-    except Exception:
-        pass
+    except Exception as exc:
+        print(f"Warning: could not collect AI package {package}: {exc}")
 
-for pkg in ["whisperx", "faster_whisper", "ctranslate2", "soundfile", "torchaudio"]:
+
+for pkg in ["whisperx", "faster_whisper", "ctranslate2", "soundfile", "torchaudio", "torch"]:
     _collect_ai_package(pkg)
 
 
