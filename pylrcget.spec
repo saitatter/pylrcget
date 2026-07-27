@@ -41,7 +41,21 @@ def _collect_ai_package(package: str):
         print(f"Warning: could not collect AI package {package}: {exc}")
 
 
-for pkg in ["whisperx", "faster_whisper", "ctranslate2", "soundfile", "torchaudio", "torch"]:
+AI_PACKAGES = [
+    "whisperx",
+    "faster_whisper",
+    "ctranslate2",
+    "soundfile",
+    "torchaudio",
+    "torch",
+    "pandas",
+    "scipy",
+    "transformers",
+    "pyannote",
+    "pyannote.audio",
+]
+
+for pkg in AI_PACKAGES:
     _collect_ai_package(pkg)
 
 
