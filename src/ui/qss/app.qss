@@ -200,23 +200,28 @@ QComboBox::down-arrow:disabled {
     border-top-color: {{color-disabled-text}};
 }
 
+QComboBox QListView,
 QComboBox QAbstractItemView {
-    background-color: {{color-bg-panel}};
+    background-color: {{color-bg-elevated}};
     color: {{color-text}};
     border: 1px solid {{color-border-strong}};
-    border-radius: {{radius-sm}};
+    border-radius: 0px;
     padding: 4px;
+    margin: 0px;
     outline: 0;
     selection-background-color: {{color-selection-bg}};
     selection-color: {{color-selection-text}};
 }
 
+QComboBox QListView::item,
 QComboBox QAbstractItemView::item {
     min-height: 26px;
     padding: 4px 8px;
     border-radius: {{radius-sm}};
 }
 
+QComboBox QListView::item:hover,
+QComboBox QListView::item:selected,
 QComboBox QAbstractItemView::item:hover,
 QComboBox QAbstractItemView::item:selected {
     background-color: {{color-table-row-hover}};
