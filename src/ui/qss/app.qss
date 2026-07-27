@@ -12,13 +12,13 @@ QMainWindow, QMenuBar, QStatusBar, QSplitter::handle {
     background-color: {{color-bg-app}};
 }
 
-QLineEdit, QTextEdit, QPlainTextEdit, QTableWidget, QAbstractItemView, QComboBox, QMenu, QMessageBox, QProgressBar {
+QLineEdit, QTextEdit, QPlainTextEdit, QTableWidget, QAbstractItemView, QMenu, QMessageBox, QProgressBar {
     background-color: {{color-bg-control}};
     color: {{color-text}};
     border: 1px solid {{color-border}};
 }
 
-QLineEdit, QTextEdit, QPlainTextEdit, QComboBox {
+QLineEdit, QTextEdit, QPlainTextEdit {
     background-color: {{color-bg-panel}};
     border-radius: {{radius-md}};
     padding: {{space-2}};
@@ -150,18 +150,77 @@ QCheckBox::indicator:checked:disabled {
 }
 
 QComboBox {
-    padding-right: 32px;
+    background-color: {{color-bg-panel}};
+    color: {{color-text}};
+    border: 1px solid {{color-border}};
+    border-radius: {{radius-md}};
+    padding: 4px 32px 4px 12px;
+    min-height: 38px;
+    selection-background-color: {{color-accent}};
+    selection-color: {{color-bg-app}};
+}
+
+QComboBox:hover {
+    border-color: {{color-border-hover}};
+    background-color: {{color-bg-elevated}};
+}
+
+QComboBox:focus {
+    border-color: {{color-accent}};
+}
+
+QComboBox:disabled {
+    color: {{color-disabled-text}};
+    border-color: {{color-disabled-border}};
+    background-color: {{color-disabled-bg}};
 }
 
 QComboBox::drop-down {
-    border: none;
+    subcontrol-origin: padding;
+    subcontrol-position: center right;
     width: 28px;
+    border: none;
+    background: transparent;
+}
+
+QComboBox::down-arrow {
+    width: 0;
+    height: 0;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-top: 5px solid {{color-text-muted}};
+    margin-right: 8px;
+}
+
+QComboBox::down-arrow:hover {
+    border-top-color: {{color-accent}};
+}
+
+QComboBox::down-arrow:disabled {
+    border-top-color: {{color-disabled-text}};
 }
 
 QComboBox QAbstractItemView {
-    border-radius: {{radius-md}};
+    background-color: {{color-bg-panel}};
+    color: {{color-text}};
+    border: 1px solid {{color-border-strong}};
+    border-radius: {{radius-sm}};
     padding: 4px;
     outline: 0;
+    selection-background-color: {{color-selection-bg}};
+    selection-color: {{color-selection-text}};
+}
+
+QComboBox QAbstractItemView::item {
+    min-height: 26px;
+    padding: 4px 8px;
+    border-radius: {{radius-sm}};
+}
+
+QComboBox QAbstractItemView::item:hover,
+QComboBox QAbstractItemView::item:selected {
+    background-color: {{color-table-row-hover}};
+    color: {{color-accent}};
 }
 
 QLabel#OnboardingTitle {
