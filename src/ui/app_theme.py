@@ -47,31 +47,6 @@ def _apply_app_font(
     app.setFont(font)
 
 
-class _ComboboxPopupEventFilter(QObject):
-    def eventFilter(self, watched: QObject, event: QEvent) -> bool:
-        if event.type() == QEvent.Type.Show and isinstance(watched, QComboBox):
-            try:
-                view = watched.view()
-                if view:
-                    popup = view.window()
-                    if popup:
-                        popup.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
-                        popup.setStyleSheet("background: transparent; border: none; outline: 0;")
-            except Exception:
-                pass
-        return super().eventFilter(watched, event)
-
-
-_POPUP_FILTER_INSTALLED = False
-
-
-def _ensure_popup_filter(app: QApplication) -> None:
-    global _POPUP_FILTER_INSTALLED
-    if not _POPUP_FILTER_INSTALLED:
-        app.installEventFilter(_ComboboxPopupEventFilter(app))
-        _POPUP_FILTER_INSTALLED = True
-
-
 def apply_app_theme(
     app: QApplication,
     theme_mode: str | None = None,
@@ -82,7 +57,6 @@ def apply_app_theme(
     app.setStyle("Fusion")
     set_theme_tokens(theme_mode, prefers_dark=_prefers_dark(app))
     _apply_app_font(app, ui_scale_percent=ui_scale_percent, font_size_mode=font_size_mode)
-    _ensure_popup_filter(app)
 
     palette = QPalette()
     palette.setColor(QPalette.ColorRole.Window, QColor(STYLE_TOKENS["color-bg-app"]))
