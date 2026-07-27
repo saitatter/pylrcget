@@ -64,6 +64,26 @@ def _canonical_vad_options(vad_options: dict | None) -> tuple[tuple[str, float],
     return tuple(normalized)
 
 
+def _patch_faster_whisper_compatibility() -> None:
+    try:
+        import faster_whisper.transcribe
+        orig_init = faster_whisper.transcribe.TranscriptionOptions.__init__
+        if getattr(orig_init, "_patched_for_whisperx", False):
+            return
+
+        def _compat_init(self, *args, **kwargs):
+            if "multilingual" not in kwargs:
+                kwargs["multilingual"] = False
+            if "hotwords" not in kwargs:
+                kwargs["hotwords"] = None
+            orig_init(self, *args, **kwargs)
+
+        _compat_init._patched_for_whisperx = True
+        faster_whisper.transcribe.TranscriptionOptions.__init__ = _compat_init
+    except Exception:
+        pass
+
+
 def _get_cached_whisperx_model(
     whisperx_module: object,
     model_name: str,
@@ -76,6 +96,7 @@ def _get_cached_whisperx_model(
     """
     Return WhisperX model from in-process cache to avoid repeated load_model cost.
     """
+    _patch_faster_whisper_compatibility()
     key = (
         str(model_name or "base"),
         str(device),
