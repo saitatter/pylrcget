@@ -64,6 +64,76 @@ def _canonical_vad_options(vad_options: dict | None) -> tuple[tuple[str, float],
     return tuple(normalized)
 
 
+def _patch_whisperx_audio_loading() -> None:
+    try:
+        import shutil
+        import whisperx.audio
+        orig_load_audio = whisperx.audio.load_audio
+
+        if getattr(orig_load_audio, "_patched_for_ffmpeg_fallback", False):
+            return
+
+        def _compat_load_audio(file: str, sr: int = 16000):
+            if shutil.which("ffmpeg"):
+                try:
+                    return orig_load_audio(file, sr=sr)
+                except Exception:
+                    pass
+
+            try:
+                import soundfile as sf
+                data, sample_rate = sf.read(file, dtype="float32")
+                if data.ndim > 1:
+                    data = data.mean(axis=1)
+                if sample_rate != sr:
+                    import torch
+                    import torchaudio.transforms as T
+                    tensor = torch.from_numpy(data).unsqueeze(0)
+                    resampler = T.Resample(orig_freq=sample_rate, new_freq=sr)
+                    data = resampler(tensor).squeeze(0).numpy()
+                return data
+            except Exception:
+                pass
+
+            try:
+                import torch
+                import torchaudio
+                import torchaudio.transforms as T
+                waveform, sample_rate = torchaudio.load(file)
+                if waveform.ndim > 1 and waveform.shape[0] > 1:
+                    waveform = waveform.mean(dim=0, keepdim=True)
+                if sample_rate != sr:
+                    resampler = T.Resample(orig_freq=sample_rate, new_freq=sr)
+                    waveform = resampler(waveform)
+                return waveform.squeeze(0).numpy().astype("float32")
+            except Exception:
+                pass
+
+            return orig_load_audio(file, sr=sr)
+
+        _compat_load_audio._patched_for_ffmpeg_fallback = True
+        whisperx.audio.load_audio = _compat_load_audio
+    except Exception:
+        pass
+
+
+def _patch_pyannote_compatibility() -> None:
+    try:
+        import pyannote.audio.core.inference
+        orig_init = pyannote.audio.core.inference.Inference.__init__
+        if getattr(orig_init, "_patched_for_whisperx", False):
+            return
+
+        def _compat_init(self, *args, **kwargs):
+            kwargs.pop("use_auth_token", None)
+            orig_init(self, *args, **kwargs)
+
+        _compat_init._patched_for_whisperx = True
+        pyannote.audio.core.inference.Inference.__init__ = _compat_init
+    except Exception:
+        pass
+
+
 def _patch_faster_whisper_compatibility() -> None:
     try:
         import faster_whisper.transcribe
@@ -96,7 +166,9 @@ def _get_cached_whisperx_model(
     """
     Return WhisperX model from in-process cache to avoid repeated load_model cost.
     """
+    _patch_whisperx_audio_loading()
     _patch_faster_whisper_compatibility()
+    _patch_pyannote_compatibility()
     key = (
         str(model_name or "base"),
         str(device),
