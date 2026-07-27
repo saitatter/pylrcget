@@ -7,10 +7,11 @@ from ui.spacing import SPACE_2
 
 
 class FlowLayout(QLayout):
-    def __init__(self, parent=None, *, spacing: int = SPACE_2, justify_rows: bool = True):
+    def __init__(self, parent=None, *, spacing: int = SPACE_2, justify_rows: bool = True, center_rows: bool = False):
         super().__init__(parent)
         self._items = []
         self._justify_rows = bool(justify_rows)
+        self._center_rows = bool(center_rows)
         self.setContentsMargins(0, 0, 0, 0)
         self.setSpacing(spacing)
 
@@ -87,8 +88,11 @@ class FlowLayout(QLayout):
             rows.append((row, row_width, row_height))
 
         for row_items, row_width, row_height in rows:
-            x = effective.x()
             extra = max(0, effective.width() - row_width)
+            if self._center_rows and not self._justify_rows and not test_only:
+                x = effective.x() + extra // 2
+            else:
+                x = effective.x()
             extra_each = extra // len(row_items) if self._justify_rows and row_items and not test_only else 0
             extra_remainder = extra % len(row_items) if self._justify_rows and row_items and not test_only else 0
             for index, (item, item_size) in enumerate(row_items):

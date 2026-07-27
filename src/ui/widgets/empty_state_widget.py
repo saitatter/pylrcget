@@ -62,16 +62,18 @@ class EmptyStateWidget(QWidget):
         self.quaternary_action.clicked.connect(self.quaternaryActionTriggered.emit)
         self.quaternary_action.hide()
 
-        self._btn_row = FlowLayout(spacing=SPACE_2, justify_rows=False)
+        self._btn_row = FlowLayout(spacing=SPACE_2, justify_rows=False, center_rows=True)
         self._btn_row.addWidget(self.action)
         self._btn_row.addWidget(self.secondary_action)
         self._btn_row.addWidget(self.tertiary_action)
         self._btn_row.addWidget(self.quaternary_action)
 
-        layout.addWidget(self.icon)
-        layout.addWidget(self.title)
-        layout.addWidget(self.body)
+        layout.addStretch(1)
+        layout.addWidget(self.icon, 0, Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(self.title, 0, Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(self.body, 0, Qt.AlignmentFlag.AlignCenter)
         layout.addLayout(self._btn_row)
+        layout.addStretch(1)
 
         self._apply_styles()
         self._sync_text_width()
