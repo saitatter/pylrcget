@@ -282,6 +282,19 @@ class LyricsEditorWidgetTests(unittest.TestCase):
         finally:
             widget.deleteLater()
 
+    def test_clicking_partially_synced_zero_timestamp_row_does_not_seek(self):
+        widget = LyricsEditorWidget()
+        emitted: list[int] = []
+        widget.seekRequested.connect(emitted.append)
+        try:
+            widget._set_synced([(1500, "First line"), (0, "Unsynced line")])
+
+            widget._on_table_clicked_seek(1, 1)
+
+            self.assertEqual(emitted, [])
+        finally:
+            widget.deleteLater()
+
     def test_up_down_on_toolbar_button_moves_lyrics_selection(self):
         widget = LyricsEditorWidget()
         try:

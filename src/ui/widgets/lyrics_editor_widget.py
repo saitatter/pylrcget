@@ -1244,9 +1244,7 @@ class LyricsEditorWidget(QWidget):
         if not it_time:
             return
         ms = it_time.data(TIMESTAMP_MS_ROLE)
-        if ms is None:
-            return
-        if int(ms) == 0 and self._table_has_only_zero_timestamps():
+        if ms is None or int(ms) <= 0:
             return
         self.seekRequested.emit(int(ms))
 
