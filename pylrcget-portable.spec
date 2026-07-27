@@ -62,6 +62,9 @@ AI_PACKAGES = [
     "transformers",
     "pyannote",
     "pyannote.audio",
+    "omegaconf",
+    "hydra",
+    "antlr4",
 ]
 
 for pkg in AI_PACKAGES:
