@@ -27,7 +27,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from PySide6.QtGui import QFontDatabase, QKeySequence
+from PySide6.QtGui import QFont, QFontDatabase, QKeySequence
 
 from core.lyrics_sidecar import DEFAULT_LYRICS_FILE_PATTERN
 from db.database import get_config, get_directories, set_config, set_directories
@@ -268,7 +268,8 @@ class MusicFoldersDialog(QDialog):
             self.pattern_preview_label.textInteractionFlags()
             | Qt.TextInteractionFlag.TextSelectableByMouse
         )
-        mono_font = QFontDatabase.systemFont(QFontDatabase.SystemFont.FixedFont)
+        mono_font = QFont("Consolas", 9)
+        mono_font.setStyleHint(QFont.StyleHint.Monospace)
         self.pattern_preview_label.setFont(mono_font)
         lyrics_layout.addWidget(self.pattern_preview_label, 4, 0, 1, 4)
 
@@ -450,8 +451,9 @@ class MusicFoldersDialog(QDialog):
         self.shortcuts_reset_btn.clicked.connect(self._reset_hotkeys_to_defaults)
 
     def _load(self):
+        directories = get_directories(self.app_state.db)
         self.list_widget.clear()
-        for directory in get_directories(self.app_state.db):
+        for directory in directories:
             self.list_widget.addItem(directory)
 
         config = get_config(self.app_state.db)
@@ -511,13 +513,12 @@ class MusicFoldersDialog(QDialog):
             self.shortcut_enabled_checks[action].setChecked(bool(binding.get("enabled", True)))
             self.shortcut_edits[action].setEnabled(bool(binding.get("enabled", True)))
             self.shortcut_edits[action].setKeySequence(QKeySequence(str(binding.get("key", HOTKEY_SPECS[action].default))))
-        directories = get_directories(self.app_state.db)
-        if config.lyrics_output_dir and os.path.isdir(config.lyrics_output_dir):
+        if config.lyrics_output_dir:
             self._last_browse_dir = config.lyrics_output_dir
         elif directories:
-            first_directory = directories[0]
-            if os.path.isdir(first_directory):
-                self._last_browse_dir = first_directory
+            self._last_browse_dir = directories[0]
+        else:
+            self._last_browse_dir = os.path.expanduser("~")
         self._update_export_fields_enabled()
         self._update_embed_fields_enabled()
         self._update_download_mode_hint()
