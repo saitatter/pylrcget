@@ -1,6 +1,6 @@
 from pathlib import Path
 from importlib import import_module
-from PyInstaller.utils.hooks import collect_all, collect_data_files
+from PyInstaller.utils.hooks import collect_all, collect_data_files, copy_metadata, collect_submodules
 
 
 SPEC_PATH = Path(globals().get("__file__", "pylrcget-portable.spec")).resolve()
@@ -9,6 +9,12 @@ ROOT = SPEC_PATH.parent if SPEC_PATH.exists() else Path.cwd()
 def _optional_collect_data_files(package: str):
     try:
         return collect_data_files(package)
+    except Exception:
+        return []
+
+def _optional_copy_metadata(package: str):
+    try:
+        return copy_metadata(package)
     except Exception:
         return []
 
@@ -40,6 +46,8 @@ def _collect_ai_package(package: str):
     except Exception as exc:
         print(f"Warning: could not collect AI package {package}: {exc}")
 
+    AI_DATAS.extend(_optional_copy_metadata(package))
+
 
 AI_PACKAGES = [
     "whisperx",
@@ -48,6 +56,7 @@ AI_PACKAGES = [
     "soundfile",
     "torchaudio",
     "torch",
+    "torchcodec",
     "pandas",
     "scipy",
     "transformers",
