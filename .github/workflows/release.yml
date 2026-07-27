@@ -24,7 +24,7 @@ jobs:
 
       - name: Semantic release
         id: semantic-release
-        uses: python-semantic-release/python-semantic-release@v10.6.0
+        uses: python-semantic-release/python-semantic-release@v10.6.1
         with:
           changelog: true
           github_token: ${{ secrets.RELEASE_PAT }}
@@ -62,7 +62,7 @@ jobs:
           ref: ${{ needs.release.outputs.commit_sha }}
 
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v7
         with:
           python-version: "3.11"
 
