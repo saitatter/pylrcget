@@ -24,8 +24,7 @@ class EmptyStateWidget(QWidget):
         self.setObjectName("EmptyState")
 
         layout = QVBoxLayout(self)
-        set_layout_spacing(layout, margins=SPACE_4, spacing=SPACE_2)
-        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        set_layout_spacing(layout, margins=(SPACE_4, SPACE_3, SPACE_4, SPACE_3), spacing=SPACE_2)
 
         self.icon = QLabel()
         self.icon.setObjectName("EmptyStateIcon")
@@ -68,7 +67,6 @@ class EmptyStateWidget(QWidget):
         self._btn_row.addWidget(self.tertiary_action)
         self._btn_row.addWidget(self.quaternary_action)
 
-        layout.addStretch(1)
         layout.addWidget(self.icon, 0, Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self.title, 0, Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self.body, 0, Qt.AlignmentFlag.AlignCenter)
