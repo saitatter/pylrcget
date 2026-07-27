@@ -690,3 +690,25 @@ class LibraryScannerIncrementalTests(unittest.TestCase):
             self.assertIn("Library scan sidecar lookup cumulative worker time:", joined)
             self.assertIn("Library scan DB flush cumulative worker time:", joined)
             self.assertIn("Library scan average throughput:", joined)
+
+    def test_first_audio_tag_text_decodes_bytes_and_handles_freeform_tags(self):
+        from library.scan_library import _first_audio_tag_text, read_audio_metadata_from_audio
+
+        class FakeAudioTag:
+            def __init__(self, val):
+                self.value = val
+
+        class FakeAudio:
+            def __init__(self, tags_dict):
+                self.tags = tags_dict
+
+        # Test freeform MP4 tag with bytes
+        audio_m4a = FakeAudio({"----:com.apple.iTunes:ALBUMARTIST": [b"Aviators"]})
+        meta = read_audio_metadata_from_audio(audio_m4a, "track.m4a")
+        self.assertEqual(meta.album_artist, "Aviators")
+
+        # Test MP3 TXXX album artist tag
+        audio_mp3 = FakeAudio({"TXXX:ALBUM ARTIST": FakeAudioTag("Aviators MP3")})
+        meta_mp3 = read_audio_metadata_from_audio(audio_mp3, "track.mp3")
+        self.assertEqual(meta_mp3.album_artist, "Aviators MP3")
+

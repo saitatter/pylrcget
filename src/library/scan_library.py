@@ -437,6 +437,46 @@ def _parse_track_number(raw: str | None) -> int | None:
         return None
 
 
+def _normalize_tag_key(key: str) -> str:
+    k = str(key).lower()
+    if ":" in k:
+        k = k.split(":")[-1]
+    return k.replace("_", "").replace(" ", "").replace("-", "")
+
+
+def _extract_text_from_mutagen_value(value) -> str | None:
+    if value is None:
+        return None
+    if isinstance(value, (list, tuple)):
+        if not value:
+            return None
+        value = value[0]
+    text = getattr(value, "text", None)
+    if isinstance(text, (list, tuple)):
+        if text:
+            text = text[0]
+        else:
+            text = None
+    if text is None:
+        text = getattr(value, "value", value)
+    if isinstance(text, (list, tuple)):
+        if not text:
+            return None
+        text = text[0]
+    if isinstance(text, bytes):
+        try:
+            rendered = text.decode("utf-8", errors="replace").strip()
+        except Exception:
+            rendered = str(text).strip()
+    else:
+        rendered = str(text).strip()
+    if rendered.startswith("b'") and rendered.endswith("'"):
+        rendered = rendered[2:-1].strip()
+    if rendered:
+        return rendered
+    return None
+
+
 def _first_audio_tag_text(audio, keys: tuple[str, ...]) -> str | None:
     tags = getattr(audio, "tags", None)
     for key in keys:
@@ -452,25 +492,31 @@ def _first_audio_tag_text(audio, keys: tuple[str, ...]) -> str | None:
                 continue
             if value is None:
                 continue
-            if isinstance(value, (list, tuple)):
-                if not value:
-                    continue
-                value = value[0]
-            text = getattr(value, "text", None)
-            if isinstance(text, (list, tuple)):
-                if text:
-                    text = text[0]
-                else:
-                    text = None
-            if text is None:
-                text = getattr(value, "value", value)
-            if isinstance(text, (list, tuple)):
-                if not text:
-                    continue
-                text = text[0]
-            rendered = str(text).strip()
-            if rendered:
-                return rendered
+            extracted = _extract_text_from_mutagen_value(value)
+            if extracted:
+                return extracted
+
+    req_norms = {_normalize_tag_key(k) for k in keys}
+    for source in (audio, tags):
+        if source is None:
+            continue
+        keys_func = getattr(source, "keys", None)
+        getter = getattr(source, "get", None)
+        if not callable(keys_func) or not callable(getter):
+            continue
+        try:
+            source_keys = list(keys_func())
+        except Exception:
+            continue
+        for skey in source_keys:
+            if _normalize_tag_key(str(skey)) in req_norms:
+                try:
+                    val = getter(skey)
+                    extracted = _extract_text_from_mutagen_value(val)
+                    if extracted:
+                        return extracted
+                except Exception:
+                    pass
     return None
 
 
@@ -497,20 +543,69 @@ def read_audio_metadata_from_audio(audio, path: str) -> AudioMetadata:
     if ext == ".mp3":
         title = _first_audio_tag_text(audio, ("TIT2",)) or os.path.splitext(os.path.basename(path))[0]
         album = _first_audio_tag_text(audio, ("TALB",)) or "Unknown Album"
-        artist = _first_audio_tag_text(audio, ("TPE1",)) or "Unknown Artist"
-        album_artist = _first_audio_tag_text(audio, ("TPE2",)) or artist
+        artist = _first_audio_tag_text(audio, ("TPE1", "artist", "author")) or "Unknown Artist"
+        album_artist = (
+            _first_audio_tag_text(
+                audio,
+                (
+                    "TPE2",
+                    "TXXX:ALBUM ARTIST",
+                    "TXXX:ALBUMARTIST",
+                    "TXXX:Album Artist",
+                    "TXXX:albumartist",
+                    "TXXX:album artist",
+                    "TXXX:ALBUM_ARTIST",
+                    "TXXX:album_artist",
+                    "albumartist",
+                    "album artist",
+                    "album_artist",
+                ),
+            )
+            or artist
+        )
         track_number = _parse_track_number(_first_audio_tag_text(audio, ("TRCK",)))
     elif ext in {".flac", ".ogg", ".oga", ".opus", ".mpc"}:
         title = _first_audio_tag_text(audio, ("title",)) or os.path.splitext(os.path.basename(path))[0]
         album = _first_audio_tag_text(audio, ("album",)) or "Unknown Album"
-        artist = _first_audio_tag_text(audio, ("artist",)) or "Unknown Artist"
-        album_artist = _first_audio_tag_text(audio, ("albumartist", "album artist")) or artist
+        artist = _first_audio_tag_text(audio, ("artist", "TPE1")) or "Unknown Artist"
+        album_artist = (
+            _first_audio_tag_text(
+                audio,
+                (
+                    "albumartist",
+                    "album artist",
+                    "album_artist",
+                    "ALBUMARTIST",
+                    "ALBUM ARTIST",
+                    "ALBUM_ARTIST",
+                    "TPE2",
+                    "aART",
+                ),
+            )
+            or artist
+        )
         track_number = _parse_track_number(_first_audio_tag_text(audio, ("tracknumber",)))
     elif ext in {".m4a", ".mp4"}:
         title = _first_audio_tag_text(audio, ("©nam",)) or os.path.splitext(os.path.basename(path))[0]
         album = _first_audio_tag_text(audio, ("©alb",)) or "Unknown Album"
-        artist = _first_audio_tag_text(audio, ("©ART",)) or "Unknown Artist"
-        album_artist = _first_audio_tag_text(audio, ("aART",)) or artist
+        artist = _first_audio_tag_text(audio, ("©ART", "artist")) or "Unknown Artist"
+        album_artist = (
+            _first_audio_tag_text(
+                audio,
+                (
+                    "aART",
+                    "----:com.apple.iTunes:ALBUMARTIST",
+                    "----:com.apple.iTunes:ALBUM ARTIST",
+                    "----:com.apple.iTunes:albumartist",
+                    "----:com.apple.iTunes:album artist",
+                    "albumartist",
+                    "album artist",
+                    "album_artist",
+                    "soaa",
+                ),
+            )
+            or artist
+        )
         track_raw = None
         getter = getattr(getattr(audio, "tags", None), "get", None)
         if callable(getter):
@@ -522,20 +617,61 @@ def read_audio_metadata_from_audio(audio, path: str) -> AudioMetadata:
     elif ext in {".wma", ".asf"}:
         title = _first_audio_tag_text(audio, ("Title",)) or os.path.splitext(os.path.basename(path))[0]
         album = _first_audio_tag_text(audio, ("WM/AlbumTitle",)) or "Unknown Album"
-        artist = _first_audio_tag_text(audio, ("Author", "WM/Artist")) or "Unknown Artist"
-        album_artist = _first_audio_tag_text(audio, ("WM/AlbumArtist",)) or artist
+        artist = _first_audio_tag_text(audio, ("Author", "WM/Artist", "artist")) or "Unknown Artist"
+        album_artist = (
+            _first_audio_tag_text(
+                audio,
+                (
+                    "WM/AlbumArtist",
+                    "albumartist",
+                    "album artist",
+                    "album_artist",
+                    "WM/Artist",
+                    "Author",
+                ),
+            )
+            or artist
+        )
         track_number = _parse_track_number(_first_audio_tag_text(audio, ("WM/TrackNumber",)))
     elif ext in {".dsf", ".dff"}:
         title = _first_audio_tag_text(audio, ("TIT2",)) or os.path.splitext(os.path.basename(path))[0]
         album = _first_audio_tag_text(audio, ("TALB",)) or "Unknown Album"
-        artist = _first_audio_tag_text(audio, ("TPE1",)) or "Unknown Artist"
-        album_artist = _first_audio_tag_text(audio, ("TPE2",)) or artist
+        artist = _first_audio_tag_text(audio, ("TPE1", "artist")) or "Unknown Artist"
+        album_artist = (
+            _first_audio_tag_text(
+                audio,
+                (
+                    "TPE2",
+                    "TXXX:ALBUM ARTIST",
+                    "TXXX:ALBUMARTIST",
+                    "TXXX:Album Artist",
+                    "albumartist",
+                    "album artist",
+                ),
+            )
+            or artist
+        )
         track_number = _parse_track_number(_first_audio_tag_text(audio, ("TRCK",)))
     else:
         title = _first_audio_tag_text(audio, ("title", "TIT2", "©nam", "Title")) or os.path.splitext(os.path.basename(path))[0]
         album = _first_audio_tag_text(audio, ("album", "TALB", "©alb", "WM/AlbumTitle")) or "Unknown Album"
         artist = _first_audio_tag_text(audio, ("artist", "TPE1", "©ART", "Author", "WM/Artist")) or "Unknown Artist"
-        album_artist = _first_audio_tag_text(audio, ("albumartist", "album artist", "TPE2", "aART", "WM/AlbumArtist")) or artist
+        album_artist = (
+            _first_audio_tag_text(
+                audio,
+                (
+                    "albumartist",
+                    "album artist",
+                    "album_artist",
+                    "TPE2",
+                    "aART",
+                    "WM/AlbumArtist",
+                    "TXXX:ALBUM ARTIST",
+                    "----:com.apple.iTunes:ALBUMARTIST",
+                ),
+            )
+            or artist
+        )
         track_number = _parse_track_number(
             _first_audio_tag_text(audio, ("tracknumber", "TRCK", "trkn", "WM/TrackNumber"))
         )
