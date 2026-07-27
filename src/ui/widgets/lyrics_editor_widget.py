@@ -1244,9 +1244,15 @@ class LyricsEditorWidget(QWidget):
         if not it_time:
             return
         ms = it_time.data(TIMESTAMP_MS_ROLE)
-        if ms is None or int(ms) <= 0:
+        if ms is None:
             return
-        self.seekRequested.emit(int(ms))
+        ms_val = int(ms)
+        if ms_val < 0:
+            return
+        if ms_val == 0:
+            if row != 0 or self._table_has_only_zero_timestamps():
+                return
+        self.seekRequested.emit(ms_val)
 
     def move_selection_by_rows(self, delta: int) -> bool:
         if self.stack.currentWidget() is not self.table:
