@@ -195,11 +195,12 @@ def _get_cached_whisperx_model(
         "compute_type": compute_type,
     }
     if vad_method:
-        # newer whisperx uses vad_model instead of vad_method
-        if "vad_model" in _load_model_params:
-            kwargs["vad_model"] = vad_method
-        elif "vad_method" in _load_model_params:
+        # older whisperx had vad_method (a string); newer uses vad_model (an object).
+        # If only vad_method param exists, pass the string. If vad_model exists,
+        # skip it — whisperx will load its built-in VAD model automatically.
+        if "vad_method" in _load_model_params:
             kwargs["vad_method"] = vad_method
+        # else: vad_model requires an object, not a string — let whisperx default
     if vad_options and "vad_options" in _load_model_params:
         kwargs["vad_options"] = vad_options
     model = whisperx_module.load_model(model_name, **kwargs)
