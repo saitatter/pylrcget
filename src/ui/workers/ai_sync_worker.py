@@ -113,6 +113,11 @@ def _patch_whisperx_audio_loading() -> None:
 
         _compat_load_audio._patched_for_ffmpeg_fallback = True
         whisperx.audio.load_audio = _compat_load_audio
+        try:
+            import whisperx
+            whisperx.load_audio = _compat_load_audio
+        except Exception:
+            pass
     except Exception:
         pass
 
@@ -180,13 +185,22 @@ def _get_cached_whisperx_model(
         cached = _WHISPERX_MODEL_CACHE.get(key)
         if cached is not None:
             return cached
-    kwargs = {
+
+    # Inspect actual load_model signature to avoid passing unsupported kwargs
+    import inspect
+    _load_model_params = set(inspect.signature(whisperx_module.load_model).parameters.keys())
+
+    kwargs: dict = {
         "device": device,
         "compute_type": compute_type,
     }
     if vad_method:
-        kwargs["vad_method"] = vad_method
-    if vad_options:
+        # newer whisperx uses vad_model instead of vad_method
+        if "vad_model" in _load_model_params:
+            kwargs["vad_model"] = vad_method
+        elif "vad_method" in _load_model_params:
+            kwargs["vad_method"] = vad_method
+    if vad_options and "vad_options" in _load_model_params:
         kwargs["vad_options"] = vad_options
     model = whisperx_module.load_model(model_name, **kwargs)
     with _INFERENCE_CACHE_LOCK:
@@ -2059,6 +2073,7 @@ class AiSyncWorker(QThread):
                 self.completed.emit(False, "Cancelled.", "")
                 return
 
+            _patch_whisperx_audio_loading()
             audio = whisperx.load_audio(self.audio_path)
             transcribe_language = _normalized_transcribe_language(self._language)
             language_label = transcribe_language or "auto-detect"
