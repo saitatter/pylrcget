@@ -308,6 +308,7 @@ def get_track_list_rows(
     album_ids: list[int] | None = None,
     sort_column: int = 0,
     sort_order: str = "asc",
+    letter_prefix: str | None = None,
 ) -> list[sqlite3.Row]:
     conditions: list[str] = []
     params: list[object] = []
@@ -319,6 +320,13 @@ def get_track_list_rows(
         )
         like = f"%{escape_like(q)}%"
         params.extend([like, like, like, like])
+
+    if letter_prefix is not None:
+        if letter_prefix == "#":
+            conditions.append("UPPER(SUBSTR(tracks.title, 1, 1)) NOT GLOB '[A-Z]'")
+        else:
+            conditions.append("UPPER(SUBSTR(tracks.title, 1, 1)) = ?")
+            params.append(letter_prefix.upper())
 
     if unsaved_draft_only:
         conditions.append("tracks.dirty_lyrics_present = 1")
@@ -627,6 +635,80 @@ def prune_library(db: sqlite3.Connection) -> None:
     db.execute("DELETE FROM albums WHERE NOT EXISTS (SELECT 1 FROM tracks WHERE tracks.album_id = albums.id)")
     db.execute("DELETE FROM artists WHERE NOT EXISTS (SELECT 1 FROM tracks WHERE tracks.artist_id = artists.id)")
     db.commit()
+
+
+def get_track_letter_counts(
+    db: sqlite3.Connection,
+    search_query: str = "",
+    synced_lyrics_tracks: bool = True,
+    plain_lyrics_tracks: bool = True,
+    instrumental_tracks: bool = True,
+    no_lyrics_tracks: bool = True,
+    unsaved_draft_only: bool = False,
+    artist_id: int | None = None,
+    album_id: int | None = None,
+    artist_ids: list[int] | None = None,
+    album_ids: list[int] | None = None,
+) -> dict[str, int]:
+    """Return {letter: count} for tracks, for building the alpha index bar."""
+    conditions: list[str] = []
+    params: list[object] = []
+
+    q = prepare_input(search_query or "")
+    if q:
+        conditions.append(
+            "(tracks.title_lower LIKE ? ESCAPE '\\' OR artists.name_lower LIKE ? ESCAPE '\\' OR albums.name_lower LIKE ? ESCAPE '\\' OR albums.album_artist_name_lower LIKE ? ESCAPE '\\')"
+        )
+        like = f"%{escape_like(q)}%"
+        params.extend([like, like, like, like])
+
+    if unsaved_draft_only:
+        conditions.append("tracks.dirty_lyrics_present = 1")
+    else:
+        if not synced_lyrics_tracks:
+            conditions.append("(tracks.lrc_lyrics IS NULL OR tracks.lrc_lyrics = '[au: instrumental]')")
+        if not plain_lyrics_tracks:
+            conditions.append("(tracks.txt_lyrics IS NULL OR tracks.lrc_lyrics IS NOT NULL)")
+        if not instrumental_tracks:
+            conditions.append("tracks.instrumental = 0")
+        if not no_lyrics_tracks:
+            conditions.append("(tracks.txt_lyrics IS NOT NULL OR tracks.lrc_lyrics IS NOT NULL OR tracks.instrumental = 1)")
+
+    if artist_ids:
+        placeholders = ", ".join("?" for _ in artist_ids)
+        conditions.append(f"tracks.artist_id IN ({placeholders})")
+        params.extend(int(v) for v in artist_ids)
+    elif artist_id is not None:
+        conditions.append("tracks.artist_id = ?")
+        params.append(int(artist_id))
+
+    if album_ids:
+        placeholders = ", ".join("?" for _ in album_ids)
+        conditions.append(f"tracks.album_id IN ({placeholders})")
+        params.extend(int(v) for v in album_ids)
+    elif album_id is not None:
+        conditions.append("tracks.album_id = ?")
+        params.append(int(album_id))
+
+    where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+    sql = f"""
+    SELECT
+        CASE
+            WHEN UPPER(SUBSTR(tracks.title, 1, 1)) GLOB '[A-Z]'
+                THEN UPPER(SUBSTR(tracks.title, 1, 1))
+            ELSE '#'
+        END AS letter,
+        COUNT(DISTINCT tracks.id) AS cnt
+    FROM tracks
+    LEFT JOIN artists ON artists.id = tracks.artist_id
+    LEFT JOIN albums ON albums.id = tracks.album_id
+    {where_clause}
+    GROUP BY letter
+    ORDER BY letter
+    """
+    cur = db.execute(sql, params)
+    return {row[0]: row[1] for row in cur.fetchall()}
+
 
 
 def purge_all_tracks(db: sqlite3.Connection) -> None:

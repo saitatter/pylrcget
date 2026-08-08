@@ -94,21 +94,25 @@ class AlphaIndexWidget(QWidget):
 
         outer.addStretch(1)
 
-        # Sub-page controls (hidden when not needed)
+        # Sub-page controls (shown when a selected letter has > page_size items)
         self._prev_btn = QPushButton("‹")
-        self._prev_btn.setFixedWidth(26)
-        self._prev_btn.setFixedHeight(24)
+        self._prev_btn.setFixedWidth(32)
+        self._prev_btn.setFixedHeight(28)
         self._prev_btn.clicked.connect(self._prev_page)
         outer.addWidget(self._prev_btn)
 
         self._page_label = QLabel("1/1")
         self._page_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._page_label.setFixedWidth(44)
+        self._page_label.setFixedWidth(52)
+        f_lbl = QFont()
+        f_lbl.setPointSize(10)
+        f_lbl.setBold(True)
+        self._page_label.setFont(f_lbl)
         outer.addWidget(self._page_label)
 
         self._next_btn = QPushButton("›")
-        self._next_btn.setFixedWidth(26)
-        self._next_btn.setFixedHeight(24)
+        self._next_btn.setFixedWidth(32)
+        self._next_btn.setFixedHeight(28)
         self._next_btn.clicked.connect(self._next_page)
         outer.addWidget(self._next_btn)
 
@@ -213,14 +217,15 @@ class AlphaIndexWidget(QWidget):
 
     def _make_letter_btn(self, text: str, *, special: bool = False) -> QPushButton:
         btn = QPushButton(text)
-        btn.setFixedHeight(24)
+        btn.setFixedHeight(28)
         if special:
-            btn.setFixedWidth(34)
+            btn.setFixedWidth(44)
         else:
-            btn.setFixedWidth(24)
+            btn.setFixedWidth(28)
         btn.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         f = QFont()
-        f.setPointSize(8)
+        f.setPointSize(10)
+        f.setBold(True)
         btn.setFont(f)
         btn.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         return btn
@@ -230,10 +235,12 @@ class AlphaIndexWidget(QWidget):
         self.setStyleSheet("""
             QPushButton {
                 border: none;
-                border-radius: 3px;
-                padding: 0px 1px;
+                border-radius: 4px;
+                padding: 2px 2px;
                 color: palette(text);
                 background: transparent;
+                font-weight: bold;
+                font-size: 13px;
             }
             QPushButton:checked {
                 background: palette(highlight);
@@ -244,8 +251,12 @@ class AlphaIndexWidget(QWidget):
             }
             QPushButton:disabled {
                 color: palette(mid);
+                opacity: 0.4;
             }
             #AlphaIndexWidget {
                 border-bottom: 1px solid palette(mid);
+                padding-bottom: 4px;
+                padding-top: 2px;
             }
         """)
+

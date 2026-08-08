@@ -400,6 +400,8 @@ def apply_appearance_preferences(window, config) -> None:
             view.set_ui_scale(scale)
 
     ignore_articles = bool(getattr(config, "ignore_sort_articles", False))
+    if hasattr(window, "track_list") and hasattr(window.track_list, "set_ignore_articles"):
+        window.track_list.set_ignore_articles(ignore_articles)
     if hasattr(window, "artists_tab") and hasattr(window.artists_tab, "set_ignore_articles"):
         window.artists_tab.set_ignore_articles(ignore_articles)
     if hasattr(window, "album_artists_tab") and hasattr(window.album_artists_tab, "set_ignore_articles"):

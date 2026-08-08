@@ -22,7 +22,9 @@ from PySide6.QtWidgets import (
 )
 
 from db.database import get_directories, get_duplicate_track_ids, get_track_by_id, get_track_list_rows
+from db.query_modules.track_queries import get_track_letter_counts
 from ui.library_routes import LibraryRoute, albums_detail, artists_detail
+from ui.widgets.alpha_index_widget import AlphaIndexWidget
 from ui.widgets.empty_state_widget import EmptyStateWidget
 from ui.models.track_table_model import TrackTableModel
 from ui.delegates.actions_delegate import ActionsDelegate
@@ -89,6 +91,8 @@ class TrackListWidget(QWidget):
         self._duplicate_ids: set[int] = set()
         self._ui_scale = 1.0
         self._drag_lyrics_path = ""
+        self._letter_prefix: str | None = None
+        self._alpha_page: int = 0
 
         self.scope_bar = QWidget()
         self.scope_bar.setObjectName("TrackScopeBar")
@@ -174,10 +178,16 @@ class TrackListWidget(QWidget):
         self.stack.addWidget(self.table)
         self.stack.addWidget(self.empty_state)
 
+        # Alpha index bar (shown in root tracks view)
+        self.alpha_index = AlphaIndexWidget()
+        self.alpha_index.set_page_size(self._page_size)
+        self.alpha_index.letterChanged.connect(self._on_letter_changed)
+
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(8)
+        layout.setSpacing(0)
         layout.addWidget(self.scope_bar)
+        layout.addWidget(self.alpha_index)
         layout.addWidget(self.stack)
 
         self._empty_action = ""
@@ -290,25 +300,51 @@ class TrackListWidget(QWidget):
             )
             return
 
-        rows = get_track_list_rows(
-            db=db,
-            search_query=self._search,
-            synced_lyrics_tracks=self._filters["synced"],
-            plain_lyrics_tracks=self._filters["plain"],
-            instrumental_tracks=self._filters["instrumental"],
-            no_lyrics_tracks=self._filters["none"],
-            unsaved_draft_only=self._filters.get("unsaved", False),
-            limit=self._page_size + 1,
-            offset=0 if reset else self.model.rowCount(),
-            artist_id=self._artist_id,
-            album_id=self._album_id,
-            artist_ids=self._artist_ids,
-            album_ids=self._album_ids,
-            sort_column=self._sort_column,
-            sort_order="desc" if self._sort_order == Qt.SortOrder.DescendingOrder else "asc",
-        )
-        self._has_more_rows = len(rows) > self._page_size
-        visible_rows = rows[: self._page_size]
+        is_root_mode = (self._artist_id is None and not self._artist_ids and self._album_id is None and not self._album_ids)
+        self.alpha_index.setVisible(is_root_mode)
+
+        if is_root_mode and self._letter_prefix is not None:
+            db_offset = self._alpha_page * self._page_size
+            rows = get_track_list_rows(
+                db=db,
+                search_query=self._search,
+                synced_lyrics_tracks=self._filters["synced"],
+                plain_lyrics_tracks=self._filters["plain"],
+                instrumental_tracks=self._filters["instrumental"],
+                no_lyrics_tracks=self._filters["none"],
+                unsaved_draft_only=self._filters.get("unsaved", False),
+                limit=self._page_size,
+                offset=db_offset,
+                artist_id=self._artist_id,
+                album_id=self._album_id,
+                artist_ids=self._artist_ids,
+                album_ids=self._album_ids,
+                sort_column=self._sort_column,
+                sort_order="desc" if self._sort_order == Qt.SortOrder.DescendingOrder else "asc",
+                letter_prefix=self._letter_prefix,
+            )
+            self._has_more_rows = False
+            visible_rows = rows
+        else:
+            rows = get_track_list_rows(
+                db=db,
+                search_query=self._search,
+                synced_lyrics_tracks=self._filters["synced"],
+                plain_lyrics_tracks=self._filters["plain"],
+                instrumental_tracks=self._filters["instrumental"],
+                no_lyrics_tracks=self._filters["none"],
+                unsaved_draft_only=self._filters.get("unsaved", False),
+                limit=self._page_size + 1,
+                offset=0 if reset else self.model.rowCount(),
+                artist_id=self._artist_id,
+                album_id=self._album_id,
+                artist_ids=self._artist_ids,
+                album_ids=self._album_ids,
+                sort_column=self._sort_column,
+                sort_order="desc" if self._sort_order == Qt.SortOrder.DescendingOrder else "asc",
+            )
+            self._has_more_rows = len(rows) > self._page_size
+            visible_rows = rows[: self._page_size]
 
         if reset:
             self._duplicate_ids = get_duplicate_track_ids(db)
@@ -322,6 +358,14 @@ class TrackListWidget(QWidget):
         self._loading_more = False
         if self.model.rowCount():
             self.stack.setCurrentWidget(self.table)
+        elif self._letter_prefix is not None:
+            self._show_empty_state(
+                icon_name="search-x.svg",
+                title=f"No tracks under '{self._letter_prefix}'",
+                body="Try selecting a different letter or click 'All' to show all tracks.",
+                action_text="Show All",
+                action_key="show-all",
+            )
         else:
             self._show_empty_state(
                 icon_name="search-x.svg",
@@ -330,6 +374,9 @@ class TrackListWidget(QWidget):
                 action_text="Clear Filters",
                 action_key="clear-filters",
             )
+
+        if reset and is_root_mode:
+            self._refresh_letter_counts()
 
     def current_track_id(self) -> int | None:
         sm = self.table.selectionModel()
@@ -722,6 +769,38 @@ class TrackListWidget(QWidget):
             self.clearFiltersRequested.emit()
         elif self._empty_action == "configure-folders":
             self.configureFoldersRequested.emit()
+        elif self._empty_action == "show-all":
+            self.alpha_index.reset()
+            self._letter_prefix = None
+            self._alpha_page = 0
+            self.refresh()
+
+    def _on_letter_changed(self, letter: str, page: int) -> None:
+        self._letter_prefix = letter if letter else None
+        self._alpha_page = page
+        self._load_rows(reset=True)
+
+    def _refresh_letter_counts(self) -> None:
+        try:
+            counts = get_track_letter_counts(
+                db=self.app_state.db,
+                search_query=self._search,
+                synced_lyrics_tracks=self._filters["synced"],
+                plain_lyrics_tracks=self._filters["plain"],
+                instrumental_tracks=self._filters["instrumental"],
+                no_lyrics_tracks=self._filters["none"],
+                unsaved_draft_only=self._filters.get("unsaved", False),
+                artist_id=self._artist_id,
+                album_id=self._album_id,
+                artist_ids=self._artist_ids,
+                album_ids=self._album_ids,
+            )
+            self.alpha_index.refresh(counts)
+        except Exception:
+            pass
+
+    def set_ignore_articles(self, ignore: bool) -> None:
+        self.alpha_index.set_ignore_articles(ignore)
 
     def set_download_state(self, track_id: int, state: str | DownloadState) -> None:
         normalized = state if isinstance(state, DownloadState) else DownloadState(str(state))
@@ -764,6 +843,8 @@ class TrackListWidget(QWidget):
             self.refresh()
 
     def _maybe_load_more(self, value: int) -> None:
+        if self._letter_prefix is not None:
+            return
         scroll = self.table.verticalScrollBar()
         if not should_load_more(
             has_more_rows=self._has_more_rows,
