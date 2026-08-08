@@ -8,6 +8,7 @@ def apply_track_filters(window) -> None:
         window.track_list,
         window.albums_tab.track_list,
         window.artists_tab.album_browser.track_list,
+        window.album_artists_tab.album_browser.track_list,
     ]
     for track_list in track_lists:
         track_list.setSearchValue(search_text)
@@ -36,3 +37,5 @@ def apply_library_search(window) -> None:
         window.albums_tab.setSearchValue(text)
     elif current is window.artists_page:
         window.artists_tab.setSearchValue(text)
+    elif current is window.album_artists_page:
+        window.album_artists_tab.setSearchValue(text)

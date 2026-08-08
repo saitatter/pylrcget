@@ -80,6 +80,16 @@ def route_breadcrumbs(route: LibraryRoute) -> list[tuple[str, LibraryRoute]]:
             crumbs.append((route.album_label or "Album", route))
         return crumbs
 
+    if route.tab == "album_artists":
+        crumbs = [("Album Artists", album_artists_all())]
+        if route.mode == "artist":
+            crumbs.append((route.artist_label or "Album Artist", route))
+        elif route.mode == "artist_album":
+            artist_route = album_artists_detail(label=route.artist_label)
+            crumbs.append((route.artist_label or "Album Artist", artist_route))
+            crumbs.append((route.album_label or "Album", route))
+        return crumbs
+
     return [(route.tab.title(), route)]
 
 
@@ -124,3 +134,28 @@ def artists_album(artist_ids: tuple[int, ...], album_ids: tuple[int, ...], artis
         artist_label=artist_label,
         album_label=album_label,
     )
+
+
+# --- Album Artists tab routes --------------------------------------------------
+# album_artist is identified by its display name (string) stored in artist_label.
+# No integer IDs are used because album_artist_name is denormalized text.
+
+def album_artists_all() -> LibraryRoute:
+    return LibraryRoute(tab="album_artists", mode="root")
+
+
+def album_artists_detail(label: str = "") -> LibraryRoute:
+    """Root of a specific album artist: shows their albums."""
+    return LibraryRoute(tab="album_artists", mode="artist", artist_label=label)
+
+
+def album_artists_album(album_ids: tuple[int, ...], artist_label: str = "", album_label: str = "") -> LibraryRoute:
+    """A specific album within the album artist drill-down."""
+    return LibraryRoute(
+        tab="album_artists",
+        mode="artist_album",
+        album_ids=tuple(int(v) for v in album_ids),
+        artist_label=artist_label,
+        album_label=album_label,
+    )
+

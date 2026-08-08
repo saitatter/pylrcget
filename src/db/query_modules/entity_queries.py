@@ -214,3 +214,103 @@ def get_album_by_id(db: sqlite3.Connection, album_id: int) -> dict:
         raise KeyError(f"Album not found: {album_id}")
     cols = [c[0] for c in cur.description]
     return dict(zip(cols, row))
+
+
+def get_album_artist_rows(
+    db: sqlite3.Connection,
+    search_query: str = "",
+    *,
+    limit: int | None = None,
+    offset: int = 0,
+    sort_column: int = 0,
+    sort_order: str = "asc",
+) -> list[dict]:
+    """
+    Return a list of album artists grouped by ``albums.album_artist_name``.
+    This represents the TPE2 / album-artist tag, distinct from the per-track
+    artist stored in the ``artists`` table.
+    """
+    q = """
+    SELECT
+        COALESCE(NULLIF(a.album_artist_name, ''), ar.name, '') AS album_artist_name,
+        COUNT(DISTINCT a.id)  AS album_count,
+        COUNT(t.id)           AS track_count
+    FROM albums a
+    LEFT JOIN artists ar ON ar.id = a.artist_id
+    LEFT JOIN tracks  t  ON t.album_id = a.id
+    WHERE 1=1
+    """
+    params: list[object] = []
+
+    if search_query:
+        q += " AND (a.album_artist_name LIKE ? ESCAPE '\\\\' OR ar.name LIKE ? ESCAPE '\\\\')"
+        like = f"%{escape_like(search_query)}%"
+        params += [like, like]
+
+    order = "DESC" if str(sort_order).lower() == "desc" else "ASC"
+    order_map = {
+        0: f"album_artist_name COLLATE NOCASE {order}",
+        1: f"album_count {order}, album_artist_name COLLATE NOCASE {order}",
+        2: f"track_count {order}, album_artist_name COLLATE NOCASE {order}",
+    }
+    col = int(sort_column) if int(sort_column) in order_map else 0
+    q += f"""
+    GROUP BY LOWER(COALESCE(NULLIF(a.album_artist_name, ''), ar.name, ''))
+    ORDER BY {order_map[col]}
+    """
+    if limit:
+        q += f" LIMIT {int(limit)} OFFSET {max(0, int(offset))}"
+
+    cur = db.execute(q, params)
+    cols = [c[0] for c in cur.description]
+    return [dict(zip(cols, row)) for row in cur.fetchall()]
+
+
+def get_album_rows_by_album_artist(
+    db: sqlite3.Connection,
+    album_artist_name: str,
+    search_query: str = "",
+    *,
+    limit: int | None = None,
+    offset: int = 0,
+    sort_column: int = 0,
+    sort_order: str = "asc",
+) -> list[dict]:
+    """
+    Return albums that belong to a given album artist (by album_artist_name text,
+    case-insensitive). Used for the Album Artists tab drill-down.
+    """
+    q = """
+    SELECT
+        a.id                    AS album_id,
+        a.name                  AS album_name,
+        COALESCE(NULLIF(a.album_artist_name, ''), ar.name, '') AS artist_name,
+        COUNT(t.id)             AS track_count
+    FROM albums a
+    LEFT JOIN artists ar ON ar.id = a.artist_id
+    LEFT JOIN tracks  t  ON t.album_id = a.id
+    WHERE LOWER(COALESCE(NULLIF(a.album_artist_name, ''), ar.name, '')) = LOWER(?)
+    """
+    params: list[object] = [album_artist_name]
+
+    if search_query:
+        q += " AND (a.name LIKE ? ESCAPE '\\\\')"
+        params.append(f"%{escape_like(search_query)}%")
+
+    order = "DESC" if str(sort_order).lower() == "desc" else "ASC"
+    order_map = {
+        0: f"a.name COLLATE NOCASE {order}",
+        1: f"artist_name COLLATE NOCASE {order}, a.name COLLATE NOCASE {order}",
+        2: f"track_count {order}, a.name COLLATE NOCASE {order}",
+    }
+    col = int(sort_column) if int(sort_column) in order_map else 0
+    q += f"""
+    GROUP BY a.id, a.name, a.album_artist_name, ar.name
+    ORDER BY {order_map[col]}
+    """
+    if limit:
+        q += f" LIMIT {int(limit)} OFFSET {max(0, int(offset))}"
+
+    cur = db.execute(q, params)
+    cols = [c[0] for c in cur.description]
+    return [dict(zip(cols, row)) for row in cur.fetchall()]

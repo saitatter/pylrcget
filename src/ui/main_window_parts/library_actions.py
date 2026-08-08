@@ -248,6 +248,7 @@ def set_track_download_state_all(window, track_id: int, state: str) -> None:
     window.track_list.set_download_state(int(track_id), state)
     window.albums_tab.set_download_state(int(track_id), state)
     window.artists_tab.set_download_state(int(track_id), state)
+    window.album_artists_tab.set_download_state(int(track_id), state)
 
 
 def get_primary_track_download_state(window, track_id: int) -> str:

@@ -8,7 +8,7 @@ from PySide6.QtCore import QObject, QTimer, Qt
 from PySide6.QtWidgets import QLabel, QLayout, QTabWidget, QToolButton, QWidget
 
 from db.queries import get_album_by_id, get_artist_by_id, get_config, set_config
-from ui.library_routes import LibraryRoute, albums_all, artists_all, deserialize_route, route_breadcrumbs, serialize_route, tracks_all
+from ui.library_routes import LibraryRoute, album_artists_all, albums_all, artists_all, deserialize_route, route_breadcrumbs, serialize_route, tracks_all
 
 
 ApplyRouteCallback = Callable[[LibraryRoute], None]
@@ -24,6 +24,7 @@ class NavigationController(QObject):
         tracks_tab: QWidget,
         albums_page: QWidget,
         artists_page: QWidget,
+        album_artists_page: QWidget,
         breadcrumbs_layout: QLayout,
         apply_route: ApplyRouteCallback,
         display_artist_name: DisplayNameCallback,
@@ -36,6 +37,7 @@ class NavigationController(QObject):
         self._tracks_tab = tracks_tab
         self._albums_page = albums_page
         self._artists_page = artists_page
+        self._album_artists_page = album_artists_page
         self._breadcrumbs_layout = breadcrumbs_layout
         self._apply_route = apply_route
         self._display_artist_name = display_artist_name
@@ -48,6 +50,7 @@ class NavigationController(QObject):
             "tracks": tracks_all(),
             "albums": albums_all(),
             "artists": artists_all(),
+            "album_artists": album_artists_all(),
         }
         self._artist_label_cache: dict[int, str] = {}
         self._album_label_cache: dict[int, str] = {}
@@ -113,6 +116,8 @@ class NavigationController(QObject):
             self.navigate_to(self._tab_routes.get("albums", albums_all()), record_history=False)
         elif current is self._artists_page:
             self.navigate_to(self._tab_routes.get("artists", artists_all()), record_history=False)
+        elif current is self._album_artists_page:
+            self.navigate_to(self._tab_routes.get("album_artists", album_artists_all()), record_history=False)
 
     def _set_current_tab_for_route(self, route: LibraryRoute) -> None:
         if route.tab == "tracks":
@@ -121,6 +126,8 @@ class NavigationController(QObject):
             self._tabs.setCurrentWidget(self._albums_page)
         elif route.tab == "artists":
             self._tabs.setCurrentWidget(self._artists_page)
+        elif route.tab == "album_artists":
+            self._tabs.setCurrentWidget(self._album_artists_page)
 
     def _persist_library_route(self, route: LibraryRoute) -> None:
         self._pending_library_route = serialize_route(route)

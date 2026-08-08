@@ -60,6 +60,7 @@ def update_single_track_lyrics_state(window, track) -> None:
     window.track_list.update_track_lyrics_state(track_id, state)
     window.albums_tab.update_track_lyrics_state(track_id, state)
     window.artists_tab.update_track_lyrics_state(track_id, state)
+    window.album_artists_tab.update_track_lyrics_state(track_id, state)
 
 
 def on_lyrics_save_requested(window, lrc: str, txt: str) -> None:
@@ -255,6 +256,7 @@ def mark_track_lyrics_clean(window, track) -> None:
     window.track_list.set_dirty_lyrics_state(track_id, False)
     window.albums_tab.set_dirty_lyrics_state(track_id, False)
     window.artists_tab.set_dirty_lyrics_state(track_id, False)
+    window.album_artists_tab.set_dirty_lyrics_state(track_id, False)
 
 
 def on_dirty_lyrics_changed(window, lrc: str, txt: str) -> None:
@@ -284,6 +286,7 @@ def flush_dirty_lyrics(window) -> None:
         window.track_list.set_dirty_lyrics_state(int(track_id), has_dirty)
         window.albums_tab.set_dirty_lyrics_state(int(track_id), has_dirty)
         window.artists_tab.set_dirty_lyrics_state(int(track_id), has_dirty)
+        window.album_artists_tab.set_dirty_lyrics_state(int(track_id), has_dirty)
         for view in window._all_lyrics_views():
             view._set_dirty_badge(has_dirty)
     except sqlite3.Error as exc:

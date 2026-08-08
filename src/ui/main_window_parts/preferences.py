@@ -346,6 +346,15 @@ def reapply_theme_styles(window) -> None:
             window.artists_tab.album_browser._apply_styles()
             if hasattr(window.artists_tab.album_browser, "empty_state") and hasattr(window.artists_tab.album_browser.empty_state, "_apply_styles"):
                 window.artists_tab.album_browser.empty_state._apply_styles()
+    if hasattr(window, "album_artists_tab"):
+        if hasattr(window.album_artists_tab, "_apply_styles"):
+            window.album_artists_tab._apply_styles()
+        if hasattr(window.album_artists_tab, "empty_state") and hasattr(window.album_artists_tab.empty_state, "_apply_styles"):
+            window.album_artists_tab.empty_state._apply_styles()
+        if hasattr(window.album_artists_tab, "album_browser") and hasattr(window.album_artists_tab.album_browser, "_apply_styles"):
+            window.album_artists_tab.album_browser._apply_styles()
+            if hasattr(window.album_artists_tab.album_browser, "empty_state") and hasattr(window.album_artists_tab.album_browser.empty_state, "_apply_styles"):
+                window.album_artists_tab.album_browser.empty_state._apply_styles()
     if hasattr(window, "lrclib_browser_tab") and hasattr(window.lrclib_browser_tab, "_apply_styles"):
         window.lrclib_browser_tab._apply_styles()
     if hasattr(window, "mylrclib_tab") and hasattr(window.mylrclib_tab, "_apply_styles"):
@@ -384,6 +393,8 @@ def apply_appearance_preferences(window, config) -> None:
         window.albums_tab.set_ui_scale(scale)
     if hasattr(window, "artists_tab"):
         window.artists_tab.set_ui_scale(scale)
+    if hasattr(window, "album_artists_tab"):
+        window.album_artists_tab.set_ui_scale(scale)
     if hasattr(window, "_all_lyrics_views"):
         for view in window._all_lyrics_views():
             view.set_ui_scale(scale)

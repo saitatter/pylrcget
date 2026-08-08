@@ -67,6 +67,7 @@ from ui.services.feedback import exception_message, log_and_notify, normalize_no
 from ui.app_theme import apply_app_theme
 from ui.widgets.album_list_widget import AlbumListWidget
 from ui.widgets.artist_list_widget import ArtistListWidget
+from ui.widgets.album_artist_list_widget import AlbumArtistListWidget
 from ui.library_routes import LibraryRoute, deserialize_route, tracks_album, tracks_all, tracks_artist
 from ui.spacing import SPACE_1, SPACE_2, SPACE_3, set_layout_spacing
 from ui.style_loader import load_stylesheet
@@ -294,6 +295,32 @@ class MainWindow(QMainWindow):
         self.artists_tab.setMinimumWidth(LIBRARY_PANE_MIN_WIDTH)
         self.artists_lyrics_view.setMinimumWidth(LYRICS_PANE_MIN_WIDTH)
         artists_layout.addWidget(self.artists_splitter)
+
+        # --- Album Artists tab ---
+        self.album_artists_tab = AlbumArtistListWidget(self.app_state)
+        self.album_artists_page = QWidget()
+        album_artists_layout = QVBoxLayout(self.album_artists_page)
+        set_layout_spacing(album_artists_layout, margins=0, spacing=SPACE_2)
+        (
+            self.album_artists_selection_actions_bar,
+            self.album_artists_selection_actions_label,
+            self.album_artists_selection_action_buttons,
+        ) = self._create_selection_actions_bar()
+        album_artists_layout.addWidget(self.album_artists_selection_actions_bar)
+        self.album_artists_splitter = QSplitter(Qt.Orientation.Horizontal)
+        self.album_artists_splitter.addWidget(self.album_artists_tab)
+        self.album_artists_lyrics_view = LyricsEditorWidget()
+        self.album_artists_lyrics_view.show_none("Select a track to see lyrics")
+        self._wire_lyrics_view(self.album_artists_lyrics_view)
+        self.album_artists_splitter.addWidget(self.album_artists_lyrics_view)
+        self.album_artists_splitter.setStretchFactor(0, 3)
+        self.album_artists_splitter.setStretchFactor(1, 2)
+        self.album_artists_splitter.setCollapsible(0, False)
+        self.album_artists_splitter.setCollapsible(1, False)
+        self.album_artists_tab.setMinimumWidth(LIBRARY_PANE_MIN_WIDTH)
+        self.album_artists_lyrics_view.setMinimumWidth(LYRICS_PANE_MIN_WIDTH)
+        album_artists_layout.addWidget(self.album_artists_splitter)
+
         self._syncing_library_splitters = False
         self._connect_library_splitter_sync()
 
@@ -307,6 +334,7 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(self.tracks_tab, "Tracks")
         self.tabs.addTab(self.albums_page, "Albums")
         self.tabs.addTab(self.artists_page, "Artists")
+        self.tabs.addTab(self.album_artists_page, "Album Artists")
         self.tabs.addTab(self.lrclib_browser_tab, "LRCLIB Browser")
         self.tabs.addTab(self.mylrclib_tab, "My LRCLIB")
         self.tabs.setAccessibleName("Library navigation tabs")
@@ -410,6 +438,8 @@ class MainWindow(QMainWindow):
         self.albums_lyrics_view.publishPlainRequested.connect(self.publish_history.publish_plain)
         self.artists_lyrics_view.publishSyncedRequested.connect(self.publish_history.publish_synced)
         self.artists_lyrics_view.publishPlainRequested.connect(self.publish_history.publish_plain)
+        self.album_artists_lyrics_view.publishSyncedRequested.connect(self.publish_history.publish_synced)
+        self.album_artists_lyrics_view.publishPlainRequested.connect(self.publish_history.publish_plain)
 
         # --- Scan progress (pretty + hidden when idle) ---
         self.scan_row = QWidget()
@@ -458,6 +488,7 @@ class MainWindow(QMainWindow):
             tracks_tab=self.tracks_tab,
             albums_page=self.albums_page,
             artists_page=self.artists_page,
+            album_artists_page=self.album_artists_page,
             breadcrumbs_layout=self.breadcrumbs_layout,
             apply_route=self._apply_library_route,
             display_artist_name=self._display_artist_name,
@@ -510,6 +541,22 @@ class MainWindow(QMainWindow):
         self.artists_tab.clearSearchRequested.connect(self._clear_library_search)
         self.artists_tab.refreshLibraryRequested.connect(self.refresh_library)
         self.artists_tab.configureFoldersRequested.connect(self.open_config_modal)
+        # --- Album Artists tab signals ---
+        self.album_artists_tab.playTrack.connect(self.on_play_track)
+        self.album_artists_tab.previewTrack.connect(self._preview_track)
+        self.album_artists_tab.refreshTrack.connect(self.on_refresh_track)
+        self.album_artists_tab.bulkRefreshRequested.connect(self.on_refresh_tracks)
+        self.album_artists_tab.downloadLyrics.connect(self.on_download_lyrics)
+        self.album_artists_tab.exportLyricsFiles.connect(self._export_track_sidecars)
+        self.album_artists_tab.importLyricsFile.connect(self._import_lyrics_file_as_draft)
+        self.album_artists_tab.bulkDownloadRequested.connect(self._on_bulk_download_requested)
+        self.album_artists_tab.navigateRequested.connect(self.navigate_to)
+        self.album_artists_tab.markInstrumental.connect(self._on_mark_instrumental)
+        self.album_artists_tab.unmarkInstrumental.connect(self._on_unmark_instrumental)
+        self.album_artists_tab.clearFiltersRequested.connect(self._reset_track_filters)
+        self.album_artists_tab.clearSearchRequested.connect(self._clear_library_search)
+        self.album_artists_tab.refreshLibraryRequested.connect(self.refresh_library)
+        self.album_artists_tab.configureFoldersRequested.connect(self.open_config_modal)
         self.mylrclib_tab.playTrack.connect(self.on_play_track)
 
         # --- Filters wiring ---
@@ -524,9 +571,12 @@ class MainWindow(QMainWindow):
         self.track_list.table.selectionModel().selectionChanged.connect(self._update_selection_actions_bar)
         self.albums_tab.track_list.table.selectionModel().selectionChanged.connect(self._update_selection_actions_bar)
         self.artists_tab.album_browser.track_list.table.selectionModel().selectionChanged.connect(self._update_selection_actions_bar)
+        self.album_artists_tab.album_browser.track_list.table.selectionModel().selectionChanged.connect(self._update_selection_actions_bar)
         self.albums_tab.stack.currentChanged.connect(self._update_selection_actions_bar)
         self.artists_tab.stack.currentChanged.connect(self._update_selection_actions_bar)
         self.artists_tab.album_browser.stack.currentChanged.connect(self._update_selection_actions_bar)
+        self.album_artists_tab.stack.currentChanged.connect(self._update_selection_actions_bar)
+        self.album_artists_tab.album_browser.stack.currentChanged.connect(self._update_selection_actions_bar)
         self.tabs.currentChanged.connect(self._update_selection_actions_bar)
         self.tabs.currentChanged.connect(self._refresh_active_lyrics_view_layout)
 
@@ -906,6 +956,7 @@ class MainWindow(QMainWindow):
             self.track_list.set_dirty_lyrics_state(int(track_id), True)
             self.albums_tab.set_dirty_lyrics_state(int(track_id), True)
             self.artists_tab.set_dirty_lyrics_state(int(track_id), True)
+            self.album_artists_tab.set_dirty_lyrics_state(int(track_id), True)
             notify_user(
                 self.app_state,
                 f"Loaded {os.path.basename(file_path)} as an unsaved lyrics draft.",
@@ -1210,6 +1261,7 @@ class MainWindow(QMainWindow):
         self.track_list.set_dirty_lyrics_state(int(track.id), False)
         self.albums_tab.set_dirty_lyrics_state(int(track.id), False)
         self.artists_tab.set_dirty_lyrics_state(int(track.id), False)
+        self.album_artists_tab.set_dirty_lyrics_state(int(track.id), False)
         return cleaned
 
     def on_refresh_track(self, track_id: int) -> None:
@@ -1269,6 +1321,8 @@ class MainWindow(QMainWindow):
             self.albums_tab.track_list.set_now_playing(now_playing.track_id if now_playing else None)
         if hasattr(self, "artists_tab") and hasattr(self.artists_tab, "album_browser"):
             self.artists_tab.album_browser.track_list.set_now_playing(now_playing.track_id if now_playing else None)
+        if hasattr(self, "album_artists_tab") and hasattr(self.album_artists_tab, "album_browser"):
+            self.album_artists_tab.album_browser.track_list.set_now_playing(now_playing.track_id if now_playing else None)
 
     def _on_player_status_changed(self, status):
         # No text-based status display currently needed
@@ -1367,6 +1421,9 @@ class MainWindow(QMainWindow):
         elif current is self.artists_page:
             route = self.navigation.current_route
             self.artists_tab.apply_route(route if route.tab == "artists" else LibraryRoute(tab="artists", mode="root"))
+        elif current is self.album_artists_page:
+            route = self.navigation.current_route
+            self.album_artists_tab.apply_route(route if route.tab == "album_artists" else LibraryRoute(tab="album_artists", mode="root"))
 
     def _active_track_list_widget(self):
         current = self.tabs.currentWidget()
@@ -1376,6 +1433,10 @@ class MainWindow(QMainWindow):
             return self.albums_tab.track_list
         if current is self.artists_page and self.artists_tab.stack.currentWidget() is self.artists_tab.album_browser:
             album_browser = self.artists_tab.album_browser
+            if album_browser.stack.currentWidget() is album_browser.track_list:
+                return album_browser.track_list
+        if current is self.album_artists_page and self.album_artists_tab.stack.currentWidget() is self.album_artists_tab.album_browser:
+            album_browser = self.album_artists_tab.album_browser
             if album_browser.stack.currentWidget() is album_browser.track_list:
                 return album_browser.track_list
         return None
@@ -1534,6 +1595,7 @@ class MainWindow(QMainWindow):
             self.track_list.set_dirty_lyrics_state(int(track_id), True)
             self.albums_tab.set_dirty_lyrics_state(int(track_id), True)
             self.artists_tab.set_dirty_lyrics_state(int(track_id), True)
+            self.album_artists_tab.set_dirty_lyrics_state(int(track_id), True)
             notify_user(
                 self.app_state,
                 msg + " (loaded as draft — save to apply)",
@@ -1778,6 +1840,7 @@ class MainWindow(QMainWindow):
             self.track_list,
             self.albums_tab.track_list,
             self.artists_tab.album_browser.track_list,
+            self.album_artists_tab.album_browser.track_list,
         ]
         for track_list in track_lists:
             for key in ("Return", "Enter"):
@@ -1806,7 +1869,8 @@ class MainWindow(QMainWindow):
             self.albums_tab.setSearchValue("")
         elif current is self.artists_page:
             self.artists_tab.setSearchValue("")
-
+        elif current is self.album_artists_page:
+            self.album_artists_tab.setSearchValue("")
     def _download_current_track_lyrics(self):
         lyrics_actions.download_current_track_lyrics(self)
 
@@ -1866,6 +1930,8 @@ class MainWindow(QMainWindow):
             return self.albums_lyrics_view
         if current is self.artists_page:
             return self.artists_lyrics_view
+        if current is self.album_artists_page:
+            return self.album_artists_lyrics_view
         return None
 
     def _move_active_lyrics_selection(self, delta: int) -> bool:
@@ -1927,10 +1993,10 @@ class MainWindow(QMainWindow):
         return super().eventFilter(watched, event)
 
     def _all_lyrics_views(self) -> list[LyricsEditorWidget]:
-        return [self.lyrics_view, self.albums_lyrics_view, self.artists_lyrics_view]
+        return [self.lyrics_view, self.albums_lyrics_view, self.artists_lyrics_view, self.album_artists_lyrics_view]
 
     def _all_library_splitters(self) -> list[QSplitter]:
-        return [self.content_splitter, self.albums_splitter, self.artists_splitter]
+        return [self.content_splitter, self.albums_splitter, self.artists_splitter, self.album_artists_splitter]
 
     def _connect_library_splitter_sync(self) -> None:
         for splitter in self._all_library_splitters():
@@ -2089,6 +2155,8 @@ class MainWindow(QMainWindow):
             self.albums_tab.apply_current_palette()
         if hasattr(self, "artists_tab"):
             self.artists_tab.apply_current_palette()
+        if hasattr(self, "album_artists_tab"):
+            self.album_artists_tab.apply_current_palette()
         self._apply_styles()
         if hasattr(self, "top_bar"):
             self.top_bar.apply_current_palette()
@@ -2096,6 +2164,8 @@ class MainWindow(QMainWindow):
             self.albums_lyrics_view._apply_styles()
         if hasattr(self, "artists_lyrics_view"):
             self.artists_lyrics_view._apply_styles()
+        if hasattr(self, "album_artists_lyrics_view"):
+            self.album_artists_lyrics_view._apply_styles()
         self._update_responsive_layout()
 
     def _clear_breadcrumbs(self) -> None:
@@ -2139,6 +2209,8 @@ class MainWindow(QMainWindow):
             self.albums_tab.apply_route(route)
         elif route.tab == "artists":
             self.artists_tab.apply_route(route)
+        elif route.tab == "album_artists":
+            self.album_artists_tab.apply_route(route)
         self._schedule_library_search()
 
     def _apply_theme(self, theme_mode: str):

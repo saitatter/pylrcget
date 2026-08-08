@@ -8,7 +8,7 @@ from PySide6.QtWidgets import QWidget, QVBoxLayout, QTableView, QHeaderView, QMe
 
 from db.database import get_directories
 from ui.style_loader import load_stylesheet
-from ui.library_routes import LibraryRoute, albums_detail, artists_album, artists_detail
+from ui.library_routes import LibraryRoute, album_artists_album, albums_detail, artists_album, artists_detail
 from ui.widgets.empty_state_widget import EmptyStateWidget
 from ui.widgets.library_rows import AlbumListRow
 from ui.widgets.library_table_utils import (
@@ -50,6 +50,7 @@ class AlbumListWidget(QWidget):
         self._artist_id: int | None = None
         self._artist_ids: list[int] | None = None
         self._artist_name: str = ""
+        self._album_artist_name: str | None = None  # album_artists tab scope
         self._detail_album_id: int | None = None
         self._detail_album_name: str = ""
         self._route_tab = "albums"
@@ -198,6 +199,7 @@ class AlbumListWidget(QWidget):
             self._artist_id = int(artist_id) if artist_id is not None else None
             self._artist_ids = None
         self._artist_name = artist_name or ""
+        self._album_artist_name = None
         self._detail_album_id = None
         self._detail_album_name = ""
         self.stack.setCurrentWidget(self.browser_page)
@@ -207,6 +209,19 @@ class AlbumListWidget(QWidget):
 
     def clearArtistScope(self) -> None:
         self.setArtistScope(None, "")
+
+    def setAlbumArtistScope(self, album_artist_name: str) -> None:
+        """Scope albums by album_artist_name text (used by the Album Artists tab)."""
+        self._album_artist_name = album_artist_name or None
+        self._artist_id = None
+        self._artist_ids = None
+        self._artist_name = album_artist_name or ""
+        self._detail_album_id = None
+        self._detail_album_name = ""
+        self.stack.setCurrentWidget(self.browser_page)
+        self._update_header()
+        if self._active:
+            self.refresh()
 
     def set_download_state(self, track_id: int, state: str) -> None:
         self.track_list.set_download_state(track_id, state)
@@ -224,7 +239,7 @@ class AlbumListWidget(QWidget):
         self._load_rows(reset=True)
 
     def _load_rows(self, *, reset: bool) -> None:
-        from db.database import get_album_rows
+        from db.database import get_album_rows, get_album_rows_by_album_artist
 
         directories = get_directories(self.app_state.db)
         if not directories:
@@ -239,16 +254,28 @@ class AlbumListWidget(QWidget):
             )
             return
 
-        rows = get_album_rows(
-            db=self.app_state.db,
-            search_query=self._search,
-            artist_id=self._artist_id,
-            artist_ids=self._artist_ids,
-            limit=self._page_size + 1,
-            offset=0 if reset else self._loaded_db_rows,
-            sort_column=self._sort_column,
-            sort_order="desc" if self._sort_order == Qt.SortOrder.DescendingOrder else "asc",
-        )
+        sort_order = "desc" if self._sort_order == Qt.SortOrder.DescendingOrder else "asc"
+        if self._album_artist_name is not None:
+            rows = get_album_rows_by_album_artist(
+                db=self.app_state.db,
+                album_artist_name=self._album_artist_name,
+                search_query=self._search,
+                limit=self._page_size + 1,
+                offset=0 if reset else self._loaded_db_rows,
+                sort_column=self._sort_column,
+                sort_order=sort_order,
+            )
+        else:
+            rows = get_album_rows(
+                db=self.app_state.db,
+                search_query=self._search,
+                artist_id=self._artist_id,
+                artist_ids=self._artist_ids,
+                limit=self._page_size + 1,
+                offset=0 if reset else self._loaded_db_rows,
+                sort_column=self._sort_column,
+                sort_order=sort_order,
+            )
         self._has_more_rows = len(rows) > self._page_size
         visible_rows = rows[: self._page_size]
         ui_rows: list[AlbumListRow] = []
@@ -287,7 +314,7 @@ class AlbumListWidget(QWidget):
         self._update_header()
         if self.model.rowCount():
             self._show_table()
-        elif self._artist_id is not None or self._artist_ids:
+        elif self._artist_id is not None or self._artist_ids or self._album_artist_name:
             self._show_empty_state(
                 icon_name="audio-lines.svg",
                 title="No albums for this artist",
@@ -349,6 +376,10 @@ class AlbumListWidget(QWidget):
             self.header_bar.show()
             self.header_label.setText(f"Album: {self._detail_album_name or 'N/A'}")
             return
+        if self._album_artist_name is not None:
+            self.header_bar.show()
+            self.header_label.setText(f"Album Artist: {display_artist_name(self._album_artist_name)}")
+            return
         if self._artist_id is not None or self._artist_ids:
             self.header_bar.show()
             self.header_label.setText(f"Artist: {display_artist_name(self._artist_name)}")
@@ -398,6 +429,8 @@ class AlbumListWidget(QWidget):
         if self._route_tab == "artists":
             artist_ids = tuple(self._artist_ids or ([self._artist_id] if self._artist_id is not None else []))
             return artists_album(artist_ids, album_ids, artist_label=self._artist_name, album_label=album_name)
+        if self._route_tab == "album_artists":
+            return album_artists_album(album_ids, artist_label=self._artist_name, album_label=album_name)
         return albums_detail(album_ids, label=album_name)
 
     def _handle_track_route(self, route: LibraryRoute) -> None:
