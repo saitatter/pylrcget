@@ -1,4 +1,11 @@
 # Changelog
+## v1.14.0 (2026-08-08)
+
+### ✨ Features
+* Add Album Artists navigation tab (group by TPE2 / ALBUMARTIST tag)
+* Add alphabetic index bar (A-Z + #) and bucketed sub-page pagination for Tracks, Albums, Artists, and Album Artists views
+* Add option in Settings to ignore lead articles ("The", "A", "An") when indexing & sorting names
+
 ## v1.13.1 (2026-07-06)
 
 ### 🐛 Fixes
