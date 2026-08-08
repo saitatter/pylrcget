@@ -2,9 +2,98 @@
 ## v1.14.0 (2026-08-08)
 
 ### ✨ Features
-* Add Album Artists navigation tab (group by TPE2 / ALBUMARTIST tag)
-* Add alphabetic index bar (A-Z + #) and bucketed sub-page pagination for Tracks, Albums, Artists, and Album Artists views
-* Add option in Settings to ignore lead articles ("The", "A", "An") when indexing & sorting names
+* Expand alpha index bar & bucketed pagination to tracks view and increase letter button size ([f30ad83](https://github.com/saitatter/pylrcget/commit/f30ad839d70fbe0a187d51e45dc980d5c8595029))
+  - TrackListWidget: integrated AlphaIndexWidget with letter_prefix query support and get_track_letter_counts aggregation.
+- AlphaIndexWidget: enlarged letter buttons (28x28px, 13px bold font) and improved sub-page pagination controls styling for better readability and touch/click targets.
+- Preferences: propagated ignore_sort_articles setting to TrackListWidget.
+* Add alphabetic index bar & bucketed pagination for artists, album artists and albums ([522e9db](https://github.com/saitatter/pylrcget/commit/522e9dba90da28f9d133f7e004b08fb0e457671a))
+  - AlphaIndexWidget: reusable A-Z + '#' letter picker bar with page controls.
+- DB queries: letter_prefix filtering and letter count aggregation functions for artists, album artists, and albums.
+- Bucketed sub-pages: when a letter contains more entries than the page size, paginated controls ('1/3', '2/3', etc.) appear.
+- Ignore articles option: added 'ignore_sort_articles' setting in Settings -> Library to ignore 'The', 'A', 'An' when sorting/indexing.
+- DB migration: bumped database version to v6 for new config column.
+* Add album artists tab (group by tpe2/albumartist) ([b81b5cb](https://github.com/saitatter/pylrcget/commit/b81b5cbf78f8aa492779ba37efb0d61e2019ce42))
+  Adds a new 'Album Artists' navigation tab that groups the library by the album-level artist tag (TPE2 / ALBUMARTIST), distinct from the existing Artists tab which groups by the per-track artist tag (TPE1 / ARTIST).
+  This matters especially for:
+- Various Artists compilations (album artist = 'Various Artists', track
+  artists are the individual performers)
+- 'Main Artist feat. Featured Artist' tracks (album artist is the main
+  artist, track artist includes the feature)
+- Large libraries (68k+ tracks) where track-level artist grouping
+  fragments albums across many entries
+  Changes:
+- db/query_modules/entity_queries.py: add get_album_artist_rows() and
+  get_album_rows_by_album_artist() SQL queries grouped by album_artist_name
+- ui/library_routes.py: new album_artists_* route factories and breadcrumbs
+- ui/controllers/navigation_controller.py: album_artists tab routing
+- ui/widgets/album_list_widget.py: setAlbumArtistScope() for text-based
+  album filtering; _load_rows branches on album_artist_name scope
+- ui/widgets/album_artist_list_widget.py: new top-level widget (artist
+  table + AlbumListWidget drill-down)
+- ui/main_window.py: tab registration, splitter, lyrics view, all signals
+- main_window_parts/*: propagate album_artists_tab to dirty-lyrics, search,
+  download state, now-playing, UI scale, and palette methods
+
+### 🐛 Fixes
+* Maintain database current_db_version at 5 ([a3e46ad](https://github.com/saitatter/pylrcget/commit/a3e46ad68ea94b68e5572f48da27fc5ea764cedc))
+  Keep database version at 5 and backfill ignore_sort_articles column within v5 migration path, ensuring database version increments strictly per official release policy.
+* **ai:** Don't pass string as vad_model in newer whisperx - let whisperx use built-in vad default ([27035db](https://github.com/saitatter/pylrcget/commit/27035dbadbf4fee78bd0ee595467a30667742d26))
+* **ai:** Use vad_model instead of vad_method for newer whisperx; inspect load_model signature dynamically ([5082a38](https://github.com/saitatter/pylrcget/commit/5082a38912e89f0e86f0782e809b275db20e129b))
+* **ai:** Add soundfile and torchaudio audio loading fallback for whisperx when ffmpeg is not in path ([1035667](https://github.com/saitatter/pylrcget/commit/103566780a02259ef92d7893362936502417e295))
+* **build:** Add omegaconf, hydra, and antlr4 to pyinstaller specs for pyannote model unpickling ([36bf85d](https://github.com/saitatter/pylrcget/commit/36bf85da293aa4a8bbca377a3b98953e976caf9b))
+* **ai:** Patch faster-whisper transcriptionoptions constructor for compatibility with newer faster-whisper versions ([140f342](https://github.com/saitatter/pylrcget/commit/140f342c59a63660f470c417fc3a9f12fbb876b5))
+* **build:** Add copy_metadata for ai packages to support transformers and torchcodec in pyinstaller ([85e5bf9](https://github.com/saitatter/pylrcget/commit/85e5bf9454a9c467bea9674c4ed0e9b74c6e2c26))
+* **build:** Include all whisperx dependencies (pandas, scipy, transformers, pyannote.audio) in pyinstaller specs ([f48f70d](https://github.com/saitatter/pylrcget/commit/f48f70d4ab62a3ad2a7c6a6e17641622448b71fe))
+* **build:** Import collect_all in pyinstaller spec files to bundle ai packages properly ([6f8a82e](https://github.com/saitatter/pylrcget/commit/6f8a82e7a8afb33e779a01bb9dd24b20a73f2323))
+* **lyrics:** Wire app_state to lyricseditorwidget so editor_auto_edit_on_add_line setting works ([8577d8c](https://github.com/saitatter/pylrcget/commit/8577d8cb199e4f91c103640234703495f4dc093e))
+* **lyrics:** Allow row 0 with 0:00.00 to seek in synced lyrics, ignore 0:00.00 for subsequent rows ([a7ea8b5](https://github.com/saitatter/pylrcget/commit/a7ea8b524ae78f5656d93adc341982225ec1f811))
+* **lyrics:** Do not seek player when clicking unsynced lyrics with timestamp 0:00.00 ([60d4f48](https://github.com/saitatter/pylrcget/commit/60d4f48012008662e3384e8a281e7842211ee140))
+* **ui:** Enable drop-down arrow and selection signals for speedcombo dropdown ([2f8ebc2](https://github.com/saitatter/pylrcget/commit/2f8ebc263e131f8a866e5a3d3e3a841f47e15b46))
+* **ui:** Use neutral svg chevron asset for qcombobox down-arrow ([e278846](https://github.com/saitatter/pylrcget/commit/e278846d0a18cc3920b76ed6aabb014aeda9efbd))
+* **ui:** Dynamic svg file generation for qcombobox chevron and fix popup background contrast ([b0e2977](https://github.com/saitatter/pylrcget/commit/b0e2977346d243f62671adfb366785051902c819))
+* **ui:** Dynamic base64 svg chevron icon and transparent qcombobox popup window frame ([ab6dd5d](https://github.com/saitatter/pylrcget/commit/ab6dd5db52ecf74807464b8839a8e0a30d2506cd))
+* **ui:** Dynamic theme colors for combobox chevron and translucent popup window filter ([e9296b6](https://github.com/saitatter/pylrcget/commit/e9296b6d2138feb4e34db5bee236679633e916d6))
+* **ui:** Use svg chevron icon and transparent popup container for qcombobox ([03f2e1a](https://github.com/saitatter/pylrcget/commit/03f2e1af565254caeaa26b9382a04c0e47befb3a))
+* **ui:** Apply smooth rounded corners to qcombobox widgets and popup container frames ([7b2c014](https://github.com/saitatter/pylrcget/commit/7b2c014a56c7968416f28542293a0b0b64ce1deb))
+* **ui:** Eliminate rectangular container bleed on qcombobox popup list views ([95d230c](https://github.com/saitatter/pylrcget/commit/95d230c1dde0b58a90ed10c69ada6eaf762b9d8c))
+* **ui:** Refine qcombobox styling to remove rectangular drop-down background artifacts ([99406e0](https://github.com/saitatter/pylrcget/commit/99406e0f1d14c5492b6bb4cf72bb8fb7f13842f3))
+* **ui:** Dynamically re-apply component stylesheets when theme changes ([af271dd](https://github.com/saitatter/pylrcget/commit/af271dd3f42236b9db0318b2d9fdf4c8f641ac3a))
+* **ui:** Position empty state content directly under header buttons ([594fc73](https://github.com/saitatter/pylrcget/commit/594fc736b1c9fbecd06ed18d518c3c535ed1d620))
+* **ui:** Center empty state content vertically in lyrics editor panel ([dc996c0](https://github.com/saitatter/pylrcget/commit/dc996c0d1c1e2e47648a90d2c39e93ad904000f1))
+* **ui:** Align right lyrics editor header vertically with left scope bar ([ce54579](https://github.com/saitatter/pylrcget/commit/ce545799931e82032e9f0b8292622b5dad426bc4))
+* **ui:** Clear track selection and reset editor when tracks are removed from library ([3b59e4a](https://github.com/saitatter/pylrcget/commit/3b59e4a7d6c79de2412ecfb74fa6906d27bcd568))
+* **scanner:** Expand album artist tag parsing for mp3, m4a, flac, and wma ([7c39596](https://github.com/saitatter/pylrcget/commit/7c39596e8e70d661e1267a3e940eedcb9e8172e8))
+* **packaging:** Collect whisperx submodules and datas in pyinstaller specs ([4a9fd84](https://github.com/saitatter/pylrcget/commit/4a9fd84aa8391d5fd448f49c0057898f4862bb73))
+
+### ♻️ Refactors
+* **ui:** Use pure qss subcontrol arrow for qcombobox down-arrow to eliminate file i/o ([ff619d7](https://github.com/saitatter/pylrcget/commit/ff619d7860a8ca384656197abadab4a9d98ebce4))
+
+### 🧰 CI & Build
+* **deps:** Bump the github-actions group across 1 directory with 2 updates ([095009e](https://github.com/saitatter/pylrcget/commit/095009efb76f51aeda27d8953db8ce3b2187c120))
+  Bumps the github-actions group with 2 updates in the / directory: [python-semantic-release/python-semantic-release](https://github.com/python-semantic-release/python-semantic-release) and [actions/setup-python](https://github.com/actions/setup-python).
+  Updates `python-semantic-release/python-semantic-release` from 10.6.0 to 10.6.1
+- [Release notes](https://github.com/python-semantic-release/python-semantic-release/releases)
+- [Changelog](https://github.com/python-semantic-release/python-semantic-release/blob/master/CHANGELOG.rst)
+- [Commits](https://github.com/python-semantic-release/python-semantic-release/compare/v10.6.0...v10.6.1)
+  Updates `actions/setup-python` from 6 to 7
+- [Release notes](https://github.com/actions/setup-python/releases)
+- [Commits](https://github.com/actions/setup-python/compare/v6...v7)
+  ---
+updated-dependencies:
+- dependency-name: python-semantic-release/python-semantic-release dependency-version: 10.6.1
+  dependency-type: direct:production
+  update-type: version-update:semver-patch
+  dependency-group: github-actions
+  - dependency-name: actions/setup-python dependency-version: '7'
+  update-type: version-update:semver-major
+  dependency-group: github-actions ...
+  Signed-off-by: dependabot[bot] <support@github.com>
+  Co-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>
+* **release:** 1.14.0 ([658a028](https://github.com/saitatter/pylrcget/commit/658a028ee653b05f8c0a922272e450400a2a4e17))
+
+### 🔧 Other Changes
+* **ui:** Optimize settings dialog load speed by removing blocking i/o ([967255d](https://github.com/saitatter/pylrcget/commit/967255d73f77588f899693d20fa32d1d70b6db5e))
+
 
 ## v1.13.1 (2026-07-06)
 
