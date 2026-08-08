@@ -154,6 +154,13 @@ class MusicFoldersDialog(QDialog):
         scan_hint.setWordWrap(True)
         scan_layout.addWidget(scan_hint, 3, 0, 1, 2)
         library_layout.addWidget(scan_box)
+
+        nav_options_box = QGroupBox("Library Grouping & Indexing")
+        nav_options_layout = QVBoxLayout(nav_options_box)
+        self.ignore_sort_articles_chk = QCheckBox("Ignore lead articles (The, A, An) when indexing/sorting names")
+        nav_options_layout.addWidget(self.ignore_sort_articles_chk)
+        library_layout.addWidget(nav_options_box)
+
         library_layout.addStretch(1)
 
         appearance_box = QGroupBox("Appearance")
@@ -176,6 +183,7 @@ class MusicFoldersDialog(QDialog):
         self.startup_view_combo.addItem("Tracks", "tracks")
         self.startup_view_combo.addItem("Albums", "albums")
         self.startup_view_combo.addItem("Artists", "artists")
+        self.startup_view_combo.addItem("Album Artists", "album_artists")
         self.startup_view_combo.addItem("My LRCLIB", "my_lrclib")
         appearance_layout.addWidget(QLabel("Theme"), 0, 0)
         appearance_layout.addWidget(self.theme_combo, 0, 1)
@@ -484,6 +492,7 @@ class MusicFoldersDialog(QDialog):
         embed_format_idx = self.embed_format_combo.findData(getattr(config, "lyrics_embed_format", "both") or "both")
         self.embed_format_combo.setCurrentIndex(max(0, embed_format_idx))
         self.reaction_delay_spin.setValue(int(config.reaction_delay_ms or 0))
+        self.ignore_sort_articles_chk.setChecked(bool(getattr(config, "ignore_sort_articles", False)))
 
         try:
             ui_state = json.loads(config.ui_state_json or "{}")
@@ -904,6 +913,7 @@ class MusicFoldersDialog(QDialog):
             lrclib_instance=self.lrclib_instance_edit.text().strip() or "https://lrclib.net",
             hotkey_bindings_json=serialize_hotkey_bindings(hotkey_bindings),
             ui_state_json=ai_state_json,
+            ignore_sort_articles=self.ignore_sort_articles_chk.isChecked(),
         )
 
         set_directories(self.app_state.db, folders)

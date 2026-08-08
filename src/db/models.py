@@ -128,3 +128,4 @@ class Config:
     scan_lyrics_source_mode: str = "both"
     scan_worker_count: int = 4
     logging_verbosity: str = "info"
+    ignore_sort_articles: bool = False

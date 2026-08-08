@@ -398,3 +398,11 @@ def apply_appearance_preferences(window, config) -> None:
     if hasattr(window, "_all_lyrics_views"):
         for view in window._all_lyrics_views():
             view.set_ui_scale(scale)
+
+    ignore_articles = bool(getattr(config, "ignore_sort_articles", False))
+    if hasattr(window, "artists_tab") and hasattr(window.artists_tab, "set_ignore_articles"):
+        window.artists_tab.set_ignore_articles(ignore_articles)
+    if hasattr(window, "album_artists_tab") and hasattr(window.album_artists_tab, "set_ignore_articles"):
+        window.album_artists_tab.set_ignore_articles(ignore_articles)
+    if hasattr(window, "albums_tab") and hasattr(window.albums_tab, "set_ignore_articles"):
+        window.albums_tab.set_ignore_articles(ignore_articles)

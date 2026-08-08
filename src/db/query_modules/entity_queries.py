@@ -54,6 +54,7 @@ def get_artist_rows(
     db: sqlite3.Connection,
     search_query: str = "",
     *,
+    letter_prefix: str | None = None,
     limit: int | None = None,
     offset: int = 0,
     sort_column: int = 0,
@@ -75,6 +76,13 @@ def get_artist_rows(
         q += " AND ar.name LIKE ? ESCAPE '\\'"
         params.append(f"%{escape_like(search_query)}%")
 
+    if letter_prefix is not None:
+        if letter_prefix == "#":
+            q += " AND UPPER(SUBSTR(ar.name, 1, 1)) NOT GLOB '[A-Z]'"
+        else:
+            q += " AND UPPER(SUBSTR(ar.name, 1, 1)) = ?"
+            params.append(letter_prefix.upper())
+
     order = "DESC" if str(sort_order).lower() == "desc" else "ASC"
     order_map = {
         0: f"ar.name COLLATE NOCASE {order}",
@@ -92,6 +100,29 @@ def get_artist_rows(
     cur = db.execute(q, params)
     cols = [c[0] for c in cur.description]
     return [dict(zip(cols, row)) for row in cur.fetchall()]
+
+
+def get_artist_letter_counts(db: sqlite3.Connection, search_query: str = "") -> dict[str, int]:
+    """Return {letter: count} for building the alpha index bar.
+    '#' covers all names that don't start with A-Z."""
+    q = """
+    SELECT
+        CASE
+            WHEN UPPER(SUBSTR(ar.name, 1, 1)) GLOB '[A-Z]'
+                THEN UPPER(SUBSTR(ar.name, 1, 1))
+            ELSE '#'
+        END AS letter,
+        COUNT(DISTINCT ar.id) AS cnt
+    FROM artists ar
+    WHERE 1=1
+    """
+    params: list[object] = []
+    if search_query:
+        q += " AND ar.name LIKE ? ESCAPE '\\'"
+        params.append(f"%{escape_like(search_query)}%")
+    q += " GROUP BY letter ORDER BY letter"
+    cur = db.execute(q, params)
+    return {row[0]: row[1] for row in cur.fetchall()}
 
 
 def get_artist_by_id(db: sqlite3.Connection, artist_id: int) -> dict:
@@ -145,6 +176,7 @@ def get_album_rows(
     artist_id: int | None = None,
     artist_ids: Sequence[int] | None = None,
     *,
+    letter_prefix: str | None = None,
     limit: int | None = None,
     offset: int = 0,
     sort_column: int = 0,
@@ -176,6 +208,13 @@ def get_album_rows(
         q += " AND t.artist_id = ?"
         params.append(int(artist_id))
 
+    if letter_prefix is not None:
+        if letter_prefix == "#":
+            q += " AND UPPER(SUBSTR(a.name, 1, 1)) NOT GLOB '[A-Z]'"
+        else:
+            q += " AND UPPER(SUBSTR(a.name, 1, 1)) = ?"
+            params.append(letter_prefix.upper())
+
     order = "DESC" if str(sort_order).lower() == "desc" else "ASC"
     order_map = {
         0: f"a.name COLLATE NOCASE {order}, COALESCE(NULLIF(a.album_artist_name, ''), ar.name, '') COLLATE NOCASE {order}",
@@ -193,6 +232,42 @@ def get_album_rows(
     cur = db.execute(q, params)
     cols = [c[0] for c in cur.description]
     return [dict(zip(cols, row)) for row in cur.fetchall()]
+
+
+def get_album_letter_counts(
+    db: sqlite3.Connection,
+    search_query: str = "",
+    artist_id: int | None = None,
+    artist_ids: Sequence[int] | None = None,
+) -> dict[str, int]:
+    """Return {letter: count} for albums, for building the alpha index bar."""
+    q = """
+    SELECT
+        CASE
+            WHEN UPPER(SUBSTR(a.name, 1, 1)) GLOB '[A-Z]'
+                THEN UPPER(SUBSTR(a.name, 1, 1))
+            ELSE '#'
+        END AS letter,
+        COUNT(DISTINCT a.id) AS cnt
+    FROM albums a
+    LEFT JOIN artists ar ON ar.id = a.artist_id
+    LEFT JOIN tracks  t  ON t.album_id = a.id
+    WHERE 1=1
+    """
+    params: list[object] = []
+    if search_query:
+        q += " AND (a.name LIKE ? ESCAPE '\\')"
+        params.append(f"%{escape_like(search_query)}%")
+    if artist_ids:
+        placeholders = ", ".join("?" for _ in artist_ids)
+        q += f" AND t.artist_id IN ({placeholders})"
+        params.extend(int(v) for v in artist_ids)
+    elif artist_id is not None:
+        q += " AND t.artist_id = ?"
+        params.append(int(artist_id))
+    q += " GROUP BY letter ORDER BY letter"
+    cur = db.execute(q, params)
+    return {row[0]: row[1] for row in cur.fetchall()}
 
 
 def get_album_by_id(db: sqlite3.Connection, album_id: int) -> dict:
@@ -220,6 +295,7 @@ def get_album_artist_rows(
     db: sqlite3.Connection,
     search_query: str = "",
     *,
+    letter_prefix: str | None = None,
     limit: int | None = None,
     offset: int = 0,
     sort_column: int = 0,
@@ -247,6 +323,14 @@ def get_album_artist_rows(
         like = f"%{escape_like(search_query)}%"
         params += [like, like]
 
+    if letter_prefix is not None:
+        name_expr = "COALESCE(NULLIF(a.album_artist_name, ''), ar.name, '')"
+        if letter_prefix == "#":
+            q += f" AND UPPER(SUBSTR({name_expr}, 1, 1)) NOT GLOB '[A-Z]'"
+        else:
+            q += f" AND UPPER(SUBSTR({name_expr}, 1, 1)) = ?"
+            params.append(letter_prefix.upper())
+
     order = "DESC" if str(sort_order).lower() == "desc" else "ASC"
     order_map = {
         0: f"album_artist_name COLLATE NOCASE {order}",
@@ -264,6 +348,30 @@ def get_album_artist_rows(
     cur = db.execute(q, params)
     cols = [c[0] for c in cur.description]
     return [dict(zip(cols, row)) for row in cur.fetchall()]
+
+
+def get_album_artist_letter_counts(db: sqlite3.Connection, search_query: str = "") -> dict[str, int]:
+    """Return {letter: count} for album artists, for the alpha index bar."""
+    q = """
+    SELECT
+        CASE
+            WHEN UPPER(SUBSTR(COALESCE(NULLIF(a.album_artist_name, ''), ar.name, ''), 1, 1)) GLOB '[A-Z]'
+                THEN UPPER(SUBSTR(COALESCE(NULLIF(a.album_artist_name, ''), ar.name, ''), 1, 1))
+            ELSE '#'
+        END AS letter,
+        COUNT(DISTINCT LOWER(COALESCE(NULLIF(a.album_artist_name, ''), ar.name, ''))) AS cnt
+    FROM albums a
+    LEFT JOIN artists ar ON ar.id = a.artist_id
+    WHERE 1=1
+    """
+    params: list[object] = []
+    if search_query:
+        q += " AND (a.album_artist_name LIKE ? ESCAPE '\\\\' OR ar.name LIKE ? ESCAPE '\\\\')"
+        like = f"%{escape_like(search_query)}%"
+        params += [like, like]
+    q += " GROUP BY letter ORDER BY letter"
+    cur = db.execute(q, params)
+    return {row[0]: row[1] for row in cur.fetchall()}
 
 
 def get_album_rows_by_album_artist(

@@ -7,8 +7,10 @@ from PySide6.QtGui import QStandardItem, QStandardItemModel
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QTableView, QHeaderView, QMenu, QHBoxLayout, QLabel, QStackedWidget
 
 from db.database import get_directories
+from db.query_modules.entity_queries import get_album_letter_counts
 from ui.style_loader import load_stylesheet
 from ui.library_routes import LibraryRoute, album_artists_album, albums_detail, artists_album, artists_detail
+from ui.widgets.alpha_index_widget import AlphaIndexWidget
 from ui.widgets.empty_state_widget import EmptyStateWidget
 from ui.widgets.library_rows import AlbumListRow
 from ui.widgets.library_table_utils import (
@@ -64,10 +66,12 @@ class AlbumListWidget(QWidget):
         self._unknown_track_count = 0
         self._unknown_artist_names: set[str] = set()
         self._ui_scale = 1.0
+        self._letter_prefix: str | None = None
+        self._alpha_page: int = 0
 
         root = QVBoxLayout(self)
         root.setContentsMargins(0, 0, 0, 0)
-        root.setSpacing(8)
+        root.setSpacing(0)
 
         self.header_bar = QWidget()
         self.header_bar.setObjectName("TrackScopeBar")
@@ -79,6 +83,13 @@ class AlbumListWidget(QWidget):
         header_layout.addWidget(self.header_label, 1)
         root.addWidget(self.header_bar)
         self.header_bar.hide()
+
+        # Alpha index bar (visible only in album-root mode — not under an artist scope)
+        self.alpha_index = AlphaIndexWidget()
+        self.alpha_index.set_page_size(self._page_size)
+        self.alpha_index.letterChanged.connect(self._on_letter_changed)
+        root.addWidget(self.alpha_index)
+        self.alpha_index.hide()   # hidden until in root mode
 
         self.stack = QStackedWidget()
         root.addWidget(self.stack)
@@ -255,6 +266,8 @@ class AlbumListWidget(QWidget):
             return
 
         sort_order = "desc" if self._sort_order == Qt.SortOrder.DescendingOrder else "asc"
+        is_root_mode = (self._artist_id is None and not self._artist_ids and self._album_artist_name is None)
+
         if self._album_artist_name is not None:
             rows = get_album_rows_by_album_artist(
                 db=self.app_state.db,
@@ -265,6 +278,23 @@ class AlbumListWidget(QWidget):
                 sort_column=self._sort_column,
                 sort_order=sort_order,
             )
+            self._has_more_rows = len(rows) > self._page_size
+            visible_rows = rows[: self._page_size]
+        elif is_root_mode and self._letter_prefix is not None:
+            db_offset = self._alpha_page * self._page_size
+            rows = get_album_rows(
+                db=self.app_state.db,
+                search_query=self._search,
+                artist_id=self._artist_id,
+                artist_ids=self._artist_ids,
+                letter_prefix=self._letter_prefix,
+                limit=self._page_size,
+                offset=db_offset,
+                sort_column=self._sort_column,
+                sort_order=sort_order,
+            )
+            self._has_more_rows = False
+            visible_rows = rows
         else:
             rows = get_album_rows(
                 db=self.app_state.db,
@@ -276,8 +306,8 @@ class AlbumListWidget(QWidget):
                 sort_column=self._sort_column,
                 sort_order=sort_order,
             )
-        self._has_more_rows = len(rows) > self._page_size
-        visible_rows = rows[: self._page_size]
+            self._has_more_rows = len(rows) > self._page_size
+            visible_rows = rows[: self._page_size]
         ui_rows: list[AlbumListRow] = []
         if reset:
             self.model.setRowCount(0)
@@ -330,6 +360,14 @@ class AlbumListWidget(QWidget):
                 action_text="Clear Search",
                 action_key="clear-search",
             )
+        elif self._letter_prefix is not None:
+            self._show_empty_state(
+                icon_name="search-x.svg",
+                title=f"No albums under '{self._letter_prefix}'",
+                body="Try a different letter or click 'All' to show everything.",
+                action_text="Show All",
+                action_key="show-all",
+            )
         else:
             self._show_empty_state(
                 icon_name="audio-lines.svg",
@@ -338,6 +376,9 @@ class AlbumListWidget(QWidget):
                 action_text="Refresh Library",
                 action_key="refresh-library",
             )
+
+        if reset and is_root_mode:
+            self._refresh_letter_counts()
 
     def set_rows(self, rows: Iterable[AlbumListRow]):
         self.model.setRowCount(0)
@@ -372,6 +413,9 @@ class AlbumListWidget(QWidget):
         self._update_header()
 
     def _update_header(self) -> None:
+        is_root_mode = (self._artist_id is None and not self._artist_ids and self._album_artist_name is None and self.stack.currentWidget() is self.browser_page)
+        self.alpha_index.setVisible(is_root_mode)
+
         if self.stack.currentWidget() is self.track_list:
             self.header_bar.show()
             self.header_label.setText(f"Album: {self._detail_album_name or 'N/A'}")
@@ -465,6 +509,31 @@ class AlbumListWidget(QWidget):
             self.refreshLibraryRequested.emit()
         elif self._empty_action == "clear-search":
             self.clearSearchRequested.emit()
+        elif self._empty_action == "show-all":
+            self.alpha_index.reset()
+            self._letter_prefix = None
+            self._alpha_page = 0
+            self.refresh()
+
+    def _on_letter_changed(self, letter: str, page: int) -> None:
+        self._letter_prefix = letter if letter else None
+        self._alpha_page = page
+        self._load_rows(reset=True)
+
+    def _refresh_letter_counts(self) -> None:
+        try:
+            counts = get_album_letter_counts(
+                self.app_state.db,
+                self._search,
+                artist_id=self._artist_id,
+                artist_ids=self._artist_ids,
+            )
+            self.alpha_index.refresh(counts)
+        except Exception:
+            pass
+
+    def set_ignore_articles(self, ignore: bool) -> None:
+        self.alpha_index.set_ignore_articles(ignore)
 
     def _find_unknown_row(self) -> int:
         return find_display_row(self.model, "N/A")
@@ -501,6 +570,8 @@ class AlbumListWidget(QWidget):
             self.refresh()
 
     def _maybe_load_more(self, value: int) -> None:
+        if self._letter_prefix is not None:
+            return
         scroll = self.table.verticalScrollBar()
         if not should_load_more(
             has_more_rows=self._has_more_rows,

@@ -7,9 +7,11 @@ from PySide6.QtGui import QStandardItem, QStandardItemModel
 from PySide6.QtWidgets import QHeaderView, QMenu, QStackedWidget, QTableView, QVBoxLayout, QWidget
 
 from db.database import get_directories
+from db.query_modules.entity_queries import get_artist_letter_counts
 from ui.style_loader import load_stylesheet
 from ui.library_routes import LibraryRoute, artists_detail
 from ui.widgets.album_list_widget import AlbumListWidget
+from ui.widgets.alpha_index_widget import AlphaIndexWidget
 from ui.widgets.empty_state_widget import EmptyStateWidget
 from ui.widgets.library_rows import ArtistListRow
 from ui.widgets.library_table_utils import (
@@ -56,9 +58,12 @@ class ArtistListWidget(QWidget):
         self._unknown_album_count = 0
         self._unknown_track_count = 0
         self._ui_scale = 1.0
+        self._letter_prefix: str | None = None   # None = show all
+        self._alpha_page: int = 0
 
         root = QVBoxLayout(self)
         root.setContentsMargins(0, 0, 0, 0)
+        root.setSpacing(0)
 
         self.stack = QStackedWidget()
         root.addWidget(self.stack)
@@ -66,6 +71,13 @@ class ArtistListWidget(QWidget):
         self.browser_page = QWidget()
         browser_layout = QVBoxLayout(self.browser_page)
         browser_layout.setContentsMargins(0, 0, 0, 0)
+        browser_layout.setSpacing(0)
+
+        # Alpha index bar
+        self.alpha_index = AlphaIndexWidget()
+        self.alpha_index.set_page_size(self._page_size)
+        self.alpha_index.letterChanged.connect(self._on_letter_changed)
+        browser_layout.addWidget(self.alpha_index)
 
         self.table = QTableView()
         self.model = QStandardItemModel(0, 3, self)
@@ -185,6 +197,7 @@ class ArtistListWidget(QWidget):
         if not directories:
             self.model.setRowCount(0)
             self._has_more_rows = False
+            self.alpha_index.refresh({})
             self._show_empty_state(
                 icon_name="folder-open.svg",
                 title="No music folders yet",
@@ -194,16 +207,33 @@ class ArtistListWidget(QWidget):
             )
             return
 
-        rows = get_artist_rows(
-            self.app_state.db,
-            self._search,
-            limit=self._page_size + 1,
-            offset=0 if reset else self._loaded_db_rows,
-            sort_column=self._sort_column,
-            sort_order="desc" if self._sort_order == Qt.SortOrder.DescendingOrder else "asc",
-        )
-        self._has_more_rows = len(rows) > self._page_size
-        visible_rows = rows[: self._page_size]
+        # When a letter is selected, use alpha paging (no infinite scroll).
+        # When no letter, fall back to infinite-scroll paging.
+        if self._letter_prefix is not None:
+            db_offset = self._alpha_page * self._page_size
+            rows = get_artist_rows(
+                self.app_state.db,
+                self._search,
+                letter_prefix=self._letter_prefix,
+                limit=self._page_size,
+                offset=db_offset,
+                sort_column=self._sort_column,
+                sort_order="desc" if self._sort_order == Qt.SortOrder.DescendingOrder else "asc",
+            )
+            self._has_more_rows = False
+            visible_rows = rows
+        else:
+            rows = get_artist_rows(
+                self.app_state.db,
+                self._search,
+                limit=self._page_size + 1,
+                offset=0 if reset else self._loaded_db_rows,
+                sort_column=self._sort_column,
+                sort_order="desc" if self._sort_order == Qt.SortOrder.DescendingOrder else "asc",
+            )
+            self._has_more_rows = len(rows) > self._page_size
+            visible_rows = rows[: self._page_size]
+
         ui_rows: list[ArtistListRow] = []
         if reset:
             self.model.setRowCount(0)
@@ -243,6 +273,14 @@ class ArtistListWidget(QWidget):
                 action_text="Clear Search",
                 action_key="clear-search",
             )
+        elif self._letter_prefix is not None:
+            self._show_empty_state(
+                icon_name="search-x.svg",
+                title=f"No artists under '{self._letter_prefix}'",
+                body="Try a different letter or click 'All' to show everything.",
+                action_text="Show All",
+                action_key="show-all",
+            )
         else:
             self._show_empty_state(
                 icon_name="audio-lines.svg",
@@ -251,6 +289,11 @@ class ArtistListWidget(QWidget):
                 action_text="Refresh Library",
                 action_key="refresh-library",
             )
+
+        # Refresh letter counts after every full reset so the index stays in sync.
+        if reset:
+            self._refresh_letter_counts()
+
 
     def set_rows(self, rows: Iterable[ArtistListRow]):
         self.model.setRowCount(0)
@@ -354,6 +397,26 @@ class ArtistListWidget(QWidget):
             self.refreshLibraryRequested.emit()
         elif self._empty_action == "clear-search":
             self.clearSearchRequested.emit()
+        elif self._empty_action == "show-all":
+            self.alpha_index.reset()
+            self._letter_prefix = None
+            self._alpha_page = 0
+            self.refresh()
+
+    def _on_letter_changed(self, letter: str, page: int) -> None:
+        self._letter_prefix = letter if letter else None
+        self._alpha_page = page
+        self._load_rows(reset=True)
+
+    def _refresh_letter_counts(self) -> None:
+        try:
+            counts = get_artist_letter_counts(self.app_state.db, self._search)
+            self.alpha_index.refresh(counts)
+        except Exception:
+            pass
+
+    def set_ignore_articles(self, ignore: bool) -> None:
+        self.alpha_index.set_ignore_articles(ignore)
 
     def _find_unknown_row(self) -> int:
         return find_display_row(self.model, "N/A")
@@ -389,6 +452,9 @@ class ArtistListWidget(QWidget):
             self.refresh()
 
     def _maybe_load_more(self, value: int) -> None:
+        # Disable infinite scroll when browsing by letter (alpha paging takes over).
+        if self._letter_prefix is not None:
+            return
         scroll = self.table.verticalScrollBar()
         if not should_load_more(
             has_more_rows=self._has_more_rows,

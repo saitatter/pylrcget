@@ -44,7 +44,8 @@ def get_config(db: sqlite3.Connection) -> Config:
                playback_volume,
                last_library_route,
                hotkey_bindings_json,
-               ui_state_json
+               ui_state_json,
+               ignore_sort_articles
         FROM config_data
         LIMIT 1
         """
@@ -83,6 +84,7 @@ def get_config(db: sqlite3.Connection) -> Config:
         last_library_route=row["last_library_route"] or "",
         hotkey_bindings_json=row["hotkey_bindings_json"] or "",
         ui_state_json=row["ui_state_json"] or "",
+        ignore_sort_articles=bool(row["ignore_sort_articles"]) if row["ignore_sort_articles"] is not None else False,
     )
     with _config_cache_lock:
         _config_cache = config
@@ -121,7 +123,8 @@ def set_config(db: sqlite3.Connection, config: Config) -> None:
             playback_volume = ?,
             last_library_route = ?,
             hotkey_bindings_json = ?,
-            ui_state_json = ?
+            ui_state_json = ?,
+            ignore_sort_articles = ?
         WHERE id = 1
         """,
         (
@@ -153,6 +156,7 @@ def set_config(db: sqlite3.Connection, config: Config) -> None:
             config.last_library_route,
             config.hotkey_bindings_json,
             config.ui_state_json,
+            config.ignore_sort_articles,
         ),
     )
     db.commit()
