@@ -24,7 +24,7 @@ class NavigationController(QObject):
         tracks_tab: QWidget,
         albums_page: QWidget,
         artists_page: QWidget,
-        album_artists_page: QWidget,
+        album_artists_page: QWidget | None = None,
         breadcrumbs_layout: QLayout,
         apply_route: ApplyRouteCallback,
         display_artist_name: DisplayNameCallback,

@@ -41,7 +41,8 @@ CREATE TABLE config_data (
     playback_volume REAL DEFAULT 0.7,
     last_library_route TEXT DEFAULT '',
     hotkey_bindings_json TEXT DEFAULT '',
-    ui_state_json TEXT DEFAULT ''
+    ui_state_json TEXT DEFAULT '',
+    ignore_sort_articles BOOLEAN DEFAULT 0
 );
 
 CREATE TABLE artists (
@@ -166,7 +167,8 @@ INSERT INTO config_data (
     playback_volume,
     last_library_route,
     hotkey_bindings_json,
-    ui_state_json
+    ui_state_json,
+    ignore_sort_articles
 ) VALUES (
     0,
     0,
@@ -196,6 +198,7 @@ INSERT INTO config_data (
     0.7,
     '',
     '',
-    ''
+    '',
+    0
 );
 """

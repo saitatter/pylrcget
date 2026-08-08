@@ -1993,10 +1993,16 @@ class MainWindow(QMainWindow):
         return super().eventFilter(watched, event)
 
     def _all_lyrics_views(self) -> list[LyricsEditorWidget]:
-        return [self.lyrics_view, self.albums_lyrics_view, self.artists_lyrics_view, self.album_artists_lyrics_view]
+        views = [self.lyrics_view, self.albums_lyrics_view, self.artists_lyrics_view]
+        if hasattr(self, "album_artists_lyrics_view"):
+            views.append(self.album_artists_lyrics_view)
+        return views
 
     def _all_library_splitters(self) -> list[QSplitter]:
-        return [self.content_splitter, self.albums_splitter, self.artists_splitter, self.album_artists_splitter]
+        splitters = [self.content_splitter, self.albums_splitter, self.artists_splitter]
+        if hasattr(self, "album_artists_splitter"):
+            splitters.append(self.album_artists_splitter)
+        return splitters
 
     def _connect_library_splitter_sync(self) -> None:
         for splitter in self._all_library_splitters():
