@@ -1,4 +1,11 @@
 # Changelog
+## v1.14.1 (2026-08-09)
+
+### 🐛 Fixes
+* **ci:** Skip oversized portable ai single-file build on linux runner ([18dfe9b](https://github.com/saitatter/pylrcget/commit/18dfe9b2a6e45bb08a4539f283e94fa37f935622))
+  PyInstaller single-file mode fails on Linux when PyTorch, Torchaudio, Transformers, and WhisperX dependencies are installed because total payload size exceeds PyInstaller's 32-bit archive header size limit (4GB). Skip building and uploading the oversized single-file AI portable asset on Linux while retaining the main Linux build, deb package, and portable executable.
+
+
 ## v1.14.0 (2026-08-08)
 
 ### ✨ Features
