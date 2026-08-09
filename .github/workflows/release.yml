@@ -87,9 +87,11 @@ jobs:
         run: mv dist/pylrcget-portable "${{ matrix.portable_name }}"
 
       - name: Install AI dependencies for portable AI build
+        if: runner.os != 'Linux'
         run: pip install .[ai]
 
       - name: Build AI-enabled portable executable
+        if: runner.os != 'Linux'
         run: pyinstaller --noconfirm pylrcget-portable.spec
 
       - name: Rename AI-enabled portable executable (Windows)
@@ -97,8 +99,8 @@ jobs:
         if: runner.os == 'Windows'
         run: Move-Item -LiteralPath dist/pylrcget-portable.exe -Destination ${{ matrix.portable_ai_name }} -Force
 
-      - name: Rename AI-enabled portable executable (Unix)
-        if: runner.os != 'Windows'
+      - name: Rename AI-enabled portable executable (macOS)
+        if: runner.os == 'macOS'
         run: mv dist/pylrcget-portable "${{ matrix.portable_ai_name }}"
 
       - name: Prepare macOS app bundle
@@ -255,6 +257,7 @@ jobs:
           path: ${{ matrix.portable_name }}
 
       - name: Upload workflow artifact (portable AI)
+        if: runner.os != 'Linux'
         uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.portable_ai_name }}
