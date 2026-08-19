@@ -31,6 +31,7 @@ from .ai_sync_alignment import (
     _same_phrase_rewind_penalty,
     _same_phrase_rewind_transition_penalty,
     _tail_rescue_alignment_indices,
+    _tail_rescue_forward_jump_indices,
     _tail_rescue_rewind_target_lag_indices,
     _words_match,
 )
@@ -174,8 +175,7 @@ class AiSyncWorker(QThread):
                 chunk_language = transcribe_language or _normalized_transcribe_language(
                     result_local.get("language")
                 )
-                sparse_segments = len(raw_segments) < max(8, int(audio_duration / 6.0))
-                if audio_duration - raw_tail >= 20.0 or sparse_segments:
+                if audio_duration - raw_tail >= 20.0:
                     chunked_segments = _transcribe_fixed_windows(
                         model_obj,
                         audio,
@@ -408,6 +408,7 @@ __all__ = [
     "_segment_alignment_quality",
     "_segment_reliable_tail_seconds",
     "_segment_tail_seconds",
+    "_tail_rescue_forward_jump_indices",
     "_should_use_relaxed_vad_result",
     "_should_retry_with_relaxed_vad",
     "_select_best_relaxed_segments",

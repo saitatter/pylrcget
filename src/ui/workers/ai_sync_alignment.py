@@ -1,7 +1,7 @@
 """Lexical scoring, candidate gating and lyric-to-word alignment helpers."""
 from __future__ import annotations
 
-from bisect import bisect_left
+from bisect import bisect_left, bisect_right
 from difflib import SequenceMatcher
 
 from .ai_sync_lrc import (
@@ -565,6 +565,70 @@ def _tail_rescue_alignment_indices(
     return rescued
 
 
+def _tail_rescue_forward_jump_indices(
+    aligned_indices: list[int],
+    *,
+    word_starts: list[float],
+    num_lines: int,
+    jump_threshold_s: float = 28.0,
+    expected_lag_s: float = 24.0,
+    local_window_s: float = 18.0,
+    min_local_words: int = 4,
+) -> list[int]:
+    """Keep a repeated chorus in its local cluster after a large forward jump."""
+    if len(aligned_indices) < 12 or len(word_starts) <= 1:
+        return aligned_indices
+    if len(aligned_indices) != num_lines:
+        return aligned_indices
+
+    horizon_s = max(word_starts)
+    for line_idx in range(1, num_lines):
+        previous = aligned_indices[line_idx - 1]
+        current = aligned_indices[line_idx]
+        if not (0 <= previous < len(word_starts) and 0 <= current < len(word_starts)):
+            continue
+        previous_s = word_starts[previous]
+        current_s = word_starts[current]
+        expected_s = _expected_time_position(line_idx, num_lines, horizon_s)
+        if current_s - previous_s < jump_threshold_s:
+            continue
+        if current_s - expected_s < expected_lag_s:
+            continue
+
+        local_start = max(0.0, expected_s - local_window_s)
+        local_end = min(horizon_s, expected_s + local_window_s)
+        local_words = [
+            idx
+            for idx, start in enumerate(word_starts)
+            if local_start <= start <= local_end
+        ]
+        if len(local_words) < min_local_words:
+            continue
+
+        rescued = list(aligned_indices)
+        previous_idx = previous
+        for rescued_line in range(line_idx, num_lines):
+            target_s = _expected_time_position(rescued_line, num_lines, horizon_s)
+            start_idx = bisect_left(word_starts, max(target_s - local_window_s, 0.0))
+            end_idx = bisect_right(
+                word_starts,
+                min(horizon_s, target_s + local_window_s),
+            )
+            candidates = [
+                idx
+                for idx in range(max(start_idx, previous_idx + 1), end_idx)
+            ]
+            if not candidates:
+                continue
+            rescued[rescued_line] = min(
+                candidates,
+                key=lambda idx: abs(word_starts[idx] - target_s),
+            )
+            previous_idx = rescued[rescued_line]
+        return rescued
+    return aligned_indices
+
+
 def _tail_rescue_rewind_target_lag_indices(
     aligned_indices: list[int],
     rewind_targets: dict[int, int],
@@ -963,6 +1027,11 @@ def _align_lyrics_to_segments_viterbi(
         line_peak_emissions,
         num_words=num_words,
     )
+    aligned_indices = _tail_rescue_forward_jump_indices(
+        aligned_indices,
+        word_starts=[float(w.get("start", 0.0)) for w in words],
+        num_lines=num_lines,
+    )
     aligned_indices = _ensure_strictly_increasing_alignment_indices(
         aligned_indices,
         num_words=num_words,
@@ -1102,6 +1171,7 @@ __all__ = [
     "_late_line_expected_position_bonus",
     "_late_line_candidate_start_floor",
     "_tail_rescue_alignment_indices",
+    "_tail_rescue_forward_jump_indices",
     "_tail_rescue_rewind_target_lag_indices",
     "_ensure_strictly_increasing_alignment_indices",
     "_prepare_manual_line_anchors",

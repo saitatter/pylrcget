@@ -37,6 +37,7 @@ from ui.workers.ai_sync_worker import (
     _should_retry_with_relaxed_vad,
     _select_best_relaxed_segments,
     _tail_rescue_alignment_indices,
+    _tail_rescue_forward_jump_indices,
     _tail_rescue_rewind_target_lag_indices,
     _ensure_strictly_increasing_alignment_indices,
     get_missing_ai_dependencies,
@@ -822,6 +823,20 @@ def test_tail_rescue_alignment_indices_uses_time_based_floor_on_sparse_tail():
         word_starts=starts,
     )
     assert rescued[-1] > aligned[-1]
+    assert all(rescued[i] < rescued[i + 1] for i in range(len(rescued) - 1))
+
+
+def test_tail_rescue_forward_jump_returns_to_local_word_cluster():
+    aligned = [0, 10, 20, 30, 40, 50, 60, 70, 170, 175, 180, 185, 190, 195]
+    word_starts = [float(i) for i in range(201)]
+
+    rescued = _tail_rescue_forward_jump_indices(
+        aligned,
+        word_starts=word_starts,
+        num_lines=len(aligned),
+    )
+
+    assert rescued[8] < aligned[8]
     assert all(rescued[i] < rescued[i + 1] for i in range(len(rescued) - 1))
 
 
