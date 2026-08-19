@@ -38,6 +38,21 @@ def resolve_ai_install_command(packages: list[str]) -> tuple[list[str] | None, s
             "Current runtime is not a Python interpreter executable. "
             "Open PyLrcGet from a Python environment and retry."
         )
+    python_version = (
+        int(getattr(sys.version_info, "major", sys.version_info[0])),
+        int(getattr(sys.version_info, "minor", sys.version_info[1])),
+    )
+    if python_version >= (3, 14):
+        return None, (
+            "AI dependencies currently support Python 3.10-3.13, but this app is "
+            f"running on Python {python_version[0]}.{python_version[1]}. "
+            "Python 3.14 is not supported by the current WhisperX dependency set "
+            "(ctranslate2 has no compatible wheel). Create a Python 3.13 environment "
+            "and install there:\n"
+            "  py -3.13 -m venv venv313\n"
+            "  venv313\\Scripts\\python.exe -m pip install torch torchaudio whisperx soundfile\n"
+            "  venv313\\Scripts\\python.exe main.py"
+        )
     return [sys.executable, "-m", "pip", "install", *missing], ""
 
 

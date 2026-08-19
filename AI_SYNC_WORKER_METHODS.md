@@ -9,7 +9,10 @@ It focuses on algorithmic behavior (what is detected, why, and how), not on a fu
 
 The runtime pipeline is:
 
-1. **ASR + forced alignment** to obtain timestamped word candidates.
+1. **ASR + forced alignment** to obtain timestamped word candidates. When fixed-window
+   ASR is selected because normal VAD has insufficient coverage, forced alignment is
+   run independently per time bucket instead of on the concatenated transcript. This
+   prevents one problematic region from causing WhisperX to drop the tail of the song.
 2. **Candidate reliability detection** (lexical, confidence, density, tail checks).
 3. **Global sequence alignment** (Viterbi over line→word mappings).
 4. **Tail-collapse detection and rescue** for repeated/ambiguous endings.
@@ -210,3 +213,30 @@ In practice:
 - lower `p95_abs_s` = fewer catastrophic tail failures,
 - lower `rtf` = faster runtime.
 
+## 13. Planned module split
+
+`ai_sync_worker.py` is intentionally still the compatibility entry point, but
+it has grown beyond a safe single-module size. The next refactor should split
+it by responsibility, while keeping thin re-exports in the worker temporarily
+so existing tests and imports do not break:
+
+| Module | Responsibility |
+| --- | --- |
+| `ai_sync_runtime.py` | Optional-dependency checks, WhisperX compatibility patches and model caches |
+| `ai_sync_transcription.py` | Audio loading helpers, fixed-window transcription, deduplication and per-chunk forced alignment |
+| `ai_sync_lrc.py` | Timestamp formatting, plain-layout preservation and segment-level LRC rendering |
+| `ai_sync_alignment.py` | Token scoring, candidate masks, anchors, Viterbi, repeat handling and tail rescue |
+| `ai_sync_worker.py` | `AiSyncWorker`, progress reporting and orchestration only |
+
+The split should be done in stages:
+
+1. Move pure LRC helpers first and keep compatibility imports in the worker.
+2. Move pure alignment/scoring helpers and preserve the same function
+   signatures.
+3. Move transcription/runtime helpers, which depend on WhisperX and are more
+   sensitive to import cycles.
+4. Extract the nested `_transcribe_and_align` closure into a service object or
+   private function once the helper modules are stable.
+
+Avoid creating a generic `utils.py`: the current functions have distinct
+contracts and a generic bucket would only move the size problem elsewhere.

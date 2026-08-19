@@ -11,6 +11,11 @@ import ui.workers.ai_sync_worker as ai_sync_worker
 from ui.workers.ai_sync_worker import (
     _align_lyrics_to_segments,
     _align_lyrics_to_segments_viterbi,
+    _approximate_word_timestamps_from_segments,
+    _transcribe_tail_window,
+    _transcribe_fixed_windows,
+    _align_segments_per_chunks,
+    _should_use_per_chunk_alignment,
     _build_same_phrase_rewind_targets,
     _build_speech_candidate_mask,
     _build_guided_word_ranges,
@@ -33,6 +38,7 @@ from ui.workers.ai_sync_worker import (
     _select_best_relaxed_segments,
     _tail_rescue_alignment_indices,
     _tail_rescue_rewind_target_lag_indices,
+    _ensure_strictly_increasing_alignment_indices,
     get_missing_ai_dependencies,
 )
 
@@ -55,6 +61,138 @@ def test_format_ts_large():
 
 def test_build_lrc_empty():
     assert _build_lrc_from_segments([]) == ""
+
+
+def test_approximate_word_timestamps_from_segments_preserves_tail():
+    segments = [
+        {"start": 10.0, "end": 14.0, "text": "first second"},
+        {"start": 30.0, "end": 34.0, "text": "last line"},
+    ]
+
+    recovered = _approximate_word_timestamps_from_segments(segments)
+
+    assert [word["word"] for word in recovered[1]["words"]] == ["last", "line"]
+    assert recovered[1]["words"][0]["start"] == 30.0
+    assert recovered[1]["words"][-1]["start"] == 32.0
+
+
+def test_transcribe_tail_window_offsets_relative_segments():
+    class _Segment:
+        start = 1.0
+        end = 2.0
+        text = "tail words"
+
+    class _Model:
+        def transcribe(self, audio, *, language, beam_size):
+            assert len(audio) == 4000
+            assert language == "en"
+            assert beam_size == 5
+            return iter([_Segment()]), object()
+
+    class _Pipeline:
+        model = _Model()
+
+    result = _transcribe_tail_window(_Pipeline(), [0] * 20000, tail_start=1.0, language="en")
+
+    assert result == [{"start": 2.0, "end": 3.0, "text": "tail words"}]
+
+
+def test_transcribe_fixed_windows_deduplicates_overlapping_segments():
+    class _Segment:
+        def __init__(self, start, end, text):
+            self.start = start
+            self.end = end
+            self.text = text
+
+    class _Model:
+        def transcribe(self, audio, *, language, beam_size, condition_on_previous_text):
+            relative_start = 45 if len(audio) == 960000 else 0
+            assert condition_on_previous_text is False
+            return iter([_Segment(relative_start, relative_start + 10, "same lyric line")]), object()
+
+    class _Pipeline:
+        model = _Model()
+
+    result = _transcribe_fixed_windows(
+        _Pipeline(),
+        [0] * (16000 * 90),
+        duration_s=90.0,
+        language="en",
+        window_s=60.0,
+        step_s=45.0,
+    )
+
+    assert len(result) == 1
+
+
+def test_align_segments_per_chunks_aligns_each_time_bucket():
+    calls = []
+
+    class _WhisperX:
+        def align(self, segments, model, metadata, audio, device):
+            calls.append([segment["text"] for segment in segments])
+            return {
+                "segments": [
+                    {
+                        **segment,
+                        "words": [{"word": segment["text"], "start": segment["start"]}],
+                    }
+                    for segment in segments
+                ]
+            }
+
+    segments = [
+        {"start": 61.0, "end": 62.0, "text": "late"},
+        {"start": 2.0, "end": 3.0, "text": "early"},
+    ]
+
+    result = _align_segments_per_chunks(
+        _WhisperX(),
+        segments,
+        object(),
+        object(),
+        [0],
+        "cpu",
+    )
+
+    assert calls == [["early"], ["late"]]
+    assert [segment["text"] for segment in result] == ["early", "late"]
+    assert all(segment["words"] for segment in result)
+
+
+def test_align_segments_per_chunks_recovers_failed_chunk_coarsely():
+    class _WhisperX:
+        def align(self, segments, model, metadata, audio, device):
+            if segments[0]["start"] > 60:
+                raise RuntimeError("tail alignment failure")
+            return {"segments": segments}
+
+    result = _align_segments_per_chunks(
+        _WhisperX(),
+        [
+            {"start": 2.0, "end": 4.0, "text": "early words"},
+            {"start": 61.0, "end": 65.0, "text": "late words"},
+        ],
+        object(),
+        object(),
+        [0],
+        "cpu",
+    )
+
+    assert result[1]["words"][0]["start"] == 61.0
+
+
+def test_should_use_per_chunk_alignment_only_after_tail_loss():
+    raw = [{"start": 0.0, "end": 100.0, "text": "lyrics"}]
+
+    assert not _should_use_per_chunk_alignment(
+        raw,
+        [{"start": 0.0, "end": 92.1, "text": "lyrics"}],
+    )
+    assert _should_use_per_chunk_alignment(
+        raw,
+        [{"start": 0.0, "end": 87.9, "text": "lyrics"}],
+    )
 
 
 def test_build_lrc_basic():
@@ -163,6 +301,34 @@ def test_align_viterbi_without_words_keeps_plain_lines():
     assert "Keep this line" in result
     assert "And this line" in result
     assert "Whisper guessed text" not in result
+
+
+def test_align_viterbi_does_not_duplicate_tail_after_missing_candidate():
+    plain_lines = ["alpha", "beta", "gamma"]
+    segments = [
+        {
+            "words": [
+                {"word": "alpha", "start": 1.0, "score": 0.95},
+                {"word": "beta", "start": 2.0, "score": 0.05},
+                {"word": "gamma", "start": 10.0, "score": 0.95},
+            ]
+        }
+    ]
+
+    result = _align_lyrics_to_segments_viterbi(plain_lines, segments)
+
+    assert result.splitlines() == [
+        "[00:01.00] alpha",
+        "[00:02.00] beta",
+        "[00:10.00] gamma",
+    ]
+
+
+def test_ensure_strictly_increasing_alignment_indices_unstacks_tail():
+    assert _ensure_strictly_increasing_alignment_indices(
+        [1, 2, 3, 9, 9, 9],
+        num_words=10,
+    ) == [1, 2, 3, 7, 8, 9]
 
 
 def test_ai_sync_availability_does_not_require_demucs(monkeypatch):

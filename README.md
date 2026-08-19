@@ -166,6 +166,11 @@ Or, if installing from `pyproject.toml`:
 pip install pylrcget[ai]
 ```
 
+> **Python compatibility:** the current WhisperX AI dependency set supports Python
+> 3.10-3.13. Python 3.14 is not supported because its required `ctranslate2`
+> version does not provide compatible wheels. Use a Python 3.13 virtual environment
+> for AI Auto-Sync.
+
 > **Note:** AI dependencies add ~2 GB to the install (mostly PyTorch). The `base` Whisper model (~140 MB) is downloaded automatically on first use. GPU acceleration (CUDA) is used when available, otherwise CPU.
 
 > **Note:** base binary releases do not include AI dependencies by default.
