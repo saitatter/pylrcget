@@ -87,9 +87,10 @@ PyLrcGet goes beyond bulk lyric downloads and turns the app into a full desktop 
 | DSF | ✅ | ✅ | ✅ |
 | DFF | ✅ | ✅ | ✅ |
 | MPC / Musepack | ✅ | ✅ | ✅ |
-| WAV | ✅ | — | ✅ |
+| WAV | ✅ | ✅ | ✅ |
 
 > **Note:** Playback support depends on the active playback backend and codecs available on the system. Lyric embedding support is broader than playback support for some formats.
+> WAV lyric metadata uses ID3v2 tags stored in the RIFF/WAVE file.
 
 ---
 
