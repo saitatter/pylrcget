@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import builtins
 
-import pytest
 
 from tests import test_support as _test_support  # noqa: F401
 

@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Iterable
 
 from PySide6.QtCore import Qt, Signal, QModelIndex, QItemSelectionModel
-from PySide6.QtGui import QStandardItem, QStandardItemModel
+from PySide6.QtGui import QStandardItemModel
 from PySide6.QtWidgets import QHeaderView, QMenu, QStackedWidget, QTableView, QVBoxLayout, QWidget
 
 from db.database import get_directories

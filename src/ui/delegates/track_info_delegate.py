@@ -71,8 +71,6 @@ class TrackInfoDelegate(QStyledItemDelegate):
         artist_text = self._clean_metadata(row.artist, kind="artist")
         album_clickable = bool(album_text and row.album_id is not None)
         artist_clickable = bool(artist_text and row.artist_id is not None)
-        album_display = album_text or "N/A"
-        artist_display = artist_text or "N/A"
         album_visible, artist_visible, separator_visible, album_rect, artist_rect = self._metadata_layout(
             meta_rect, meta_metrics, row
         )

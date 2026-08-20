@@ -36,7 +36,6 @@ class LyricsDiffDialog(QDialog):
         splitter = QSplitter(Qt.Orientation.Horizontal)
 
         # Left: saved
-        left_panel = QVBoxLayout()
         left_label = QLabel("Saved")
         left_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         left_label.setStyleSheet("font-weight: bold;")
@@ -46,7 +45,6 @@ class LyricsDiffDialog(QDialog):
         splitter.addWidget(left_w)
 
         # Right: draft
-        right_panel = QVBoxLayout()
         right_label = QLabel("Draft")
         right_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         right_label.setStyleSheet("font-weight: bold;")

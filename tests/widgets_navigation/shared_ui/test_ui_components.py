@@ -8,7 +8,9 @@ class SharedUiComponentTests(unittest.TestCase):
         cls.app = qt_app()
 
     def test_download_missing_tooltip_does_not_populate_status_bar(self):
-        noop = lambda *args, **kwargs: None
+        def noop(*args, **kwargs):
+            return None
+
         widget = TopBarController(
             on_refresh=noop,
             on_download_missing=noop,

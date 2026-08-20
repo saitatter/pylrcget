@@ -424,7 +424,6 @@ class TrackListWidget(QWidget):
         menu = QMenu(self)
         menu.setObjectName("TrackContextMenu")
         current_track_id = self.model.track_id_at(idx.row())
-        has_focused_track = current_track_id is not None
         focused_row = self.model.index(idx.row(), 0).data(Qt.ItemDataRole.UserRole) if idx.isValid() else None
         focused_artist_id = getattr(focused_row, "artist_id", None)
         focused_album_id = getattr(focused_row, "album_id", None)

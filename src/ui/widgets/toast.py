@@ -294,7 +294,6 @@ class ToastManager(QWidget):
         for t in self._toasts:
             t.adjustSize()
             self._set_toast_width(t)
-            w = t.width()
             h = t.sizeHint().height()
             t.setFixedHeight(h)
 

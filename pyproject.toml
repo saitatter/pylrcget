@@ -41,3 +41,9 @@ patch_tags = ["fix", "perf", "refactor", "ci", "chore"]
 # body so release notes include each conventional commit from the PR branch.
 parse_squash_commits = true
 ignore_merge_commits = true
+
+[tool.ruff.lint.per-file-ignores]
+"main.py" = ["E402"]
+"src/db/database.py" = ["E402"]
+"tests/test_support.py" = ["E402"]
+"tests/widgets_navigation/**/*.py" = ["F401", "F403", "F405"]

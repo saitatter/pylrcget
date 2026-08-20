@@ -7,7 +7,7 @@ from typing import Callable
 from PySide6.QtCore import QObject
 from PySide6.QtWidgets import QMessageBox
 
-from db.queries import get_config, get_track_by_id, mark_tracks_instrumental, unmark_tracks_instrumental
+from db.queries import get_config, mark_tracks_instrumental, unmark_tracks_instrumental
 from ui.services.feedback import exception_message, log_and_notify, notify_user
 
 logger = logging.getLogger(__name__)

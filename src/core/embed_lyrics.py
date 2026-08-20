@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from mutagen import File as MutagenFile
 from mutagen.apev2 import APETextValue
@@ -18,6 +19,9 @@ from mutagen.mp4 import MP4
 from mutagen.wave import WAVE
 
 from core.utils import plain_text_from_lrc
+
+if TYPE_CHECKING:
+    from db.models import Track
 
 # Convention:
 #   - Synced LRC goes into:   LYRICS
@@ -56,7 +60,7 @@ def _prune_managed_id3_frames(tags: ID3) -> None:
     tags.setall("TXXX", txxx_frames)
 
 
-def embed_lyrics_for_track(track: TrackWithLyrics, output_format: str = "both") -> None:
+def embed_lyrics_for_track(track: Track, output_format: str = "both") -> None:
     """
     Embed lyrics for a Track object from the DB.
     The object is expected to have:

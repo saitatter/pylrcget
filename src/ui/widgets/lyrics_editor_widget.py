@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import logging
-import re
 import json
 from bisect import bisect_right
 from db.queries import get_config
@@ -23,8 +22,6 @@ from ui.style_loader import load_stylesheet
 from ui.widgets.empty_state_widget import EmptyStateWidget
 from ui.widgets.lyrics_editor_parts import FlowLayout, hotkeys as lyrics_editor_hotkeys
 from core.utils import (
-    LRC_TS_RE as _TS_RE,
-    _ts_to_ms,
     ms_to_ts as _ms_to_ts,
     parse_ts_str as _parse_ts_str,
     parse_lrc,
@@ -36,7 +33,7 @@ from core.lyrics_validator import (
     validate_plain_lyrics,
     validate_synced_lyrics,
 )
-from ui.hotkeys import HOTKEY_SPECS, effective_hotkey_text, lyrics_hotkey_defaults, normalize_hotkey_text
+from ui.hotkeys import HOTKEY_SPECS, effective_hotkey_text, lyrics_hotkey_defaults
 
 TIMESTAMP_MS_ROLE = Qt.ItemDataRole.UserRole
 TIMESTAMP_VALID_ROLE = Qt.ItemDataRole.UserRole + 1
@@ -1390,7 +1387,6 @@ class LyricsEditorWidget(QWidget):
     def _insert_line_at(self, insert_at: int, ms: int | None = None):
         self._push_undo()
         insert_at = max(0, min(int(insert_at), self.table.rowCount()))
-        top_visible_row = self.table.rowAt(0)
         auto_scroll = self.table.hasAutoScroll()
         self.table.setAutoScroll(False)
 
@@ -1434,7 +1430,6 @@ class LyricsEditorWidget(QWidget):
         rows = self._selected_rows()
         if not rows:
             return
-        top_visible_row = self.table.rowAt(0)
         auto_scroll = self.table.hasAutoScroll()
         self.table.setAutoScroll(False)
         self._push_undo()

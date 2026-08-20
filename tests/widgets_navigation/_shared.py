@@ -40,6 +40,6 @@ from tests.test_support import (
 )
 
 
+
 __all__ = [name for name in globals() if not name.startswith("__")]
 __all__.extend(["_BrowserPublishDialog", "_normalized_diff_lines"])
-

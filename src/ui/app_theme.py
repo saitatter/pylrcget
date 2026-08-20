@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from PySide6.QtCore import QEvent, QObject, Qt
+from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor, QFont, QPalette
-from PySide6.QtWidgets import QApplication, QComboBox
+from PySide6.QtWidgets import QApplication
 
 from ui.style_loader import load_stylesheet
 from ui.theme_tokens import STYLE_TOKENS, set_theme_tokens

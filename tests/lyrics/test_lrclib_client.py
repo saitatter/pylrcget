@@ -118,10 +118,8 @@ def test_search_result_from_dict():
 # ---------------------------------------------------------------------------
 
 def test_is_nonce_valid():
-    import hashlib
     prefix = "test"
     nonce = 0
-    digest = hashlib.sha256(f"{prefix}{nonce}".encode()).digest()
     # target must be greater than digest for validity
     target = bytes([0xFF] * 32)
     assert _is_nonce_valid(prefix, nonce, target) is True

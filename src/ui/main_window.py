@@ -4,7 +4,6 @@ from PySide6.QtWidgets import (
     QLabel,
     QMenu,
     QMainWindow,
-    QMessageBox,
     QDialog,
     QProgressBar,
     QPushButton,
@@ -15,7 +14,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from PySide6.QtCore import QEvent, Qt, QByteArray, QTimer
+from PySide6.QtCore import QEvent, Qt, QTimer
 from PySide6.QtGui import QCloseEvent, QShortcut, QKeySequence
 import logging
 import os
@@ -23,7 +22,6 @@ import sqlite3
 
 from dataclasses import replace
 
-from core.state import Notify
 from core.tracklist_models import LyricsState
 from db.queries import (
     add_tracks,
@@ -32,17 +30,13 @@ from db.queries import (
     get_config,
     get_directories,
     get_existing_file_paths,
-    get_similar_lyrics_track_rows,
     get_track_by_id,
     mark_tracks_instrumental,
     set_config,
     set_directories,
     unmark_tracks_instrumental,
     clear_track_dirty_lyrics,
-    update_track_null_lyrics,
     update_track_dirty_lyrics,
-    update_track_plain_lyrics,
-    update_track_synced_lyrics,
 )
 from library.scan_library import AUDIO_EXTS, new_fs_track_from_path
 from ui.controllers.lyrics_download_controller import LyricsDownloadController
@@ -52,7 +46,6 @@ from ui.controllers.publish_history_controller import PublishHistoryController
 from ui.controllers.track_maintenance_controller import TrackMaintenanceController
 from ui.controllers.top_bar_controller import TopBarController
 from ui.ai_sync_settings import load_ai_sync_settings
-from ui.hotkeys import HOTKEY_SPECS, effective_hotkey_text, parse_hotkey_bindings
 from ui.widgets.track_list_widget import TrackListWidget
 from ui.dialogs.music_folders_dialog import MusicFoldersDialog
 from ui.dialogs.about_dialog import AboutDialog
@@ -64,13 +57,11 @@ from core.utils import parse_lrc
 from ui.dialogs.first_run_dialog import FirstRunDialog
 from player.player import NowPlaying, Player
 from ui.services.feedback import exception_message, log_and_notify, normalize_notify_type, notify_user
-from ui.app_theme import apply_app_theme
 from ui.widgets.album_list_widget import AlbumListWidget
 from ui.widgets.artist_list_widget import ArtistListWidget
 from ui.widgets.album_artist_list_widget import AlbumArtistListWidget
 from ui.library_routes import LibraryRoute, deserialize_route, tracks_album, tracks_all, tracks_artist
 from ui.spacing import SPACE_1, SPACE_2, SPACE_3, set_layout_spacing
-from ui.style_loader import load_stylesheet
 from ui.widgets.toast import ToastManager
 from ui.widgets.log_panel import LogPanel, QtLogHandler
 from ui.services.logging_preferences import apply_logging_verbosity
@@ -1031,7 +1022,7 @@ class MainWindow(QMainWindow):
         self._apply_saved_playback_volume()
 
     def _toggle_play_pause(self) -> None:
-        from PySide6.QtWidgets import QApplication, QLineEdit, QTextEdit, QPlainTextEdit, QAbstractSpinBox, QComboBox
+        from PySide6.QtWidgets import QLineEdit, QTextEdit, QPlainTextEdit, QAbstractSpinBox, QComboBox
         focus = QApplication.focusWidget()
         if isinstance(focus, (QLineEdit, QTextEdit, QPlainTextEdit, QAbstractSpinBox, QComboBox)):
             return

@@ -418,7 +418,7 @@ class ScanLibraryHelpersTests(unittest.TestCase):
                     }
                     return mapping.get(key)
 
-            with patch("library.scan_library.MutagenFile", return_value=_FakeAudio()) as file_mock, patch(
+            with patch("library.scan_library.MutagenFile", return_value=_FakeAudio()) as _file_mock, patch(
                 "library.scan_library.read_embedded_lyrics",
                 return_value=("embedded plain", "[00:03.00]embedded synced"),
             ) as embedded_mock:
@@ -712,7 +712,7 @@ class LibraryScannerIncrementalTests(unittest.TestCase):
             self.assertIn("Library scan average throughput:", joined)
 
     def test_first_audio_tag_text_decodes_bytes_and_handles_freeform_tags(self):
-        from library.scan_library import _first_audio_tag_text, read_audio_metadata_from_audio
+        from library.scan_library import read_audio_metadata_from_audio
 
         class FakeAudioTag:
             def __init__(self, val):

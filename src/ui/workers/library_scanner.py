@@ -292,7 +292,7 @@ class LibraryScanner(QThread):
                 updated += 1
 
             def drain_completed(*, block: bool) -> None:
-                nonlocal scanned
+                nonlocal scanned, worker_failures
                 if not futures:
                     return
                 done, _pending = wait(

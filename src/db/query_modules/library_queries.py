@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import sqlite3
-from typing import Sequence
 
 from core.utils import prepare_input
 from db.models import Track

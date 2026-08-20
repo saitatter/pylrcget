@@ -15,7 +15,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ui.spacing import SPACE_1, SPACE_2, SPACE_3, set_layout_spacing
+from ui.spacing import SPACE_2, SPACE_3, set_layout_spacing
 from ui.theme_tokens import STYLE_TOKENS
 
 

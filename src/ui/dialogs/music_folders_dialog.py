@@ -27,11 +27,10 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from PySide6.QtGui import QFont, QFontDatabase, QKeySequence
+from PySide6.QtGui import QFont, QKeySequence
 
 from core.lyrics_sidecar import DEFAULT_LYRICS_FILE_PATTERN
 from db.database import get_config, get_directories, set_config, set_directories
-from db.models import Config
 from library.scan_library import preview_audio_path_exclusions
 from ui.ai_sync_settings import (
     AI_SYNC_DEVICE_OPTIONS,

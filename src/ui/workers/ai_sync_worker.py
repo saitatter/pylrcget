@@ -5,50 +5,31 @@ import logging
 import multiprocessing
 import os
 import queue
-from pathlib import Path
 
 from PySide6.QtCore import QThread, Signal
 
 from .ai_sync_alignment import (
     _align_lyrics_to_segments,
     _align_lyrics_to_segments_viterbi,
-    _anchor_bonus,
     _build_guided_word_ranges,
-    _build_plain_vocabulary,
     _build_same_phrase_rewind_targets,
     _build_speech_candidate_mask,
-    _compute_line_to_words_score,
     _ensure_strictly_increasing_alignment_indices,
-    _expected_time_position,
-    _expected_word_position,
-    _extract_word_confidence,
-    _find_confidence_anchors,
-    _is_late_line,
-    _is_speech_like_token,
     _late_line_candidate_start_floor,
     _late_line_expected_position_bonus,
-    _manual_anchor_bonus,
-    _normalize_line_text,
-    _normalize_word,
     _prepare_manual_line_anchors,
-    _same_phrase_rewind_penalty,
-    _same_phrase_rewind_transition_penalty,
     _repair_repeated_prefix_timestamp_gaps,
     _tail_rescue_alignment_indices,
     _tail_rescue_collapsed_cluster_indices,
     _tail_rescue_forward_jump_indices,
     _tail_rescue_rewind_target_lag_indices,
-    _words_match,
 )
 from .ai_sync_lrc import (
-    _build_lrc_from_plain_layout,
     _build_lrc_from_plain_lines_and_segments,
     _build_lrc_from_segments,
     _format_ts,
-    _is_non_lyric_line,
 )
 from .ai_sync_lyrics_aligner import align as _align_with_lyrics_aligner
-from .ai_sync_lyrics_aligner import is_available as _lyrics_aligner_available
 from .ai_sync_demucs import (
     AlignmentCandidate,
     candidate_quality as _demucs_candidate_quality,
@@ -56,28 +37,20 @@ from .ai_sync_demucs import (
     separated_vocal_audio as _separated_vocal_audio,
 )
 from .ai_sync_runtime import (
-    _canonical_vad_options,
     _check_ai_sync_available,
     _clear_inference_caches,
     _get_cached_align_model,
     _get_cached_whisperx_model,
     _preferred_whisper_compute_type,
-    _module_available,
-    _patch_faster_whisper_compatibility,
-    _patch_pyannote_compatibility,
-    _patch_whisperx_audio_loading,
     get_missing_ai_dependencies,
-    is_ai_sync_available,
 )
 from .ai_sync_transcription import (
     _align_segments_per_chunks,
     _approximate_word_timestamps_from_segments,
-    _deduplicate_transcribed_segments,
     _normalized_transcribe_language,
     _segment_alignment_quality,
     _segment_reliable_tail_seconds,
     _segment_tail_seconds,
-    _segment_word_starts,
     _find_targeted_retry_window,
     _select_best_relaxed_segments,
     _should_retry_with_short_windows,

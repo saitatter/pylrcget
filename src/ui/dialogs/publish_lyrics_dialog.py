@@ -39,7 +39,7 @@ def lint_lyrics(text: str, *, is_synced: bool) -> list[LintProblem]:
     """Validate lyrics text before publishing to LRCLIB."""
     problems: list[LintProblem] = []
     lines = text.splitlines()
-    content_lines = [l for l in lines if l.strip()]
+    content_lines = [line for line in lines if line.strip()]
 
     if not content_lines:
         problems.append(LintProblem(line=1, severity="error", message="Lyrics are empty."))

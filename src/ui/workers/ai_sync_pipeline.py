@@ -168,13 +168,13 @@ def run_ai_sync_pipeline(self, *, align_optional_demucs=None) -> None:
 
         import whisperx
 
+        compute_type = _preferred_whisper_compute_type(device)
         self._emit_stage(
             2,
             total_steps,
             f"Loading WhisperX ASR ({self.whisper_model}, device: {device}, "
             f"compute: {compute_type})…",
         )
-        compute_type = _preferred_whisper_compute_type(device)
         model = _get_cached_whisperx_model(
             whisperx,
             self.whisper_model,

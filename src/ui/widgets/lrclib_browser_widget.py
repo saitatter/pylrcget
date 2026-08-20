@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import logging
 
 from PySide6.QtCore import Qt, QThread, QTimer, Signal

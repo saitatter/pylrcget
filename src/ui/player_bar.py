@@ -20,7 +20,7 @@ from PySide6.QtWidgets import (
 
 from core.artwork import extract_embedded_cover_bytes, find_sidecar_cover_path
 from ui.icon_loader import load_svg_icon
-from ui.spacing import SPACE_2, SPACE_3, set_layout_spacing
+from ui.spacing import SPACE_2, set_layout_spacing
 from ui.style_loader import load_stylesheet
 from ui.theme_tokens import STYLE_TOKENS
 

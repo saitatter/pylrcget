@@ -11,22 +11,15 @@ from dataclasses import dataclass
 from typing import Callable
 
 from mutagen import File as MutagenFile
-from mutagen.asf import ASF
-from mutagen.dsf import DSF
-from mutagen.dsdiff import DSDIFF
-from mutagen.id3 import ID3, USLT, TXXX, ID3NoHeaderError
-from mutagen.flac import FLAC
+from mutagen.id3 import ID3, ID3NoHeaderError
 from mutagen.musepack import Musepack
-from mutagen.oggvorbis import OggVorbis
-from mutagen.oggopus import OggOpus
-from mutagen.mp4 import MP4
 from mutagen._util import MutagenError
 
 from core.models import FsTrack
 
 from core.embed_lyrics import (
     VORBIS_PLAIN_KEY, VORBIS_SYNCED_KEY,
-    ID3_PLAIN_DESC, ID3_SYNCED_DESC,
+    ID3_SYNCED_DESC,
     MP4_PLAIN_KEY, MP4_SYNCED_KEY
 )
 
