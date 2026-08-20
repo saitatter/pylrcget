@@ -8,7 +8,7 @@ import pytest
 from tests import test_support as _test_support  # noqa: F401
 
 import ui.workers.ai_sync_worker as ai_sync_worker
-from ui.workers.ai_sync_demucs import candidate_quality
+from ui.workers.ai_sync_demucs import AlignmentCandidate, candidate_quality
 from ui.workers.ai_sync_worker import (
     _align_lyrics_to_segments,
     _align_lyrics_to_segments_viterbi,
@@ -95,15 +95,17 @@ def test_optional_demucs_keeps_mix_when_candidate_proxy_does_not_win(monkeypatch
     )
     monkeypatch.setattr(ai_sync_worker, "_demucs_candidate_quality", lambda raw, lyrics: 1.0)
 
-    lrc, source = ai_sync_worker._align_with_optional_demucs(
+    candidate = ai_sync_worker._align_with_optional_demucs(
         "track.flac",
         "line",
         device="cpu",
         enable_demucs_candidate=True,
     )
 
-    assert source == "mix"
-    assert lrc.startswith("[00:01.00]")
+    assert isinstance(candidate, AlignmentCandidate)
+    assert candidate.source == "mix"
+    assert candidate.lrc.startswith("[00:01.00]")
+    assert candidate.quality == 1.0
 
 
 class _fake_vocal_context:

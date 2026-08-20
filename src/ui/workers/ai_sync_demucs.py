@@ -4,12 +4,27 @@ from __future__ import annotations
 import re
 import tempfile
 from contextlib import contextmanager
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterator
 
 
 _LRC_LINE_RE = re.compile(r"\[(\d+):(\d+(?:\.\d+)?)\]\s*(.*)")
 _WORD_RE = re.compile(r"[a-z0-9]+")
+
+
+@dataclass(frozen=True)
+class AlignmentCandidate:
+    """A lyrics-aligner result and its no-ground-truth selection metadata."""
+
+    lrc: str
+    source: str
+    quality: float
+
+    def __iter__(self) -> Iterator[str]:
+        """Keep unpacking compatibility for callers from before the dataclass."""
+        yield self.lrc
+        yield self.source
 
 
 def is_available() -> bool:
@@ -126,4 +141,9 @@ def separated_vocal_audio(audio_path: str, *, device: str) -> Iterator[str]:
         yield str(output)
 
 
-__all__ = ["candidate_quality", "is_available", "separated_vocal_audio"]
+__all__ = [
+    "AlignmentCandidate",
+    "candidate_quality",
+    "is_available",
+    "separated_vocal_audio",
+]
