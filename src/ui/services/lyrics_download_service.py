@@ -4,8 +4,8 @@ import logging
 import re
 import sqlite3
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Callable
 
 from requests import exceptions as requests_exceptions
 
@@ -340,7 +340,7 @@ def download_track_lyrics(
         artist = (track.artist_name or "").strip()
         album = (track.album_name or "").strip()
         title_for_ui = f"{artist} - {title}".strip(" -")
-        duration_s = int(round(track.duration or 0.0))
+        duration_s = round(track.duration or 0.0)
 
         if not title or not artist:
             return False, "Missing title/artist; cannot search lyrics.", track_id, title_for_ui
@@ -369,7 +369,7 @@ def download_track_lyrics(
             config=config,
         )
         return ok, msg, track_id, title_for_ui
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         return False, f"Download failed: {exc}", track_id, title_for_ui
     finally:
         if owns_db and db is not None:

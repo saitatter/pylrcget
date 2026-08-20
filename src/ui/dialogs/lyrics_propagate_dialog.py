@@ -108,10 +108,13 @@ class LyricsDiffButtonDelegate(QStyledItemDelegate):
                 )
             return hovered
 
-        if event.type() == QEvent.Type.MouseButtonRelease and event.button() == Qt.MouseButton.LeftButton:
-            if hovered:
-                self.diffClicked.emit(track)
-                return True
+        if (
+            event.type() == QEvent.Type.MouseButtonRelease
+            and event.button() == Qt.MouseButton.LeftButton
+            and hovered
+        ):
+            self.diffClicked.emit(track)
+            return True
         return False
 
 
@@ -231,8 +234,8 @@ def _track_label(track: Track) -> str:
     return f"{number}{track.title or ''}".strip()
 
 
-def _format_duration(duration: float | int | None) -> str:
-    seconds = max(0, int(round(float(duration or 0))))
+def _format_duration(duration: float | None) -> str:
+    seconds = max(0, round(float(duration or 0)))
     minutes, seconds = divmod(seconds, 60)
     return f"{minutes}:{seconds:02d}"
 

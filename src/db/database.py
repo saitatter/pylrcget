@@ -10,5 +10,5 @@ from __future__ import annotations
 # Public DB version (single source of truth for the app)
 CURRENT_DB_VERSION = 5
 
-from db.migrations import *  # noqa: F401,F403
-from db.queries import *  # noqa: F403
+from db.migrations import *
+from db.queries import *

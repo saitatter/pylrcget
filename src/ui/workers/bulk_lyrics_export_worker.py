@@ -77,7 +77,7 @@ class BulkLyricsExportWorker(QThread):
 
                 try:
                     track = get_track_by_id(db, int(track_id))
-                except Exception as exc:
+                except Exception as exc:  # noqa: BLE001
                     failed_count += 1
                     completed += 1
                     label = f"Track {track_id}"
@@ -108,7 +108,7 @@ class BulkLyricsExportWorker(QThread):
 
                 try:
                     result = sync_track_outputs_with_result(track, self.export_config)
-                except Exception as exc:
+                except Exception as exc:  # noqa: BLE001
                     failed_count += 1
                     completed += 1
                     payload = {
@@ -157,7 +157,7 @@ class BulkLyricsExportWorker(QThread):
                 self.progress.emit(completed, total, label, message, self._elapsed())
 
         except Exception as exc:
-            logger.exception("Bulk lyrics export failed: %s", exc)
+            logger.exception("Bulk lyrics export failed")
             stats = {
                 "exported": exported_count,
                 "skipped": skipped_count,

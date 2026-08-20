@@ -64,7 +64,7 @@ def _patch_whisperx_audio_loading() -> None:
             if shutil.which("ffmpeg"):
                 try:
                     return orig_load_audio(file, sr=sr)
-                except Exception:
+                except Exception:  # noqa: BLE001, S110
                     pass
 
             try:
@@ -79,7 +79,7 @@ def _patch_whisperx_audio_loading() -> None:
                     resampler = T.Resample(orig_freq=sample_rate, new_freq=sr)
                     data = resampler(tensor).squeeze(0).numpy()
                 return data
-            except Exception:
+            except Exception:  # noqa: BLE001, S110
                 pass
 
             try:
@@ -93,7 +93,7 @@ def _patch_whisperx_audio_loading() -> None:
                     resampler = T.Resample(orig_freq=sample_rate, new_freq=sr)
                     waveform = resampler(waveform)
                 return waveform.squeeze(0).numpy().astype("float32")
-            except Exception:
+            except Exception:  # noqa: BLE001, S110
                 pass
 
             return orig_load_audio(file, sr=sr)
@@ -103,9 +103,9 @@ def _patch_whisperx_audio_loading() -> None:
         try:
             import whisperx
             whisperx.load_audio = _compat_load_audio
-        except Exception:
+        except Exception:  # noqa: BLE001, S110
             pass
-    except Exception:
+    except Exception:  # noqa: BLE001, S110
         pass
 
 
@@ -122,7 +122,7 @@ def _patch_pyannote_compatibility() -> None:
 
         _compat_init._patched_for_whisperx = True
         pyannote.audio.core.inference.Inference.__init__ = _compat_init
-    except Exception:
+    except Exception:  # noqa: BLE001, S110
         pass
 
 
@@ -142,7 +142,7 @@ def _patch_faster_whisper_compatibility() -> None:
 
         _compat_init._patched_for_whisperx = True
         faster_whisper.transcribe.TranscriptionOptions.__init__ = _compat_init
-    except Exception:
+    except Exception:  # noqa: BLE001, S110
         pass
 
 
@@ -254,16 +254,16 @@ def is_ai_sync_available() -> bool:
 
 
 __all__ = [
-    "_clear_inference_caches",
-    "_preferred_whisper_compute_type",
     "_canonical_vad_options",
-    "_patch_whisperx_audio_loading",
-    "_patch_pyannote_compatibility",
-    "_patch_faster_whisper_compatibility",
-    "_get_cached_whisperx_model",
-    "_get_cached_align_model",
-    "get_missing_ai_dependencies",
-    "_module_available",
     "_check_ai_sync_available",
+    "_clear_inference_caches",
+    "_get_cached_align_model",
+    "_get_cached_whisperx_model",
+    "_module_available",
+    "_patch_faster_whisper_compatibility",
+    "_patch_pyannote_compatibility",
+    "_patch_whisperx_audio_loading",
+    "_preferred_whisper_compute_type",
+    "get_missing_ai_dependencies",
     "is_ai_sync_available",
 ]

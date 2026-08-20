@@ -100,7 +100,7 @@ def _read_metadata_for_scan(path: str, *, timings: _ScanTimingStats | None = Non
     started_at = time.perf_counter()
     try:
         return read_audio_metadata_for_scan(path)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         logger.warning("Skipping unreadable audio file during scan: %s (%s)", path, exc)
         return None
     finally:
@@ -218,7 +218,7 @@ class LibraryScanner(QThread):
             worker_failures = 0
 
             current_path_set = set(paths)
-            removed_paths = [path for path in existing_index.keys() if path not in current_path_set]
+            removed_paths = [path for path in existing_index if path not in current_path_set]
             removed = len(removed_paths)
 
             # Build orphan index *before* deleting removed tracks so we can
@@ -305,7 +305,7 @@ class LibraryScanner(QThread):
                     scanned += 1
                     try:
                         result = future.result()
-                    except Exception as exc:
+                    except Exception as exc:  # noqa: BLE001
                         worker_failures += 1
                         logger.warning("Skipping audio file during scan worker failure: %s", exc)
                         maybe_emit_progress("")
@@ -498,7 +498,7 @@ class LibraryScanner(QThread):
             if reattached:
                 msg += f" Reattached lyrics for {reattached} moved file(s)."
             self.finished_signal.emit(True, msg)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             self.finished_signal.emit(False, f"Scan failed: {e}")
         finally:
             if db is not None:

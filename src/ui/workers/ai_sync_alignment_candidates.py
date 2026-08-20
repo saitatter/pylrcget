@@ -17,7 +17,7 @@ def _words_match(w1: str, w2: str, threshold: float = 0.85) -> tuple[bool, float
         return True, 1.0
     try:
         from rapidfuzz import fuzz
-    except Exception:
+    except Exception:  # noqa: BLE001
         fuzz = None
     if fuzz is not None:
         ratio = float(fuzz.ratio(norm_w1, norm_w2)) / 100.0
@@ -53,8 +53,7 @@ def _compute_line_to_words_score(
                     break
         match_ratio = matched / len(line_words_norm) if line_words_norm else 0.0
         adjusted_ratio = match_ratio - i * 0.02
-        if adjusted_ratio > best_match_ratio:
-            best_match_ratio = adjusted_ratio
+        best_match_ratio = max(best_match_ratio, adjusted_ratio)
     return max(0.0, best_match_ratio)
 
 def _extract_word_confidence(word: dict) -> float | None:
@@ -369,11 +368,10 @@ def _build_same_phrase_rewind_targets(
             if tail_end > last_center:
                 for k in range(1, missing + 1):
                     frac = k / max(1, missing)
-                    candidate = int(round(last_center + (tail_end - last_center) * frac))
+                    candidate = round(last_center + (tail_end - last_center) * frac)
                     if candidate <= last_center:
                         candidate = last_center + k
-                    if candidate > tail_end:
-                        candidate = tail_end
+                    candidate = min(candidate, tail_end)
                     if candidate > cluster_centers[-1]:
                         cluster_centers.append(candidate)
 
@@ -563,7 +561,7 @@ def _build_guided_word_ranges(
         pre_slope = (next_w - first_w) / max(1, next_l - first_l)
     else:
         pre_slope = 0.0
-    for li in range(0, first_l):
+    for li in range(first_l):
         expected[li] = first_w - (first_l - li) * pre_slope
 
     last_l, last_w = anchors[-1]
@@ -577,7 +575,7 @@ def _build_guided_word_ranges(
 
     ranges: dict[int, tuple[int, int]] = {}
     for li in range(num_lines):
-        center = max(0, min(num_words - 1, int(round(expected[li]))))
+        center = max(0, min(num_words - 1, round(expected[li])))
         start = max(0, center - half_window)
         end = min(num_words, center + half_window + 1)
         if end - start < min_width:
@@ -592,4 +590,4 @@ def _build_guided_word_ranges(
         ranges[li] = (start, end)
     return ranges
 
-__all__ = ['_normalize_word', '_words_match', '_compute_line_to_words_score', '_extract_word_confidence', '_is_speech_like_token', '_build_plain_vocabulary', '_build_speech_candidate_mask', '_find_confidence_anchors', '_anchor_bonus', '_normalize_line_text', '_expected_word_position', '_expected_time_position', '_is_late_line', '_build_same_phrase_rewind_targets', '_same_phrase_rewind_penalty', '_same_phrase_rewind_transition_penalty', '_late_line_expected_position_bonus', '_late_line_candidate_start_floor', '_prepare_manual_line_anchors', '_manual_anchor_bonus', '_build_guided_word_ranges']
+__all__ = ['_anchor_bonus', '_build_guided_word_ranges', '_build_plain_vocabulary', '_build_same_phrase_rewind_targets', '_build_speech_candidate_mask', '_compute_line_to_words_score', '_expected_time_position', '_expected_word_position', '_extract_word_confidence', '_find_confidence_anchors', '_is_late_line', '_is_speech_like_token', '_late_line_candidate_start_floor', '_late_line_expected_position_bonus', '_manual_anchor_bonus', '_normalize_line_text', '_normalize_word', '_prepare_manual_line_anchors', '_same_phrase_rewind_penalty', '_same_phrase_rewind_transition_penalty', '_words_match']

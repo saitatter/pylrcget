@@ -403,48 +403,48 @@ class MyLrclibWidget(QWidget):
         qss = load_stylesheet("data_table.qss", table_name="MyLrclibTable")
         qss += "\n" + load_stylesheet("data_table.qss", table_name="DownloadHistoryTable")
         qss += """
-QFrame#MyLrclibSummary {
-    background: %(panel)s;
-    border: 1px solid %(border)s;
-    border-radius: %(radius)s;
-}
-QLabel#MyLrclibSummaryTitle {
-    color: %(text_strong)s;
+QFrame#MyLrclibSummary {{
+    background: {panel};
+    border: 1px solid {border};
+    border-radius: {radius};
+}}
+QLabel#MyLrclibSummaryTitle {{
+    color: {text_strong};
     font-size: 16px;
     font-weight: 700;
-}
-QLabel#MyLrclibSummaryBody {
-    color: %(text_soft)s;
+}}
+QLabel#MyLrclibSummaryBody {{
+    color: {text_soft};
     font-size: 12px;
-}
-QFrame#MyLrclibMetricCard {
-    background: %(app)s;
-    border: 1px solid %(border)s;
-    border-radius: %(radius_sm)s;
-}
-QLabel#MyLrclibMetricLabel {
-    color: %(text_muted)s;
+}}
+QFrame#MyLrclibMetricCard {{
+    background: {app};
+    border: 1px solid {border};
+    border-radius: {radius_sm};
+}}
+QLabel#MyLrclibMetricLabel {{
+    color: {text_muted};
     font-size: 11px;
     text-transform: uppercase;
     letter-spacing: 0.08em;
     font-weight: 600;
-}
-QLabel#MyLrclibMetricValue {
-    color: %(text_strong)s;
+}}
+QLabel#MyLrclibMetricValue {{
+    color: {text_strong};
     font-size: 24px;
     font-weight: 700;
-}
-QPushButton#MyLrclibClearButton {
+}}
+QPushButton#MyLrclibClearButton {{
     padding: 5px 12px;
-}
-        """ % {
-            "panel": STYLE_TOKENS.get("color-bg-panel", "#111827"),
-            "app": STYLE_TOKENS.get("color-bg-app", "#0f172a"),
-            "border": STYLE_TOKENS.get("color-border-strong", "#334155"),
-            "radius": STYLE_TOKENS.get("radius-lg", "14px"),
-            "radius_sm": STYLE_TOKENS.get("radius-md", "10px"),
-            "text_strong": STYLE_TOKENS.get("color-text-strong", "#f8fafc"),
-            "text_soft": STYLE_TOKENS.get("color-text-soft", "#94a3b8"),
-            "text_muted": STYLE_TOKENS.get("color-text-muted", "#64748b"),
-        }
+}}
+        """.format(
+            panel=STYLE_TOKENS.get("color-bg-panel", "#111827"),
+            app=STYLE_TOKENS.get("color-bg-app", "#0f172a"),
+            border=STYLE_TOKENS.get("color-border-strong", "#334155"),
+            radius=STYLE_TOKENS.get("radius-lg", "14px"),
+            radius_sm=STYLE_TOKENS.get("radius-md", "10px"),
+            text_strong=STYLE_TOKENS.get("color-text-strong", "#f8fafc"),
+            text_soft=STYLE_TOKENS.get("color-text-soft", "#94a3b8"),
+            text_muted=STYLE_TOKENS.get("color-text-muted", "#64748b"),
+        )
         self.setStyleSheet(qss)

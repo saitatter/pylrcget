@@ -272,7 +272,7 @@ def _align_lyrics_to_segments(
         try:
             from rapidfuzz import fuzz as rapidfuzz_fuzz
             fuzz = rapidfuzz_fuzz
-        except Exception:
+        except Exception:  # noqa: BLE001
             fuzz = None
 
     original_lines = [str(line) for line in plain_lines]
@@ -310,7 +310,7 @@ def _align_lyrics_to_segments(
                 wtext = " ".join(w.get("word", "") for w in words[i:window_end])
                 try:
                     score = fuzz.partial_ratio(line_stripped, wtext)
-                except Exception:
+                except Exception:  # noqa: BLE001
                     score = 0
                 if score > best_score:
                     best_score = score
@@ -348,4 +348,4 @@ def _align_lyrics_to_segments(
         aligned_starts,
     )
 
-__all__ = ['_align_lyrics_to_segments_viterbi', '_align_lyrics_to_segments']
+__all__ = ['_align_lyrics_to_segments', '_align_lyrics_to_segments_viterbi']

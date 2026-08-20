@@ -67,7 +67,7 @@ def _tail_rescue_alignment_indices(
 
     lagging = 0
     for li in weak_tail:
-        expected = int(round(_expected_word_position(li, num_lines, num_words)))
+        expected = round(_expected_word_position(li, num_lines, num_words))
         if aligned_indices[li] + collapse_gap_words < expected:
             lagging += 1
     if lagging < max(3, int(len(weak_tail) * 0.55)):
@@ -76,7 +76,7 @@ def _tail_rescue_alignment_indices(
     rescued = list(aligned_indices)
     prev = rescued[max(0, tail_start - 1)] if tail_start > 0 else 0
     for li in range(tail_start, num_lines):
-        expected = int(round(_expected_word_position(li, num_lines, num_words)))
+        expected = round(_expected_word_position(li, num_lines, num_words))
         floor = max(prev + 1, expected - 10)
         ceil = min(num_words - 1, expected + 16)
         cur = rescued[li]
@@ -319,8 +319,7 @@ def _tail_rescue_rewind_target_lag_indices(
                 line_peak_emissions[li] >= strong_peak_threshold or very_late
             ):
                 floor = max(prev + 1, min(num_words - 1, target - 8))
-                if cur < floor:
-                    cur = floor
+                cur = max(cur, floor)
         cur = max(cur, prev + 1)
         cur = min(cur, num_words - 1)
         rescued[li] = cur
@@ -345,4 +344,4 @@ def _ensure_strictly_increasing_alignment_indices(
         normalized = [max(0, index - offset) for index in normalized]
     return normalized
 
-__all__ = ['_tail_rescue_alignment_indices', '_tail_rescue_forward_jump_indices', '_tail_rescue_collapsed_cluster_indices', '_repair_repeated_prefix_timestamp_gaps', '_tail_rescue_rewind_target_lag_indices', '_ensure_strictly_increasing_alignment_indices']
+__all__ = ['_ensure_strictly_increasing_alignment_indices', '_repair_repeated_prefix_timestamp_gaps', '_tail_rescue_alignment_indices', '_tail_rescue_collapsed_cluster_indices', '_tail_rescue_forward_jump_indices', '_tail_rescue_rewind_target_lag_indices']

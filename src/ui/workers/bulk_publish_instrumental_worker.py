@@ -59,7 +59,7 @@ class BulkPublishInstrumentalWorker(QThread):
                 title = (track.title or "").strip()
                 artist = (track.artist_name or "").strip()
                 album = (track.album_name or "").strip()
-                duration_s = int(round(track.duration or 0.0))
+                duration_s = round(track.duration or 0.0)
 
                 if not title or not artist:
                     fail_count += 1
@@ -68,12 +68,12 @@ class BulkPublishInstrumentalWorker(QThread):
                 try:
                     self._publish_with_retry(api, title, artist, album, duration_s)
                     ok_count += 1
-                except Exception as exc:
+                except Exception as exc:  # noqa: BLE001
                     fail_count += 1
                     logger.warning("Failed to publish instrumental for track %s: %s", track_id, exc)
 
         except Exception as exc:
-            logger.exception("Bulk instrumental publish failed: %s", exc)
+            logger.exception("Bulk instrumental publish failed")
             self.finished.emit(False, f"Bulk instrumental publish failed: {exc}", {})
             return
         finally:

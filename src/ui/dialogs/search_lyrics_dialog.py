@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import sqlite3
+from typing import ClassVar
 
 from PySide6.QtCore import Qt, QThread, Signal
 from PySide6.QtGui import QColor
@@ -44,7 +45,7 @@ class _SearchWorker(QThread):
                 album_name=self.album or None,
             )
             self.finished.emit(list(results), "")
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             logger.warning("LRCLIB search failed: %s", exc)
             self.finished.emit([], str(exc))
 
@@ -207,7 +208,7 @@ class SearchLyricsDialog(QDialog):
         self._worker.finished.connect(self._on_search_finished)
         self._worker.start()
 
-    _TYPE_COLORS = {
+    _TYPE_COLORS: ClassVar[dict[str, str]] = {
         "Synced": "#4CAF50",       # green
         "Plain": "#2196F3",        # blue
         "Instrumental": "#9C27B0", # purple
@@ -293,7 +294,7 @@ class SearchLyricsDialog(QDialog):
 
         try:
             entries = get_recent_search_queries(self._db, limit=5)
-        except Exception:
+        except Exception:  # noqa: BLE001
             self._history_label.hide()
             return
 
@@ -330,5 +331,5 @@ class SearchLyricsDialog(QDialog):
             return
         try:
             record_search_history(self._db, artist=artist, title=title, album=album)
-        except Exception:
+        except Exception:  # noqa: BLE001, S110
             pass

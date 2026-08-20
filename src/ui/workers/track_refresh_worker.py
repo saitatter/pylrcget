@@ -39,7 +39,7 @@ class TrackRefreshWorker(QThread):
                 self.progress.emit(idx, total, f"Track {track_id}", "Refreshing from disk...")
                 try:
                     refreshed = refresh_track_from_file(db, track_id)
-                except Exception as exc:
+                except Exception as exc:  # noqa: BLE001
                     failed_ids.append(track_id)
                     logger.warning("Failed to refresh track %s: %s", track_id, exc)
                     continue
@@ -50,7 +50,7 @@ class TrackRefreshWorker(QThread):
                     refreshed_ids.append(track_id)
 
         except Exception as exc:
-            logger.exception("Track refresh worker failed: %s", exc)
+            logger.exception("Track refresh worker failed")
             stats = {
                 "refreshed": refreshed_ids,
                 "removed": removed_ids,

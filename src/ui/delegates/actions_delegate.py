@@ -40,16 +40,16 @@ class ActionsDelegate(QStyledItemDelegate):
         self._update_resources()
 
     def _update_resources(self) -> None:
-        size = int(round(14 * self._ui_scale))
+        size = round(14 * self._ui_scale)
         self._refresh_icon = load_svg_icon("refresh-cw.svg", size, STYLE_TOKENS.get("color-text-soft", "#e5e7eb"))
 
     def _button_rects(self, cell_rect: QRect) -> tuple[QRect, QRect]:
-        refresh_w = int(round(28 * self._ui_scale))
-        refresh_h = int(round(26 * self._ui_scale))
-        download_w = int(round(90 * self._ui_scale))
-        download_h = int(round(26 * self._ui_scale))
-        gap = int(round(6 * self._ui_scale))
-        margin = int(round(8 * self._ui_scale))
+        refresh_w = round(28 * self._ui_scale)
+        refresh_h = round(26 * self._ui_scale)
+        download_w = round(90 * self._ui_scale)
+        download_h = round(26 * self._ui_scale)
+        gap = round(6 * self._ui_scale)
+        margin = round(8 * self._ui_scale)
         download_rect = QRect(
             cell_rect.right() - download_w - margin,
             cell_rect.center().y() - download_h // 2,
@@ -94,7 +94,7 @@ class ActionsDelegate(QStyledItemDelegate):
         selected = bool(option.state & QStyle.State_Selected)
         hover_refresh = self._hover_row == index.row() and self._hover_button == "refresh"
         hover_download = self._hover_row == index.row() and self._hover_button == "download"
-        icon_size = int(round(14 * self._ui_scale))
+        icon_size = round(14 * self._ui_scale)
         self._draw_action_button(
             painter,
             refresh_rect,

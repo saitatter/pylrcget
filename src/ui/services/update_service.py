@@ -207,7 +207,7 @@ def is_linux_installer_asset(asset: ReleaseAssetInfo | None) -> bool:
     if asset is None:
         return False
     name = str(asset.name).lower()
-    return name.endswith(".appimage") or name.endswith(".deb") or name.endswith(".rpm")
+    return name.endswith((".appimage", ".deb", ".rpm"))
 
 
 def can_auto_install_update(asset: ReleaseAssetInfo | None) -> bool:
@@ -334,7 +334,7 @@ def launch_platform_installer(installer_path: Path) -> None:
                 close_fds=True,
             )
             return
-        if lower_name.endswith(".deb") or lower_name.endswith(".rpm"):
+        if lower_name.endswith((".deb", ".rpm")):
             subprocess.Popen(
                 ["xdg-open", str(installer_path)],
                 start_new_session=True,
@@ -356,8 +356,7 @@ def download_release_asset(
 ) -> Path:
     destination.parent.mkdir(parents=True, exist_ok=True)
     manager = nullcontext(session) if session is not None else requests.Session()
-    with manager as http:
-        with http.get(asset.download_url, stream=True, timeout=timeout_s) as response:
+    with manager as http, http.get(asset.download_url, stream=True, timeout=timeout_s) as response:
             response.raise_for_status()
             total = int(response.headers.get("Content-Length") or asset.size or 0)
             downloaded = 0
@@ -374,9 +373,9 @@ def download_release_asset(
     digest = hasher.hexdigest()
     logger.info("Download complete: %s (SHA-256: %s, %d bytes)", destination.name, digest, downloaded)
     if total > 0 and downloaded != total:
-        raise IOError(f"Incomplete download: expected {total} bytes, got {downloaded} bytes.")
+        raise OSError(f"Incomplete download: expected {total} bytes, got {downloaded} bytes.")
     if asset.size > 0 and destination.stat().st_size != asset.size:
-        raise IOError(
+        raise OSError(
             f"Downloaded asset size mismatch: expected {asset.size} bytes, got {destination.stat().st_size} bytes."
         )
     return destination

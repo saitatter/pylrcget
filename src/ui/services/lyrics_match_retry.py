@@ -121,7 +121,7 @@ def _score_result(
         + (artist_score * ARTIST_SCORE_WEIGHT)
         + (album_score * ALBUM_SCORE_WEIGHT)
     )
-    return int(round(score * 100))
+    return round(score * 100)
 
 
 def _text_similarity(left: str, right: str) -> float:

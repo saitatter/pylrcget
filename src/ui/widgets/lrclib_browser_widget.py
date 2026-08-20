@@ -57,7 +57,7 @@ class _SearchWorker(QThread):
                 album_name=self.album or None,
             )
             self.finished.emit(list(results), "")
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             logger.warning("LRCLIB browser search failed: %s", exc)
             self.finished.emit([], str(exc))
 

@@ -59,7 +59,7 @@ class LyricsApplyCandidatesWorker(QThread):
 
             record_download_history_batch(db, history_entries)
             self.finishedApply.emit(len(applied_ids), applied_ids, "")
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             logger.warning("Failed to apply lyrics candidates in background: %s", exc)
             self.finishedApply.emit(len(applied_ids), applied_ids, str(exc))
         finally:

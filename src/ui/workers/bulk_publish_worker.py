@@ -78,7 +78,7 @@ class BulkPublishWorker(QThread):
                     self.itemFinished.emit(track_id, False, "No lyrics to publish.")
                     continue
 
-                duration_s = int(round(track.duration or 0.0))
+                duration_s = round(track.duration or 0.0)
                 if not title or not artist:
                     skipped += 1
                     self.itemFinished.emit(track_id, False, "Missing title or artist.")
@@ -95,13 +95,13 @@ class BulkPublishWorker(QThread):
                     self._publish_with_retry(api, title, artist, album, duration_s, plain, synced)
                     ok_count += 1
                     self.itemFinished.emit(track_id, True, "Published.")
-                except Exception as exc:
+                except Exception as exc:  # noqa: BLE001
                     fail_count += 1
                     self.itemFinished.emit(track_id, False, str(exc))
                     logger.warning("Failed to publish track %s: %s", track_id, exc)
 
         except Exception as exc:
-            logger.exception("Bulk publish failed: %s", exc)
+            logger.exception("Bulk publish failed")
             self.finished.emit(False, f"Bulk publish failed: {exc}", {})
             return
         finally:

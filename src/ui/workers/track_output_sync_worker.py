@@ -42,7 +42,7 @@ class TrackOutputSyncWorker(QThread):
                 try:
                     track = get_track_by_id(db, int(track_id))
                     result = sync_track_outputs_with_result(track, config)
-                except Exception as exc:
+                except Exception as exc:  # noqa: BLE001
                     fail_count += 1
                     logger.warning("Failed to sync outputs for track %s: %s", track_id, exc)
                     self.itemFinished.emit(int(track_id), {"track_id": int(track_id), "error": exc})
@@ -63,7 +63,7 @@ class TrackOutputSyncWorker(QThread):
                 )
 
         except Exception as exc:
-            logger.exception("Track output sync worker failed: %s", exc)
+            logger.exception("Track output sync worker failed")
             stats = {"ok": ok_count, "failed": fail_count, "total": total, "cancelled": cancelled}
             self.finishedSync.emit(False, f"Lyrics output sync failed: {exc}", stats)
             return

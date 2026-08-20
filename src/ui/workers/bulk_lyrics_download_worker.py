@@ -100,7 +100,7 @@ class BulkLyricsDownloadWorker(QThread):
                         self.itemFinished.emit(int(track_id), False, label, msg)
                         self.progress.emit(completed, total, label, msg, self._elapsed())
                         continue
-                    duration_s = int(round(track.duration or 0.0)) or None
+                    duration_s = round(track.duration or 0.0) or None
                     if duration_s is not None and not is_valid_lrclib_duration(duration_s):
                         fail_count += 1
                         completed += 1
@@ -158,7 +158,7 @@ class BulkLyricsDownloadWorker(QThread):
                             completed += 1
                             try:
                                 result = future.result()
-                            except Exception as exc:
+                            except Exception as exc:  # noqa: BLE001
                                 result = _DownloadFetchResult(job=job, error=str(exc))
 
                             if result.error:
@@ -232,7 +232,7 @@ class BulkLyricsDownloadWorker(QThread):
                 duration_s=job.duration_s,
             )
             return _DownloadFetchResult(job=job, match=match)
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             return _DownloadFetchResult(job=job, error=str(exc))
 
     def _api_for_current_thread(self) -> LrcLibAPI:

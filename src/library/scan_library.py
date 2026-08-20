@@ -6,9 +6,9 @@ import os
 import re
 import threading
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable
 
 from mutagen import File as MutagenFile
 from mutagen._util import MutagenError
@@ -410,7 +410,7 @@ def get_audio_file_signature_with_lookup(
     timing_hook: Callable[[str, float], None] | None = None,
     count_hook: Callable[[str, int], None] | None = None,
 ) -> tuple[float | None, int | None]:
-    use_embedded, use_sidecar = _scan_lyrics_source_flags(scan_lyrics_source_mode)
+    _use_embedded, use_sidecar = _scan_lyrics_source_flags(scan_lyrics_source_mode)
     newest_mtime: float | None = None
     total_size = 0
     sidecar_candidates: list[str] = []
@@ -507,7 +507,7 @@ def _extract_text_from_mutagen_value(value) -> str | None:
     if isinstance(text, bytes):
         try:
             rendered = text.decode("utf-8", errors="replace").strip()
-        except Exception:
+        except Exception:  # noqa: BLE001
             rendered = str(text).strip()
     else:
         rendered = str(text).strip()
@@ -529,7 +529,7 @@ def _first_audio_tag_text(audio, keys: tuple[str, ...]) -> str | None:
                 continue
             try:
                 value = getter(key)
-            except Exception:
+            except Exception:  # noqa: BLE001, S112
                 continue
             if value is None:
                 continue
@@ -547,7 +547,7 @@ def _first_audio_tag_text(audio, keys: tuple[str, ...]) -> str | None:
             continue
         try:
             source_keys = list(keys_func())
-        except Exception:
+        except Exception:  # noqa: BLE001, S112
             continue
         for skey in source_keys:
             if _normalize_tag_key(str(skey)) in req_norms:
@@ -556,7 +556,7 @@ def _first_audio_tag_text(audio, keys: tuple[str, ...]) -> str | None:
                     extracted = _extract_text_from_mutagen_value(val)
                     if extracted:
                         return extracted
-                except Exception:
+                except Exception:  # noqa: BLE001, S110
                     pass
     return None
 
@@ -652,7 +652,7 @@ def read_audio_metadata_from_audio(audio, path: str) -> AudioMetadata:
         if callable(getter):
             try:
                 track_raw = getter("trkn")
-            except Exception:
+            except Exception:  # noqa: BLE001
                 track_raw = None
         track_number = _parse_track_number_value(track_raw)
     elif ext in {".wma", ".asf"}:
@@ -918,11 +918,7 @@ def read_embedded_lyrics_from_audio(audio, path: str) -> tuple[str | None, str |
 
                 synced = _first_id3_synced_lrc(tags)
 
-        elif ext in {".flac"}:
-            plain, synced = _read_vorbis_lyrics(audio)
-        elif ext in {".ogg", ".oga"}:
-            plain, synced = _read_vorbis_lyrics(audio)
-        elif ext == ".opus":
+        elif ext in {".flac"} or ext in {".ogg", ".oga"} or ext == ".opus":
             plain, synced = _read_vorbis_lyrics(audio)
 
         elif ext in {".m4a", ".mp4"}:
@@ -1006,8 +1002,8 @@ def read_embedded_lyrics_from_audio(audio, path: str) -> tuple[str | None, str |
                             plain = None
                     if plain:
                         break
-    except (MutagenError, Exception) as e:
-        logger.exception("Failed to read embedded lyrics from %s: %s", path, e)
+    except (MutagenError, Exception):
+        logger.exception("Failed to read embedded lyrics from %s", path)
 
     def _norm(s: str | None) -> str | None:
         if s is None:
@@ -1037,15 +1033,15 @@ def read_embedded_lyrics(path: str) -> tuple[str | None, str | None]:
         audio = MutagenFile(path, easy=False)
         if audio is not None:
             plain, synced = read_embedded_lyrics_from_audio(audio, path)
-    except (MutagenError, Exception) as e:
+    except (MutagenError, Exception):
         if ext == ".mpc":
             try:
                 audio = Musepack(path)
                 plain, synced = read_embedded_lyrics_from_audio(audio, path)
-            except (MutagenError, Exception) as inner_exc:
-                logger.exception("Failed to read embedded lyrics from %s: %s", path, inner_exc)
+            except (MutagenError, Exception):
+                logger.exception("Failed to read embedded lyrics from %s", path)
         else:
-            logger.exception("Failed to read embedded lyrics from %s: %s", path, e)
+            logger.exception("Failed to read embedded lyrics from %s", path)
     return plain, synced
 
 
@@ -1131,6 +1127,6 @@ def new_fs_track_from_path(
             modified_time=modified_time,
             file_size=file_size,
         )
-    except (MutagenError, Exception) as exc:
+    except (MutagenError, Exception) as exc:  # noqa: BLE001
         logger.warning("Skipping unreadable audio file during scan: %s (%s)", path, exc)
         return None

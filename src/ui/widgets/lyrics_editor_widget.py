@@ -438,10 +438,10 @@ class LyricsEditorWidget(QWidget):
 
     def set_ui_scale(self, scale: float) -> None:
         self._ui_scale = max(0.85, min(1.5, float(scale or 1.0)))
-        self.shift_spin.setMinimumWidth(int(round(SHIFT_SPIN_MIN_WIDTH * self._ui_scale)))
-        self.table.setColumnWidth(TIME_COLUMN, int(round(95 * self._ui_scale)))
-        self.table.setColumnWidth(LINE_NUMBER_COLUMN, int(round(LINE_NUMBER_HEADER_WIDTH * self._ui_scale)))
-        self.table.verticalHeader().setDefaultSectionSize(int(round(30 * self._ui_scale)))
+        self.shift_spin.setMinimumWidth(round(SHIFT_SPIN_MIN_WIDTH * self._ui_scale))
+        self.table.setColumnWidth(TIME_COLUMN, round(95 * self._ui_scale))
+        self.table.setColumnWidth(LINE_NUMBER_COLUMN, round(LINE_NUMBER_HEADER_WIDTH * self._ui_scale))
+        self.table.verticalHeader().setDefaultSectionSize(round(30 * self._ui_scale))
 
     def set_hotkey_bindings(self, bindings: dict[str, dict[str, object]] | None) -> None:
         lyrics_editor_hotkeys.set_hotkey_bindings(self, bindings)
@@ -457,10 +457,13 @@ class LyricsEditorWidget(QWidget):
         return lyrics_editor_hotkeys.shortcut_variants(key)
 
     def eventFilter(self, watched, event):
-        if watched is self.validation_hint and event.type() == QEvent.Type.MouseButtonRelease:
-            if self._validation_problems:
-                self._jump_to_first_validation_problem()
-                return True
+        if (
+            watched is self.validation_hint
+            and event.type() == QEvent.Type.MouseButtonRelease
+            and self._validation_problems
+        ):
+            self._jump_to_first_validation_problem()
+            return True
         if (
             watched in self._line_navigation_widgets
             and self.stack.currentWidget() is self.table
@@ -494,8 +497,7 @@ class LyricsEditorWidget(QWidget):
 
         pos = self._current_pos_ms
         idx = bisect_right(self._times, pos) - 1
-        if idx < 0:
-            idx = 0
+        idx = max(idx, 0)
         if idx == self._current_index:
             return
 
@@ -1259,9 +1261,8 @@ class LyricsEditorWidget(QWidget):
         ms_val = int(ms)
         if ms_val < 0:
             return
-        if ms_val == 0:
-            if row != 0 or self._table_has_only_zero_timestamps():
-                return
+        if ms_val == 0 and (row != 0 or self._table_has_only_zero_timestamps()):
+            return
         self.seekRequested.emit(ms_val)
 
     def move_selection_by_rows(self, delta: int) -> bool:
@@ -1495,7 +1496,7 @@ class LyricsEditorWidget(QWidget):
         self.table.setFocus()
 
     def _shift_selected_lines_by_custom_amount(self):
-        delta_ms = int(round(float(self.shift_spin.value()) * 1000.0))
+        delta_ms = round(float(self.shift_spin.value()) * 1000.0)
         self._shift_selected_lines(delta_ms)
 
     def _shift_selected_lines(self, delta_ms: int):
@@ -1719,13 +1720,9 @@ class LyricsEditorWidget(QWidget):
         button.style().unpolish(button)
         button.style().polish(button)
         button.update()
-        if button is self.btn_save:
-            self._update_save_enabled()
-        elif button is self.btn_sync_others:
+        if button is self.btn_save or button is self.btn_sync_others:
             self._update_save_enabled()
         elif button is self.btn_export_files:
             button.setEnabled(self.stack.currentWidget() in {self.table, self.plain})
-        elif button is self.btn_publish_synced:
-            self._update_publish_enabled()
-        elif button is self.btn_publish_plain:
+        elif button is self.btn_publish_synced or button is self.btn_publish_plain:
             self._update_publish_enabled()

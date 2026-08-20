@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import ClassVar
+
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QBoxLayout,
@@ -19,7 +21,7 @@ from ui.spacing import SPACE_1, SPACE_2, SPACE_3, set_layout_spacing
 
 
 class TopBarController(QWidget):
-    _DEFAULT_FILTERS = {
+    _DEFAULT_FILTERS: ClassVar[dict[str, bool]] = {
         "synced": True,
         "plain": True,
         "instrumental": False,

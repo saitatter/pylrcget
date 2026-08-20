@@ -108,7 +108,7 @@ class LyricsRetrySearchWorker(QThread):
                         completed += 1
                         try:
                             candidate = future.result()
-                        except Exception as exc:
+                        except Exception as exc:  # noqa: BLE001
                             self.progress.emit(
                                 completed,
                                 total,
@@ -132,7 +132,7 @@ class LyricsRetrySearchWorker(QThread):
                     executor.shutdown(wait=True)
 
             self.finishedSearch.emit(candidates, "")
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             self.finishedSearch.emit(candidates, str(exc))
         finally:
             if db is not None:
@@ -146,7 +146,7 @@ class LyricsRetrySearchWorker(QThread):
                 break
             try:
                 candidate = self._search_retry_query(api, track, query)
-            except Exception:
+            except Exception:  # noqa: BLE001, S112
                 continue
             if candidate is not None and (best is None or candidate.score > best.score):
                 best = candidate

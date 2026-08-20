@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Iterable
+from collections.abc import Iterable
 
 from PySide6.QtCore import QItemSelectionModel, QModelIndex, Qt, Signal
 from PySide6.QtGui import QStandardItemModel
@@ -175,7 +175,7 @@ class AlbumListWidget(QWidget):
 
     def set_ui_scale(self, scale: float) -> None:
         self._ui_scale = max(0.85, min(1.5, float(scale or 1.0)))
-        self.table.verticalHeader().setDefaultSectionSize(int(round(30 * self._ui_scale)))
+        self.table.verticalHeader().setDefaultSectionSize(round(30 * self._ui_scale))
         self.track_list.set_ui_scale(self._ui_scale)
 
     def apply_current_palette(self) -> None:
@@ -544,7 +544,7 @@ class AlbumListWidget(QWidget):
                 artist_ids=self._artist_ids,
             )
             self.alpha_index.refresh(counts)
-        except Exception:
+        except Exception:  # noqa: BLE001, S110
             pass
 
     def set_ignore_articles(self, ignore: bool) -> None:

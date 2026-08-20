@@ -3,9 +3,8 @@ from __future__ import annotations
 
 import builtins
 
-import ui.workers.ai_sync_runtime as ai_sync_runtime
-import ui.workers.ai_sync_worker as ai_sync_worker
 from tests import test_support as _test_support  # noqa: F401
+from ui.workers import ai_sync_runtime, ai_sync_worker
 from ui.workers.ai_sync_demucs import AlignmentCandidate, candidate_quality
 from ui.workers.ai_sync_worker import (
     _align_lyrics_to_segments,
@@ -64,30 +63,8 @@ def test_preferred_whisper_compute_type_uses_int8_on_cpu():
 
 
 def test_demucs_candidate_quality_prefers_consistent_repeated_blocks():
-    plain = "\n".join(
-        (
-            "You don't know",
-            "You don't know nothing yet",
-            "About the dreams I have",
-            "I will make you sleep",
-            "You don't know",
-            "You don't know nothing yet",
-            "About the dreams I have",
-            "I will make you sleep",
-        )
-    )
-    consistent = "\n".join(
-        (
-            "[00:10.00] You don't know",
-            "[00:14.00] You don't know nothing yet",
-            "[00:17.00] About the dreams I have",
-            "[00:22.00] I will make you sleep",
-            "[01:10.00] You don't know",
-            "[01:14.00] You don't know nothing yet",
-            "[01:17.00] About the dreams I have",
-            "[01:22.00] I will make you sleep",
-        )
-    )
+    plain = "You don't know\nYou don't know nothing yet\nAbout the dreams I have\nI will make you sleep\nYou don't know\nYou don't know nothing yet\nAbout the dreams I have\nI will make you sleep"
+    consistent = "[00:10.00] You don't know\n[00:14.00] You don't know nothing yet\n[00:17.00] About the dreams I have\n[00:22.00] I will make you sleep\n[01:10.00] You don't know\n[01:14.00] You don't know nothing yet\n[01:17.00] About the dreams I have\n[01:22.00] I will make you sleep"
     collapsed = consistent.replace("[01:10.00]", "[00:40.00]").replace(
         "[01:14.00]", "[00:44.00]"
     ).replace("[01:17.00]", "[01:00.00]").replace("[01:22.00]", "[01:05.00]")
@@ -141,7 +118,7 @@ def test_should_retry_with_short_windows_detects_long_low_density_segment():
             "end": 159.0,
             "words": [
                 {"word": word}
-                for word in "good time by your eyes may we meet again and time is close".split()
+                for word in ["good", "time", "by", "your", "eyes", "may", "we", "meet", "again", "and", "time", "is", "close"]
             ],
         }
     ]
@@ -184,16 +161,7 @@ def test_find_targeted_retry_window_detects_repeated_lyrics_near_medium_gap():
 
 
 def test_repair_repeated_prefix_timestamp_gaps_uses_prior_block_offsets():
-    lrc = "\n".join(
-        (
-            "[00:10.00] Upside down",
-            "[00:12.00] You fool yourself",
-            "[00:14.00] I see you now",
-            "[01:00.00] Upside down",
-            "[01:02.00] You fool yourself",
-            "[01:21.00] I see you now",
-        )
-    )
+    lrc = "[00:10.00] Upside down\n[00:12.00] You fool yourself\n[00:14.00] I see you now\n[01:00.00] Upside down\n[01:02.00] You fool yourself\n[01:21.00] I see you now"
 
     repaired = _repair_repeated_prefix_timestamp_gaps(lrc)
 

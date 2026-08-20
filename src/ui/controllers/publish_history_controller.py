@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import sqlite3
-from typing import Callable
+from collections.abc import Callable
 
 from PySide6.QtCore import QObject
 

@@ -36,7 +36,7 @@ class QtLogHandler(logging.Handler):
         try:
             rendered = self.format(record)
             self.bridge.messageReady.emit(record.levelname, rendered)
-        except Exception:
+        except Exception:  # noqa: BLE001
             self.handleError(record)
 
 

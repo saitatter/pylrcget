@@ -9,8 +9,9 @@ import socket
 import subprocess
 import threading
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Callable
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +27,7 @@ def _is_windows() -> bool:
 def _default_ipc_endpoint(app_name: str = "lrcget-mpv") -> str:
     """
     Returns a platform-appropriate IPC endpoint.
-    Windows: named pipe path for mpv: \\.\pipe\<name>
+    Windows: named pipe path for mpv: \\.\\pipe\\<name>
     Unix:    filesystem path to a unix socket
     """
     if _is_windows():
@@ -122,7 +123,7 @@ class _MpvJsonIpcTransport:
         self._stop = threading.Event()
 
         self._rx_thread: threading.Thread | None = None
-        self._rx_queue: "queue.Queue[dict[str, Any]]" = queue.Queue()
+        self._rx_queue: queue.Queue[dict[str, Any]] = queue.Queue()
 
         self._tx_lock = threading.Lock()
 
@@ -142,7 +143,7 @@ class _MpvJsonIpcTransport:
             last_err: Exception | None = None
             while time.time() < deadline and not self._stop.is_set():
                 try:
-                    self._pipe_fh = open(self.endpoint, "r+b", buffering=0)
+                    self._pipe_fh = open(self.endpoint, "r+b", buffering=0)  # noqa: SIM115
                     last_err = None
                     break
                 except (FileNotFoundError, OSError, PermissionError) as e:
@@ -250,7 +251,7 @@ class _MpvJsonIpcTransport:
                         msg = json.loads(line.decode("utf-8", errors="replace"))
                         if isinstance(msg, dict):
                             self._rx_queue.put(msg)
-                    except Exception:
+                    except Exception:  # noqa: BLE001, S112
                         # Ignore malformed line
                         continue
         finally:
@@ -299,7 +300,7 @@ class MpvIpcBackend:
 
         # JSON request/response correlation
         self._req_id = 0
-        self._pending: dict[int, "queue.Queue[dict[str, Any]]"] = {}
+        self._pending: dict[int, queue.Queue[dict[str, Any]]] = {}
 
         # Property observers: name -> list of callbacks(value)
         self._observers: dict[str, list[Callable[[Any], None]]] = {}
@@ -411,7 +412,7 @@ class MpvIpcBackend:
         Send a command with request_id and wait for its response.
         """
         rid = self._next_id()
-        q: "queue.Queue[dict[str, Any]]" = queue.Queue()
+        q: queue.Queue[dict[str, Any]] = queue.Queue()
         self._pending[rid] = q
 
         payload = {"command": list(args), "request_id": rid}

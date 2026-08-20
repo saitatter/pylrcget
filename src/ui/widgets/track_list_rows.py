@@ -30,7 +30,7 @@ def build_track_list_rows(
             state = LyricsState.NONE
 
         duration = row["duration"]
-        duration_s = int(round(duration)) if duration is not None else None
+        duration_s = round(duration) if duration is not None else None
         track_id = int(row["id"])
 
         ui_rows.append(

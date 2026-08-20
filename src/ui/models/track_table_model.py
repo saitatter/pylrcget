@@ -38,11 +38,11 @@ class TrackTableModel(QAbstractTableModel):
         self._rows.extend(new_rows)
         self.endInsertRows()
 
-    def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
+    def rowCount(self, parent: QModelIndex | None = None) -> int:
         del parent
         return len(self._rows)
 
-    def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:
+    def columnCount(self, parent: QModelIndex | None = None) -> int:
         del parent
         return 5
 

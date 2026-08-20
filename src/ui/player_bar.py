@@ -496,11 +496,11 @@ class PlayerBar(QWidget):
         cover_size = PLAYER_COVER_COMPACT_SIZE if compact else PLAYER_COVER_SIZE
         bar_height = PLAYER_BAR_COMPACT_HEIGHT if compact else PLAYER_BAR_HEIGHT
 
-        left_width = int(round(left_width * self._ui_scale))
-        right_width = int(round(right_width * self._ui_scale))
-        center_width = int(round(center_width * self._ui_scale))
-        cover_size = int(round(cover_size * self._ui_scale))
-        bar_height = int(round(bar_height * self._ui_scale))
+        left_width = round(left_width * self._ui_scale)
+        right_width = round(right_width * self._ui_scale)
+        center_width = round(center_width * self._ui_scale)
+        cover_size = round(cover_size * self._ui_scale)
+        bar_height = round(bar_height * self._ui_scale)
 
         self.lbl_cover.setFixedSize(cover_size, cover_size)
         self.lbl_cover.setVisible(self._show_album_art)
@@ -559,7 +559,7 @@ class PlayerBar(QWidget):
 
     def _set_volume_slider_value(self, volume_0_to_1: float) -> None:
         normalized = max(0.0, min(1.0, float(volume_0_to_1)))
-        rendered = int(round(normalized * 100))
+        rendered = round(normalized * 100)
         self.slider_volume.blockSignals(True)
         self.slider_volume.setValue(rendered)
         self.slider_volume.blockSignals(False)
@@ -567,7 +567,7 @@ class PlayerBar(QWidget):
 
     def _on_volume_changed(self, value: int) -> None:
         normalized = max(0.0, min(1.0, float(value) / 100.0))
-        self.lbl_volume_value.setText(f"{int(round(normalized * 100))}%")
+        self.lbl_volume_value.setText(f"{round(normalized * 100)}%")
         if value > 0:
             self._muted = False
             self.lbl_volume.setIcon(self._icons["volume"])
@@ -663,11 +663,14 @@ class PlayerBar(QWidget):
         self._position_speed_prefix()
 
     def eventFilter(self, watched, event):
-        if watched is self.cmb_speed.lineEdit() and event.type() == QEvent.Type.KeyPress:
-            if event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
-                self._on_custom_speed_committed()
-                event.accept()
-                return True
+        if (
+            watched is self.cmb_speed.lineEdit()
+            and event.type() == QEvent.Type.KeyPress
+            and event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter)
+        ):
+            self._on_custom_speed_committed()
+            event.accept()
+            return True
         if watched is self.cmb_speed and event.type() == QEvent.Type.Resize:
             self._position_speed_prefix()
         return super().eventFilter(watched, event)

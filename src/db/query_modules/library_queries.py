@@ -263,7 +263,7 @@ def get_similar_lyrics_track_rows(
                 "score": int(score),
                 "title_score": 100,
                 "artist_score": 100,
-                "duration_score": int(round(duration_score)),
+                "duration_score": round(duration_score),
                 "duration_delta": abs(candidate_duration - source_duration),
             }
         )

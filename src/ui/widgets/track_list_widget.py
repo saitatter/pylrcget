@@ -2,9 +2,9 @@
 from __future__ import annotations
 
 import time
+from collections.abc import Sequence
 from dataclasses import replace
 from pathlib import Path
-from typing import Sequence
 
 from PySide6.QtCore import QEvent, QItemSelectionModel, Qt, QUrl, Signal
 from PySide6.QtGui import QDesktopServices
@@ -74,13 +74,13 @@ class TrackListWidget(QWidget):
         self._active = True
         self._page_size = 250
         self._search = ""
-        self._filters = dict(
-            synced=True,
-            plain=True,
-            instrumental=False,
-            none=True,
-            unsaved=False,
-        )
+        self._filters = {
+            "synced": True,
+            "plain": True,
+            "instrumental": False,
+            "none": True,
+            "unsaved": False,
+        }
         self._artist_id: int | None = None
         self._album_id: int | None = None
         self._artist_ids: list[int] | None = None
@@ -198,7 +198,7 @@ class TrackListWidget(QWidget):
 
     def set_ui_scale(self, scale: float) -> None:
         self._ui_scale = max(0.85, min(1.5, float(scale or 1.0)))
-        self.table.verticalHeader().setDefaultSectionSize(int(round(44 * self._ui_scale)))
+        self.table.verticalHeader().setDefaultSectionSize(round(44 * self._ui_scale))
         self._apply_column_widths()
         if hasattr(self.actions, "set_ui_scale"):
             self.actions.set_ui_scale(self._ui_scale)
@@ -214,10 +214,10 @@ class TrackListWidget(QWidget):
         self.table.update()
 
     def _apply_column_widths(self) -> None:
-        self.table.setColumnWidth(0, int(round(TRACK_NUMBER_COLUMN_WIDTH * self._ui_scale)))
-        self.table.setColumnWidth(2, int(round(TRACK_DURATION_COLUMN_WIDTH * self._ui_scale)))
-        self.table.setColumnWidth(3, int(round(TRACK_LYRICS_COLUMN_WIDTH * self._ui_scale)))
-        self.table.setColumnWidth(4, int(round(TRACK_ACTIONS_COLUMN_WIDTH * self._ui_scale)))
+        self.table.setColumnWidth(0, round(TRACK_NUMBER_COLUMN_WIDTH * self._ui_scale))
+        self.table.setColumnWidth(2, round(TRACK_DURATION_COLUMN_WIDTH * self._ui_scale))
+        self.table.setColumnWidth(3, round(TRACK_LYRICS_COLUMN_WIDTH * self._ui_scale))
+        self.table.setColumnWidth(4, round(TRACK_ACTIONS_COLUMN_WIDTH * self._ui_scale))
 
     # -------------------------
     # External API
@@ -241,7 +241,7 @@ class TrackListWidget(QWidget):
             self.refresh()
 
     def setFilters(self, synced: bool, plain: bool, instrumental: bool, none_: bool, unsaved: bool = False):
-        self._filters = dict(synced=synced, plain=plain, instrumental=instrumental, none=none_, unsaved=unsaved)
+        self._filters = {"synced": synced, "plain": plain, "instrumental": instrumental, "none": none_, "unsaved": unsaved}
         if self._active:
             self.refresh()
 
@@ -570,13 +570,12 @@ class TrackListWidget(QWidget):
             QEvent.Type.MouseButtonPress,
             QEvent.Type.MouseButtonRelease,
             QEvent.Type.MouseButtonDblClick,
-        }:
-            if (
-                event.button() == Qt.MouseButton.LeftButton
-                and time.monotonic() < self._suppress_left_click_until
-            ):
-                event.accept()
-                return True
+        } and (
+            event.button() == Qt.MouseButton.LeftButton
+            and time.monotonic() < self._suppress_left_click_until
+        ):
+            event.accept()
+            return True
         return super().eventFilter(watched, event)
 
     @staticmethod
@@ -799,7 +798,7 @@ class TrackListWidget(QWidget):
                 album_ids=self._album_ids,
             )
             self.alpha_index.refresh(counts)
-        except Exception:
+        except Exception:  # noqa: BLE001, S110
             pass
 
     def set_ignore_articles(self, ignore: bool) -> None:

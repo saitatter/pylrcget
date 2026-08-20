@@ -297,7 +297,7 @@ def run_ai_sync_pipeline(self, *, align_optional_demucs=None) -> None:
                         audio,
                         alignment_device,
                     )
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 if alignment_device != "cpu":
                     logger.warning("Alignment on %s failed, retrying on CPU: %s", alignment_device, e)
                     try:
@@ -324,7 +324,7 @@ def run_ai_sync_pipeline(self, *, align_optional_demucs=None) -> None:
                                 audio,
                                 "cpu",
                             )
-                    except Exception as e2:
+                    except Exception as e2:  # noqa: BLE001
                         logger.warning("CPU alignment also failed, using raw segments: %s", e2)
                 else:
                     logger.warning("CPU alignment failed, using raw segments: %s", e)
@@ -492,7 +492,7 @@ def run_ai_sync_pipeline(self, *, align_optional_demucs=None) -> None:
                     segments,
                     manual_anchors=self.manual_anchors,
                 )
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 logger.warning("Viterbi alignment failed, falling back to greedy: %s", e)
                 raw = _align_lyrics_to_segments(
                     plain_lines,
@@ -514,7 +514,7 @@ def run_ai_sync_pipeline(self, *, align_optional_demucs=None) -> None:
                     seconds = int(mm) * 60 + int(ss) + int(cs) / 100.0
                     text = ln[end + 1:].strip()
                     lrc_tuples.append((seconds, text))
-                except Exception:
+                except Exception:  # noqa: BLE001, S112
                     continue
             lrc = "\n".join(f"[{_format_ts(s)}] {t}" for s, t in lrc_tuples)
         else:
@@ -531,7 +531,7 @@ def run_ai_sync_pipeline(self, *, align_optional_demucs=None) -> None:
             return
         self.completed.emit(True, "Lyrics synchronized successfully.", lrc)
     except Exception as exc:
-        logger.error("AI sync failed: %s", exc, exc_info=True)
+        logger.exception("AI sync failed")
         self.completed.emit(False, f"AI sync failed: {exc}", "")
 
 __all__ = ["AlignmentCandidate", "align_with_optional_demucs", "run_ai_sync_pipeline"]

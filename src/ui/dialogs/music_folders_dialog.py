@@ -525,7 +525,7 @@ class MusicFoldersDialog(QDialog):
             self.ai_enable_fuzzy_chk.setChecked(bool(ai_settings.get("enable_fuzzy", True)))
             try:
                 self.ai_fuzzy_threshold_spin.setValue(int(ai_settings.get("fuzzy_threshold", 60)))
-            except Exception:
+            except Exception:  # noqa: BLE001
                 self.ai_fuzzy_threshold_spin.setValue(60)
             self.ai_enable_demucs_chk.setChecked(
                 bool(ai_settings.get("enable_demucs_candidate", True))

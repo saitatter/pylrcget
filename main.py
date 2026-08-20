@@ -21,6 +21,8 @@ from ui.icon_loader import load_app_icon
 from ui.main_window import MainWindow
 from ui.services.logging_preferences import apply_logging_verbosity
 
+logger = logging.getLogger(__name__)
+
 
 def debug_print_schema(db) -> None:
     for table in ("tracks", "albums"):
@@ -37,7 +39,7 @@ def _migrate_old_nested_app_data(base: str) -> None:
     base_path = Path(base).resolve()
     old_nested_path = Path(old_nested).resolve()
     if old_nested_path.parent != base_path or old_nested_path.name != "PyLrcGet":
-        logging.warning("Refusing to remove unexpected old app data path: %s", old_nested)
+        logger.warning("Refusing to remove unexpected old app data path: %s", old_nested)
         return
 
     for item in os.listdir(old_nested):
@@ -47,12 +49,12 @@ def _migrate_old_nested_app_data(base: str) -> None:
             try:
                 os.rename(src, dst)
             except OSError as exc:
-                logging.warning("Failed to migrate app data from %s to %s: %s", src, dst, exc)
+                logger.warning("Failed to migrate app data from %s to %s: %s", src, dst, exc)
 
     try:
         os.rmdir(old_nested_path)
     except OSError:
-        logging.info("Old app data directory not empty after migration, keeping: %s", old_nested)
+        logger.info("Old app data directory not empty after migration, keeping: %s", old_nested)
 
 def get_app_data_dir() -> str:
     app = QApplication.instance()

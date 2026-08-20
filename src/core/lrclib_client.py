@@ -18,7 +18,7 @@ def _get_app_version() -> str:
     try:
         from ui.services.update_service import current_app_version
         return current_app_version()
-    except Exception:
+    except Exception:  # noqa: BLE001
         return "0.0.0"
 
 BASE_URL = "https://lrclib.net/api"
@@ -63,7 +63,7 @@ def _raise_for_status(response: requests.Response) -> None:
     try:
         body = response.json()
         message = body.get("message", "")
-    except Exception:
+    except Exception:  # noqa: BLE001
         message = response.text[:200] if response.text else ""
 
     if code == 404:

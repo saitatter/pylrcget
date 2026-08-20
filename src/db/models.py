@@ -26,7 +26,7 @@ class Track:
     dirty_lyrics_present: bool = False
 
     @staticmethod
-    def from_row(row: sqlite3.Row) -> "Track":
+    def from_row(row: sqlite3.Row) -> Track:
         # Note: sqlite3.Row doesn't support .get; use "in row.keys()" checks if needed.
         keys = set(row.keys())
         def opt(k: str):
@@ -64,7 +64,7 @@ class Album:
     tracks_count: int
 
     @staticmethod
-    def from_row(row: sqlite3.Row) -> "Album":
+    def from_row(row: sqlite3.Row) -> Album:
         keys = set(row.keys())
         def opt(k: str):
             return row[k] if k in keys else None
@@ -86,7 +86,7 @@ class Artist:
     tracks_count: int
 
     @staticmethod
-    def from_row(row: sqlite3.Row) -> "Artist":
+    def from_row(row: sqlite3.Row) -> Artist:
         keys = set(row.keys())
         def opt(k: str):
             return row[k] if k in keys else None

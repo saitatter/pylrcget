@@ -60,7 +60,7 @@ def _colors(kind: str) -> tuple[str, str, str, str]:
     )
 
 class ToastWidget(QFrame):
-    def __init__(self, data: ToastData, parent: QWidget, manager: "ToastManager"):
+    def __init__(self, data: ToastData, parent: QWidget, manager: ToastManager):
         super().__init__(parent)
         self.data = data
         self._manager = manager

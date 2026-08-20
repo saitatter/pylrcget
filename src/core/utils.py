@@ -71,8 +71,7 @@ def _ts_to_ms(mm: str, ss: str, frac: str | None) -> int:
 
 def ms_to_ts(ms: int) -> str:
     """Format milliseconds as mm:ss.xx (centiseconds)."""
-    if ms < 0:
-        ms = 0
+    ms = max(ms, 0)
     total_s = ms // 1000
     m = total_s // 60
     s = total_s % 60

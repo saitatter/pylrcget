@@ -18,7 +18,7 @@ class UpdateCheckWorker(QThread):
         try:
             info = check_for_updates()
             self.finishedCheck.emit(info, "")
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             self.finishedCheck.emit(None, str(exc))
 
 
@@ -39,5 +39,5 @@ class UpdateDownloadWorker(QThread):
                 progress_callback=lambda received, total: self.progressChanged.emit(int(received), int(total)),
             )
             self.finishedDownload.emit(str(path), "")
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             self.finishedDownload.emit("", str(exc))

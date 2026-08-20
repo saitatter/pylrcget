@@ -695,12 +695,15 @@ class LibraryScannerIncrementalTests(unittest.TestCase):
                 )
 
             scanner = LibraryScanner(db_path, [str(music_dir)])
-            with self.assertLogs("ui.workers.library_scanner", level="DEBUG") as logs:
-                with (
-                    patch("ui.workers.library_scanner.read_audio_metadata_for_scan", return_value=(object(), fake_metadata)),
-                    patch("ui.workers.library_scanner.new_fs_track_from_path", side_effect=fake_new_fs_track),
-                ):
-                    scanner.run()
+            with (
+                self.assertLogs("ui.workers.library_scanner", level="DEBUG") as logs,
+                patch(
+                    "ui.workers.library_scanner.read_audio_metadata_for_scan",
+                    return_value=(object(), fake_metadata),
+                ),
+                patch("ui.workers.library_scanner.new_fs_track_from_path", side_effect=fake_new_fs_track),
+            ):
+                scanner.run()
 
             joined = "\n".join(logs.output)
             self.assertIn("Library scan summary:", joined)

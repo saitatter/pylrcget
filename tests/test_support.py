@@ -26,7 +26,7 @@ try:
     from ui.widgets.track_list_widget import TrackListWidget
 
     HAS_QT = True
-except Exception:
+except Exception:  # noqa: BLE001
     Qt = None  # type: ignore[assignment]
     QApplication = None  # type: ignore[assignment]
     AlbumListWidget = None  # type: ignore[assignment]

@@ -1717,24 +1717,23 @@ class MainWindow(QMainWindow):
             if step != 4 and getattr(self, "_ai_sync_watchdog_timer", None):
                 try:
                     self._ai_sync_watchdog_timer.stop()
-                except Exception:
+                except Exception:  # noqa: BLE001, S110
                     pass
                 self._ai_sync_watchdog_timer = None
 
-            if step >= max(1, total - 2):
+            if step >= max(1, total - 2) and not getattr(self, "_ai_sync_watchdog_timer", None):
                 # start a 2-minute watchdog that nudges the overlay if not completed
-                if not getattr(self, "_ai_sync_watchdog_timer", None):
-                    timer = QTimer(self)
-                    timer.setSingleShot(True)
-                    timer.setInterval(120000)  # 2 minutes
-                    def _on_watchdog():
-                        ov = getattr(self, "ai_sync_overlay", None)
-                        if ov is not None:
-                            ov.update_progress(-1, total, "AI Auto-Sync", "Still processing final alignment — you can cancel")
-                    timer.timeout.connect(_on_watchdog)
-                    timer.start()
-                    self._ai_sync_watchdog_timer = timer
-        except Exception:
+                timer = QTimer(self)
+                timer.setSingleShot(True)
+                timer.setInterval(120000)  # 2 minutes
+                def _on_watchdog():
+                    ov = getattr(self, "ai_sync_overlay", None)
+                    if ov is not None:
+                        ov.update_progress(-1, total, "AI Auto-Sync", "Still processing final alignment — you can cancel")
+                timer.timeout.connect(_on_watchdog)
+                timer.start()
+                self._ai_sync_watchdog_timer = timer
+        except Exception:  # noqa: BLE001, S110
             # non-fatal; overlay is advisory
             pass
 
@@ -2036,11 +2035,18 @@ class MainWindow(QMainWindow):
     def eventFilter(self, watched, event):
         if watched is self.player_bar.slider and event.type() == QEvent.Type.KeyPress:
             modifiers = event.modifiers() & ~Qt.KeyboardModifier.KeypadModifier
-            if modifiers == Qt.KeyboardModifier.NoModifier:
-                if event.key() == Qt.Key.Key_Up and self._move_active_lyrics_selection(-1):
-                    return True
-                if event.key() == Qt.Key.Key_Down and self._move_active_lyrics_selection(1):
-                    return True
+            if (
+                modifiers == Qt.KeyboardModifier.NoModifier
+                and event.key() == Qt.Key.Key_Up
+                and self._move_active_lyrics_selection(-1)
+            ):
+                return True
+            if (
+                modifiers == Qt.KeyboardModifier.NoModifier
+                and event.key() == Qt.Key.Key_Down
+                and self._move_active_lyrics_selection(1)
+            ):
+                return True
         return super().eventFilter(watched, event)
 
     def _all_lyrics_views(self) -> list[LyricsEditorWidget]:
@@ -2076,7 +2082,7 @@ class MainWindow(QMainWindow):
         target_total = sum(max(0, int(value)) for value in splitter.sizes())
         if target_total <= 0:
             target_total = source_total
-        first = max(1, int(round(target_total * max(0, int(source_sizes[0])) / source_total)))
+        first = max(1, round(target_total * max(0, int(source_sizes[0])) / source_total))
         second = max(1, target_total - first)
         return [first, second]
 

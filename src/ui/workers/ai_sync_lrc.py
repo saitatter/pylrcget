@@ -6,9 +6,8 @@ import re
 
 def _format_ts(seconds: float) -> str:
     """Format seconds as mm:ss.xx for LRC."""
-    if seconds < 0:
-        seconds = 0
-    total_cs = int(round(seconds * 100))
+    seconds = max(seconds, 0)
+    total_cs = round(seconds * 100)
     minutes = total_cs // 6000
     secs = (total_cs % 6000) // 100
     centiseconds = total_cs % 100
@@ -155,9 +154,9 @@ def _build_lrc_from_plain_layout(
 
 
 __all__ = [
+    "_build_lrc_from_plain_layout",
+    "_build_lrc_from_plain_lines_and_segments",
+    "_build_lrc_from_segments",
     "_format_ts",
     "_is_non_lyric_line",
-    "_build_lrc_from_segments",
-    "_build_lrc_from_plain_lines_and_segments",
-    "_build_lrc_from_plain_layout",
 ]

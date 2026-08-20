@@ -90,11 +90,10 @@ class NavigationController(QObject):
             self._tab_sync_suppressed = False
             self._nav_apply_in_progress = False
 
-        if record_history:
-            if self._nav_index < 0 or self._nav_history[self._nav_index] != route:
-                self._nav_history = self._nav_history[: self._nav_index + 1]
-                self._nav_history.append(route)
-                self._nav_index = len(self._nav_history) - 1
+        if record_history and (self._nav_index < 0 or self._nav_history[self._nav_index] != route):
+            self._nav_history = self._nav_history[: self._nav_index + 1]
+            self._nav_history.append(route)
+            self._nav_index = len(self._nav_history) - 1
         self._persist_library_route(route)
         self._update_breadcrumbs()
 

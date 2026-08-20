@@ -1,12 +1,13 @@
 """Optional Demucs vocal-stem candidate for lyrics-aligner."""
 from __future__ import annotations
 
+import itertools
 import re
 import tempfile
+from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterator
 
 _LRC_LINE_RE = re.compile(r"\[(\d+):(\d+(?:\.\d+)?)\]\s*(.*)")
 _WORD_RE = re.compile(r"[a-z0-9]+")
@@ -101,7 +102,7 @@ def candidate_quality(raw_lrc: str, plain_lyrics: str) -> float:
     coverage = min(len(lines), len(expected)) / len(expected)
     monotonic = sum(
         current[0] > previous[0]
-        for previous, current in zip(lines, lines[1:])
+        for previous, current in itertools.pairwise(lines)
     ) / max(1, len(lines) - 1)
     repeated = _repeated_block_consistency(lines, expected)
     return coverage * 10.0 + monotonic * 2.0 + repeated * 5.0
@@ -113,9 +114,9 @@ def separated_vocal_audio(audio_path: str, *, device: str) -> Iterator[str]:
     import numpy as np
     import soundfile as sf
     import torch
-    import torchaudio.functional as functional
     from demucs.apply import apply_model
     from demucs.pretrained import get_model
+    from torchaudio import functional
 
     data, sample_rate = sf.read(audio_path, dtype="float32", always_2d=True)
     waveform = torch.from_numpy(np.asarray(data.T, dtype=np.float32).copy())

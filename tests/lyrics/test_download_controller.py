@@ -6,6 +6,7 @@ import unittest
 from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
+from typing import ClassVar
 from unittest.mock import patch
 
 from PySide6.QtCore import QObject, Signal
@@ -52,7 +53,7 @@ class _FakeWorker(QObject):
     progress = Signal(int, int, str, str, float)
     itemFinished = Signal(int, bool, str, str)
     finishedBatch = Signal(bool, str, object)
-    instances: list["_FakeWorker"] = []
+    instances: ClassVar[list[_FakeWorker]] = []
 
     def __init__(self, db_path: str, track_ids: list[int], lrclib_instance: str, *, download_mode: str = "prefer_synced", parent=None):
         super().__init__(parent)
@@ -82,7 +83,7 @@ class _FakeWorker(QObject):
 
 class _ControllableApplyWorker(QObject):
     finishedApply = Signal(int, object, str)
-    instances: list["_ControllableApplyWorker"] = []
+    instances: ClassVar[list[_ControllableApplyWorker]] = []
 
     def __init__(self, db_path: str, candidates: list[LyricsMatchCandidate], *, download_mode: str, lrclib_instance: str, parent=None):
         super().__init__(parent)
@@ -116,8 +117,8 @@ class _ControllableApplyWorker(QObject):
 
 
 class _FakeMatchDialog:
-    selected: list[LyricsMatchCandidate] = []
-    instances: list["_FakeMatchDialog"] = []
+    selected: ClassVar[list[LyricsMatchCandidate]] = []
+    instances: ClassVar[list[_FakeMatchDialog]] = []
 
     def __init__(self, candidates, parent=None):
         del parent

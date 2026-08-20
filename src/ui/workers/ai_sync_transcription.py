@@ -1,6 +1,7 @@
 """Audio transcription, deduplication and per-chunk alignment helpers."""
 from __future__ import annotations
 
+import itertools
 import logging
 import re
 from collections import Counter
@@ -197,7 +198,7 @@ def _align_segments_per_chunks(
         try:
             result = whisperx_module.align(batch, align_model, metadata, audio, device)
             aligned_batch = result.get("segments", []) if isinstance(result, dict) else []
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001
             logger.warning(
                 "Per-chunk forced alignment failed for chunk %d; using coarse timings: %s",
                 batch_index,
@@ -326,7 +327,7 @@ def _should_retry_with_relaxed_vad(
     """
     try:
         duration_s = float(len(audio_samples)) / 16000.0
-    except Exception:
+    except Exception:  # noqa: BLE001
         return False
     if duration_s < min_duration_s:
         return False
@@ -394,8 +395,7 @@ def _segment_alignment_quality(
         best = 0.0
         for idx in candidate_indices:
             score = _compute_line_to_words_score(line_words, words, idx)
-            if score > best:
-                best = score
+            best = max(best, score)
         line_scores.append(best)
 
     line_match = sum(line_scores) / len(line_scores) if line_scores else 0.0
@@ -505,7 +505,7 @@ def _find_targeted_retry_window(
     )
     if len(starts) < 2:
         return None
-    for previous, current in zip(starts, starts[1:]):
+    for previous, current in itertools.pairwise(starts):
         gap = current - previous
         if min_gap_s <= gap <= max_gap_s:
             return (max(0.0, previous - context_s), current + context_s)
@@ -513,20 +513,20 @@ def _find_targeted_retry_window(
 
 
 __all__ = [
-    "_approximate_word_timestamps_from_segments",
-    "_transcribe_tail_window",
-    "_transcribe_fixed_windows",
-    "_deduplicate_transcribed_segments",
     "_align_segments_per_chunks",
-    "_should_use_per_chunk_alignment",
-    "_normalized_transcribe_language",
-    "_segment_word_starts",
-    "_segment_tail_seconds",
-    "_segment_reliable_tail_seconds",
-    "_should_retry_with_relaxed_vad",
-    "_segment_alignment_quality",
-    "_should_use_relaxed_vad_result",
-    "_select_best_relaxed_segments",
-    "_should_retry_with_short_windows",
+    "_approximate_word_timestamps_from_segments",
+    "_deduplicate_transcribed_segments",
     "_find_targeted_retry_window",
+    "_normalized_transcribe_language",
+    "_segment_alignment_quality",
+    "_segment_reliable_tail_seconds",
+    "_segment_tail_seconds",
+    "_segment_word_starts",
+    "_select_best_relaxed_segments",
+    "_should_retry_with_relaxed_vad",
+    "_should_retry_with_short_windows",
+    "_should_use_per_chunk_alignment",
+    "_should_use_relaxed_vad_result",
+    "_transcribe_fixed_windows",
+    "_transcribe_tail_window",
 ]

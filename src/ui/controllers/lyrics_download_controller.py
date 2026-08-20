@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import logging
 import sqlite3
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Callable
 
 from PySide6.QtCore import QObject, QTimer
 
