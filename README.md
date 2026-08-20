@@ -29,7 +29,7 @@ PyLrcGet goes beyond bulk lyric downloads and turns the app into a full desktop 
 
 - Synced lyrics (`.lrc`) and plain lyrics support
 - Toggle between synced and plain editing modes on any track
-- AI-powered auto-sync: generate synced lyrics from audio using WhisperX (see [AI Auto-Sync](#-ai-auto-sync))
+- AI-powered auto-sync with lyrics-aligner for English and WhisperX fallback (see [AI Auto-Sync](#-ai-auto-sync))
 - Configurable download modes: `Prefer synced`, `Synced only`, `Plain only`
 - Bulk `Download missing lyrics` action based on the active download mode
 - Per-selection download overrides from the track context menu
@@ -151,10 +151,11 @@ The feature lives inside the track lyrics editor. Select a track, open the lyric
 
 ### How it works
 
-1. WhisperX detects the audio language
-2. For English, lyrics-aligner aligns the supplied lyrics phonetically; other languages use WhisperX word-level timestamps
-3. If the optional English backend fails, WhisperX is used as a safe fallback
-4. The result is placed in the synced lyrics editor as an unsaved draft
+1. WhisperX performs a short language-detection pass
+2. For English, lyrics-aligner aligns the supplied lyrics phonetically with VAD threshold 30
+3. Other languages, missing backends, or backend errors use the full WhisperX alignment pipeline
+4. AI inference runs in a child process so Stop can terminate it immediately
+5. The result is placed in the synced lyrics editor as an unsaved draft
 
 ### Install AI dependencies
 
@@ -182,6 +183,8 @@ pip install g2p-en
 
 The checkout must contain `align.py`, `model_parameters.pth`, and
 `files\phoneme2idx.pickle`. The backend is used only when Whisper detects English.
+For stable results, the checkout's `align.py` should call `lyrics_aligner.eval()`
+after loading the checkpoint.
 
 > **Python compatibility:** the current WhisperX AI dependency set supports Python
 > 3.10-3.13. Python 3.14 is not supported because its required `ctranslate2`
@@ -293,6 +296,7 @@ Local feed testing is supported via `PYLRCGET_UPDATE_LATEST_URL` and `PYLRCGET_U
 - **Playback not working for a format** — Check that the required codec is available on your system.
 - **Update installer not launching** — Ensure you confirm the administrator/UAC prompt when it appears.
 - **Auto Sync says dependencies are missing** — If you run from source, install `pip install .[ai]` in that same environment. If you use the packaged `.exe`, AI dependencies must be present in the app's bundled Python runtime.
+- **Auto Sync cancel** — Stop terminates the isolated AI inference process immediately; a new sync can be started after the worker cleanup completes.
 - **Using packaged `.exe` and want AI Auto Sync** — Download and run `pylrcget-windows-portable-ai.exe` (AI-enabled portable build).
 - **App closes with `QThread: Destroyed while thread is still running` after Auto Sync** — update to the latest release; shutdown handling for AI sync workers was fixed.
 
@@ -303,6 +307,7 @@ Local feed testing is supported via `PYLRCGET_UPDATE_LATEST_URL` and `PYLRCGET_U
 PRs are welcome! Please:
 - Keep commits small and conventional.
 - Run `python -m pytest tests/` before submitting.
+- Run `ruff check .` before submitting.
 
 ---
 

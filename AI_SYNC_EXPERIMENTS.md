@@ -24,17 +24,22 @@ of 1-2 seconds should not be treated as meaningful without repeated runs.
 
 The active implementation is in `src/ui/workers/ai_sync_worker.py`:
 
-1. WhisperX transcription.
-2. Fixed-window ASR (`60s` window, `45s` step) when VAD coverage is sparse or
-   the tail is missing.
-3. `condition_on_previous_text=False` for independent chunks.
-4. WhisperX forced alignment, with per-chunk alignment when global alignment
-   loses a meaningful tail.
-5. Candidate filtering using confidence, lexical vocabulary, density and tail
-   re-entry rules.
-6. Monotonic Viterbi alignment from plain lyric lines to ASR words.
-7. Repeat-aware rewind penalties, late-position priors and tail rescue.
-8. Coarse timestamp fallback when forced alignment drops the ASR tail.
+1. WhisperX language detection.
+2. English tracks use the optional `schufo/lyrics-aligner` backend with
+   phonetic alignment and VAD threshold `30`.
+3. Non-English tracks, unavailable backends, and backend failures use WhisperX:
+   fixed-window ASR (`60s` window, `45s` step), per-chunk forced alignment,
+   candidate filtering, Viterbi alignment, and repeat-aware rescue.
+4. The complete AI run is isolated in a child process so cancellation can
+   terminate GPU inference immediately.
+
+On the five-track benchmark, the current lyrics-aligner routing measured about
+`1.67s` macro mean and `12.04s` macro p95 with VAD 30. Results vary between
+runs, especially on long instrumental gaps in `House of Sleep` and
+`Upside Down`.
+
+The latest release `v1.14.1`, measured with the same runner and GPU, produced
+about `37.59s` macro mean and `80.63s` macro p95.
 
 The most reliable global improvement was enabling
 `condition_on_previous_text=False`. Historical benchmark:

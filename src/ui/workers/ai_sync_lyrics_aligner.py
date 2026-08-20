@@ -27,7 +27,7 @@ def is_available() -> bool:
 
 
 def _words(text: str) -> list[str]:
-    return re.findall(r"[a-z]+(?:'[a-z]+)?", text.lower().replace("’", "'"))
+    return re.findall(r"'?[a-z]+(?:'[a-z]*)?", text.lower().replace("’", "'"))
 
 
 def _get_dictionary(root: Path, lyrics: str, dataset: str) -> Path:
@@ -44,16 +44,20 @@ def _get_dictionary(root: Path, lyrics: str, dataset: str) -> Path:
     for word in _words(lyrics):
         if word in dictionary:
             continue
-        phonemes = [
-            token.rstrip("012")
-            for token in converter(word)
-            if re.fullmatch(r"[A-Z]+[012]?", token)
-        ]
+        source_word = word.strip("'")
+        phonemes = []
+        for token in converter(source_word):
+            if re.fullmatch(r"[A-Z]+[012]?", token):
+                phonemes.append(token.rstrip("012"))
         if phonemes:
             dictionary[word] = " ".join(phonemes)
     if not dictionary:
         raise RuntimeError("lyrics-aligner could not phonemize the supplied lyrics.")
     dictionary["'em"] = dictionary.get("em", "AH M")
+    for word in _words(lyrics):
+        base_word = word.strip("'")
+        if word not in dictionary and base_word in dictionary:
+            dictionary[word] = dictionary[base_word]
     with dictionary_path.open("wb") as handle:
         pickle.dump(dictionary, handle)
     return dictionary_path
@@ -91,7 +95,7 @@ def align(audio_path: str, lyrics: str, *, device: str) -> str:
             "--dataset-name",
             dataset,
             "--vad-threshold",
-            "0",
+            "30",
         ]
         if device == "cpu":
             env = os.environ.copy()
@@ -156,7 +160,56 @@ def _build_lrc(lyrics: str, onset_file: Path) -> str:
             seconds = predicted[first_match][0]
             minutes, remainder = divmod(seconds, 60)
             output.append(f"[{int(minutes):02d}:{remainder:05.2f}] {text}")
-    return "\n".join(output)
+    return "\n".join(_repair_repeated_block_timestamps(output))
+
+
+def _repair_repeated_block_timestamps(lines: list[str]) -> list[str]:
+    """Repair isolated timing jumps inside repeated four-line lyric blocks."""
+    parsed: list[tuple[float, str]] = []
+    for line in lines:
+        match = re.match(r"\[(\d+):(\d+\.\d+)\]\s+(.*)", line)
+        if match:
+            parsed.append(
+                (
+                    int(match.group(1)) * 60 + float(match.group(2)),
+                    match.group(3),
+                )
+            )
+
+    groups: dict[tuple[str, ...], list[int]] = {}
+    for index in range(len(parsed) - 3):
+        key = tuple(re.sub(r"[^a-z0-9]+", " ", parsed[index + offset][1].lower()).strip()
+                    for offset in range(4))
+        groups.setdefault(key, []).append(index)
+
+    claimed: set[int] = set()
+    for indices in sorted(groups.values(), key=len, reverse=True):
+        if len(indices) < 2:
+            continue
+        block_indices = {index + offset for index in indices for offset in range(4)}
+        if claimed & block_indices:
+            continue
+        claimed.update(block_indices)
+        reference = indices[0]
+        reference_offsets = [
+            parsed[reference + offset][0] - parsed[reference][0]
+            for offset in range(4)
+        ]
+        for index in indices[1:]:
+            start = parsed[index][0]
+            for offset in range(1, 4):
+                actual_offset = parsed[index + offset][0] - start
+                expected_offset = reference_offsets[offset]
+                if abs(actual_offset - expected_offset) > 5.0:
+                    parsed[index + offset] = (
+                        start + expected_offset,
+                        parsed[index + offset][1],
+                    )
+
+    return [
+        f"[{int(seconds // 60):02d}:{seconds % 60:05.2f}] {text}"
+        for seconds, text in parsed
+    ]
 
 
 __all__ = ["align", "is_available"]

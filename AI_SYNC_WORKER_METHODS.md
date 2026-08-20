@@ -9,14 +9,21 @@ It focuses on algorithmic behavior (what is detected, why, and how), not on a fu
 
 The runtime pipeline is:
 
-1. **ASR + forced alignment** to obtain timestamped word candidates. When fixed-window
+1. **Process isolation**: the Qt worker starts a child process for all model
+   loading and inference. Cancelling the worker terminates this process instead
+   of trying to interrupt PyTorch calls in-place.
+2. **Language detection** with a short WhisperX pass.
+3. **English lyrics-aligner routing**: configured English tracks use the
+   phonetic lyrics-aligner backend with VAD threshold 30.
+4. **ASR + forced alignment** to obtain timestamped word candidates for the
+   WhisperX fallback. When fixed-window
    ASR is selected because normal VAD has insufficient coverage, forced alignment is
    run independently per time bucket instead of on the concatenated transcript. This
    prevents one problematic region from causing WhisperX to drop the tail of the song.
-2. **Candidate reliability detection** (lexical, confidence, density, tail checks).
-3. **Global sequence alignment** (Viterbi over line→word mappings).
-4. **Tail-collapse detection and rescue** for repeated/ambiguous endings.
-5. **LRC reconstruction** preserving original plain-lyrics layout.
+5. **Candidate reliability detection** (lexical, confidence, density, tail checks).
+6. **Global sequence alignment** (Viterbi over line→word mappings).
+7. **Tail-collapse detection and rescue** for repeated/ambiguous endings.
+8. **LRC reconstruction** preserving original plain-lyrics layout.
 
 The system is designed to remain robust when ASR text is imperfect, repeated choruses exist, and late-song coverage is unstable.
 
