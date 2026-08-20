@@ -8,6 +8,7 @@ import pytest
 from tests import test_support as _test_support  # noqa: F401
 
 import ui.workers.ai_sync_worker as ai_sync_worker
+from ui.workers.ai_sync_demucs import candidate_quality
 from ui.workers.ai_sync_worker import (
     _align_lyrics_to_segments,
     _align_lyrics_to_segments_viterbi,
@@ -46,6 +47,71 @@ from ui.workers.ai_sync_worker import (
     _ensure_strictly_increasing_alignment_indices,
     get_missing_ai_dependencies,
 )
+
+
+def test_demucs_candidate_quality_prefers_consistent_repeated_blocks():
+    plain = "\n".join(
+        (
+            "You don't know",
+            "You don't know nothing yet",
+            "About the dreams I have",
+            "I will make you sleep",
+            "You don't know",
+            "You don't know nothing yet",
+            "About the dreams I have",
+            "I will make you sleep",
+        )
+    )
+    consistent = "\n".join(
+        (
+            "[00:10.00] You don't know",
+            "[00:14.00] You don't know nothing yet",
+            "[00:17.00] About the dreams I have",
+            "[00:22.00] I will make you sleep",
+            "[01:10.00] You don't know",
+            "[01:14.00] You don't know nothing yet",
+            "[01:17.00] About the dreams I have",
+            "[01:22.00] I will make you sleep",
+        )
+    )
+    collapsed = consistent.replace("[01:10.00]", "[00:40.00]").replace(
+        "[01:14.00]", "[00:44.00]"
+    ).replace("[01:17.00]", "[01:00.00]").replace("[01:22.00]", "[01:05.00]")
+
+    assert candidate_quality(consistent, plain) > candidate_quality(collapsed, plain)
+
+
+def test_optional_demucs_keeps_mix_when_candidate_proxy_does_not_win(monkeypatch):
+    monkeypatch.setattr(
+        ai_sync_worker,
+        "_align_with_lyrics_aligner",
+        lambda path, lyrics, *, device: f"[00:01.00] {lyrics}",
+    )
+    monkeypatch.setattr(ai_sync_worker, "_demucs_available", lambda: True)
+    monkeypatch.setattr(
+        ai_sync_worker,
+        "_separated_vocal_audio",
+        lambda path, *, device: _fake_vocal_context(),
+    )
+    monkeypatch.setattr(ai_sync_worker, "_demucs_candidate_quality", lambda raw, lyrics: 1.0)
+
+    lrc, source = ai_sync_worker._align_with_optional_demucs(
+        "track.flac",
+        "line",
+        device="cpu",
+        enable_demucs_candidate=True,
+    )
+
+    assert source == "mix"
+    assert lrc.startswith("[00:01.00]")
+
+
+class _fake_vocal_context:
+    def __enter__(self):
+        return "vocals.wav"
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        return False
 
 
 def test_format_ts_zero():

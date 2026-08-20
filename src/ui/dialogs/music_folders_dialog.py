@@ -375,6 +375,10 @@ class MusicFoldersDialog(QDialog):
         self.ai_fuzzy_threshold_spin.setRange(0, 100)
         self.ai_fuzzy_threshold_spin.setValue(60)
         self.ai_fuzzy_threshold_spin.setSuffix(" %")
+        self.ai_enable_demucs_chk = QCheckBox(
+            "Try optional Demucs vocal stem and keep it only if quality improves"
+        )
+        self.ai_enable_demucs_chk.setChecked(True)
 
         ai_sync_layout.addWidget(QLabel("Execution device"), 0, 0)
         ai_sync_layout.addWidget(self.ai_device_combo, 0, 1)
@@ -383,12 +387,13 @@ class MusicFoldersDialog(QDialog):
         ai_sync_layout.addWidget(self.ai_enable_fuzzy_chk, 2, 0, 1, 2)
         ai_sync_layout.addWidget(QLabel("Fuzzy threshold"), 3, 0)
         ai_sync_layout.addWidget(self.ai_fuzzy_threshold_spin, 3, 1)
+        ai_sync_layout.addWidget(self.ai_enable_demucs_chk, 4, 0, 1, 2)
         ai_sync_hint = QLabel(
             "These options control local AI auto-sync only. "
             "Changes apply to the next Auto Sync run."
         )
         ai_sync_hint.setWordWrap(True)
-        ai_sync_layout.addWidget(ai_sync_hint, 4, 0, 1, 2)
+        ai_sync_layout.addWidget(ai_sync_hint, 5, 0, 1, 2)
         ai_sync_tab_layout.addWidget(ai_sync_box)
         ai_sync_tab_layout.addStretch(1)
 
@@ -508,12 +513,19 @@ class MusicFoldersDialog(QDialog):
         ai_language_idx = self.ai_language_combo.findData(str(ai_settings.get("language") or "auto"))
         self.ai_language_combo.setCurrentIndex(max(0, ai_language_idx))
         # ensure widgets exist before setting
-        if hasattr(self, 'ai_enable_fuzzy_chk') and hasattr(self, 'ai_fuzzy_threshold_spin'):
+        if (
+            hasattr(self, "ai_enable_fuzzy_chk")
+            and hasattr(self, "ai_fuzzy_threshold_spin")
+            and hasattr(self, "ai_enable_demucs_chk")
+        ):
             self.ai_enable_fuzzy_chk.setChecked(bool(ai_settings.get("enable_fuzzy", True)))
             try:
                 self.ai_fuzzy_threshold_spin.setValue(int(ai_settings.get("fuzzy_threshold", 60)))
             except Exception:
                 self.ai_fuzzy_threshold_spin.setValue(60)
+            self.ai_enable_demucs_chk.setChecked(
+                bool(ai_settings.get("enable_demucs_candidate", True))
+            )
         lrclib_url = (config.lrclib_instance or "").strip()
         self.lrclib_instance_edit.setText("" if lrclib_url == "https://lrclib.net" else lrclib_url)
         self.excluded_paths_edit.setPlainText(config.scan_excluded_paths)
@@ -887,6 +899,7 @@ class MusicFoldersDialog(QDialog):
                 "language": str(self.ai_language_combo.currentData() or "auto"),
                 "enable_fuzzy": self.ai_enable_fuzzy_chk.isChecked(),
                 "fuzzy_threshold": int(self.ai_fuzzy_threshold_spin.value()),
+                "enable_demucs_candidate": self.ai_enable_demucs_chk.isChecked(),
             },
         )
         new_config = replace(

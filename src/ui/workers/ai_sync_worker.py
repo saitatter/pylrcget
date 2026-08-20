@@ -49,6 +49,11 @@ from .ai_sync_lrc import (
 )
 from .ai_sync_lyrics_aligner import align as _align_with_lyrics_aligner
 from .ai_sync_lyrics_aligner import is_available as _lyrics_aligner_available
+from .ai_sync_demucs import (
+    candidate_quality as _demucs_candidate_quality,
+    is_available as _demucs_available,
+    separated_vocal_audio as _separated_vocal_audio,
+)
 from .ai_sync_runtime import (
     _canonical_vad_options,
     _check_ai_sync_available,
@@ -84,6 +89,44 @@ from .ai_sync_transcription import (
 logger = logging.getLogger(__name__)
 
 
+def _align_with_optional_demucs(
+    audio_path: str,
+    plain_lyrics: str,
+    *,
+    device: str,
+    enable_demucs_candidate: bool,
+) -> tuple[str, str]:
+    """Align the mix and optionally keep a Demucs candidate when its proxy wins."""
+    mix_lrc = _align_with_lyrics_aligner(audio_path, plain_lyrics, device=device)
+    if (
+        not enable_demucs_candidate
+        or not mix_lrc.strip()
+        or not _demucs_available()
+    ):
+        return mix_lrc, "mix"
+
+    with _separated_vocal_audio(audio_path, device=device) as vocal_path:
+        vocal_lrc = _align_with_lyrics_aligner(vocal_path, plain_lyrics, device=device)
+    if not vocal_lrc.strip():
+        return mix_lrc, "mix"
+
+    mix_quality = _demucs_candidate_quality(mix_lrc, plain_lyrics)
+    vocal_quality = _demucs_candidate_quality(vocal_lrc, plain_lyrics)
+    if vocal_quality > mix_quality + 0.5:
+        logger.info(
+            "Selected Demucs vocal candidate (quality %.2f vs mix %.2f).",
+            vocal_quality,
+            mix_quality,
+        )
+        return vocal_lrc, "Demucs vocal"
+    logger.info(
+        "Kept original mix candidate (quality %.2f vs Demucs %.2f).",
+        mix_quality,
+        vocal_quality,
+    )
+    return mix_lrc, "mix"
+
+
 class AiSyncWorker(QThread):
     """Worker thread for AI-powered lyrics synchronization."""
 
@@ -103,6 +146,7 @@ class AiSyncWorker(QThread):
         enable_fuzzy: bool = True,
         fuzzy_threshold: int = 60,
         fuzzy_window_words: int = 12,
+        enable_demucs_candidate: bool = True,
         parent=None,
     ):
         super().__init__(parent)
@@ -115,6 +159,7 @@ class AiSyncWorker(QThread):
         self._enable_fuzzy = bool(enable_fuzzy)
         self._fuzzy_threshold = int(fuzzy_threshold)
         self._fuzzy_window_words = int(fuzzy_window_words)
+        self._enable_demucs_candidate = bool(enable_demucs_candidate)
 
     def _resolve_device(self) -> str:
         import torch
@@ -150,6 +195,7 @@ class AiSyncWorker(QThread):
             "enable_fuzzy": self._enable_fuzzy,
             "fuzzy_threshold": self._fuzzy_threshold,
             "fuzzy_window_words": self._fuzzy_window_words,
+            "enable_demucs_candidate": self._enable_demucs_candidate,
         }
         process = context.Process(
             target=run_ai_sync_process,
@@ -399,15 +445,17 @@ class AiSyncWorker(QThread):
                         "English detected — lyrics-aligner phonetic alignment…",
                     )
                     try:
-                        lrc = _align_with_lyrics_aligner(
+                        lrc, aligner_source = _align_with_optional_demucs(
                             self.audio_path,
                             self.plain_lyrics,
                             device=device,
+                            enable_demucs_candidate=self._enable_demucs_candidate,
                         )
                         if lrc.strip():
                             self.completed.emit(
                                 True,
-                                "Lyrics synchronized successfully with lyrics-aligner.",
+                                "Lyrics synchronized successfully with lyrics-aligner "
+                                f"({aligner_source}).",
                                 lrc,
                             )
                             return
@@ -438,15 +486,17 @@ class AiSyncWorker(QThread):
                     "Using lyrics-aligner for English singing…",
                 )
                 try:
-                    lrc = _align_with_lyrics_aligner(
+                    lrc, aligner_source = _align_with_optional_demucs(
                         self.audio_path,
                         self.plain_lyrics,
                         device=device,
+                        enable_demucs_candidate=self._enable_demucs_candidate,
                     )
                     if lrc.strip():
                         self.completed.emit(
                             True,
-                            "Lyrics synchronized successfully with lyrics-aligner.",
+                            "Lyrics synchronized successfully with lyrics-aligner "
+                            f"({aligner_source}).",
                             lrc,
                         )
                         return

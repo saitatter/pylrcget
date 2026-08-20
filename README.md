@@ -153,9 +153,11 @@ The feature lives inside the track lyrics editor. Select a track, open the lyric
 
 1. WhisperX performs a short language-detection pass
 2. For English, lyrics-aligner aligns the supplied lyrics phonetically with VAD threshold 30
-3. Other languages, missing backends, or backend errors use the full WhisperX alignment pipeline
-4. AI inference runs in a child process so Stop can terminate it immediately
-5. The result is placed in the synced lyrics editor as an unsaved draft
+3. If optional Demucs is installed, a vocal-stem candidate is also tested and kept only when
+   its no-ground-truth quality proxy is better; the original mix remains the fallback
+4. Other languages, missing backends, or backend errors use the full WhisperX alignment pipeline
+5. AI inference runs in a child process so Stop can terminate it immediately
+6. The result is placed in the synced lyrics editor as an unsaved draft
 
 ### Install AI dependencies
 
@@ -185,6 +187,18 @@ The checkout must contain `align.py`, `model_parameters.pth`, and
 `files\phoneme2idx.pickle`. The backend is used only when Whisper detects English.
 For stable results, the checkout's `align.py` should call `lyrics_aligner.eval()`
 after loading the checkpoint.
+
+### Optional Demucs vocal candidate
+
+Demucs is not required for AI Auto-Sync and is not part of the `ai` extra. If it is
+installed separately, the AI Sync settings can test a vocal stem before accepting it:
+
+```bash
+pip install demucs
+```
+
+The original mix is always retained as the safe fallback when the candidate quality
+proxy does not improve.
 
 > **Python compatibility:** the current WhisperX AI dependency set supports Python
 > 3.10-3.13. Python 3.14 is not supported because its required `ctranslate2`

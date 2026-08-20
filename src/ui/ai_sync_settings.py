@@ -32,6 +32,7 @@ _DEFAULT_AI_SYNC_SETTINGS = {
     "language": "auto",
     "enable_fuzzy": True,
     "fuzzy_threshold": 60,
+    "enable_demucs_candidate": True,
 }
 
 
@@ -92,6 +93,13 @@ def load_ai_sync_settings(ui_state_json: str) -> dict[str, object]:
             int(_DEFAULT_AI_SYNC_SETTINGS["fuzzy_threshold"]),
             minimum=0,
             maximum=100,
+        ),
+        "enable_demucs_candidate": _coerce_bool(
+            raw.get(
+                "enable_demucs_candidate",
+                _DEFAULT_AI_SYNC_SETTINGS["enable_demucs_candidate"],
+            ),
+            bool(_DEFAULT_AI_SYNC_SETTINGS["enable_demucs_candidate"]),
         ),
     }
 

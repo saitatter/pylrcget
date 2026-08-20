@@ -12,6 +12,7 @@ def test_load_ai_sync_settings_defaults_when_missing():
     assert loaded["language"] == "auto"
     assert loaded["enable_fuzzy"] is True
     assert loaded["fuzzy_threshold"] == 60
+    assert loaded["enable_demucs_candidate"] is True
 
 
 def test_load_ai_sync_settings_coerces_legacy_types():
@@ -22,6 +23,7 @@ def test_load_ai_sync_settings_coerces_legacy_types():
                 "language": "ro",
                 "enable_fuzzy": "false",
                 "fuzzy_threshold": "72",
+                "enable_demucs_candidate": "false",
             }
         }
     )
@@ -30,6 +32,7 @@ def test_load_ai_sync_settings_coerces_legacy_types():
     assert loaded["language"] == "ro"
     assert loaded["enable_fuzzy"] is False
     assert loaded["fuzzy_threshold"] == 72
+    assert loaded["enable_demucs_candidate"] is False
 
 
 def test_load_ai_sync_settings_clamps_invalid_threshold():
@@ -47,6 +50,7 @@ def test_merge_ai_sync_settings_preserves_unrelated_ui_state():
             "language": "en",
             "enable_fuzzy": False,
             "fuzzy_threshold": 70,
+            "enable_demucs_candidate": False,
         },
     )
     parsed = json.loads(merged)
@@ -55,3 +59,4 @@ def test_merge_ai_sync_settings_preserves_unrelated_ui_state():
     assert parsed["ai_sync"]["language"] == "en"
     assert parsed["ai_sync"]["enable_fuzzy"] is False
     assert parsed["ai_sync"]["fuzzy_threshold"] == 70
+    assert parsed["ai_sync"]["enable_demucs_candidate"] is False

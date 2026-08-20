@@ -1548,6 +1548,9 @@ class MainWindow(QMainWindow):
             language=str(ai_sync_settings.get("language") or "auto"),
             enable_fuzzy=bool(ai_sync_settings.get("enable_fuzzy", True)),
             fuzzy_threshold=int(ai_sync_settings.get("fuzzy_threshold", 60)),
+            enable_demucs_candidate=bool(
+                ai_sync_settings.get("enable_demucs_candidate", True)
+            ),
         )
         worker.progress.connect(self._on_ai_sync_progress)
         worker.completed.connect(
