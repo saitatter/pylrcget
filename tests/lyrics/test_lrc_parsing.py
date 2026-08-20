@@ -1,9 +1,8 @@
 """Tests for LRC parsing functions moved to core.utils."""
 from __future__ import annotations
 
+from core.utils import _ts_to_ms, ms_to_ts, parse_lrc, parse_ts_str
 from tests import test_support as _test_support  # noqa: F401
-
-from core.utils import parse_lrc, ms_to_ts, parse_ts_str, _ts_to_ms
 
 
 def test_ms_to_ts_basic():

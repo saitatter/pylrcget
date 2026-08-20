@@ -27,7 +27,6 @@ from ui.theme_tokens import STYLE_TOKENS
 from ui.widgets.empty_state_widget import EmptyStateWidget
 from ui.widgets.sortable_header_view import SortableHeaderView
 
-
 TRACK_ID_ROLE = Qt.ItemDataRole.UserRole
 TRACK_EXISTS_ROLE = Qt.ItemDataRole.UserRole + 1
 

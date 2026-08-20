@@ -343,7 +343,9 @@ def publish_instrumental_to_lrclib(window, track_ids: list[int]) -> None:
     if reply != QMessageBox.StandardButton.Yes:
         return
 
-    from ui.workers.bulk_publish_instrumental_worker import BulkPublishInstrumentalWorker
+    from ui.workers.bulk_publish_instrumental_worker import (
+        BulkPublishInstrumentalWorker,
+    )
 
     config = get_config(window.app_state.db)
     lrclib_url = window._normalize_lrclib_base(config.lrclib_instance)

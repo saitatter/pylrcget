@@ -1,10 +1,10 @@
-from tests.widgets_navigation._shared import *
-from PySide6.QtWidgets import QToolButton
-from PySide6.QtWidgets import QDialog
 from dataclasses import replace
+
+from PySide6.QtWidgets import QDialog, QToolButton
 
 from db.models import Config
 from db.queries import get_config, set_config
+from tests.widgets_navigation._shared import *
 from ui.main_window_parts.preferences import persist_window_state_payload
 
 

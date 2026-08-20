@@ -2,18 +2,32 @@
 from __future__ import annotations
 
 from .ai_sync_alignment_candidates import (
-    _anchor_bonus, _build_guided_word_ranges, _build_same_phrase_rewind_targets,
-    _build_speech_candidate_mask, _compute_line_to_words_score, _expected_word_position,
-    _find_confidence_anchors, _late_line_candidate_start_floor,
-    _late_line_expected_position_bonus, _manual_anchor_bonus, _prepare_manual_line_anchors,
-    _same_phrase_rewind_penalty, _same_phrase_rewind_transition_penalty, _words_match,
+    _anchor_bonus,
+    _build_guided_word_ranges,
+    _build_same_phrase_rewind_targets,
+    _build_speech_candidate_mask,
+    _compute_line_to_words_score,
+    _expected_word_position,
+    _find_confidence_anchors,
+    _late_line_candidate_start_floor,
+    _late_line_expected_position_bonus,
+    _manual_anchor_bonus,
+    _prepare_manual_line_anchors,
+    _same_phrase_rewind_penalty,
+    _same_phrase_rewind_transition_penalty,
+    _words_match,
 )
 from .ai_sync_alignment_tail import (
     _ensure_strictly_increasing_alignment_indices,
-    _tail_rescue_alignment_indices, _tail_rescue_collapsed_cluster_indices,
-    _tail_rescue_forward_jump_indices, _tail_rescue_rewind_target_lag_indices,
+    _tail_rescue_alignment_indices,
+    _tail_rescue_collapsed_cluster_indices,
+    _tail_rescue_forward_jump_indices,
+    _tail_rescue_rewind_target_lag_indices,
 )
-from .ai_sync_lrc import _build_lrc_from_plain_layout, _build_lrc_from_plain_lines_and_segments
+from .ai_sync_lrc import (
+    _build_lrc_from_plain_layout,
+    _build_lrc_from_plain_lines_and_segments,
+)
 
 
 def _align_lyrics_to_segments_viterbi(

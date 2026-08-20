@@ -1,9 +1,11 @@
 # ui/track_table_model.py
 from __future__ import annotations
+
 from collections.abc import Sequence
 
 from PySide6.QtCore import QAbstractTableModel, QModelIndex, Qt
 from PySide6.QtGui import QColor, QFont
+
 from core.tracklist_models import LyricsState, TrackListRow
 from ui.theme_tokens import STYLE_TOKENS
 

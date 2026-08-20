@@ -9,7 +9,12 @@ from core.utils import prepare_input
 from db.models import Track
 from db.query_modules.common import escape_like
 from db.query_modules.config_queries import get_config
-from db.query_modules.entity_queries import add_album, add_artist, find_album, find_artist
+from db.query_modules.entity_queries import (
+    add_album,
+    add_artist,
+    find_album,
+    find_artist,
+)
 from library import scan_library
 
 

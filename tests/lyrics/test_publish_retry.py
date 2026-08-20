@@ -7,8 +7,8 @@ import requests
 
 from tests import test_support as _test_support  # noqa: F401
 from ui.dialogs.publish_lyrics_dialog import PublishWorker
-from ui.workers.bulk_publish_worker import BulkPublishWorker
 from ui.workers.bulk_publish_instrumental_worker import BulkPublishInstrumentalWorker
+from ui.workers.bulk_publish_worker import BulkPublishWorker
 
 
 class PublishRetryTests(TestCase):

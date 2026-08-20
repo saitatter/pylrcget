@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from PySide6.QtCore import QThread, Signal
+
 from ui.services.lyrics_download_service import download_track_lyrics
+
 
 class LyricsDownloadWorker(QThread):
     progress = Signal(str)

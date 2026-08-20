@@ -6,11 +6,11 @@ import threading
 from dataclasses import dataclass
 from enum import Enum, auto
 
-from PySide6.QtCore import QObject, Signal, QTimer
-from PySide6.QtMultimedia import QMediaPlayer, QAudioOutput
-from PySide6.QtCore import QUrl
+from PySide6.QtCore import QObject, QTimer, QUrl, Signal
+from PySide6.QtMultimedia import QAudioOutput, QMediaPlayer
 
-from .mpv_ipc import MpvIpcBackend, MpvBackendConfig
+from .mpv_ipc import MpvBackendConfig, MpvIpcBackend
+
 
 class PlayerStatus(Enum):
     STOPPED = auto()

@@ -5,9 +5,9 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from tests import test_support as _test_support  # noqa: F401
 from db.database import CURRENT_DB_VERSION
 from db.migrations import upgrade_database_if_needed
+from tests import test_support as _test_support  # noqa: F401
 
 
 class MigrationTests(unittest.TestCase):

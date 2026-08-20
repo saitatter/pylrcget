@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-
 DOWNLOAD_MODE_LABELS: dict[str, str] = {
     "prefer_synced": "Prefer synced",
     "synced_only": "Synced only",

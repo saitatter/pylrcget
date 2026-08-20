@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
-from dataclasses import dataclass
 import sqlite3
 import threading
+from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
+from dataclasses import dataclass
 
 from PySide6.QtCore import QObject, QThread, Signal
 
@@ -15,7 +15,6 @@ from ui.services.lyrics_match_retry import (
     build_retry_search_queries,
     choose_best_candidate,
 )
-
 
 RELAXED_RETRY_ACCEPT_SCORE = 90
 MAX_PARALLEL_RETRY_WORKERS = 4

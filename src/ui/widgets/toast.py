@@ -2,14 +2,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from PySide6.QtCore import Qt, QTimer, QEasingCurve, QPoint, QPropertyAnimation
+from PySide6.QtCore import QEasingCurve, QPoint, QPropertyAnimation, Qt, QTimer
 from PySide6.QtWidgets import (
-    QWidget,
     QFrame,
-    QLabel,
-    QHBoxLayout,
-    QToolButton,
     QGraphicsOpacityEffect,
+    QHBoxLayout,
+    QLabel,
+    QToolButton,
+    QWidget,
 )
 
 from ui.spacing import SPACE_2, SPACE_3, set_layout_spacing

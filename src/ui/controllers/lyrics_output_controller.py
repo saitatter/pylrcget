@@ -1,13 +1,16 @@
 from __future__ import annotations
 
-from collections.abc import Callable
 import logging
+from collections.abc import Callable
 
 from PySide6.QtCore import QObject
 
 from db.models import Config
 from ui.widgets.download_progress_overlay import DownloadProgressOverlay
-from ui.workers.bulk_lyrics_export_worker import BulkLyricsExportWorker, TrackExportScope
+from ui.workers.bulk_lyrics_export_worker import (
+    BulkLyricsExportWorker,
+    TrackExportScope,
+)
 from ui.workers.track_output_sync_worker import TrackOutputSyncWorker
 
 logger = logging.getLogger(__name__)

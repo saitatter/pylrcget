@@ -1,14 +1,12 @@
 from __future__ import annotations
 
-from dataclasses import replace
 import tempfile
 import unittest
+from dataclasses import replace
 from pathlib import Path
 from unittest.mock import patch
 
-from tests import test_support as _test_support  # noqa: F401
 from core.models import FsTrack
-from tests.test_support import make_fs_track, touch_text
 from db.database import add_tracks, get_album_rows, initialize_database
 from db.queries import (
     clear_download_history,
@@ -19,17 +17,19 @@ from db.queries import (
     get_download_history_rows,
     get_publish_history_rows,
     get_similar_lyrics_track_rows,
+    get_track_by_id,
     get_track_list_rows,
     get_track_rows,
-    get_track_by_id,
-    refresh_track_from_file,
-    record_download_history_batch,
     record_download_history,
+    record_download_history_batch,
     record_publish_history,
+    refresh_track_from_file,
     set_config,
     update_track_dirty_lyrics,
     update_track_plain_lyrics,
 )
+from tests import test_support as _test_support  # noqa: F401
+from tests.test_support import make_fs_track, touch_text
 
 
 class ArtistAlbumQueryTests(unittest.TestCase):

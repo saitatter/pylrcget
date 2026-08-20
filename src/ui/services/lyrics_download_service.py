@@ -1,22 +1,35 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 import logging
 import re
 import sqlite3
 import time
+from dataclasses import dataclass
 from typing import Callable
 
 from requests import exceptions as requests_exceptions
 
-from core.lrclib_client import LrcLibAPI, LrcLibError, NotFoundError, RateLimitError, ServerError
-
 from core.embed_lyrics import embed_lyrics_for_track
+from core.lrclib_client import (
+    LrcLibAPI,
+    LrcLibError,
+    NotFoundError,
+    RateLimitError,
+    ServerError,
+)
 from core.lyrics_sidecar import export_lyrics_sidecars
-from db.database import get_config, get_track_by_id, update_track_plain_lyrics, update_track_synced_lyrics
+from db.database import (
+    get_config,
+    get_track_by_id,
+    update_track_plain_lyrics,
+    update_track_synced_lyrics,
+)
 from db.models import Config, Track
 from ui.services.download_modes import normalize_download_mode
-from ui.services.lyrics_match_retry import build_retry_search_queries, choose_best_candidate
+from ui.services.lyrics_match_retry import (
+    build_retry_search_queries,
+    choose_best_candidate,
+)
 
 logger = logging.getLogger(__name__)
 

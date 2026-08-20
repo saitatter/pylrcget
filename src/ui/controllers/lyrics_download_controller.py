@@ -1,13 +1,14 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from datetime import datetime, timezone
 import logging
 import sqlite3
+from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Callable
 
 from PySide6.QtCore import QObject, QTimer
 
+from core.tracklist_models import DownloadState
 from db.models import Track
 from db.queries import (
     get_config,
@@ -15,14 +16,16 @@ from db.queries import (
     get_track_ids_for_download_mode,
     record_download_history_batch,
 )
-from core.tracklist_models import DownloadState
 from ui.dialogs.batch_lyrics_match_dialog import BatchLyricsMatchDialog
-from ui.services.feedback import notify_user
 from ui.services.download_modes import download_mode_label, no_missing_tracks_message
+from ui.services.feedback import notify_user
 from ui.services.lyrics_match_retry import LyricsMatchCandidate
 from ui.widgets.download_progress_overlay import DownloadProgressOverlay
+from ui.workers.bulk_lyrics_download_worker import (
+    BulkDownloadStats,
+    BulkLyricsDownloadWorker,
+)
 from ui.workers.lyrics_apply_worker import LyricsApplyCandidatesWorker
-from ui.workers.bulk_lyrics_download_worker import BulkDownloadStats, BulkLyricsDownloadWorker
 from ui.workers.lyrics_retry_search_worker import LyricsRetrySearchWorker
 
 logger = logging.getLogger(__name__)

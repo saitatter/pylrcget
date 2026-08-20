@@ -7,7 +7,10 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from tests.test_support import HAS_QT, qt_app
-from ui.workers.bulk_lyrics_export_worker import BulkLyricsExportWorker, TrackExportScope
+from ui.workers.bulk_lyrics_export_worker import (
+    BulkLyricsExportWorker,
+    TrackExportScope,
+)
 
 
 @unittest.skipUnless(HAS_QT, "PySide6 is required for widget tests")

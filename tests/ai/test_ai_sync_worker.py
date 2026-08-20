@@ -3,48 +3,46 @@ from __future__ import annotations
 
 import builtins
 
-
-from tests import test_support as _test_support  # noqa: F401
-
-import ui.workers.ai_sync_worker as ai_sync_worker
 import ui.workers.ai_sync_runtime as ai_sync_runtime
+import ui.workers.ai_sync_worker as ai_sync_worker
+from tests import test_support as _test_support  # noqa: F401
 from ui.workers.ai_sync_demucs import AlignmentCandidate, candidate_quality
 from ui.workers.ai_sync_worker import (
     _align_lyrics_to_segments,
     _align_lyrics_to_segments_viterbi,
-    _approximate_word_timestamps_from_segments,
-    _transcribe_tail_window,
-    _transcribe_fixed_windows,
     _align_segments_per_chunks,
-    _should_use_per_chunk_alignment,
+    _approximate_word_timestamps_from_segments,
+    _build_guided_word_ranges,
+    _build_lrc_from_plain_lines_and_segments,
+    _build_lrc_from_segments,
     _build_same_phrase_rewind_targets,
     _build_speech_candidate_mask,
-    _build_guided_word_ranges,
-    _build_lrc_from_segments,
-    _build_lrc_from_plain_lines_and_segments,
     _check_ai_sync_available,
     _clear_inference_caches,
+    _ensure_strictly_increasing_alignment_indices,
+    _find_targeted_retry_window,
+    _format_ts,
     _get_cached_align_model,
     _get_cached_whisperx_model,
-    _format_ts,
+    _late_line_candidate_start_floor,
+    _late_line_expected_position_bonus,
     _normalized_transcribe_language,
     _prepare_manual_line_anchors,
-    _late_line_expected_position_bonus,
-    _late_line_candidate_start_floor,
+    _repair_repeated_prefix_timestamp_gaps,
     _segment_alignment_quality,
     _segment_reliable_tail_seconds,
     _segment_tail_seconds,
-    _should_use_relaxed_vad_result,
-    _should_retry_with_relaxed_vad,
     _select_best_relaxed_segments,
+    _should_retry_with_relaxed_vad,
     _should_retry_with_short_windows,
-    _find_targeted_retry_window,
+    _should_use_per_chunk_alignment,
+    _should_use_relaxed_vad_result,
     _tail_rescue_alignment_indices,
-    _tail_rescue_forward_jump_indices,
     _tail_rescue_collapsed_cluster_indices,
+    _tail_rescue_forward_jump_indices,
     _tail_rescue_rewind_target_lag_indices,
-    _repair_repeated_prefix_timestamp_gaps,
-    _ensure_strictly_increasing_alignment_indices,
+    _transcribe_fixed_windows,
+    _transcribe_tail_window,
     get_missing_ai_dependencies,
 )
 

@@ -14,7 +14,6 @@ from mutagen.musepack import Musepack
 from mutagen.oggopus import OggOpus
 from mutagen.oggvorbis import OggVorbis
 
-
 _SIDECAR_COVER_NAMES = (
     "cover.jpg",
     "cover.jpeg",

@@ -4,12 +4,20 @@ import sqlite3
 from collections.abc import Callable
 from dataclasses import replace
 
-from PySide6.QtCore import QObject, QTimer, Qt
+from PySide6.QtCore import QObject, Qt, QTimer
 from PySide6.QtWidgets import QLabel, QLayout, QTabWidget, QToolButton, QWidget
 
 from db.queries import get_album_by_id, get_artist_by_id, get_config, set_config
-from ui.library_routes import LibraryRoute, album_artists_all, albums_all, artists_all, deserialize_route, route_breadcrumbs, serialize_route, tracks_all
-
+from ui.library_routes import (
+    LibraryRoute,
+    album_artists_all,
+    albums_all,
+    artists_all,
+    deserialize_route,
+    route_breadcrumbs,
+    serialize_route,
+    tracks_all,
+)
 
 ApplyRouteCallback = Callable[[LibraryRoute], None]
 DisplayNameCallback = Callable[[str | None], str]

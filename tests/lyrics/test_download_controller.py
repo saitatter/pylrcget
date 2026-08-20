@@ -10,9 +10,14 @@ from unittest.mock import patch
 
 from PySide6.QtCore import QObject, Signal
 
-from tests import test_support as _test_support  # noqa: F401
-from db.queries import get_config, get_track_by_id, set_config, update_track_plain_lyrics
 from db.database import add_tracks, initialize_database
+from db.queries import (
+    get_config,
+    get_track_by_id,
+    set_config,
+    update_track_plain_lyrics,
+)
+from tests import test_support as _test_support  # noqa: F401
 from tests.test_support import make_fs_track, qt_app, touch_text
 from ui.controllers.lyrics_download_controller import LyricsDownloadController
 from ui.services.lyrics_match_retry import LyricsMatchCandidate

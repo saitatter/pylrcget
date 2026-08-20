@@ -1,5 +1,6 @@
-from tests.widgets_navigation._shared import *
 from PySide6.QtWidgets import QMenu
+
+from tests.widgets_navigation._shared import *
 
 
 @unittest.skipUnless(HAS_QT, "PySide6 is required for widget tests")

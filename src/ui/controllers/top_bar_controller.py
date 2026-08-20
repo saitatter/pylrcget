@@ -14,8 +14,8 @@ from PySide6.QtWidgets import (
 )
 
 from ui.icon_loader import load_svg_icon
-from ui.spacing import SPACE_1, SPACE_2, SPACE_3, set_layout_spacing
 from ui.services.download_modes import download_missing_tooltip
+from ui.spacing import SPACE_1, SPACE_2, SPACE_3, set_layout_spacing
 
 
 class TopBarController(QWidget):

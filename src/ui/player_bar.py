@@ -3,15 +3,15 @@ from __future__ import annotations
 import html
 import logging
 
-from PySide6.QtCore import QEvent, QRectF, QSize, Qt, Signal, QTimer
+from PySide6.QtCore import QEvent, QRectF, QSize, Qt, QTimer, Signal
 from PySide6.QtGui import QColor, QFont, QLinearGradient, QPainter, QPen, QPixmap
 from PySide6.QtWidgets import (
     QComboBox,
     QGridLayout,
     QHBoxLayout,
     QLabel,
-    QSlider,
     QSizePolicy,
+    QSlider,
     QStyle,
     QToolButton,
     QVBoxLayout,

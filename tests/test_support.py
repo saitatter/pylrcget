@@ -20,6 +20,7 @@ from library.scan_library import get_audio_file_signature
 try:
     from PySide6.QtCore import Qt
     from PySide6.QtWidgets import QApplication
+
     from ui.widgets.album_list_widget import AlbumListWidget
     from ui.widgets.artist_list_widget import ArtistListWidget
     from ui.widgets.track_list_widget import TrackListWidget

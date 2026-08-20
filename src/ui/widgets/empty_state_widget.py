@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel, QPushButton
+from PySide6.QtWidgets import QLabel, QPushButton, QVBoxLayout, QWidget
 
 from ui.icon_loader import load_svg_pixmap
 from ui.spacing import SPACE_2, SPACE_3, SPACE_4, set_layout_spacing

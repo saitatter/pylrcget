@@ -3,13 +3,13 @@ from __future__ import annotations
 from PySide6.QtCore import QEvent, QRect, Qt, Signal
 from PySide6.QtGui import QCursor, QPainter, QPen
 from PySide6.QtWidgets import (
-    QStyle,
-    QStyledItemDelegate,
-    QStyleOptionViewItem,
     QDialog,
     QDialogButtonBox,
     QHeaderView,
     QLabel,
+    QStyle,
+    QStyledItemDelegate,
+    QStyleOptionViewItem,
     QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
@@ -18,7 +18,6 @@ from PySide6.QtWidgets import (
 from db.models import Track
 from ui.delegates.actions_delegate import _theme_color
 from ui.style_loader import load_stylesheet
-
 
 TRACK_ID_ROLE = Qt.ItemDataRole.UserRole
 TRACK_ROLE = Qt.ItemDataRole.UserRole + 1

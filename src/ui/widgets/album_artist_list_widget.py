@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from typing import Iterable
 
-from PySide6.QtCore import Qt, Signal, QModelIndex, QItemSelectionModel
+from PySide6.QtCore import QItemSelectionModel, QModelIndex, Qt, Signal
 from PySide6.QtGui import QStandardItem, QStandardItemModel
 from PySide6.QtWidgets import (
     QHeaderView,
@@ -29,8 +29,9 @@ from PySide6.QtWidgets import (
 
 from db.database import get_directories
 from db.query_modules.entity_queries import get_album_artist_letter_counts
-from ui.style_loader import load_stylesheet
 from ui.library_routes import LibraryRoute, album_artists_detail
+from ui.style_loader import load_stylesheet
+from ui.widgets.album_list_widget import AlbumListWidget
 from ui.widgets.alpha_index_widget import AlphaIndexWidget
 from ui.widgets.empty_state_widget import EmptyStateWidget
 from ui.widgets.library_rows import ArtistListRow
@@ -40,7 +41,6 @@ from ui.widgets.library_table_utils import (
     should_load_more,
 )
 from ui.widgets.sortable_header_view import SortableHeaderView
-from ui.widgets.album_list_widget import AlbumListWidget
 
 
 class AlbumArtistListWidget(QWidget):

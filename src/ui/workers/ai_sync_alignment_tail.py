@@ -1,11 +1,12 @@
 """Tail-rescue heuristics for lyric alignment."""
 from __future__ import annotations
 
-
-
 from bisect import bisect_left, bisect_right
 
-from .ai_sync_alignment_candidates import _expected_time_position, _expected_word_position
+from .ai_sync_alignment_candidates import (
+    _expected_time_position,
+    _expected_word_position,
+)
 
 
 def _tail_rescue_alignment_indices(

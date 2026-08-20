@@ -53,6 +53,7 @@ def _canonical_vad_options(vad_options: dict | None) -> tuple[tuple[str, float],
 def _patch_whisperx_audio_loading() -> None:
     try:
         import shutil
+
         import whisperx.audio
         orig_load_audio = whisperx.audio.load_audio
 

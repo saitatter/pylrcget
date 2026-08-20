@@ -4,8 +4,7 @@ import tempfile
 import unittest
 import zipfile
 from pathlib import Path
-from unittest.mock import MagicMock
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from tests import test_support as _test_support  # noqa: F401
 from ui.services import update_service

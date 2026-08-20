@@ -6,7 +6,6 @@ from unittest.mock import patch
 
 from mutagen.apev2 import APETextValue
 
-from tests import test_support as _test_support  # noqa: F401
 from core.embed_lyrics import (
     ASF_PLAIN_KEY,
     ASF_SYNCED_KEY,
@@ -20,6 +19,7 @@ from core.embed_lyrics import (
     embed_lyrics_in_file,
 )
 from library.scan_library import read_embedded_lyrics_from_audio
+from tests import test_support as _test_support  # noqa: F401
 
 
 class _FakeTagAudio(dict):

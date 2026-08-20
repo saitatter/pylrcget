@@ -26,7 +26,6 @@ from PySide6.QtWidgets import (
 )
 
 from core.lrclib_client import LrcLibAPI
-
 from ui.dialogs.publish_lyrics_dialog import PublishProgress, PublishWorker
 from ui.spacing import SPACE_2, SPACE_3, SPACE_4, set_layout_spacing
 

@@ -1,31 +1,29 @@
 # ui/lyrics_view.py
 from __future__ import annotations
 
-import logging
 import json
+import logging
 from bisect import bisect_right
-from db.queries import get_config
 
-from PySide6.QtCore import QEvent, Qt, Signal, QTimer
+from PySide6.QtCore import QEvent, Qt, QTimer, Signal
 from PySide6.QtGui import QColor, QKeySequence, QShortcut, QTextCursor
 from PySide6.QtWidgets import (
     QApplication,
+    QDoubleSpinBox,
+    QHBoxLayout,
     QHeaderView,
+    QLabel,
+    QMenu,
+    QPushButton,
     QSizePolicy,
-    QWidget, QVBoxLayout, QLabel, QStackedWidget,
-    QTextEdit, QTableWidget, QTableWidgetItem,
-    QPushButton, QHBoxLayout, QDoubleSpinBox, QMenu
+    QStackedWidget,
+    QTableWidget,
+    QTableWidgetItem,
+    QTextEdit,
+    QVBoxLayout,
+    QWidget,
 )
 
-from ui.spacing import SPACE_2, SPACE_3, set_layout_spacing
-from ui.style_loader import load_stylesheet
-from ui.widgets.empty_state_widget import EmptyStateWidget
-from ui.widgets.lyrics_editor_parts import FlowLayout, hotkeys as lyrics_editor_hotkeys
-from core.utils import (
-    ms_to_ts as _ms_to_ts,
-    parse_ts_str as _parse_ts_str,
-    parse_lrc,
-)
 from core.lyrics_validator import (
     LyricsValidationProblem,
     autofix_plain_lyrics,
@@ -33,7 +31,22 @@ from core.lyrics_validator import (
     validate_plain_lyrics,
     validate_synced_lyrics,
 )
+from core.utils import (
+    ms_to_ts as _ms_to_ts,
+)
+from core.utils import (
+    parse_lrc,
+)
+from core.utils import (
+    parse_ts_str as _parse_ts_str,
+)
+from db.queries import get_config
 from ui.hotkeys import HOTKEY_SPECS, effective_hotkey_text, lyrics_hotkey_defaults
+from ui.spacing import SPACE_2, SPACE_3, set_layout_spacing
+from ui.style_loader import load_stylesheet
+from ui.widgets.empty_state_widget import EmptyStateWidget
+from ui.widgets.lyrics_editor_parts import FlowLayout
+from ui.widgets.lyrics_editor_parts import hotkeys as lyrics_editor_hotkeys
 
 TIMESTAMP_MS_ROLE = Qt.ItemDataRole.UserRole
 TIMESTAMP_VALID_ROLE = Qt.ItemDataRole.UserRole + 1

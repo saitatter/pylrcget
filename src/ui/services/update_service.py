@@ -1,26 +1,25 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 import hashlib
 import importlib.metadata
+import json
 import logging
 import os
-from pathlib import Path
-from contextlib import nullcontext
-import json
 import shlex
 import shutil
 import subprocess
 import sys
 import tarfile
 import tempfile
-import tomllib
 import uuid
 import zipfile
+from contextlib import nullcontext
+from dataclasses import dataclass
+from pathlib import Path
 
 import requests
+import tomllib
 from packaging.version import InvalidVersion, Version
-
 
 logger = logging.getLogger(__name__)
 

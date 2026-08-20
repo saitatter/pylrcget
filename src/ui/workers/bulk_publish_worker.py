@@ -7,9 +7,9 @@ import time
 from PySide6.QtCore import QThread, Signal
 from requests import exceptions as requests_exceptions
 
+from core.lrclib_client import LrcLibAPI, RateLimitError, ServerError
 from core.utils import plain_text_from_lrc
 from db.queries import get_track_by_id
-from core.lrclib_client import LrcLibAPI, RateLimitError, ServerError
 
 logger = logging.getLogger(__name__)
 

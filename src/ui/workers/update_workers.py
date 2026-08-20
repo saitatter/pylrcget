@@ -4,7 +4,11 @@ from pathlib import Path
 
 from PySide6.QtCore import QThread, Signal
 
-from ui.services.update_service import ReleaseAssetInfo, check_for_updates, download_release_asset
+from ui.services.update_service import (
+    ReleaseAssetInfo,
+    check_for_updates,
+    download_release_asset,
+)
 
 
 class UpdateCheckWorker(QThread):

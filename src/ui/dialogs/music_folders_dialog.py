@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-from dataclasses import replace
 import json
 import os
 import re
+from dataclasses import replace
 
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QFont, QKeySequence
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -14,12 +15,12 @@ from PySide6.QtWidgets import (
     QGridLayout,
     QGroupBox,
     QHBoxLayout,
+    QKeySequenceEdit,
     QLabel,
     QLineEdit,
     QListWidget,
     QMessageBox,
     QPushButton,
-    QKeySequenceEdit,
     QScrollArea,
     QSpinBox,
     QTabWidget,
@@ -27,7 +28,6 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from PySide6.QtGui import QFont, QKeySequence
 
 from core.lyrics_sidecar import DEFAULT_LYRICS_FILE_PATTERN
 from db.database import get_config, get_directories, set_config, set_directories
@@ -38,7 +38,12 @@ from ui.ai_sync_settings import (
     load_ai_sync_settings,
     merge_ai_sync_settings,
 )
-from ui.hotkeys import HOTKEY_SPECS, find_duplicate_hotkeys, parse_hotkey_bindings, serialize_hotkey_bindings
+from ui.hotkeys import (
+    HOTKEY_SPECS,
+    find_duplicate_hotkeys,
+    parse_hotkey_bindings,
+    serialize_hotkey_bindings,
+)
 from ui.services.download_modes import missing_lyrics_detail, missing_lyrics_summary
 from ui.services.logging_preferences import LOG_VERBOSITY_CHOICES
 from ui.theme_tokens import get_available_themes

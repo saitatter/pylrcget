@@ -3,13 +3,12 @@ from __future__ import annotations
 
 import re
 
-from tests import test_support as _test_support  # noqa: F401
-
 from library.scan_library import (
-    _normalize_excluded_paths,
     _compile_excluded_patterns,
     _is_path_excluded_variants,
+    _normalize_excluded_paths,
 )
+from tests import test_support as _test_support  # noqa: F401
 
 
 def test_normalize_excluded_paths_empty():

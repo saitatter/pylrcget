@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from pathlib import Path
 import sys
+from pathlib import Path
 
 from PySide6.QtCore import QTimer, QUrl
 from PySide6.QtGui import QDesktopServices
@@ -11,16 +11,16 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QMessageBox,
+    QProgressBar,
     QPushButton,
     QTextBrowser,
     QVBoxLayout,
     QWidget,
-    QProgressBar,
 )
 
 from ui.services.update_service import (
-    choose_update_download_path,
     UpdateInfo,
+    choose_update_download_path,
     cleanup_stale_update_downloads,
     current_app_version,
     default_update_download_dir,

@@ -4,7 +4,6 @@ import sqlite3
 from typing import Sequence
 
 from core.utils import prepare_input
-
 from db.query_modules.common import escape_like
 
 

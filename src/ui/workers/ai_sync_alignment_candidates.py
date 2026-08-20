@@ -1,7 +1,6 @@
 """Candidate scoring, gating and anchor construction for lyric alignment."""
 from __future__ import annotations
 
-
 from bisect import bisect_left
 from difflib import SequenceMatcher
 

@@ -1,7 +1,7 @@
 # ui/actions_delegate.py
 from __future__ import annotations
 
-from PySide6.QtCore import QEvent, Qt, QRect, Signal, QSize
+from PySide6.QtCore import QEvent, QRect, QSize, Qt, Signal
 from PySide6.QtGui import QColor, QCursor, QPainter, QPen
 from PySide6.QtWidgets import QStyle, QStyledItemDelegate, QStyleOptionViewItem
 

@@ -5,7 +5,6 @@ import threading
 
 from db.models import Config
 
-
 _config_cache: Config | None = None
 _config_cache_lock = threading.Lock()
 

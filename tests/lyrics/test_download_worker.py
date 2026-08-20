@@ -7,14 +7,17 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from core.lrclib_client import LrcLibError, NotFoundError, RateLimitError
 import requests
 
-from tests import test_support as _test_support  # noqa: F401
+from core.lrclib_client import LrcLibError, NotFoundError, RateLimitError
 from db.database import add_tracks, get_track_by_id, initialize_database
+from tests import test_support as _test_support  # noqa: F401
 from tests.test_support import make_fs_track, touch_text
+from ui.workers.bulk_lyrics_download_worker import (
+    MAX_PARALLEL_DOWNLOAD_WORKERS,
+    BulkLyricsDownloadWorker,
+)
 from ui.workers.lyrics_download_worker import LyricsDownloadWorker
-from ui.workers.bulk_lyrics_download_worker import MAX_PARALLEL_DOWNLOAD_WORKERS, BulkLyricsDownloadWorker
 
 
 class _ImmediateFuture:

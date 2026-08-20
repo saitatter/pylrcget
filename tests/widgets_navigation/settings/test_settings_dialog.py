@@ -1,5 +1,6 @@
-from tests.widgets_navigation._shared import *
 from PySide6.QtWidgets import QGroupBox
+
+from tests.widgets_navigation._shared import *
 from ui.hotkeys import HOTKEY_SPECS
 
 

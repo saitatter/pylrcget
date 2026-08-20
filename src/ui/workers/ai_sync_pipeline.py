@@ -11,16 +11,22 @@ from .ai_sync_alignment import (
 )
 from .ai_sync_demucs import (
     AlignmentCandidate,
+)
+from .ai_sync_demucs import (
     candidate_quality as _demucs_candidate_quality,
+)
+from .ai_sync_demucs import (
     is_available as _demucs_available,
+)
+from .ai_sync_demucs import (
     separated_vocal_audio as _separated_vocal_audio,
 )
-from .ai_sync_lyrics_aligner import align as _align_with_lyrics_aligner
-from .ai_sync_lyrics_aligner import is_available as _lyrics_aligner_available
 from .ai_sync_lrc import (
     _build_lrc_from_segments,
     _format_ts,
 )
+from .ai_sync_lyrics_aligner import align as _align_with_lyrics_aligner
+from .ai_sync_lyrics_aligner import is_available as _lyrics_aligner_available
 from .ai_sync_runtime import (
     _check_ai_sync_available,
     _get_cached_align_model,
@@ -33,10 +39,10 @@ from .ai_sync_transcription import (
     _approximate_word_timestamps_from_segments,
     _find_targeted_retry_window,
     _normalized_transcribe_language,
-    _select_best_relaxed_segments,
     _segment_tail_seconds,
-    _should_retry_with_short_windows,
+    _select_best_relaxed_segments,
     _should_retry_with_relaxed_vad,
+    _should_retry_with_short_windows,
     _should_use_per_chunk_alignment,
     _transcribe_fixed_windows,
 )

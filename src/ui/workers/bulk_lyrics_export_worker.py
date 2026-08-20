@@ -9,8 +9,8 @@ from PySide6.QtCore import QThread, Signal
 
 from core.utils import prepare_input
 from db.models import Config
-from db.query_modules.common import escape_like
 from db.queries import get_track_by_id
+from db.query_modules.common import escape_like
 from ui.services.lyrics_download_service import sync_track_outputs_with_result
 
 logger = logging.getLogger(__name__)

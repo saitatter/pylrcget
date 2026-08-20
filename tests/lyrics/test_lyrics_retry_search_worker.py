@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import unittest
 from types import SimpleNamespace
-from unittest.mock import MagicMock
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from tests import test_support as _test_support  # noqa: F401
 from tests.test_support import qt_app
-from ui.workers.lyrics_retry_search_worker import MAX_PARALLEL_RETRY_WORKERS, LyricsRetrySearchWorker
+from ui.workers.lyrics_retry_search_worker import (
+    MAX_PARALLEL_RETRY_WORKERS,
+    LyricsRetrySearchWorker,
+)
 
 
 class _ImmediateFuture:

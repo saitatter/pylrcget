@@ -1,15 +1,15 @@
 from __future__ import annotations
 
-from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
-from dataclasses import dataclass
 import sqlite3
 import threading
 import time
+from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
+from dataclasses import dataclass
 from typing import TypedDict
 
 from PySide6.QtCore import QObject, QThread, Signal
-from core.lrclib_client import LrcLibAPI
 
+from core.lrclib_client import LrcLibAPI
 from db.queries import get_track_by_id
 from ui.services.download_modes import normalize_download_mode
 from ui.services.lyrics_download_service import (

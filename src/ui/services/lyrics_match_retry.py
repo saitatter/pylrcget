@@ -1,9 +1,8 @@
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from difflib import SequenceMatcher
-import re
-
 
 _WORD_RE = re.compile(r"[a-z0-9]+")
 TITLE_SCORE_WEIGHT = 0.58

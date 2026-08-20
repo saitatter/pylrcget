@@ -1,18 +1,23 @@
 from __future__ import annotations
 
-import sqlite3
 import os
+import sqlite3
 import tempfile
 import time
 import unittest
-from dataclasses import replace
 from concurrent.futures import ThreadPoolExecutor as RealThreadPoolExecutor
+from dataclasses import replace
 from pathlib import Path
 from unittest.mock import patch
 
-from tests import test_support as _test_support  # noqa: F401
-from tests.test_support import make_fs_track, touch_text
-from db.database import add_tracks, get_config, get_library_file_index, initialize_database, set_config
+from core.models import FsTrack
+from db.database import (
+    add_tracks,
+    get_config,
+    get_library_file_index,
+    initialize_database,
+    set_config,
+)
 from library.scan_library import (
     AudioMetadata,
     MutagenError,
@@ -21,11 +26,12 @@ from library.scan_library import (
     iter_audio_paths,
     iter_audio_paths_with_signatures,
     new_fs_track_from_path,
-    read_audio_metadata_from_audio,
     preview_audio_path_exclusions,
+    read_audio_metadata_from_audio,
 )
+from tests import test_support as _test_support  # noqa: F401
+from tests.test_support import make_fs_track, touch_text
 from ui.workers.library_scanner import LibraryScanner, _scan_worker_count
-from core.models import FsTrack
 
 
 class ScanLibraryHelpersTests(unittest.TestCase):

@@ -13,7 +13,6 @@ from PySide6.QtWidgets import (
 
 from ui.services.lyrics_match_retry import LyricsMatchCandidate
 
-
 CANDIDATE_ROLE = Qt.ItemDataRole.UserRole
 
 

@@ -2,14 +2,21 @@ from __future__ import annotations
 
 from typing import Iterable
 
-from PySide6.QtCore import Qt, Signal, QModelIndex, QItemSelectionModel
+from PySide6.QtCore import QItemSelectionModel, QModelIndex, Qt, Signal
 from PySide6.QtGui import QStandardItemModel
-from PySide6.QtWidgets import QHeaderView, QMenu, QStackedWidget, QTableView, QVBoxLayout, QWidget
+from PySide6.QtWidgets import (
+    QHeaderView,
+    QMenu,
+    QStackedWidget,
+    QTableView,
+    QVBoxLayout,
+    QWidget,
+)
 
 from db.database import get_directories
 from db.query_modules.entity_queries import get_artist_letter_counts
-from ui.style_loader import load_stylesheet
 from ui.library_routes import LibraryRoute, artists_detail
+from ui.style_loader import load_stylesheet
 from ui.widgets.album_list_widget import AlbumListWidget
 from ui.widgets.alpha_index_widget import AlphaIndexWidget
 from ui.widgets.empty_state_widget import EmptyStateWidget

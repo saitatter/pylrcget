@@ -8,7 +8,8 @@ from dataclasses import replace
 from PySide6.QtWidgets import QDialog
 
 from core.tracklist_models import LyricsState
-from core.utils import ms_to_ts as _ms_to_ts, parse_lrc
+from core.utils import ms_to_ts as _ms_to_ts
+from core.utils import parse_lrc
 from db.queries import (
     clear_track_dirty_lyrics,
     get_config,

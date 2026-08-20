@@ -3,7 +3,12 @@ from __future__ import annotations
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QKeySequence, QShortcut
 
-from ui.hotkeys import HOTKEY_SPECS, effective_hotkey_text, lyrics_hotkey_defaults, normalize_hotkey_text
+from ui.hotkeys import (
+    HOTKEY_SPECS,
+    effective_hotkey_text,
+    lyrics_hotkey_defaults,
+    normalize_hotkey_text,
+)
 
 
 def make_shortcut(widget, key: str, callback) -> QShortcut:

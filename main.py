@@ -1,6 +1,6 @@
+import logging
 import os
 import sys
-import logging
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
@@ -20,6 +20,7 @@ from ui.app_theme import apply_app_theme
 from ui.icon_loader import load_app_icon
 from ui.main_window import MainWindow
 from ui.services.logging_preferences import apply_logging_verbosity
+
 
 def debug_print_schema(db) -> None:
     for table in ("tracks", "albums"):

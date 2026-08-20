@@ -8,14 +8,14 @@ from typing import TYPE_CHECKING
 from mutagen import File as MutagenFile
 from mutagen.apev2 import APETextValue
 from mutagen.asf import ASF, ASFUnicodeAttribute
-from mutagen.dsf import DSF
 from mutagen.dsdiff import DSDIFF
-from mutagen.id3 import ID3, USLT, TXXX, ID3NoHeaderError
+from mutagen.dsf import DSF
 from mutagen.flac import FLAC
-from mutagen.musepack import Musepack
-from mutagen.oggvorbis import OggVorbis
-from mutagen.oggopus import OggOpus
+from mutagen.id3 import ID3, TXXX, USLT, ID3NoHeaderError
 from mutagen.mp4 import MP4
+from mutagen.musepack import Musepack
+from mutagen.oggopus import OggOpus
+from mutagen.oggvorbis import OggVorbis
 from mutagen.wave import WAVE
 
 from core.utils import plain_text_from_lrc

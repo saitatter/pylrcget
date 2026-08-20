@@ -1,19 +1,31 @@
 from __future__ import annotations
 
 import logging
+import re
 import time
 from dataclasses import dataclass
 
-from PySide6.QtCore import Qt, QThread, Signal, QTimer
+from PySide6.QtCore import Qt, QThread, QTimer, Signal
 from PySide6.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QTableWidget, QTableWidgetItem, QWidget, QStackedWidget
+    QDialog,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QStackedWidget,
+    QTableWidget,
+    QTableWidgetItem,
+    QVBoxLayout,
+    QWidget,
 )
-import re
 from requests import exceptions as requests_exceptions
 
-from core.lrclib_client import LrcLibAPI, IncorrectPublishTokenError, LrcLibError, RateLimitError, ServerError
-
+from core.lrclib_client import (
+    IncorrectPublishTokenError,
+    LrcLibAPI,
+    LrcLibError,
+    RateLimitError,
+    ServerError,
+)
 from ui.spacing import SPACE_2, SPACE_3, SPACE_4, set_layout_spacing
 
 logger = logging.getLogger(__name__)

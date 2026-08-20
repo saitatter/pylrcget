@@ -114,7 +114,9 @@ class TrackMaintenanceController(QObject):
         if reply != QMessageBox.StandardButton.Yes:
             return
 
-        from ui.workers.bulk_publish_instrumental_worker import BulkPublishInstrumentalWorker
+        from ui.workers.bulk_publish_instrumental_worker import (
+            BulkPublishInstrumentalWorker,
+        )
 
         config = get_config(self._app_state.db)
         lrclib_url = self._normalize_lrclib_base(config.lrclib_instance)

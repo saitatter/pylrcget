@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
 import logging
 import sqlite3
+from datetime import datetime, timezone
 
 from PySide6.QtCore import QObject, QThread, Signal
 

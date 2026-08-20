@@ -4,9 +4,9 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from tests import test_support as _test_support  # noqa: F401
 from core.lyrics_sidecar import export_lyrics_sidecars
 from db.models import Config, Track
+from tests import test_support as _test_support  # noqa: F401
 
 
 def _make_config(output_dir: str, pattern: str) -> Config:

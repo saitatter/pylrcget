@@ -4,7 +4,10 @@ import unittest
 from types import SimpleNamespace
 
 from tests import test_support as _test_support  # noqa: F401
-from ui.services.lyrics_match_retry import build_retry_search_queries, choose_best_candidate
+from ui.services.lyrics_match_retry import (
+    build_retry_search_queries,
+    choose_best_candidate,
+)
 
 
 class LyricsMatchRetryTests(unittest.TestCase):

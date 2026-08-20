@@ -3,20 +3,14 @@ import dataclasses
 import logging
 import os
 import sqlite3
-import time
 import threading
+import time
 from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
 from dataclasses import dataclass
+
 from PySide6.QtCore import QThread, Signal
 
 from core.utils import prepare_input
-from library.scan_library import (
-    get_audio_file_signature,
-    iter_audio_paths_with_signatures,
-    new_fs_track_from_path,
-    SidecarLookupCache,
-    read_audio_metadata_for_scan,
-)
 from db.database import (
     delete_tracks_by_paths,
     get_library_scan_index,
@@ -24,7 +18,13 @@ from db.database import (
     prune_library,
 )
 from db.query_modules.track_queries import TrackBatchInserter
-
+from library.scan_library import (
+    SidecarLookupCache,
+    get_audio_file_signature,
+    iter_audio_paths_with_signatures,
+    new_fs_track_from_path,
+    read_audio_metadata_for_scan,
+)
 
 logger = logging.getLogger(__name__)
 LIBRARY_SCAN_MAX_WORKERS = 4

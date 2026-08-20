@@ -8,6 +8,7 @@ HAS_QT = importlib.util.find_spec("PySide6") is not None
 
 if HAS_QT:
     from PySide6.QtWidgets import QApplication
+
     from player.player import NowPlaying, Player, PlayerStatus
 
 

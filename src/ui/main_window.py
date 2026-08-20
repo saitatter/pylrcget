@@ -1,10 +1,17 @@
+import logging
+import os
+import sqlite3
+from dataclasses import replace
+
+from PySide6.QtCore import QEvent, Qt, QTimer
+from PySide6.QtGui import QCloseEvent, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QApplication,
+    QDialog,
     QHBoxLayout,
     QLabel,
-    QMenu,
     QMainWindow,
-    QDialog,
+    QMenu,
     QProgressBar,
     QPushButton,
     QSizePolicy,
@@ -14,17 +21,12 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from PySide6.QtCore import QEvent, Qt, QTimer
-from PySide6.QtGui import QCloseEvent, QShortcut, QKeySequence
-import logging
-import os
-import sqlite3
-
-from dataclasses import replace
 
 from core.tracklist_models import LyricsState
+from core.utils import parse_lrc
 from db.queries import (
     add_tracks,
+    clear_track_dirty_lyrics,
     get_album_by_id,
     get_artist_by_id,
     get_config,
@@ -35,41 +37,11 @@ from db.queries import (
     set_config,
     set_directories,
     unmark_tracks_instrumental,
-    clear_track_dirty_lyrics,
     update_track_dirty_lyrics,
 )
 from library.scan_library import AUDIO_EXTS, new_fs_track_from_path
-from ui.controllers.lyrics_download_controller import LyricsDownloadController
-from ui.controllers.lyrics_output_controller import LyricsOutputController
-from ui.controllers.navigation_controller import NavigationController
-from ui.controllers.publish_history_controller import PublishHistoryController
-from ui.controllers.track_maintenance_controller import TrackMaintenanceController
-from ui.controllers.top_bar_controller import TopBarController
-from ui.ai_sync_settings import load_ai_sync_settings
-from ui.widgets.track_list_widget import TrackListWidget
-from ui.dialogs.music_folders_dialog import MusicFoldersDialog
-from ui.dialogs.about_dialog import AboutDialog
-from ui.dialogs.ai_dependencies_dialog import AIDependenciesDialog
-from ui.icon_loader import load_app_icon
-from ui.player_bar import PlayerBar
-from ui.widgets.lyrics_editor_widget import LyricsEditorWidget
-from core.utils import parse_lrc
-from ui.dialogs.first_run_dialog import FirstRunDialog
 from player.player import NowPlaying, Player
-from ui.services.feedback import exception_message, log_and_notify, normalize_notify_type, notify_user
-from ui.widgets.album_list_widget import AlbumListWidget
-from ui.widgets.artist_list_widget import ArtistListWidget
-from ui.widgets.album_artist_list_widget import AlbumArtistListWidget
-from ui.library_routes import LibraryRoute, deserialize_route, tracks_album, tracks_all, tracks_artist
-from ui.spacing import SPACE_1, SPACE_2, SPACE_3, set_layout_spacing
-from ui.widgets.toast import ToastManager
-from ui.widgets.log_panel import LogPanel, QtLogHandler
-from ui.services.logging_preferences import apply_logging_verbosity
-from ui.widgets.my_lrclib_widget import MyLrclibWidget
-from ui.widgets.lrclib_browser_widget import LrclibBrowserWidget
-from ui.widgets.download_progress_overlay import DownloadProgressOverlay
-from ui.widgets.hotkey_hints import HotkeyHintManager
-from ui.main_window_parts import canonical_lyrics_pair, library_actions, library_filters, lyrics_actions, preferences
+from ui.ai_sync_settings import load_ai_sync_settings
 from ui.constants import (
     DIRTY_LYRICS_FLUSH_MS,
     FEEDBACK_RESET_MS,
@@ -79,6 +51,51 @@ from ui.constants import (
     PLAYBACK_VOLUME_SAVE_MS,
     SEARCH_DEBOUNCE_MS,
 )
+from ui.controllers.lyrics_download_controller import LyricsDownloadController
+from ui.controllers.lyrics_output_controller import LyricsOutputController
+from ui.controllers.navigation_controller import NavigationController
+from ui.controllers.publish_history_controller import PublishHistoryController
+from ui.controllers.top_bar_controller import TopBarController
+from ui.controllers.track_maintenance_controller import TrackMaintenanceController
+from ui.dialogs.about_dialog import AboutDialog
+from ui.dialogs.ai_dependencies_dialog import AIDependenciesDialog
+from ui.dialogs.first_run_dialog import FirstRunDialog
+from ui.dialogs.music_folders_dialog import MusicFoldersDialog
+from ui.icon_loader import load_app_icon
+from ui.library_routes import (
+    LibraryRoute,
+    deserialize_route,
+    tracks_album,
+    tracks_all,
+    tracks_artist,
+)
+from ui.main_window_parts import (
+    canonical_lyrics_pair,
+    library_actions,
+    library_filters,
+    lyrics_actions,
+    preferences,
+)
+from ui.player_bar import PlayerBar
+from ui.services.feedback import (
+    exception_message,
+    log_and_notify,
+    normalize_notify_type,
+    notify_user,
+)
+from ui.services.logging_preferences import apply_logging_verbosity
+from ui.spacing import SPACE_1, SPACE_2, SPACE_3, set_layout_spacing
+from ui.widgets.album_artist_list_widget import AlbumArtistListWidget
+from ui.widgets.album_list_widget import AlbumListWidget
+from ui.widgets.artist_list_widget import ArtistListWidget
+from ui.widgets.download_progress_overlay import DownloadProgressOverlay
+from ui.widgets.hotkey_hints import HotkeyHintManager
+from ui.widgets.log_panel import LogPanel, QtLogHandler
+from ui.widgets.lrclib_browser_widget import LrclibBrowserWidget
+from ui.widgets.lyrics_editor_widget import LyricsEditorWidget
+from ui.widgets.my_lrclib_widget import MyLrclibWidget
+from ui.widgets.toast import ToastManager
+from ui.widgets.track_list_widget import TrackListWidget
 
 logger = logging.getLogger(__name__)
 
@@ -1022,7 +1039,13 @@ class MainWindow(QMainWindow):
         self._apply_saved_playback_volume()
 
     def _toggle_play_pause(self) -> None:
-        from PySide6.QtWidgets import QLineEdit, QTextEdit, QPlainTextEdit, QAbstractSpinBox, QComboBox
+        from PySide6.QtWidgets import (
+            QAbstractSpinBox,
+            QComboBox,
+            QLineEdit,
+            QPlainTextEdit,
+            QTextEdit,
+        )
         focus = QApplication.focusWidget()
         if isinstance(focus, (QLineEdit, QTextEdit, QPlainTextEdit, QAbstractSpinBox, QComboBox)):
             return
@@ -1462,7 +1485,11 @@ class MainWindow(QMainWindow):
         lyrics_actions.on_discard_draft_requested(self)
 
     def _on_auto_sync_requested(self) -> None:
-        from ui.workers.ai_sync_worker import _check_ai_sync_available, AiSyncWorker, get_missing_ai_dependencies
+        from ui.workers.ai_sync_worker import (
+            AiSyncWorker,
+            _check_ai_sync_available,
+            get_missing_ai_dependencies,
+        )
 
         track_id = self._editing_track_id
         if track_id is None:

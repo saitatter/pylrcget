@@ -3,7 +3,6 @@ from __future__ import annotations
 import sys
 
 from tests import test_support as _test_support  # noqa: F401
-
 from ui.dialogs.ai_dependencies_dialog import resolve_ai_install_command
 
 

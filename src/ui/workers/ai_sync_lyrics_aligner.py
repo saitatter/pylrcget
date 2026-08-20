@@ -10,6 +10,7 @@ import tempfile
 from difflib import SequenceMatcher
 from pathlib import Path
 
+
 def _backend_root() -> Path | None:
     value = os.environ.get("PYLRCGET_LYRICS_ALIGNER_PATH", "").strip()
     if not value:

@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from collections import deque
 import html
 import logging
 import os
+from collections import deque
 
-from PySide6.QtCore import QObject, Signal, QUrl
+from PySide6.QtCore import QObject, QUrl, Signal
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QApplication,

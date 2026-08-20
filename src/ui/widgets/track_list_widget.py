@@ -1,16 +1,16 @@
 # ui/track_list_widget.py
 from __future__ import annotations
 
+import time
 from dataclasses import replace
 from pathlib import Path
-import time
 from typing import Sequence
 
-from PySide6.QtCore import QEvent, Signal, Qt, QItemSelectionModel, QUrl
+from PySide6.QtCore import QEvent, QItemSelectionModel, Qt, QUrl, Signal
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
-    QHeaderView,
     QHBoxLayout,
+    QHeaderView,
     QLabel,
     QMenu,
     QPushButton,
@@ -21,23 +21,27 @@ from PySide6.QtWidgets import (
     QWidgetAction,
 )
 
-from db.database import get_directories, get_duplicate_track_ids, get_track_by_id, get_track_list_rows
+from core.tracklist_models import DownloadState, LyricsState
+from db.database import (
+    get_directories,
+    get_duplicate_track_ids,
+    get_track_by_id,
+    get_track_list_rows,
+)
 from db.query_modules.track_queries import get_track_letter_counts
-from ui.library_routes import LibraryRoute, albums_detail, artists_detail
-from ui.widgets.alpha_index_widget import AlphaIndexWidget
-from ui.widgets.empty_state_widget import EmptyStateWidget
-from ui.models.track_table_model import TrackTableModel
 from ui.delegates.actions_delegate import ActionsDelegate
 from ui.delegates.lyrics_status_delegate import LyricsStatusDelegate
 from ui.delegates.track_info_delegate import TrackInfoDelegate
+from ui.library_routes import LibraryRoute, albums_detail, artists_detail
+from ui.models.track_table_model import TrackTableModel
 from ui.spacing import set_layout_spacing
 from ui.style_loader import load_stylesheet
-from ui.widgets.sortable_header_view import SortableHeaderView
+from ui.widgets.alpha_index_widget import AlphaIndexWidget
+from ui.widgets.empty_state_widget import EmptyStateWidget
 from ui.widgets.library_table_utils import should_load_more
+from ui.widgets.sortable_header_view import SortableHeaderView
 from ui.widgets.track_list_rows import build_track_list_rows
-from core.tracklist_models import DownloadState, LyricsState
 from ui.workers.bulk_lyrics_export_worker import TrackExportScope
-
 
 TRACK_NUMBER_COLUMN_WIDTH = 56
 TRACK_DURATION_COLUMN_WIDTH = 92

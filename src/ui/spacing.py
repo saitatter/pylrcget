@@ -4,7 +4,6 @@ from PySide6.QtWidgets import QLayout
 
 from ui.theme_tokens import SPACE_TOKENS
 
-
 SPACE_1 = int(SPACE_TOKENS["space-1"].replace("px", ""))
 SPACE_2 = int(SPACE_TOKENS["space-2"].replace("px", ""))
 SPACE_3 = int(SPACE_TOKENS["space-3"].replace("px", ""))

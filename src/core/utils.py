@@ -1,6 +1,7 @@
 import re
 import unicodedata
 
+
 def lower_lay_string(s: str) -> str:
     """Normalize a string via NFKD and strip combining (accent) characters."""
     normalized = unicodedata.normalize('NFKD', s)

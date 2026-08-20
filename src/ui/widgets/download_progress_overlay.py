@@ -2,13 +2,13 @@ from __future__ import annotations
 
 from html import escape
 
-from PySide6.QtCore import QTimer, Qt, Signal
+from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtWidgets import (
     QFrame,
     QHBoxLayout,
     QLabel,
-    QPushButton,
     QProgressBar,
+    QPushButton,
     QTextEdit,
     QToolButton,
     QVBoxLayout,

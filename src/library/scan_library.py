@@ -1,27 +1,28 @@
 # src/library/scan_library.py
 from __future__ import annotations
 
-import os
 import logging
+import os
 import re
-import time
 import threading
-from pathlib import Path
+import time
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Callable
 
 from mutagen import File as MutagenFile
+from mutagen._util import MutagenError
 from mutagen.id3 import ID3, ID3NoHeaderError
 from mutagen.musepack import Musepack
-from mutagen._util import MutagenError
-
-from core.models import FsTrack
 
 from core.embed_lyrics import (
-    VORBIS_PLAIN_KEY, VORBIS_SYNCED_KEY,
     ID3_SYNCED_DESC,
-    MP4_PLAIN_KEY, MP4_SYNCED_KEY
+    MP4_PLAIN_KEY,
+    MP4_SYNCED_KEY,
+    VORBIS_PLAIN_KEY,
+    VORBIS_SYNCED_KEY,
 )
+from core.models import FsTrack
 
 logger = logging.getLogger(__name__)
 

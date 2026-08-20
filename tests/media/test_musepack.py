@@ -8,9 +8,9 @@ from unittest.mock import patch
 
 from mutagen.apev2 import APEBinaryValue
 
-from tests.test_support import touch_text
 from core.artwork import extract_embedded_cover_bytes
 from library.scan_library import new_fs_track_from_path, read_embedded_lyrics
+from tests.test_support import touch_text
 
 
 class _FakeEasyAudio(dict):

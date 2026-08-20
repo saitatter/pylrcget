@@ -10,21 +10,19 @@ try:
 except ImportError:
     pytest = None  # type: ignore[assignment]
 
-from tests import test_support as _test_support  # noqa: F401
-
 from core.lrclib_client import (
     LrcLibAPI,
     LrcLibError,
     NotFoundError,
     RateLimitError,
     ServerError,
-    _raise_for_status,
+    _is_nonce_valid,
     _lyrics_from_dict,
+    _raise_for_status,
     _search_result_from_dict,
     solve_challenge,
-    _is_nonce_valid,
 )
-
+from tests import test_support as _test_support  # noqa: F401
 
 # When pytest is not installed (e.g. CI running ``unittest discover``),
 # expose an empty suite so the runner does not choke on bare functions.
