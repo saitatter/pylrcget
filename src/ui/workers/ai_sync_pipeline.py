@@ -131,14 +131,41 @@ def run_ai_sync_pipeline(self, *, align_optional_demucs=None) -> None:
             self.completed.emit(False, msg, "")
             return
 
-        import whisperx
-
         device = self._resolve_device()
         total_steps = 8
         self._emit_stage(1, total_steps, f"Loading audio file ({Path(self.audio_path).name})…")
         if self.isInterruptionRequested():
             self.completed.emit(False, "Cancelled.", "")
             return
+
+        plain_lines = self.plain_lyrics.splitlines() if self.plain_lyrics else []
+        lyrics_aligner_attempted = False
+        transcribe_language = _normalized_transcribe_language(self._language)
+        if (
+            plain_lines
+            and transcribe_language == "en"
+            and _lyrics_aligner_available()
+        ):
+            lyrics_aligner_attempted = True
+            candidate = _try_lyrics_aligner(
+                self,
+                device=device,
+                stage=2,
+                stage_message="English selected — lyrics-aligner phonetic alignment…",
+                fallback_stage=2,
+                fallback_message="lyrics-aligner failed — loading WhisperX fallback…",
+                router=align_optional_demucs,
+            )
+            if candidate is not None:
+                self.completed.emit(
+                    True,
+                    "Lyrics synchronized successfully with lyrics-aligner "
+                    f"({candidate.source}).",
+                    candidate.lrc,
+                )
+                return
+
+        import whisperx
 
         self._emit_stage(
             2,
@@ -158,7 +185,6 @@ def run_ai_sync_pipeline(self, *, align_optional_demucs=None) -> None:
 
         _patch_whisperx_audio_loading()
         audio = whisperx.load_audio(self.audio_path)
-        transcribe_language = _normalized_transcribe_language(self._language)
         language_label = transcribe_language or "auto-detect"
         detected_language = transcribe_language
 
@@ -306,8 +332,7 @@ def run_ai_sync_pipeline(self, *, align_optional_demucs=None) -> None:
                     return recovered_segments
             return aligned_segments
 
-        plain_lines = self.plain_lyrics.splitlines() if self.plain_lyrics else []
-        if plain_lines and _lyrics_aligner_available():
+        if plain_lines and _lyrics_aligner_available() and not lyrics_aligner_attempted:
             if transcribe_language == "en":
                 detected_language = "en"
             elif transcribe_language is None:
@@ -349,7 +374,11 @@ def run_ai_sync_pipeline(self, *, align_optional_demucs=None) -> None:
             f"Detected language: {selected_language}. "
             f"Selecting English lyrics-aligner or WhisperX fallback…",
         )
-        if plain_lines and (detected_language or "").lower() == "en":
+        if (
+            plain_lines
+            and (detected_language or "").lower() == "en"
+            and not lyrics_aligner_attempted
+        ):
             candidate = _try_lyrics_aligner(
                 self,
                 device=device,
