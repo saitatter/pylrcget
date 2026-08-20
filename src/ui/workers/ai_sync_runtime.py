@@ -8,6 +8,29 @@ _WHISPERX_MODEL_CACHE: dict[tuple[str, str, str, str | None, tuple[tuple[str, fl
 _ALIGN_MODEL_CACHE: dict[tuple[str, str], tuple[object, object]] = {}
 
 
+def _cuda_compute_capability() -> tuple[int, int] | None:
+    try:
+        import torch
+
+        if not torch.cuda.is_available():
+            return None
+        capability = torch.cuda.get_device_capability()
+        return int(capability[0]), int(capability[1])
+    except (ImportError, AttributeError, RuntimeError, TypeError, ValueError):
+        return None
+
+
+def _preferred_whisper_compute_type(device: str) -> str:
+    """Choose a CTranslate2 type supported by the selected accelerator."""
+    if device != "cuda":
+        return "int8"
+    capability = _cuda_compute_capability()
+    if capability is not None and capability[0] < 7:
+        # Pascal and older GPUs cannot run CTranslate2's efficient FP16 path.
+        return "int8_float32"
+    return "float16"
+
+
 def _clear_inference_caches() -> None:
     """Clear cached WhisperX/align models (used by tests)."""
     with _INFERENCE_CACHE_LOCK:
@@ -231,6 +254,7 @@ def is_ai_sync_available() -> bool:
 
 __all__ = [
     "_clear_inference_caches",
+    "_preferred_whisper_compute_type",
     "_canonical_vad_options",
     "_patch_whisperx_audio_loading",
     "_patch_pyannote_compatibility",

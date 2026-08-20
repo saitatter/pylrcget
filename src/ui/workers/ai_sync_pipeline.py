@@ -26,6 +26,7 @@ from .ai_sync_runtime import (
     _get_cached_align_model,
     _get_cached_whisperx_model,
     _patch_whisperx_audio_loading,
+    _preferred_whisper_compute_type,
 )
 from .ai_sync_transcription import (
     _align_segments_per_chunks,
@@ -170,9 +171,10 @@ def run_ai_sync_pipeline(self, *, align_optional_demucs=None) -> None:
         self._emit_stage(
             2,
             total_steps,
-            f"Loading WhisperX ASR ({self.whisper_model}, device: {device})…",
+            f"Loading WhisperX ASR ({self.whisper_model}, device: {device}, "
+            f"compute: {compute_type})…",
         )
-        compute_type = "float16" if device == "cuda" else "int8"
+        compute_type = _preferred_whisper_compute_type(device)
         model = _get_cached_whisperx_model(
             whisperx,
             self.whisper_model,

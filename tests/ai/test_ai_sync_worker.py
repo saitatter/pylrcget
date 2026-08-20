@@ -8,6 +8,7 @@ import pytest
 from tests import test_support as _test_support  # noqa: F401
 
 import ui.workers.ai_sync_worker as ai_sync_worker
+import ui.workers.ai_sync_runtime as ai_sync_runtime
 from ui.workers.ai_sync_demucs import AlignmentCandidate, candidate_quality
 from ui.workers.ai_sync_worker import (
     _align_lyrics_to_segments,
@@ -47,6 +48,22 @@ from ui.workers.ai_sync_worker import (
     _ensure_strictly_increasing_alignment_indices,
     get_missing_ai_dependencies,
 )
+
+
+def test_preferred_whisper_compute_type_avoids_fp16_on_pascal(monkeypatch):
+    monkeypatch.setattr(ai_sync_runtime, "_cuda_compute_capability", lambda: (6, 1))
+
+    assert ai_sync_runtime._preferred_whisper_compute_type("cuda") == "int8_float32"
+
+
+def test_preferred_whisper_compute_type_keeps_fp16_on_modern_cuda(monkeypatch):
+    monkeypatch.setattr(ai_sync_runtime, "_cuda_compute_capability", lambda: (7, 5))
+
+    assert ai_sync_runtime._preferred_whisper_compute_type("cuda") == "float16"
+
+
+def test_preferred_whisper_compute_type_uses_int8_on_cpu():
+    assert ai_sync_runtime._preferred_whisper_compute_type("cpu") == "int8"
 
 
 def test_demucs_candidate_quality_prefers_consistent_repeated_blocks():
