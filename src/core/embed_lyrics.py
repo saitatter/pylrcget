@@ -15,6 +15,7 @@ from mutagen.musepack import Musepack
 from mutagen.oggvorbis import OggVorbis
 from mutagen.oggopus import OggOpus
 from mutagen.mp4 import MP4
+from mutagen.wave import WAVE
 
 from core.utils import plain_text_from_lrc
 
@@ -94,7 +95,7 @@ def _select_lyrics_for_output(
 def embed_lyrics_in_file(path: str, plain: str | None, synced: str | None) -> None:
     """
     Embed lyrics depending on file extension:
-      - .mp3            -> ID3: USLT for plain + TXXX for synced (LYRICS)
+      - .mp3/.wav       -> ID3: USLT for plain + TXXX for synced (LYRICS)
       - .flac           -> Vorbis comments: UNSYNCEDLYRICS + LYRICS
       - .ogg/.oga/.opus -> Vorbis comments: UNSYNCEDLYRICS + LYRICS
       - .m4a/.mp4       -> MP4: ©lyr for plain + custom atom for synced
@@ -102,6 +103,7 @@ def embed_lyrics_in_file(path: str, plain: str | None, synced: str | None) -> No
     """
     EMBEDDER_MAP = {
         ".mp3": _embed_mp3,
+        ".wav": _embed_wav,
         ".flac": _embed_flac,
         ".ogg": _embed_ogg_vorbis,
         ".oga": _embed_ogg_vorbis,
@@ -211,6 +213,14 @@ def _embed_mp3(path: str, plain: str | None, synced: str | None) -> None:
         )
 
     tags.save(path)
+
+
+def _embed_wav(path: str, plain: str | None, synced: str | None) -> None:
+    audio = WAVE(path)
+    if getattr(audio, "tags", None) is None:
+        audio.add_tags()
+    _write_id3_lyrics(audio.tags, plain, synced)
+    audio.save()
 
 
 def _write_id3_lyrics(tags: ID3, plain: str | None, synced: str | None) -> None:

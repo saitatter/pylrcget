@@ -540,7 +540,7 @@ def _parse_track_number_value(value) -> int | None:
 def read_audio_metadata_from_audio(audio, path: str) -> AudioMetadata:
     ext = Path(path).suffix.lower()
 
-    if ext == ".mp3":
+    if ext in {".mp3", ".wav"}:
         title = _first_audio_tag_text(audio, ("TIT2",)) or os.path.splitext(os.path.basename(path))[0]
         album = _first_audio_tag_text(audio, ("TALB",)) or "Unknown Album"
         artist = _first_audio_tag_text(audio, ("TPE1", "artist", "author")) or "Unknown Artist"
@@ -858,7 +858,7 @@ def read_embedded_lyrics_from_audio(audio, path: str) -> tuple[str | None, str |
     synced: str | None = None
 
     try:
-        if ext == ".mp3":
+        if ext in {".mp3", ".wav"}:
             try:
                 tags = audio if callable(getattr(audio, "getall", None)) else getattr(audio, "tags", None) or ID3(path)
                 if not callable(getattr(tags, "getall", None)):
@@ -998,7 +998,7 @@ def read_embedded_lyrics(path: str) -> tuple[str | None, str | None]:
     Returns (plain_lyrics_or_None, synced_lrc_or_None).
 
     Implementation notes:
-      - MP3: reads ID3 USLT for plain lyrics and a TXXX with desc 'LYRICS' for synced.
+      - MP3/WAV: reads ID3 USLT for plain lyrics and a TXXX with desc 'LYRICS' for synced.
       - FLAC/Vorbis/Ogg: reads 'LYRICS' and 'LRCLIB_LRC' vorbis comments.
       - MP4/M4A: reads '\xa9lyr' and '----:com.lrclib:lrc' (custom atom, bytes).
       - WMA/ASF: reads ASF string attributes for plain and synced lyrics.

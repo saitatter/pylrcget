@@ -21,6 +21,7 @@ from library.scan_library import (
     iter_audio_paths,
     iter_audio_paths_with_signatures,
     new_fs_track_from_path,
+    read_audio_metadata_from_audio,
     preview_audio_path_exclusions,
 )
 from ui.workers.library_scanner import LibraryScanner, _scan_worker_count
@@ -28,6 +29,25 @@ from core.models import FsTrack
 
 
 class ScanLibraryHelpersTests(unittest.TestCase):
+    def test_wav_metadata_uses_id3_tags(self):
+        class _FakeWave:
+            def get(self, key):
+                return {
+                    "TIT2": ["Track"],
+                    "TALB": ["Album"],
+                    "TPE1": ["Artist"],
+                    "TPE2": ["Album Artist"],
+                    "TRCK": ["02/10"],
+                }.get(key)
+
+        metadata = read_audio_metadata_from_audio(_FakeWave(), "song.wav")
+
+        self.assertEqual(metadata.title, "Track")
+        self.assertEqual(metadata.album, "Album")
+        self.assertEqual(metadata.artist, "Artist")
+        self.assertEqual(metadata.album_artist, "Album Artist")
+        self.assertEqual(metadata.track_number, 2)
+
     def test_get_audio_file_signature_includes_sidecars(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -711,4 +731,3 @@ class LibraryScannerIncrementalTests(unittest.TestCase):
         audio_mp3 = FakeAudio({"TXXX:ALBUM ARTIST": FakeAudioTag("Aviators MP3")})
         meta_mp3 = read_audio_metadata_from_audio(audio_mp3, "track.mp3")
         self.assertEqual(meta_mp3.album_artist, "Aviators MP3")
-

@@ -150,6 +150,24 @@ class EmbedLyricsFormatTests(unittest.TestCase):
         )
         self.assertEqual(fake_tags.saved_path, "song.mp3")
 
+    def test_wav_writes_id3_lyrics_tags(self):
+        fake_tags = _FakeID3()
+        fake_audio = _FakeMusepackAudio(tags=fake_tags)
+
+        with patch("core.embed_lyrics.WAVE", return_value=fake_audio):
+            embed_lyrics_in_file("song.wav", "Plain lyrics", "[00:01.00]Synced lyrics")
+
+        self.assertTrue(any(frame.FrameID == "USLT" and frame.text == "Plain lyrics" for frame in fake_tags.frames))
+        self.assertTrue(
+            any(
+                frame.FrameID == "TXXX"
+                and frame.desc == ID3_SYNCED_DESC
+                and frame.text == ["[00:01.00]Synced lyrics"]
+                for frame in fake_tags.frames
+            )
+        )
+        self.assertTrue(fake_audio.saved)
+
     def test_mp3_preserves_foreign_uslt_frames_while_replacing_managed_ones(self):
         foreign_frame = _FakeFrame(FrameID="USLT", lang="eng", desc="translation", text="Foreign lyrics")
         managed_frame = _FakeFrame(FrameID="USLT", lang="und", desc="", text="Old managed lyrics")
@@ -181,6 +199,22 @@ class EmbedLyricsFormatTests(unittest.TestCase):
 
         self.assertEqual(plain, "Plain lyrics")
         self.assertIsNone(synced)
+
+    def test_wav_read_prefers_managed_id3_lyrics_frames(self):
+        plain_frame = _FakeFrame(FrameID="USLT", lang="und", desc="", text="Plain lyrics")
+        synced_frame = _FakeFrame(
+            FrameID="TXXX",
+            desc=ID3_SYNCED_DESC,
+            text=["[00:01.00]Synced lyrics"],
+        )
+        fake_tags = _FakeID3()
+        fake_tags.frames = [plain_frame, synced_frame]
+        fake_audio = _FakeAudioWithTags(fake_tags)
+
+        plain, synced = read_embedded_lyrics_from_audio(fake_audio, "song.wav")
+
+        self.assertEqual(plain, "Plain lyrics")
+        self.assertEqual(synced, "[00:01.00]Synced lyrics")
 
     def test_mp3_read_falls_back_when_easy_tags_do_not_expose_getall(self):
         managed_frame = _FakeFrame(FrameID="USLT", lang="und", desc="", text="Plain lyrics")
