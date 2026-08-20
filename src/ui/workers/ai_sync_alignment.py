@@ -606,8 +606,9 @@ def _tail_rescue_forward_jump_indices(
             continue
 
         rescued = list(aligned_indices)
-        previous_idx = previous
-        for rescued_line in range(line_idx, num_lines):
+        rescue_start = max(0, line_idx - 2)
+        previous_idx = rescued[rescue_start - 1] if rescue_start > 0 else -1
+        for rescued_line in range(rescue_start, num_lines):
             target_s = _expected_time_position(rescued_line, num_lines, horizon_s)
             start_idx = bisect_left(word_starts, max(target_s - local_window_s, 0.0))
             end_idx = bisect_right(
@@ -629,13 +630,136 @@ def _tail_rescue_forward_jump_indices(
     return aligned_indices
 
 
+def _tail_rescue_collapsed_cluster_indices(
+    aligned_indices: list[int],
+    *,
+    word_starts: list[float],
+    num_lines: int,
+    collapse_window_s: float = 3.0,
+    forward_gap_s: float = 20.0,
+    local_window_s: float = 12.0,
+    min_local_words: int = 8,
+) -> list[int]:
+    """Recover a repeated lyric block collapsed before a large ASR coverage gap."""
+    if len(aligned_indices) < 4 or len(word_starts) <= 1:
+        return aligned_indices
+    if len(aligned_indices) != num_lines:
+        return aligned_indices
+
+    for line_idx in range(2, num_lines - 1):
+        first = aligned_indices[line_idx - 2]
+        second = aligned_indices[line_idx - 1]
+        current = aligned_indices[line_idx]
+        if not all(0 <= idx < len(word_starts) for idx in (first, second, current)):
+            continue
+        if word_starts[second] - word_starts[first] > collapse_window_s:
+            continue
+        forward_gap = word_starts[current] - word_starts[second]
+        if forward_gap < forward_gap_s:
+            continue
+
+        local_start = max(0.0, word_starts[second] - local_window_s)
+        local_end = word_starts[second] + 1.0
+        local_words = [
+            idx
+            for idx, start in enumerate(word_starts)
+            if local_start <= start <= local_end
+        ]
+        if len(local_words) < min_local_words:
+            continue
+
+        rescue_start = line_idx - 2
+        rescue_end = min(num_lines, line_idx + 1)
+        span = local_words[-1] - local_words[0]
+        rescued = list(aligned_indices)
+        previous_idx = rescued[rescue_start - 1] if rescue_start > 0 else -1
+        for rescued_line in range(rescue_start, rescue_end):
+            ratio = (rescued_line - rescue_start) / max(rescue_end - rescue_start - 1, 1)
+            target_idx = local_words[0] + round(span * ratio)
+            candidates = [
+                idx
+                for idx in local_words
+                if idx > previous_idx
+            ]
+            if not candidates:
+                break
+            selected = min(candidates, key=lambda idx: abs(idx - target_idx))
+            rescued[rescued_line] = selected
+            previous_idx = selected
+        else:
+            return rescued
+    return aligned_indices
+
+
+def _repair_repeated_prefix_timestamp_gaps(lrc_text: str) -> str:
+    """Reposition repeated two-line prefixes collapsed before a long gap."""
+    import re
+
+    rows = []
+    for line in lrc_text.splitlines():
+        match = re.match(r"^\[(\d+):(\d+\.\d+)\](.*)$", line)
+        if not match or not match.group(3).strip():
+            continue
+        minutes, seconds = match.group(1), match.group(2)
+        rows.append(
+            {
+                "line": line,
+                "time": int(minutes) * 60 + float(seconds),
+                "text": " ".join(re.findall(r"[a-z0-9]+", match.group(3).casefold())),
+            }
+        )
+    if len(rows) < 6:
+        return lrc_text
+
+    for index in range(2, len(rows) - 2):
+        current = rows[index : index + 3]
+        anchor_gap = current[2]["time"] - current[1]["time"]
+        if anchor_gap < 15.0 or anchor_gap > 20.5:
+            continue
+        for previous_index in range(index - 3, -1, -1):
+            previous = rows[previous_index : previous_index + 3]
+            if [row["text"] for row in previous] != [row["text"] for row in current]:
+                continue
+            offsets = [
+                previous[0]["time"] - previous[2]["time"],
+                previous[1]["time"] - previous[2]["time"],
+            ]
+            repaired = [current[2]["time"] + offset for offset in offsets]
+            if not (repaired[0] < repaired[1] < current[2]["time"]):
+                continue
+            if index > 0 and repaired[0] <= rows[index - 1]["time"]:
+                continue
+            for row, timestamp in zip(current[:2], repaired):
+                minutes = int(timestamp // 60)
+                seconds = timestamp - minutes * 60
+                row["line"] = re.sub(
+                    r"^\[\d+:\d+\.\d+\]",
+                    f"[{minutes:02d}:{seconds:05.2f}]",
+                    row["line"],
+                )
+                row["time"] = timestamp
+            break
+
+    replacements = {id(row): row["line"] for row in rows}
+    output = []
+    row_index = 0
+    for line in lrc_text.splitlines():
+        match = re.match(r"^\[(\d+):(\d+\.\d+)\](.*)$", line)
+        if match and match.group(3).strip():
+            output.append(replacements[id(rows[row_index])])
+            row_index += 1
+        else:
+            output.append(line)
+    return "\n".join(output)
+
+
 def _tail_rescue_rewind_target_lag_indices(
     aligned_indices: list[int],
     rewind_targets: dict[int, int],
     line_peak_emissions: list[float],
     *,
     num_words: int,
-    tail_start_ratio: float = 0.66,
+    tail_start_ratio: float = 0.58,
     min_lag_words: int = 26,
     min_tail_hits: int = 3,
     strong_peak_threshold: float = 0.72,
@@ -1032,6 +1156,11 @@ def _align_lyrics_to_segments_viterbi(
         word_starts=[float(w.get("start", 0.0)) for w in words],
         num_lines=num_lines,
     )
+    aligned_indices = _tail_rescue_collapsed_cluster_indices(
+        aligned_indices,
+        word_starts=[float(w.get("start", 0.0)) for w in words],
+        num_lines=num_lines,
+    )
     aligned_indices = _ensure_strictly_increasing_alignment_indices(
         aligned_indices,
         num_words=num_words,
@@ -1172,6 +1301,8 @@ __all__ = [
     "_late_line_candidate_start_floor",
     "_tail_rescue_alignment_indices",
     "_tail_rescue_forward_jump_indices",
+    "_tail_rescue_collapsed_cluster_indices",
+    "_repair_repeated_prefix_timestamp_gaps",
     "_tail_rescue_rewind_target_lag_indices",
     "_ensure_strictly_increasing_alignment_indices",
     "_prepare_manual_line_anchors",

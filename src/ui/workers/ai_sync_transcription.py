@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import logging
+import re
+from collections import Counter
 from difflib import SequenceMatcher
 
 logger = logging.getLogger(__name__)
@@ -451,6 +453,65 @@ def _select_best_relaxed_segments(
     return best_segments
 
 
+def _should_retry_with_short_windows(
+    segments: list[dict],
+    *,
+    min_segment_duration_s: float = 18.0,
+    max_word_density: float = 1.5,
+    min_segment_words: int = 12,
+) -> bool:
+    """Detect a long, low-density ASR segment likely compressing repeated lyrics."""
+    for segment in segments:
+        try:
+            duration_s = float(segment.get("end", 0.0)) - float(segment.get("start", 0.0))
+        except (TypeError, ValueError):
+            continue
+        word_count = sum(
+            1
+            for word in segment.get("words", [])
+            if isinstance(word, dict) and str(word.get("word", "")).strip()
+        )
+        if (
+            duration_s >= min_segment_duration_s
+            and word_count >= min_segment_words
+            and word_count / max(duration_s, 0.1) <= max_word_density
+        ):
+            return True
+    return False
+
+
+def _find_targeted_retry_window(
+    segments: list[dict],
+    plain_lines: list[str],
+    *,
+    min_gap_s: float = 15.0,
+    max_gap_s: float = 25.0,
+    context_s: float = 10.0,
+) -> tuple[float, float] | None:
+    """Find a medium ASR gap near repeated lyrics for a local retry."""
+    normalized_lines = [
+        re.sub(r"[^a-z0-9 ]", "", line.casefold()).strip()
+        for line in plain_lines
+        if line.strip()
+    ]
+    if not any(count >= 2 for count in Counter(normalized_lines).values()):
+        return None
+
+    starts = sorted(
+        float(word["start"])
+        for segment in segments
+        for word in segment.get("words", [])
+        if isinstance(word, dict) and word.get("start") is not None
+    )
+    if len(starts) < 2:
+        return None
+    for previous, current in zip(starts, starts[1:]):
+        gap = current - previous
+        if min_gap_s <= gap <= max_gap_s:
+            return (max(0.0, previous - context_s), current + context_s)
+    return None
+
+
 __all__ = [
     "_approximate_word_timestamps_from_segments",
     "_transcribe_tail_window",
@@ -466,4 +527,6 @@ __all__ = [
     "_segment_alignment_quality",
     "_should_use_relaxed_vad_result",
     "_select_best_relaxed_segments",
+    "_should_retry_with_short_windows",
+    "_find_targeted_retry_window",
 ]

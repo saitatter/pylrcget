@@ -16,6 +16,7 @@ ai = [
     "torchaudio",
     "whisperx",
     "soundfile",
+    "g2p-en",
 ]
 
 [tool.semantic_release]

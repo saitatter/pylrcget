@@ -142,15 +142,19 @@ File export and embedded lyric format are controlled separately in Settings. For
 
 ## 🤖 AI Auto-Sync
 
-PyLrcGet can generate synced lyrics locally using **WhisperX** for transcription and alignment. Everything runs on your machine — no API keys or internet connection required (after initial model download).
+PyLrcGet can generate synced lyrics locally. English singing uses the optional
+**lyrics-aligner** backend when configured; other detected languages, or an unavailable
+lyrics-aligner installation, fall back to **WhisperX**. Everything runs on your machine —
+no API keys or internet connection required (after initial model downloads).
 
 The feature lives inside the track lyrics editor. Select a track, open the lyrics pane, and use **Auto Sync**. If the track has no lyrics yet, the empty lyrics state also exposes an **Auto Sync** action.
 
 ### How it works
 
-1. **WhisperX** transcribes the audio with word-level timestamps
-2. If plain lyrics are already present, they are aligned to the detected timestamps; otherwise WhisperX's transcription is used directly
-3. The result is placed in the synced lyrics editor as an unsaved draft
+1. WhisperX detects the audio language
+2. For English, lyrics-aligner aligns the supplied lyrics phonetically; other languages use WhisperX word-level timestamps
+3. If the optional English backend fails, WhisperX is used as a safe fallback
+4. The result is placed in the synced lyrics editor as an unsaved draft
 
 ### Install AI dependencies
 
@@ -165,6 +169,19 @@ Or, if installing from `pyproject.toml`:
 ```bash
 pip install pylrcget[ai]
 ```
+
+### Optional English lyrics-aligner backend
+
+Clone `schufo/lyrics-aligner`, install its model dependencies and download
+`g2p-en`, then point PyLrcGet at that checkout:
+
+```powershell
+$env:PYLRCGET_LYRICS_ALIGNER_PATH = "C:\path\to\lyrics-aligner"
+pip install g2p-en
+```
+
+The checkout must contain `align.py`, `model_parameters.pth`, and
+`files\phoneme2idx.pickle`. The backend is used only when Whisper detects English.
 
 > **Python compatibility:** the current WhisperX AI dependency set supports Python
 > 3.10-3.13. Python 3.14 is not supported because its required `ctranslate2`

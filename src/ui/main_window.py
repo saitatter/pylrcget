@@ -1550,12 +1550,33 @@ class MainWindow(QMainWindow):
             fuzzy_threshold=int(ai_sync_settings.get("fuzzy_threshold", 60)),
         )
         worker.progress.connect(self._on_ai_sync_progress)
-        worker.completed.connect(lambda ok, msg, lrc: self._on_auto_sync_finished(ok, msg, lrc, sync_track_id))
+        worker.completed.connect(
+            lambda ok, msg, lrc, sync_worker=worker: self._on_auto_sync_finished(
+                ok,
+                msg,
+                lrc,
+                sync_track_id,
+                cancelled_worker=sync_worker is getattr(
+                    self, "_ai_sync_cancelled_worker", None
+                ),
+            )
+        )
         worker.finished.connect(lambda: self._on_ai_sync_thread_finished(worker))
         self._ai_sync_worker = worker
         worker.start()
 
-    def _on_auto_sync_finished(self, ok: bool, msg: str, lrc: str, track_id: int) -> None:
+    def _on_auto_sync_finished(
+        self,
+        ok: bool,
+        msg: str,
+        lrc: str,
+        track_id: int,
+        *,
+        cancelled_worker: bool = False,
+    ) -> None:
+        if cancelled_worker:
+            return
+
         for view in self._all_lyrics_views():
             view.btn_auto_sync.setEnabled(True)
             view.btn_auto_sync.setText("Auto Sync")
@@ -1615,8 +1636,15 @@ class MainWindow(QMainWindow):
             )
 
     def _on_ai_sync_thread_finished(self, worker) -> None:
+        was_cancelled = getattr(self, "_ai_sync_cancelled_worker", None) is worker
         if self._ai_sync_worker is worker:
             self._ai_sync_worker = None
+        if getattr(self, "_ai_sync_cancelled_worker", None) is worker:
+            self._ai_sync_cancelled_worker = None
+        if was_cancelled:
+            for view in self._all_lyrics_views():
+                view.btn_auto_sync.setEnabled(True)
+                view.btn_auto_sync.setText("Auto Sync")
 
     # ------------------ helpers ------------------
     def _on_ai_sync_progress(self, message: str) -> None:
@@ -1692,10 +1720,12 @@ class MainWindow(QMainWindow):
     def _cancel_ai_sync(self) -> None:
         worker = getattr(self, "_ai_sync_worker", None)
         if worker is not None and worker.isRunning():
+            self._ai_sync_cancelled_worker = worker
             worker.requestInterruption()
             overlay = getattr(self, "ai_sync_overlay", None)
             if overlay is not None:
-                overlay.update_progress(-1, 8, "AI Auto-Sync", "Cancelling now…")
+                overlay.finish_batch("AI sync cancelled.", cancelled=True)
+                overlay.queue_auto_close(1200)
 
     def _cancel_lyrics_export(self) -> None:
         controller = getattr(self, "lyrics_output", None)

@@ -2,6 +2,9 @@
 from __future__ import annotations
 
 import logging
+import multiprocessing
+import os
+import queue
 from pathlib import Path
 
 from PySide6.QtCore import QThread, Signal
@@ -30,7 +33,9 @@ from .ai_sync_alignment import (
     _prepare_manual_line_anchors,
     _same_phrase_rewind_penalty,
     _same_phrase_rewind_transition_penalty,
+    _repair_repeated_prefix_timestamp_gaps,
     _tail_rescue_alignment_indices,
+    _tail_rescue_collapsed_cluster_indices,
     _tail_rescue_forward_jump_indices,
     _tail_rescue_rewind_target_lag_indices,
     _words_match,
@@ -42,6 +47,8 @@ from .ai_sync_lrc import (
     _format_ts,
     _is_non_lyric_line,
 )
+from .ai_sync_lyrics_aligner import align as _align_with_lyrics_aligner
+from .ai_sync_lyrics_aligner import is_available as _lyrics_aligner_available
 from .ai_sync_runtime import (
     _canonical_vad_options,
     _check_ai_sync_available,
@@ -64,7 +71,9 @@ from .ai_sync_transcription import (
     _segment_reliable_tail_seconds,
     _segment_tail_seconds,
     _segment_word_starts,
+    _find_targeted_retry_window,
     _select_best_relaxed_segments,
+    _should_retry_with_short_windows,
     _should_retry_with_relaxed_vad,
     _should_use_per_chunk_alignment,
     _should_use_relaxed_vad_result,
@@ -121,6 +130,68 @@ class AiSyncWorker(QThread):
         self.progress.emit(f"{self._PROGRESS_MARKER}|{int(current)}|{int(total)}|{message}")
 
     def run(self):
+        if os.environ.get("_PYLRCGET_AI_SYNC_CHILD") != "1":
+            self._run_in_subprocess()
+            return
+        self._run_in_process()
+
+    def _run_in_subprocess(self) -> None:
+        from .ai_sync_process import run_ai_sync_process
+
+        context = multiprocessing.get_context("spawn")
+        messages = context.Queue()
+        config = {
+            "audio_path": self.audio_path,
+            "plain_lyrics": self.plain_lyrics,
+            "manual_anchors": self.manual_anchors,
+            "whisper_model": self.whisper_model,
+            "device": self._device,
+            "language": self._language,
+            "enable_fuzzy": self._enable_fuzzy,
+            "fuzzy_threshold": self._fuzzy_threshold,
+            "fuzzy_window_words": self._fuzzy_window_words,
+        }
+        process = context.Process(
+            target=run_ai_sync_process,
+            args=(config, messages),
+            name="pylrcget-ai-sync",
+        )
+        process.start()
+        try:
+            while True:
+                try:
+                    message = messages.get(timeout=0.1)
+                except queue.Empty:
+                    if self.isInterruptionRequested():
+                        process.terminate()
+                        process.join(timeout=2.0)
+                        self.completed.emit(False, "Cancelled.", "")
+                        return
+                    if not process.is_alive():
+                        break
+                    continue
+                if message[0] == "progress":
+                    self.progress.emit(str(message[1]))
+                elif message[0] == "completed":
+                    self.completed.emit(bool(message[1]), str(message[2]), str(message[3]))
+                    process.join(timeout=2.0)
+                    return
+
+            if self.isInterruptionRequested():
+                self.completed.emit(False, "Cancelled.", "")
+            elif process.exitcode:
+                self.completed.emit(
+                    False,
+                    f"AI sync process exited unexpectedly (code {process.exitcode}).",
+                    "",
+                )
+        finally:
+            if process.is_alive():
+                process.terminate()
+            process.join(timeout=2.0)
+            messages.close()
+
+    def _run_in_process(self):
         try:
             ok, msg = _check_ai_sync_available()
             if not ok:
@@ -137,7 +208,11 @@ class AiSyncWorker(QThread):
                 self.completed.emit(False, "Cancelled.", "")
                 return
 
-            self._emit_stage(2, total_steps, f"Loading ASR model ({self.whisper_model}, {device})…")
+            self._emit_stage(
+                2,
+                total_steps,
+                f"Loading WhisperX ASR ({self.whisper_model}, device: {device})…",
+            )
             compute_type = "float16" if device == "cuda" else "int8"
             model = _get_cached_whisperx_model(
                 whisperx,
@@ -153,17 +228,29 @@ class AiSyncWorker(QThread):
             audio = whisperx.load_audio(self.audio_path)
             transcribe_language = _normalized_transcribe_language(self._language)
             language_label = transcribe_language or "auto-detect"
+            detected_language = transcribe_language
 
-            def _transcribe_and_align(model_obj, *, pass_label: str):
+            def _transcribe_and_align(
+                model_obj,
+                *,
+                pass_label: str,
+                fixed_window_s: float = 60.0,
+                fixed_step_s: float = 45.0,
+            ):
                 self._emit_stage(
                     3,
                     total_steps,
-                    f"Transcribing audio ({pass_label}, language: {language_label})…",
+                    f"WhisperX transcription ({pass_label}, language: {language_label}, "
+                    f"device: {device})…",
                 )
                 if transcribe_language is None:
                     result_local = model_obj.transcribe(audio)
                 else:
                     result_local = model_obj.transcribe(audio, language=transcribe_language)
+                nonlocal detected_language
+                detected_language = transcribe_language or _normalized_transcribe_language(
+                    result_local.get("language")
+                )
 
                 audio_duration = float(len(audio)) / 16000.0 if hasattr(audio, "__len__") else 0.0
                 raw_segments = [dict(segment) for segment in result_local.get("segments", [])]
@@ -181,6 +268,8 @@ class AiSyncWorker(QThread):
                         audio,
                         duration_s=audio_duration,
                         language=chunk_language,
+                        window_s=fixed_window_s,
+                        step_s=fixed_step_s,
                     )
                     if len(chunked_segments) > len(raw_segments):
                         raw_segments = chunked_segments
@@ -193,7 +282,12 @@ class AiSyncWorker(QThread):
                             len(raw_segments),
                         )
 
-                self._emit_stage(4, total_steps, f"Aligning detected words to audio ({pass_label})…")
+                self._emit_stage(
+                    4,
+                    total_steps,
+                    f"WhisperX forced alignment ({pass_label}, language: "
+                    f"{chunk_language or 'auto'})…",
+                )
                 raw_tail = max(
                     (float(seg.get("end", 0.0)) for seg in raw_segments if seg.get("end") is not None),
                     default=0.0,
@@ -280,8 +374,118 @@ class AiSyncWorker(QThread):
                         return recovered_segments
                 return aligned_segments
 
-            segments = _transcribe_and_align(model, pass_label="base pass")
             plain_lines = self.plain_lyrics.splitlines() if self.plain_lyrics else []
+            if plain_lines and _lyrics_aligner_available():
+                if transcribe_language == "en":
+                    detected_language = "en"
+                elif transcribe_language is None:
+                    self._emit_stage(
+                        3,
+                        total_steps,
+                        f"WhisperX language detection only (device: {device})…",
+                    )
+                    try:
+                        detection = model.transcribe(audio)
+                        detected_language = _normalized_transcribe_language(
+                            detection.get("language")
+                        )
+                    except (RuntimeError, TypeError, ValueError) as exc:
+                        logger.warning("Language detection failed; continuing with WhisperX: %s", exc)
+
+                if (detected_language or "").lower() == "en":
+                    self._emit_stage(
+                        4,
+                        total_steps,
+                        "English detected — lyrics-aligner phonetic alignment…",
+                    )
+                    try:
+                        lrc = _align_with_lyrics_aligner(
+                            self.audio_path,
+                            self.plain_lyrics,
+                            device=device,
+                        )
+                        if lrc.strip():
+                            self.completed.emit(
+                                True,
+                                "Lyrics synchronized successfully with lyrics-aligner.",
+                                lrc,
+                            )
+                            return
+                        logger.warning(
+                            "lyrics-aligner returned no aligned lyric lines; using WhisperX."
+                        )
+                    except (OSError, RuntimeError, ValueError) as exc:
+                        logger.warning(
+                            "lyrics-aligner failed; falling back to WhisperX: %s", exc
+                        )
+
+            segments = _transcribe_and_align(model, pass_label="base pass")
+            selected_language = (detected_language or "unknown").lower()
+            self._emit_stage(
+                5,
+                total_steps,
+                f"Detected language: {selected_language}. "
+                f"Selecting English lyrics-aligner or WhisperX fallback…",
+            )
+            if (
+                plain_lines
+                and (detected_language or "").lower() == "en"
+                and _lyrics_aligner_available()
+            ):
+                self._emit_stage(
+                    6,
+                    total_steps,
+                    "Using lyrics-aligner for English singing…",
+                )
+                try:
+                    lrc = _align_with_lyrics_aligner(
+                        self.audio_path,
+                        self.plain_lyrics,
+                        device=device,
+                    )
+                    if lrc.strip():
+                        self.completed.emit(
+                            True,
+                            "Lyrics synchronized successfully with lyrics-aligner.",
+                            lrc,
+                        )
+                        return
+                    logger.warning("lyrics-aligner returned no aligned lyric lines; using WhisperX.")
+                    self._emit_stage(
+                        5,
+                        total_steps,
+                        "lyrics-aligner returned no lines — falling back to WhisperX…",
+                    )
+                except (OSError, RuntimeError, ValueError) as exc:
+                    logger.warning("lyrics-aligner failed; falling back to WhisperX: %s", exc)
+                    self._emit_stage(
+                        5,
+                        total_steps,
+                        "lyrics-aligner failed — falling back to WhisperX…",
+                    )
+            elif plain_lines and selected_language == "en":
+                self._emit_stage(
+                    5,
+                    total_steps,
+                    "English detected, but lyrics-aligner is not configured — using WhisperX…",
+                )
+            targeted_window = _find_targeted_retry_window(segments, plain_lines)
+            if targeted_window is not None:
+                logger.info(
+                    "Detected repeated lyrics near an ASR gap; targeted retry window: %.2fs-%.2fs.",
+                    targeted_window[0],
+                    targeted_window[1],
+                )
+            if _should_retry_with_short_windows(segments):
+                logger.info(
+                    "Detected a long low-density ASR segment; retrying with short windows."
+                )
+                segments = _transcribe_and_align(
+                    model,
+                    pass_label="short-window retry",
+                    fixed_window_s=30.0,
+                    fixed_step_s=20.0,
+                )
             self._emit_stage(5, total_steps, "Checking speech coverage and selecting best pass…")
             if _should_retry_with_relaxed_vad(audio, segments, plain_lines):
                 duration_s = float(len(audio)) / 16000.0 if hasattr(audio, "__len__") else 0.0
@@ -349,6 +553,7 @@ class AiSyncWorker(QThread):
                         fuzzy_threshold=self._fuzzy_threshold,
                         fuzzy_window_words=self._fuzzy_window_words,
                     )
+                raw = _repair_repeated_prefix_timestamp_gaps(raw)
                 for ln in raw.splitlines():
                     ln = ln.strip()
                     if not ln or not ln.startswith("["):
@@ -409,6 +614,10 @@ __all__ = [
     "_segment_reliable_tail_seconds",
     "_segment_tail_seconds",
     "_tail_rescue_forward_jump_indices",
+    "_tail_rescue_collapsed_cluster_indices",
+    "_repair_repeated_prefix_timestamp_gaps",
+    "_should_retry_with_short_windows",
+    "_find_targeted_retry_window",
     "_should_use_relaxed_vad_result",
     "_should_retry_with_relaxed_vad",
     "_select_best_relaxed_segments",

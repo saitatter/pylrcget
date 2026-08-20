@@ -36,9 +36,13 @@ from ui.workers.ai_sync_worker import (
     _should_use_relaxed_vad_result,
     _should_retry_with_relaxed_vad,
     _select_best_relaxed_segments,
+    _should_retry_with_short_windows,
+    _find_targeted_retry_window,
     _tail_rescue_alignment_indices,
     _tail_rescue_forward_jump_indices,
+    _tail_rescue_collapsed_cluster_indices,
     _tail_rescue_rewind_target_lag_indices,
+    _repair_repeated_prefix_timestamp_gaps,
     _ensure_strictly_increasing_alignment_indices,
     get_missing_ai_dependencies,
 )
@@ -46,6 +50,73 @@ from ui.workers.ai_sync_worker import (
 
 def test_format_ts_zero():
     assert _format_ts(0) == "00:00.00"
+
+
+def test_should_retry_with_short_windows_detects_long_low_density_segment():
+    segments = [
+        {
+            "start": 136.3,
+            "end": 159.0,
+            "words": [
+                {"word": word}
+                for word in "good time by your eyes may we meet again and time is close".split()
+            ],
+        }
+    ]
+
+    assert _should_retry_with_short_windows(segments)
+
+
+def test_should_retry_with_short_windows_ignores_dense_or_short_segments():
+    dense = [
+        {
+            "start": 135.5,
+            "end": 164.8,
+            "words": [{"word": f"word-{index}"} for index in range(68)],
+        }
+    ]
+    short = [
+        {
+            "start": 72.3,
+            "end": 90.0,
+            "words": [{"word": f"word-{index}"} for index in range(75)],
+        }
+    ]
+
+    assert not _should_retry_with_short_windows(dense)
+    assert not _should_retry_with_short_windows(short)
+
+
+def test_find_targeted_retry_window_detects_repeated_lyrics_near_medium_gap():
+    segments = [
+        {
+            "words": [
+                {"start": 116.0, "word": "down"},
+                {"start": 136.0, "word": "fool"},
+            ]
+        }
+    ]
+    plain_lines = ["Upside down", "You fool yourself", "Upside down"]
+
+    assert _find_targeted_retry_window(segments, plain_lines) == (106.0, 146.0)
+
+
+def test_repair_repeated_prefix_timestamp_gaps_uses_prior_block_offsets():
+    lrc = "\n".join(
+        (
+            "[00:10.00] Upside down",
+            "[00:12.00] You fool yourself",
+            "[00:14.00] I see you now",
+            "[01:00.00] Upside down",
+            "[01:02.00] You fool yourself",
+            "[01:21.00] I see you now",
+        )
+    )
+
+    repaired = _repair_repeated_prefix_timestamp_gaps(lrc)
+
+    assert "[01:17.00] Upside down" in repaired
+    assert "[01:19.00] You fool yourself" in repaired
 
 
 def test_format_ts_basic():
@@ -838,6 +909,26 @@ def test_tail_rescue_forward_jump_returns_to_local_word_cluster():
 
     assert rescued[8] < aligned[8]
     assert all(rescued[i] < rescued[i + 1] for i in range(len(rescued) - 1))
+
+
+def test_tail_rescue_collapsed_cluster_recovers_lines_before_coverage_gap():
+    word_starts = [float(i) for i in range(180)] + [220.0, 225.0, 230.0]
+    aligned = [150, 160, 165, 166, 180, 181]
+
+    rescued = _tail_rescue_collapsed_cluster_indices(
+        aligned,
+        word_starts=word_starts,
+        num_lines=len(aligned),
+    )
+
+    assert rescued[2] < 180
+    assert rescued[3] < 180
+    assert rescued[4] < 180
+    assert rescued[5] == 181
+    assert all(rescued[i] < rescued[i + 1] for i in range(len(rescued) - 1))
+
+
+
 
 
 def test_same_phrase_rewind_targets_expand_tail_when_clusters_are_few():
