@@ -200,6 +200,25 @@ class EmbedLyricsFormatTests(unittest.TestCase):
         self.assertEqual(plain, "Plain lyrics")
         self.assertIsNone(synced)
 
+    def test_mp3_read_falls_back_to_standard_sylt_frame(self):
+        plain_frame = _FakeFrame(FrameID="USLT", lang="und", desc="", text="Plain lyrics")
+        synced_frame = _FakeFrame(
+            FrameID="SYLT",
+            format=2,
+            text=[("First line", 1250), ("Second line", 3675)],
+        )
+        fake_tags = _FakeID3()
+        fake_tags.frames = [plain_frame, synced_frame]
+        fake_audio = _FakeAudioWithTags(fake_tags)
+
+        plain, synced = read_embedded_lyrics_from_audio(fake_audio, "song.mp3")
+
+        self.assertEqual(plain, "Plain lyrics")
+        self.assertEqual(
+            synced,
+            "[00:01.25] First line\n[00:03.68] Second line",
+        )
+
     def test_wav_read_prefers_managed_id3_lyrics_frames(self):
         plain_frame = _FakeFrame(FrameID="USLT", lang="und", desc="", text="Plain lyrics")
         synced_frame = _FakeFrame(

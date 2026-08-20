@@ -114,6 +114,53 @@ def _first_managed_uslt_text(tags: ID3) -> str | None:
     return None
 
 
+def _first_id3_synced_lrc(tags: ID3) -> str | None:
+    """Read PyLrcGet's TXXX LRC or convert a standard ID3 SYLT frame."""
+    getall = getattr(tags, "getall", None)
+    if not callable(getall):
+        return None
+
+    for frame in getall("TXXX"):
+        if getattr(frame, "desc", "") != ID3_SYNCED_DESC:
+            continue
+        text = getattr(frame, "text", None)
+        if isinstance(text, (list, tuple)) and text:
+            return str(text[0])
+        if isinstance(text, str) and text.strip():
+            return text
+
+    for frame in getall("SYLT"):
+        if getattr(frame, "format", 2) != 2:
+            continue
+        entries = getattr(frame, "text", None)
+        if not isinstance(entries, (list, tuple)):
+            continue
+        output: list[str] = []
+        for entry in entries:
+            if not isinstance(entry, (list, tuple)) or len(entry) < 2:
+                continue
+            text, timestamp_ms = entry[0], entry[1]
+            text = str(text).strip()
+            if not text:
+                continue
+            try:
+                seconds = max(0.0, float(timestamp_ms) / 1000.0)
+            except (TypeError, ValueError):
+                continue
+            total_centiseconds = round(seconds * 100)
+            minutes, centiseconds = divmod(total_centiseconds, 6000)
+            for line in text.splitlines() or [text]:
+                line = line.strip()
+                if line:
+                    output.append(
+                        f"[{int(minutes):02d}:{centiseconds // 100:02d}."
+                        f"{centiseconds % 100:02d}] {line}"
+                    )
+        if output:
+            return "\n".join(output)
+    return None
+
+
 def _split_lines(block: str | None) -> list[str]:
     return [line.strip() for line in (block or "").splitlines() if line.strip()]
 
@@ -868,30 +915,14 @@ def read_embedded_lyrics_from_audio(audio, path: str) -> tuple[str | None, str |
 
             plain = _first_managed_uslt_text(tags)
 
-            txxx_frames = tags.getall("TXXX")
-            for t in txxx_frames:
-                if getattr(t, "desc", "") == ID3_SYNCED_DESC:
-                    txt = getattr(t, "text", None)
-                    if isinstance(txt, (list, tuple)) and txt:
-                        synced = str(txt[0])
-                    elif isinstance(txt, str):
-                        synced = txt
-                    break
+            synced = _first_id3_synced_lrc(tags)
 
         elif ext in {".dsf", ".dff"}:
             tags = getattr(audio, "tags", None)
             if tags:
                 plain = _first_managed_uslt_text(tags)
 
-                txxx_frames = tags.getall("TXXX")
-                for t in txxx_frames:
-                    if getattr(t, "desc", "") == ID3_SYNCED_DESC:
-                        txt = getattr(t, "text", None)
-                        if isinstance(txt, (list, tuple)) and txt:
-                            synced = str(txt[0])
-                        elif isinstance(txt, str):
-                            synced = txt
-                        break
+                synced = _first_id3_synced_lrc(tags)
 
         elif ext in {".flac"}:
             plain, synced = _read_vorbis_lyrics(audio)

@@ -90,7 +90,10 @@ PyLrcGet goes beyond bulk lyric downloads and turns the app into a full desktop 
 | WAV | ✅ | ✅ | ✅ |
 
 > **Note:** Playback support depends on the active playback backend and codecs available on the system. Lyric embedding support is broader than playback support for some formats.
-> WAV lyric metadata uses ID3v2 tags stored in the RIFF/WAVE file.
+> MP3/WAV lyric metadata uses ID3v2 tags. PyLrcGet reads its managed `TXXX` LRC
+> field and also detects standard `SYLT` synchronized-lyrics frames used by
+> applications such as Kid3 and LRCGET. WAV ID3v2 tags are stored in the
+> RIFF/WAVE file.
 
 ---
 
