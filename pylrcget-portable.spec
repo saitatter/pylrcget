@@ -1,90 +1,53 @@
 from pathlib import Path
-from importlib import import_module
-from PyInstaller.utils.hooks import collect_all, collect_data_files, copy_metadata, collect_submodules
+import sys
 
 
 SPEC_PATH = Path(globals().get("__file__", "pylrcget-portable.spec")).resolve()
 ROOT = SPEC_PATH.parent if SPEC_PATH.exists() else Path.cwd()
 
-def _optional_collect_data_files(package: str):
-    try:
-        return collect_data_files(package)
-    except Exception:
-        return []
+if not (3, 10) <= tuple(sys.version_info[:2]) <= (3, 13):
+    raise SystemExit(
+        "PyLrcGet builds require Python 3.10-3.13; "
+        f"the current interpreter is Python {sys.version_info[0]}.{sys.version_info[1]}."
+    )
 
-def _optional_copy_metadata(package: str):
-    try:
-        return copy_metadata(package)
-    except Exception:
-        return []
-
-AI_DATAS = []
-AI_BINARIES = []
-AI_HIDDENIMPORTS = [
-    "whisperx",
-    "whisperx.asr",
-    "whisperx.alignment",
-    "whisperx.audio",
-    "whisperx.diarize",
-    "whisperx.types",
-    "whisperx.utils",
-    "whisperx.vad",
-    "soundfile",
-    "_soundfile",
-    "_soundfile_data",
-    "cffi",
-    "_cffi_backend",
+AI_RUNTIME_DATAS = [
+    (str(path), "ai_runtime_src/ui/workers")
+    for path in (ROOT / "src" / "ui" / "workers").glob("*.py")
 ]
 
-def _collect_ai_package(package: str):
-    global AI_DATAS, AI_BINARIES, AI_HIDDENIMPORTS
-    try:
-        datas, binaries, hiddenimports = collect_all(package)
-        AI_DATAS.extend(datas)
-        AI_BINARIES.extend(binaries)
-        AI_HIDDENIMPORTS.extend(hiddenimports)
-    except Exception as exc:
-        print(f"Warning: could not collect AI package {package}: {exc}")
-
-    AI_DATAS.extend(_optional_copy_metadata(package))
-
-
-AI_PACKAGES = [
+AI_EXCLUDES = [
+    "torch",
+    "torchaudio",
+    "torchcodec",
     "whisperx",
     "faster_whisper",
     "ctranslate2",
     "soundfile",
-    "torchaudio",
-    "torch",
-    "torchcodec",
+    "pyannote",
+    "transformers",
+    "demucs",
     "pandas",
     "scipy",
-    "transformers",
-    "pyannote",
-    "pyannote.audio",
-    "omegaconf",
-    "hydra",
-    "antlr4",
+    "onnxruntime",
+    "librosa",
+    "g2p_en",
 ]
-
-for pkg in AI_PACKAGES:
-    _collect_ai_package(pkg)
-
 
 a = Analysis(
     ["main.py"],
     pathex=[str(ROOT), str(ROOT / "src")],
-    binaries=AI_BINARIES,
     datas=[
+        *AI_RUNTIME_DATAS,
         (str(ROOT / "src" / "ui" / "qss"), "ui/qss"),
         (str(ROOT / "src" / "ui" / "assets"), "ui/assets"),
         (str(ROOT / "pyproject.toml"), "."),
-    ] + AI_DATAS,
-    hiddenimports=AI_HIDDENIMPORTS,
+    ],
+    hiddenimports=[],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=[],
+    excludes=AI_EXCLUDES,
     noarchive=False,
 )
 pyz = PYZ(a.pure)

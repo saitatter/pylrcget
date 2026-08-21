@@ -171,6 +171,14 @@ AI sync dependencies are **not** included in the base install. Install them sepa
 pip install torch torchaudio whisperx soundfile
 ```
 
+The packaged application can also keep the AI stack in a separate runtime. When the
+AI dependencies are missing, the AI setup dialog creates an isolated Python environment
+under the application data directory and installs `torch`, `torchaudio`, `whisperx`, and
+`soundfile` there. AI Sync then launches that interpreter as a subprocess, so updating
+the AI stack does not require reinstalling the main application. A system Python 3.10-3.13
+installation is required to bootstrap this runtime; `PYLRCGET_AI_BOOTSTRAP_PYTHON` can
+select a specific interpreter and `PYLRCGET_AI_RUNTIME_DIR` can select its location.
+
 Or, if installing from `pyproject.toml`:
 
 ```bash
@@ -179,8 +187,10 @@ pip install pylrcget[ai]
 
 ### Optional English lyrics-aligner backend
 
-Clone `schufo/lyrics-aligner`, install its model dependencies and download
-`g2p-en`, then point PyLrcGet at that checkout:
+When Auto Sync is used, PyLrcGet offers to clone `schufo/lyrics-aligner` into
+`%LOCALAPPDATA%\PyLrcGet\lyrics-aligner` and install `g2p-en` and `librosa` in
+the external AI runtime if the backend is missing. Manual setup is also
+supported by pointing PyLrcGet at a checkout:
 
 ```powershell
 $env:PYLRCGET_LYRICS_ALIGNER_PATH = "C:\path\to\lyrics-aligner"
@@ -209,12 +219,19 @@ proxy does not improve.
 > version does not provide compatible wheels. Use a Python 3.13 virtual environment
 > for AI Auto-Sync.
 
-> **Note:** AI dependencies add ~2 GB to the install (mostly PyTorch). The `base` Whisper model (~140 MB) is downloaded automatically on first use. GPU acceleration (CUDA) is used when available, otherwise CPU.
+> **Note:** the optional AI runtime can add ~2 GB (mostly PyTorch), but it is kept
+> outside the main application when installed through the AI setup dialog. The `base`
+> Whisper model (~140 MB) is downloaded automatically on first use. GPU acceleration
+> (CUDA) is used when available, otherwise CPU.
 
-> **Note:** base binary releases do not include AI dependencies by default.
-> **Note:** AI-enabled portable builds are published for Windows and macOS. The Linux AI build is generated in CI but is too large for GitHub release assets, so it is not published there. All AI builds include the Python AI stack, but `ffmpeg` is still a system prerequisite for Whisper/WhisperX. The Linux `.deb` release declares `ffmpeg` as a package dependency so it is installed automatically on apt-based distros.
+> **Note:** binary releases do not include AI dependencies. The
+> separate runtime is created on demand when Auto Sync is first used; `ffmpeg` is
+> still a system prerequisite for Whisper/WhisperX. The Linux `.deb` release declares
+> `ffmpeg` as a package dependency so it is installed automatically on apt-based distros.
 
-> **Tip for packaged users:** installing packages into system Python does not patch an already packaged executable.
+> **Tip for packaged users:** install AI dependencies from the AI setup dialog, or set
+> `PYLRCGET_AI_RUNTIME_PYTHON` to an existing compatible virtual environment. Installing
+> packages into an unrelated system Python does not affect PyLrcGet.
 
 > **UI note:** there is no separate AI screen. The AI entrypoint is the **Auto Sync** button in the lyrics editor.
 
@@ -261,13 +278,6 @@ To build the portable single-file variant:
 pyinstaller --noconfirm pylrcget-portable.spec
 ```
 
-To build an AI-enabled portable variant (larger, includes AI deps):
-
-```bash
-python -m pip install .[ai]
-pyinstaller --noconfirm pylrcget-portable.spec
-```
-
 > **Note:** The app falls back to Qt Multimedia when `mpv` is unavailable, so packaged builds remain usable without an external `mpv` binary.
 
 ---
@@ -285,7 +295,6 @@ Uses **semantic-release** with Conventional Commits. On every push to `main`, CI
 - The macOS `.pkg` installs `PyLrcGet.app` into `/Applications` and exposes a `pylrcget` launcher in `/usr/local/bin`
 - Folder-based archives are published as `pylrcget-windows.zip`, `pylrcget-linux.tar.gz`, and `pylrcget-macos.tar.gz` (`PyLrcGet.app` inside the macOS archive)
 - Portable single-file executables are also published as `pylrcget-windows-portable.exe`, `pylrcget-linux-portable`, and `pylrcget-macos-portable`
-- AI-enabled portable builds are published as `pylrcget-windows-portable-ai.exe` and `pylrcget-macos-portable-ai`
 
 ### 🛡️ Windows note
 
@@ -313,9 +322,9 @@ Local feed testing is supported via `PYLRCGET_UPDATE_LATEST_URL` and `PYLRCGET_U
 - **No lyrics found** — Verify track metadata (title, artist) matches LRCLIB entries.
 - **Playback not working for a format** — Check that the required codec is available on your system.
 - **Update installer not launching** — Ensure you confirm the administrator/UAC prompt when it appears.
-- **Auto Sync says dependencies are missing** — If you run from source, install `pip install .[ai]` in that same environment. If you use the packaged `.exe`, AI dependencies must be present in the app's bundled Python runtime.
+- **Auto Sync says dependencies are missing** — Use the AI setup dialog to create the separate runtime, or install `pip install .[ai]` in the source environment. A packaged build can also use an existing runtime via `PYLRCGET_AI_RUNTIME_PYTHON`.
 - **Auto Sync cancel** — Stop terminates the isolated AI inference process immediately; a new sync can be started after the worker cleanup completes.
-- **Using packaged `.exe` and want AI Auto Sync** — Download and run `pylrcget-windows-portable-ai.exe` (AI-enabled portable build).
+- **Using packaged `.exe` and want AI Auto Sync** — Press Auto Sync and use the AI setup dialog to create the separate runtime. Existing AI-enabled installations can be updated normally; their settings and app data are preserved, and the AI runtime is reused if it already exists. Otherwise, Auto Sync installs the supported AI dependencies on first use.
 - **App closes with `QThread: Destroyed while thread is still running` after Auto Sync** — update to the latest release; shutdown handling for AI sync workers was fixed.
 
 ---
