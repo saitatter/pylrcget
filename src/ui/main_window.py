@@ -1513,7 +1513,8 @@ class MainWindow(QMainWindow):
             )
             return
 
-        ai_sync_settings = load_ai_sync_settings(get_config(self.app_state.db).ui_state_json)
+        config = get_config(self.app_state.db) if getattr(self.app_state, "db", None) else None
+        ai_sync_settings = load_ai_sync_settings(config.ui_state_json) if config else {}
         device_setting = str(ai_sync_settings.get("device") or "auto")
         prefer_cuda = device_setting == "cuda" or (
             device_setting == "auto" and nvidia_gpu_available()
@@ -1521,6 +1522,7 @@ class MainWindow(QMainWindow):
         missing = get_missing_ai_dependencies(
             prefer_cuda=prefer_cuda,
             require_lyrics_aligner=True,
+            require_demucs=bool(ai_sync_settings.get("enable_demucs_candidate", True)),
         )
         ok, msg = _check_ai_sync_available()
         if not ok or missing:
@@ -1534,6 +1536,9 @@ class MainWindow(QMainWindow):
                 missing_after_install = get_missing_ai_dependencies(
                     prefer_cuda=prefer_cuda,
                     require_lyrics_aligner=True,
+                    require_demucs=bool(
+                        ai_sync_settings.get("enable_demucs_candidate", True)
+                    ),
                 )
                 if ok_after_install and not missing_after_install:
                     self._on_auto_sync_requested()

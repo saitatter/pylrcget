@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import subprocess
 import threading
+from pathlib import Path
 
 from .ai_runtime import resolve_ai_runtime_python
 from .ai_sync_lyrics_aligner import is_available as _lyrics_aligner_available
@@ -225,7 +226,10 @@ def _module_available(module: str) -> bool:
 
 
 def get_missing_ai_dependencies(
-    *, prefer_cuda: bool = False, require_lyrics_aligner: bool = False
+    *,
+    prefer_cuda: bool = False,
+    require_lyrics_aligner: bool = False,
+    require_demucs: bool = False,
 ) -> list[str]:
     deps = [
         ("torch", "torch"),
@@ -254,6 +258,8 @@ def get_missing_ai_dependencies(
                 missing.append("torch-cuda")
             if require_lyrics_aligner and not _lyrics_aligner_available():
                 missing.append("lyrics-aligner")
+            if require_demucs and not _module_available_in_runtime(external_python, "demucs"):
+                missing.append("demucs")
             return missing
         return packages
 
@@ -265,7 +271,18 @@ def get_missing_ai_dependencies(
         missing.append("torch-cuda")
     if require_lyrics_aligner and not _lyrics_aligner_available():
         missing.append("lyrics-aligner")
+    if require_demucs and not _module_available("demucs"):
+        missing.append("demucs")
     return missing
+
+
+def _module_available_in_runtime(executable: Path, module: str) -> bool:
+    result = subprocess.run(
+        [str(executable), "-c", f"import {module}"],
+        capture_output=True,
+        check=False,
+    )
+    return result.returncode == 0
 
 
 def _cuda_runtime_available(external_python) -> bool:
