@@ -187,6 +187,12 @@ class LyricsEditorWidget(QWidget):
         self.btn_switch_mode.clicked.connect(self._toggle_editor_mode)
         title_row.addWidget(self.btn_switch_mode)
 
+        self.btn_clear_timestamps = QPushButton("Clear Timestamps")
+        self.btn_clear_timestamps.setToolTip("Reset all synced timestamps to 00:00 (undoable)")
+        self.btn_clear_timestamps.hide()
+        self.btn_clear_timestamps.clicked.connect(self._clear_timestamps)
+        title_row.addWidget(self.btn_clear_timestamps)
+
         self.btn_auto_sync = QPushButton("Auto Sync")
         self.btn_auto_sync.setObjectName("LyricsAutoSync")
         self.btn_auto_sync.setToolTip("Automatically synchronize lyrics using AI (requires torch and openai-whisper; Demucs is optional)")
@@ -227,8 +233,6 @@ class LyricsEditorWidget(QWidget):
         self.shift_spin.setMinimumWidth(SHIFT_SPIN_MIN_WIDTH)
         self.btn_shift_selected = QPushButton("Shift Selected")
         self.btn_shift_all_from_first = QPushButton("Shift All from First")
-        self.btn_clear_timestamps = QPushButton("Clear Timestamps")
-        self.btn_clear_timestamps.setToolTip("Reset all synced timestamps to 00:00 (undoable)")
         self.btn_add = QPushButton("+ Line")
         self.btn_add.setToolTip("Insert a new line after the current selection (Ctrl+N or Insert)")
         self.btn_del = QPushButton("Delete")
@@ -262,7 +266,6 @@ class LyricsEditorWidget(QWidget):
         self.btn_shift_plus.clicked.connect(lambda: self._shift_selected_lines(100))
         self.btn_shift_selected.clicked.connect(self._shift_selected_lines_by_custom_amount)
         self.btn_shift_all_from_first.clicked.connect(self._shift_all_lines_from_first_delta)
-        self.btn_clear_timestamps.clicked.connect(self._clear_timestamps)
         self.btn_add.clicked.connect(self._add_line_after_selection)
         self.btn_del.clicked.connect(self._delete_selected_line)
         self.btn_autofix.clicked.connect(self._autofix_validation_problems)
@@ -276,7 +279,6 @@ class LyricsEditorWidget(QWidget):
         toolbar.addWidget(self.shift_spin)
         toolbar.addWidget(self.btn_shift_selected)
         toolbar.addWidget(self.btn_shift_all_from_first)
-        toolbar.addWidget(self.btn_clear_timestamps)
         toolbar.addWidget(self.btn_add)
         toolbar.addWidget(self.btn_del)
         toolbar.addWidget(self.btn_autofix)
@@ -662,6 +664,7 @@ class LyricsEditorWidget(QWidget):
         self.btn_export_files.setEnabled(False)
         self._update_publish_enabled()
         self.btn_switch_mode.hide()
+        self.btn_clear_timestamps.hide()
         self.btn_auto_sync.hide()
 
     def _set_dirty_badge(self, visible: bool) -> None:
@@ -725,13 +728,13 @@ class LyricsEditorWidget(QWidget):
             for r in range(self.table.rowCount()):
                 it_text = self.table.item(r, 1)
                 lines.append(it_text.text().rstrip() if it_text else "")
-            txt = "\n".join(lines).rstrip()
+            txt = "\n".join(lines)
             self._set_plain(txt)
             self._emit_dirty_draft_changed()
         elif self.stack.currentWidget() is self.plain:
             # Plain → Synced: parse pasted LRC first, otherwise restore cached timestamps.
-            txt = (self.plain.toPlainText() or "").strip()
-            if not txt:
+            txt = self.plain.toPlainText() or ""
+            if not txt.strip():
                 return
             parsed = parse_lrc(txt)
             if parsed:
@@ -739,10 +742,13 @@ class LyricsEditorWidget(QWidget):
                 self._set_synced(parsed)
                 self._emit_dirty_draft_changed()
                 return
-            lines = txt.splitlines()
+            lines = txt.split("\n")
             cached = getattr(self, "_cached_synced_pairs", None)
-            if cached and len(cached) == len(lines):
-                pairs = [(ms, line.rstrip()) for (ms, _), line in zip(cached, lines)]
+            cached_lines = list(cached or [])
+            while len(cached_lines) > len(lines) and not cached_lines[-1][1].strip():
+                cached_lines.pop()
+            if cached_lines and len(cached_lines) == len(lines):
+                pairs = [(ms, line.rstrip()) for (ms, _), line in zip(cached_lines, lines)]
             else:
                 pairs = [(0, line.rstrip()) for line in lines]
             self._cached_synced_pairs = None
@@ -862,6 +868,7 @@ class LyricsEditorWidget(QWidget):
         self.btn_sync_others.setEnabled(True)
         self.btn_switch_mode.setText("Switch to Plain")
         self.btn_switch_mode.setVisible(True)
+        self.btn_clear_timestamps.setVisible(True)
         self.btn_auto_sync.setVisible(True)
         self._validate_current_lyrics()
 
@@ -1383,14 +1390,26 @@ class LyricsEditorWidget(QWidget):
             return
         lrc, txt = self._current_lyrics_text()
         if self.stack.currentWidget() is self.table:
-            has_changes = lrc.strip() != self._saved_lrc
+            current_pairs = sorted(self._take_snapshot(), key=lambda pair: pair[0])
+            saved_pairs = sorted(parse_lrc(self._saved_lrc), key=lambda pair: pair[0])
+            if saved_pairs:
+                has_changes = current_pairs != saved_pairs
+            else:
+                has_changes = self._normalize_lyrics_text(txt) != self._normalize_lyrics_text(self._saved_txt)
         else:
             saved_txt = self._saved_txt
             if not saved_txt and self._saved_lrc:
                 saved_txt = "\n".join(text.rstrip() for _, text in parse_lrc(self._saved_lrc)).strip()
-            has_changes = txt.strip() != saved_txt
+            has_changes = self._normalize_lyrics_text(txt) != self._normalize_lyrics_text(saved_txt)
         self._set_dirty_badge(has_changes)
-        self.dirtyDraftChanged.emit(lrc, txt)
+        if has_changes:
+            self.dirtyDraftChanged.emit(lrc, txt)
+        else:
+            self.dirtyDraftChanged.emit(self._saved_lrc, self._saved_txt)
+
+    @staticmethod
+    def _normalize_lyrics_text(text: str) -> tuple[str, ...]:
+        return tuple(line.rstrip() for line in text.strip().splitlines())
 
     def _chronological_insert_index(self, ms: int) -> int:
         for r in range(self.table.rowCount()):

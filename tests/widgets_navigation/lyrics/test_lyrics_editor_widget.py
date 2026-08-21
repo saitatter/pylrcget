@@ -155,6 +155,20 @@ class LyricsEditorWidgetTests(unittest.TestCase):
         finally:
             widget.deleteLater()
 
+    def test_switching_modes_preserves_timestamps_with_trailing_empty_line(self):
+        widget = LyricsEditorWidget()
+        try:
+            widget._set_synced([(1200, "First line"), (3000, "Second line"), (4500, "")])
+            widget._toggle_editor_mode()
+            widget._toggle_editor_mode()
+
+            self.assertEqual(widget.table.rowCount(), 3)
+            self.assertEqual(widget.table.item(0, 0).text(), "00:01.20")
+            self.assertEqual(widget.table.item(1, 0).text(), "00:03.00")
+            self.assertEqual(widget.table.item(2, 1).text(), "")
+        finally:
+            widget.deleteLater()
+
     def test_switching_modes_does_not_mark_unchanged_lrc_as_dirty(self):
         widget = LyricsEditorWidget()
         try:
@@ -175,6 +189,7 @@ class LyricsEditorWidgetTests(unittest.TestCase):
         widget = LyricsEditorWidget()
         try:
             widget._set_synced([(1200, "First line"), (3000, "Second line")])
+            self.assertFalse(widget.btn_clear_timestamps.isHidden())
             widget._clear_timestamps()
 
             self.assertEqual(widget.table.item(0, 0).text(), "00:00.00")
