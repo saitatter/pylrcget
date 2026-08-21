@@ -1382,7 +1382,13 @@ class LyricsEditorWidget(QWidget):
         if self.stack.currentWidget() not in {self.table, self.plain}:
             return
         lrc, txt = self._current_lyrics_text()
-        has_changes = (lrc.strip() != self._saved_lrc) or (txt.strip() != self._saved_txt)
+        if self.stack.currentWidget() is self.table:
+            has_changes = lrc.strip() != self._saved_lrc
+        else:
+            saved_txt = self._saved_txt
+            if not saved_txt and self._saved_lrc:
+                saved_txt = "\n".join(text.rstrip() for _, text in parse_lrc(self._saved_lrc)).strip()
+            has_changes = txt.strip() != saved_txt
         self._set_dirty_badge(has_changes)
         self.dirtyDraftChanged.emit(lrc, txt)
 

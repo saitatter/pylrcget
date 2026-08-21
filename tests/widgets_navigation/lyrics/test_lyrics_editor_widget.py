@@ -155,6 +155,22 @@ class LyricsEditorWidgetTests(unittest.TestCase):
         finally:
             widget.deleteLater()
 
+    def test_switching_modes_does_not_mark_unchanged_lrc_as_dirty(self):
+        widget = LyricsEditorWidget()
+        try:
+            widget.set_track_lyrics(
+                "Song",
+                "",
+                "[00:01.20] First line\n[00:03.00] Second line",
+                False,
+            )
+            widget._toggle_editor_mode()
+            self.assertFalse(widget._has_dirty_draft)
+            widget._toggle_editor_mode()
+            self.assertFalse(widget._has_dirty_draft)
+        finally:
+            widget.deleteLater()
+
     def test_clear_timestamps_is_explicit_and_undoable(self):
         widget = LyricsEditorWidget()
         try:
