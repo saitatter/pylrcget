@@ -1,7 +1,11 @@
 """Optional AI runtime setup, dependency checks and model caches."""
 from __future__ import annotations
 
+import subprocess
 import threading
+
+from .ai_runtime import resolve_ai_runtime_python
+from .ai_sync_lyrics_aligner import is_available as _lyrics_aligner_available
 
 _INFERENCE_CACHE_LOCK = threading.Lock()
 _WHISPERX_MODEL_CACHE: dict[tuple[str, str, str, str | None, tuple[tuple[str, float], ...]], object] = {}
@@ -220,18 +224,69 @@ def _module_available(module: str) -> bool:
     return True
 
 
-def get_missing_ai_dependencies() -> list[str]:
+def get_missing_ai_dependencies(
+    *, prefer_cuda: bool = False, require_lyrics_aligner: bool = False
+) -> list[str]:
     deps = [
         ("torch", "torch"),
         ("torchaudio", "torchaudio"),
         ("soundfile", "soundfile"),
         ("whisperx", "whisperx"),
     ]
+    external_python = resolve_ai_runtime_python()
+    if external_python is not None:
+        packages = [package for _module, package in deps]
+        probe = (
+            "import importlib.util; "
+            "missing = [name for name in "
+            f"{packages!r} if importlib.util.find_spec(name) is None]; "
+            "print('\\n'.join(missing))"
+        )
+        result = subprocess.run(
+            [str(external_python), "-c", probe],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if result.returncode == 0:
+            missing = [line.strip() for line in result.stdout.splitlines() if line.strip()]
+            if prefer_cuda and not _cuda_runtime_available(external_python):
+                missing.append("torch-cuda")
+            if require_lyrics_aligner and not _lyrics_aligner_available():
+                missing.append("lyrics-aligner")
+            return missing
+        return packages
+
     missing: list[str] = []
     for module, package in deps:
         if not _module_available(module):
             missing.append(package)
+    if prefer_cuda and not _cuda_runtime_available(None):
+        missing.append("torch-cuda")
+    if require_lyrics_aligner and not _lyrics_aligner_available():
+        missing.append("lyrics-aligner")
     return missing
+
+
+def _cuda_runtime_available(external_python) -> bool:
+    if external_python is None:
+        try:
+            import torch
+
+            return bool(torch.version.cuda and torch.cuda.is_available())
+        except (ImportError, AttributeError, RuntimeError):
+            return False
+    result = subprocess.run(
+        [
+            str(external_python),
+            "-c",
+            "import torch; print(bool(torch.version.cuda and torch.cuda.is_available()))",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    return result.returncode == 0 and result.stdout.strip().lower() == "true"
 
 
 def _check_ai_sync_available() -> tuple[bool, str]:

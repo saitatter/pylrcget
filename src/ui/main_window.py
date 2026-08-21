@@ -1485,6 +1485,7 @@ class MainWindow(QMainWindow):
         lyrics_actions.on_discard_draft_requested(self)
 
     def _on_auto_sync_requested(self) -> None:
+        from ui.workers.ai_runtime import nvidia_gpu_available
         from ui.workers.ai_sync_worker import (
             AiSyncWorker,
             _check_ai_sync_available,
@@ -1512,17 +1513,33 @@ class MainWindow(QMainWindow):
             )
             return
 
+        ai_sync_settings = load_ai_sync_settings(get_config(self.app_state.db).ui_state_json)
+        device_setting = str(ai_sync_settings.get("device") or "auto")
+        prefer_cuda = device_setting == "cuda" or (
+            device_setting == "auto" and nvidia_gpu_available()
+        )
+        missing = get_missing_ai_dependencies(
+            prefer_cuda=prefer_cuda,
+            require_lyrics_aligner=True,
+        )
         ok, msg = _check_ai_sync_available()
-        if not ok:
-            dlg = AIDependenciesDialog(get_missing_ai_dependencies(), msg, self)
+        if not ok or missing:
+            if prefer_cuda and "torch-cuda" in missing:
+                msg = (
+                    (msg + "\n\n") if msg else ""
+                ) + "CUDA-enabled Torch is required for the selected GPU mode."
+            dlg = AIDependenciesDialog(missing, msg, self)
             if dlg.exec() == QDialog.DialogCode.Accepted:
                 ok_after_install, _ = _check_ai_sync_available()
-                if ok_after_install:
+                missing_after_install = get_missing_ai_dependencies(
+                    prefer_cuda=prefer_cuda,
+                    require_lyrics_aligner=True,
+                )
+                if ok_after_install and not missing_after_install:
                     self._on_auto_sync_requested()
             return
 
         track = get_track_by_id(self.app_state.db, int(track_id))
-        ai_sync_settings = load_ai_sync_settings(get_config(self.app_state.db).ui_state_json)
         audio_path = self._track_playback_path(track)
         if not os.path.isfile(audio_path):
             notify_user(
@@ -1609,7 +1626,6 @@ class MainWindow(QMainWindow):
                 "AI sync cancelled." if msg == "Cancelled." else msg,
                 cancelled=(msg == "Cancelled."),
             )
-            overlay.queue_auto_close(2200)
 
         if not ok:
             notify_user(
@@ -1745,7 +1761,6 @@ class MainWindow(QMainWindow):
             overlay = getattr(self, "ai_sync_overlay", None)
             if overlay is not None:
                 overlay.finish_batch("AI sync cancelled.", cancelled=True)
-                overlay.queue_auto_close(1200)
 
     def _cancel_lyrics_export(self) -> None:
         controller = getattr(self, "lyrics_output", None)

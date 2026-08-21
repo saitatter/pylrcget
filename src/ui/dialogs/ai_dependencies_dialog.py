@@ -3,7 +3,6 @@ from __future__ import annotations
 import logging
 import subprocess
 import sys
-from pathlib import Path
 
 from PySide6.QtCore import QThread, Signal
 from PySide6.QtGui import QGuiApplication
@@ -17,43 +16,10 @@ from PySide6.QtWidgets import (
 )
 
 from ui.spacing import SPACE_2, SPACE_3, SPACE_4, set_layout_spacing
+from ui.workers.ai_runtime import resolve_ai_install_command
 from ui.workers.ai_sync_worker import get_missing_ai_dependencies
 
 logger = logging.getLogger(__name__)
-
-
-def resolve_ai_install_command(packages: list[str]) -> tuple[list[str] | None, str]:
-    missing = [pkg for pkg in packages if str(pkg).strip()]
-    if not missing:
-        return None, "No missing AI dependencies were detected."
-    if bool(getattr(sys, "frozen", False)):
-        return None, (
-            "This packaged executable cannot install Python packages into itself. "
-            "Use the AI-enabled packaged build (`pylrcget-windows-portable-ai.exe`), "
-            "or run PyLrcGet from source and install `.[ai]`."
-        )
-    exe_name = Path(sys.executable).name.casefold()
-    if not exe_name.startswith("python"):
-        return None, (
-            "Current runtime is not a Python interpreter executable. "
-            "Open PyLrcGet from a Python environment and retry."
-        )
-    python_version = (
-        int(getattr(sys.version_info, "major", sys.version_info[0])),
-        int(getattr(sys.version_info, "minor", sys.version_info[1])),
-    )
-    if python_version >= (3, 14):
-        return None, (
-            "AI dependencies currently support Python 3.10-3.13, but this app is "
-            f"running on Python {python_version[0]}.{python_version[1]}. "
-            "Python 3.14 is not supported by the current WhisperX dependency set "
-            "(ctranslate2 has no compatible wheel). Create a Python 3.13 environment "
-            "and install there:\n"
-            "  py -3.13 -m venv venv313\n"
-            "  venv313\\Scripts\\python.exe -m pip install torch torchaudio whisperx soundfile\n"
-            "  venv313\\Scripts\\python.exe main.py"
-        )
-    return [sys.executable, "-m", "pip", "install", *missing], ""
 
 
 class _InstallAIDependenciesWorker(QThread):

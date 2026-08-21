@@ -1,13 +1,17 @@
 """Qt orchestrator for AI-powered lyrics synchronization."""
 from __future__ import annotations
 
+import json
 import logging
 import multiprocessing
 import os
 import queue
+import subprocess
+import threading
 
 from PySide6.QtCore import QThread, Signal
 
+from .ai_runtime import resolve_ai_runtime_python, resolve_ai_runtime_source
 from .ai_sync_alignment import (
     _align_lyrics_to_segments,
     _align_lyrics_to_segments_viterbi,
@@ -129,6 +133,11 @@ class AiSyncWorker(QThread):
     def _resolve_device(self) -> str:
         import torch
         if self._device and self._device != "auto":
+            if self._device == "cuda" and not torch.cuda.is_available():
+                raise RuntimeError(
+                    "CUDA was selected, but the external Torch runtime has no CUDA support. "
+                    "Install a CUDA-enabled Torch build or select Auto/CPU."
+                )
             return self._device
         if torch.cuda.is_available():
             return "cuda"
@@ -146,6 +155,11 @@ class AiSyncWorker(QThread):
         self._run_in_process()
 
     def _run_in_subprocess(self) -> None:
+        external_python = resolve_ai_runtime_python()
+        if external_python is not None:
+            self._run_in_external_subprocess(external_python)
+            return
+
         from .ai_sync_process import run_ai_sync_process
 
         context = multiprocessing.get_context("spawn")
@@ -201,6 +215,123 @@ class AiSyncWorker(QThread):
                 process.terminate()
             process.join(timeout=2.0)
             messages.close()
+
+    def _run_in_external_subprocess(self, python_path) -> None:
+        source_root = resolve_ai_runtime_source()
+        if source_root is None:
+            self.completed.emit(
+                False,
+                "External AI runtime is configured but the PyLrcGet source runtime is unavailable.",
+                "",
+            )
+            return
+
+        config = {
+            "audio_path": self.audio_path,
+            "plain_lyrics": self.plain_lyrics,
+            "manual_anchors": self.manual_anchors,
+            "whisper_model": self.whisper_model,
+            "device": self._device,
+            "language": self._language,
+            "enable_fuzzy": self._enable_fuzzy,
+            "fuzzy_threshold": self._fuzzy_threshold,
+            "fuzzy_window_words": self._fuzzy_window_words,
+            "enable_demucs_candidate": self._enable_demucs_candidate,
+        }
+        environment = os.environ.copy()
+        for variable in (
+            "PYTHONHOME",
+            "PYTHONEXECUTABLE",
+            "PYTHONUSERBASE",
+            "PYTHONPATH",
+        ):
+            environment.pop(variable, None)
+        environment["PYTHONPATH"] = str(source_root)
+        try:
+            creationflags = (
+                subprocess.CREATE_NO_WINDOW
+                if os.name == "nt"
+                else 0
+            )
+            process = subprocess.Popen(
+                [
+                    str(python_path),
+                    "-m",
+                    "ui.workers.ai_sync_external_entry",
+                ],
+                cwd=str(source_root.parent),
+                env=environment,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                bufsize=1,
+                creationflags=creationflags,
+            )
+        except OSError as exc:
+            self.completed.emit(False, f"Could not start external AI runtime: {exc}", "")
+            return
+
+        assert process.stdin is not None
+        assert process.stdout is not None
+        process.stdin.write(json.dumps(config, ensure_ascii=True) + "\n")
+        process.stdin.close()
+        messages: queue.Queue[str | None] = queue.Queue()
+
+        def read_output() -> None:
+            for line in process.stdout:
+                messages.put(line.rstrip())
+            messages.put(None)
+
+        threading.Thread(target=read_output, daemon=True).start()
+        completed = False
+        try:
+            while True:
+                try:
+                    line = messages.get(timeout=0.1)
+                except queue.Empty:
+                    if self.isInterruptionRequested():
+                        process.terminate()
+                        self.completed.emit(False, "Cancelled.", "")
+                        return
+                    if process.poll() is not None:
+                        break
+                    continue
+                if line is None:
+                    break
+                try:
+                    message = json.loads(line)
+                except json.JSONDecodeError:
+                    logger.debug("Ignoring non-JSON external AI runtime output: %s", line)
+                    continue
+                if message.get("type") == "progress":
+                    self.progress.emit(str(message.get("message", "")))
+                elif message.get("type") == "completed":
+                    self.completed.emit(
+                        bool(message.get("ok")),
+                        str(message.get("message", "")),
+                        str(message.get("output", "")),
+                    )
+                    completed = True
+                    return
+                elif message.get("type") == "error":
+                    self.completed.emit(False, str(message.get("message", "")), "")
+                    completed = True
+                    return
+            if self.isInterruptionRequested():
+                self.completed.emit(False, "Cancelled.", "")
+            elif not completed:
+                self.completed.emit(
+                    False,
+                    f"External AI runtime exited unexpectedly (code {process.returncode}).",
+                    "",
+                )
+        finally:
+            if process.poll() is None:
+                process.terminate()
+            process.wait(timeout=2.0)
 
     def _run_in_process(self) -> None:
         from .ai_sync_pipeline import run_ai_sync_pipeline
