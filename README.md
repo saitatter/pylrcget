@@ -148,7 +148,8 @@ File export and embedded lyric format are controlled separately in Settings. For
 
 PyLrcGet can generate synced lyrics locally. English singing uses the optional
 **lyrics-aligner** backend when configured; other detected languages, or an unavailable
-lyrics-aligner installation, fall back to **WhisperX**. Everything runs on your machine —
+lyrics-aligner installation, use **WhisperX**. When the configured English backend fails,
+the sync stops instead of silently producing a lower-quality fallback. Everything runs on your machine —
 no API keys or internet connection required (after initial model downloads).
 
 The feature lives inside the track lyrics editor. Select a track, open the lyrics pane, and use **Auto Sync**. If the track has no lyrics yet, the empty lyrics state also exposes an **Auto Sync** action.
@@ -159,7 +160,7 @@ The feature lives inside the track lyrics editor. Select a track, open the lyric
 2. For English, lyrics-aligner aligns the supplied lyrics phonetically with VAD threshold 30
 3. If optional Demucs is installed, a vocal-stem candidate is also tested and kept only when
    its no-ground-truth quality proxy is better; the original mix remains the fallback
-4. Other languages, missing backends, or backend errors use the full WhisperX alignment pipeline
+4. Other languages or missing English backends use the full WhisperX alignment pipeline
 5. AI inference runs in a child process so Stop can terminate it immediately
 6. The result is placed in the synced lyrics editor as an unsaved draft
 
