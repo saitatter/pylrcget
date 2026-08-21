@@ -227,6 +227,8 @@ class LyricsEditorWidget(QWidget):
         self.shift_spin.setMinimumWidth(SHIFT_SPIN_MIN_WIDTH)
         self.btn_shift_selected = QPushButton("Shift Selected")
         self.btn_shift_all_from_first = QPushButton("Shift All from First")
+        self.btn_clear_timestamps = QPushButton("Clear Timestamps")
+        self.btn_clear_timestamps.setToolTip("Reset all synced timestamps to 00:00 (undoable)")
         self.btn_add = QPushButton("+ Line")
         self.btn_add.setToolTip("Insert a new line after the current selection (Ctrl+N or Insert)")
         self.btn_del = QPushButton("Delete")
@@ -248,6 +250,7 @@ class LyricsEditorWidget(QWidget):
         self.shift_spin.setEnabled(False)
         self.btn_shift_selected.setEnabled(False)
         self.btn_shift_all_from_first.setEnabled(False)
+        self.btn_clear_timestamps.setEnabled(False)
         self.btn_add.setEnabled(False)
         self.btn_del.setEnabled(False)
         self.btn_save.setEnabled(False)
@@ -259,6 +262,7 @@ class LyricsEditorWidget(QWidget):
         self.btn_shift_plus.clicked.connect(lambda: self._shift_selected_lines(100))
         self.btn_shift_selected.clicked.connect(self._shift_selected_lines_by_custom_amount)
         self.btn_shift_all_from_first.clicked.connect(self._shift_all_lines_from_first_delta)
+        self.btn_clear_timestamps.clicked.connect(self._clear_timestamps)
         self.btn_add.clicked.connect(self._add_line_after_selection)
         self.btn_del.clicked.connect(self._delete_selected_line)
         self.btn_autofix.clicked.connect(self._autofix_validation_problems)
@@ -272,6 +276,7 @@ class LyricsEditorWidget(QWidget):
         toolbar.addWidget(self.shift_spin)
         toolbar.addWidget(self.btn_shift_selected)
         toolbar.addWidget(self.btn_shift_all_from_first)
+        toolbar.addWidget(self.btn_clear_timestamps)
         toolbar.addWidget(self.btn_add)
         toolbar.addWidget(self.btn_del)
         toolbar.addWidget(self.btn_autofix)
@@ -294,6 +299,7 @@ class LyricsEditorWidget(QWidget):
             self.btn_shift_plus,
             self.btn_shift_selected,
             self.btn_shift_all_from_first,
+            self.btn_clear_timestamps,
             self.btn_add,
             self.btn_del,
             self.btn_autofix,
@@ -358,6 +364,7 @@ class LyricsEditorWidget(QWidget):
             self.btn_shift_plus,
             self.btn_shift_selected,
             self.btn_shift_all_from_first,
+            self.btn_clear_timestamps,
             self.btn_add,
             self.btn_del,
             self.btn_autofix,
@@ -645,6 +652,7 @@ class LyricsEditorWidget(QWidget):
         self.shift_spin.setEnabled(False)
         self.btn_shift_selected.setEnabled(False)
         self.btn_shift_all_from_first.setEnabled(False)
+        self.btn_clear_timestamps.setEnabled(False)
         self.btn_add.setEnabled(False)
         self.btn_del.setEnabled(False)
         self.btn_autofix.setEnabled(False)
@@ -842,6 +850,7 @@ class LyricsEditorWidget(QWidget):
         # enable editing controls
         self.btn_add.setEnabled(True)
         self.btn_shift_all_from_first.setEnabled(bool(self.table.rowCount()))
+        self.btn_clear_timestamps.setEnabled(bool(self.table.rowCount()))
         has_selection = self.table.currentRow() >= 0
         self.btn_del.setEnabled(has_selection)
         self.btn_snap.setEnabled(has_selection)
@@ -863,6 +872,19 @@ class LyricsEditorWidget(QWidget):
             ms = int(it_time.data(TIMESTAMP_MS_ROLE) or 0) if it_time else 0
             times.append(ms)
         self._times = times
+
+    def _clear_timestamps(self) -> None:
+        if self.stack.currentWidget() is not self.table or not self.table.rowCount():
+            return
+        if not any(self._take_snapshot()[row][0] for row in range(self.table.rowCount())):
+            return
+        self._push_undo()
+        self._restore_snapshot(
+            [(0, self.table.item(row, TEXT_COLUMN).text() if self.table.item(row, TEXT_COLUMN) else "")
+             for row in range(self.table.rowCount())]
+        )
+        self._set_validation_message("Timestamps cleared.", state="success")
+        self._emit_dirty_draft_changed()
 
     def _refresh_row_styles(self):
         from ui.theme_tokens import STYLE_TOKENS

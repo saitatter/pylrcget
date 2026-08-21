@@ -143,6 +143,32 @@ class LyricsEditorWidgetTests(unittest.TestCase):
         finally:
             widget.deleteLater()
 
+    def test_switching_modes_preserves_synced_timestamps(self):
+        widget = LyricsEditorWidget()
+        try:
+            widget._set_synced([(1200, "First line"), (3000, "Second line")])
+            widget._toggle_editor_mode()
+            widget._toggle_editor_mode()
+
+            self.assertEqual(widget.table.item(0, 0).text(), "00:01.20")
+            self.assertEqual(widget.table.item(1, 0).text(), "00:03.00")
+        finally:
+            widget.deleteLater()
+
+    def test_clear_timestamps_is_explicit_and_undoable(self):
+        widget = LyricsEditorWidget()
+        try:
+            widget._set_synced([(1200, "First line"), (3000, "Second line")])
+            widget._clear_timestamps()
+
+            self.assertEqual(widget.table.item(0, 0).text(), "00:00.00")
+            self.assertEqual(widget.table.item(1, 0).text(), "00:00.00")
+            widget._undo()
+            self.assertEqual(widget.table.item(0, 0).text(), "00:01.20")
+            self.assertEqual(widget.table.item(1, 0).text(), "00:03.00")
+        finally:
+            widget.deleteLater()
+
     def test_synced_lyrics_table_can_copy_selected_lrc_rows(self):
         widget = LyricsEditorWidget()
         try:
