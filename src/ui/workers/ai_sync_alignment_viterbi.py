@@ -63,28 +63,71 @@ def _align_lyrics_to_segments_viterbi(
     num_words = len(words)
     if num_words <= 0:
         return _build_lrc_from_plain_lines_and_segments(plain_lines, segments)
-
-    emissions: list[list[float]] = []
-    for line_words in line_words_list:
-        emissions.append([
-            _compute_line_to_words_score(line_words, words, word_idx)
-            for word_idx in range(num_words)
-        ])
-    line_peak_emissions = [max(row) if row else 0.0 for row in emissions]
     anchors = _find_confidence_anchors(line_words_list, words)
-    rewind_targets = _build_same_phrase_rewind_targets(plain_lines, emissions)
     manual_targets = _prepare_manual_line_anchors(plain_lines, words, manual_anchors)
-    guided_ranges = _build_guided_word_ranges(num_lines, num_words, manual_targets)
+    guidance_targets = dict(anchors)
+    guidance_targets.update(manual_targets)
+    large_alignment = num_lines * num_words > 5_000
+    if large_alignment:
+        guidance_targets.setdefault(0, 0)
+        guidance_targets.setdefault(num_lines - 1, num_words - 1)
+        guided_ranges = _build_guided_word_ranges(
+            num_lines,
+            num_words,
+            guidance_targets,
+            half_window=60,
+        )
+    else:
+        guided_ranges = _build_guided_word_ranges(
+            num_lines,
+            num_words,
+            manual_targets,
+        )
+    emissions: list[list[float] | dict[int, float]] = []
+    for line_idx, line_words in enumerate(line_words_list):
+        start, end = guided_ranges.get(line_idx, (0, num_words))
+        if large_alignment:
+            row = {
+                word_idx: _compute_line_to_words_score(line_words, words, word_idx)
+                for word_idx in range(start, min(end, num_words))
+            }
+        else:
+            row = [0.0] * num_words
+            for word_idx in range(start, min(end, num_words)):
+                row[word_idx] = _compute_line_to_words_score(
+                    line_words, words, word_idx
+                )
+        emissions.append(row)
+    line_peak_emissions = [max(row.values(), default=0.0) if isinstance(row, dict)
+                           else max(row) if row else 0.0 for row in emissions]
+    rewind_targets = (
+        {}
+        if large_alignment
+        else _build_same_phrase_rewind_targets(plain_lines, emissions)
+    )
     speech_candidate_mask = _build_speech_candidate_mask(words, plain_lines)
 
     viterbi: dict[tuple[int, int], float] = {}
     backptr: dict[tuple[int, int], int] = {}
     start0, end0 = guided_ranges.get(0, (0, min(120, num_words)))
-    for word_idx in range(start0, min(end0, num_words)):
-        if not speech_candidate_mask[word_idx]:
-            continue
+    initial_candidates = [
+        word_idx
+        for word_idx in range(start0, min(end0, num_words))
+        if speech_candidate_mask[word_idx]
+    ]
+    if large_alignment and len(initial_candidates) > 32:
+        initial_candidates = sorted(
+            initial_candidates,
+            key=lambda idx: emissions[0].get(idx, 0.0)
+            if isinstance(emissions[0], dict)
+            else emissions[0][idx],
+            reverse=True,
+        )[:32]
+    for word_idx in initial_candidates:
         score = (
-            emissions[0][word_idx]
+            emissions[0].get(word_idx, 0.0)
+            if isinstance(emissions[0], dict)
+            else emissions[0][word_idx]
             + _anchor_bonus(0, word_idx, anchors)
             + _same_phrase_rewind_penalty(0, word_idx, rewind_targets)
             + _manual_anchor_bonus(0, word_idx, manual_targets)
@@ -105,9 +148,20 @@ def _align_lyrics_to_segments_viterbi(
         if candidate_start >= candidate_end:
             continue
 
-        for word_idx in range(candidate_start, candidate_end):
-            if not speech_candidate_mask[word_idx]:
-                continue
+        candidates = [
+            word_idx
+            for word_idx in range(candidate_start, candidate_end)
+            if speech_candidate_mask[word_idx]
+        ]
+        if large_alignment and len(candidates) > 32:
+            row = emissions[line_idx]
+            candidates = sorted(
+                candidates,
+                key=lambda idx: row.get(idx, 0.0) if isinstance(row, dict) else row[idx],
+                reverse=True,
+            )[:32]
+            candidates.sort()
+        for word_idx in candidates:
             best_prev_score = -1e18
             best_prev_idx = -1
             search_start = max(0, word_idx - 140)
@@ -129,7 +183,11 @@ def _align_lyrics_to_segments_viterbi(
                 position_cost = -abs(word_idx - expected_pos) * 0.18
                 total_score = (
                     prev_score
-                    + emissions[line_idx][word_idx]
+                    + (
+                        emissions[line_idx].get(word_idx, 0.0)
+                        if isinstance(emissions[line_idx], dict)
+                        else emissions[line_idx][word_idx]
+                    )
                     + transition_cost
                     + position_cost
                     + _anchor_bonus(line_idx, word_idx, anchors)
@@ -167,9 +225,19 @@ def _align_lyrics_to_segments_viterbi(
     )
     if late_final_floor is not None:
         final_start = max(final_start, late_final_floor)
-    for word_idx in range(final_start, final_end):
-        if not speech_candidate_mask[word_idx]:
-            continue
+    final_candidates = [
+        word_idx
+        for word_idx in range(final_start, final_end)
+        if speech_candidate_mask[word_idx]
+    ]
+    if large_alignment and len(final_candidates) > 32:
+        row = emissions[-1]
+        final_candidates = sorted(
+            final_candidates,
+            key=lambda idx: row.get(idx, 0.0) if isinstance(row, dict) else row[idx],
+            reverse=True,
+        )[:32]
+    for word_idx in final_candidates:
         if (num_lines - 1, word_idx) in viterbi:
             score = viterbi[(num_lines - 1, word_idx)]
             if score > best_final_score:
@@ -202,7 +270,13 @@ def _align_lyrics_to_segments_viterbi(
             if not candidate_indices:
                 candidate_indices = list(range(previous_idx + 1, len(words)))
             if candidate_indices:
-                word_idx = max(candidate_indices, key=lambda idx: emissions[line_idx][idx])
+                row = emissions[line_idx]
+                word_idx = max(
+                    candidate_indices,
+                    key=lambda idx: (
+                        row.get(idx, 0.0) if isinstance(row, dict) else row[idx]
+                    ),
+                )
             else:
                 word_idx = min(max(previous_idx, 0), len(words) - 1)
         word_idx = min(max(int(word_idx), 0), len(words) - 1)

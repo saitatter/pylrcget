@@ -10,12 +10,16 @@ import tempfile
 from difflib import SequenceMatcher
 from pathlib import Path
 
+from .ai_runtime import default_lyrics_aligner_dir, resolve_ai_runtime_python
+
 
 def _backend_root() -> Path | None:
     value = os.environ.get("PYLRCGET_LYRICS_ALIGNER_PATH", "").strip()
-    if not value:
-        return None
-    root = Path(value).expanduser()
+    root = (
+        Path(value).expanduser()
+        if value
+        else default_lyrics_aligner_dir()
+    )
     if not (root / "align.py").is_file() or not (root / "model_parameters.pth").is_file():
         return None
     if not (root / "files" / "phoneme2idx.pickle").is_file():
@@ -25,6 +29,30 @@ def _backend_root() -> Path | None:
 
 def is_available() -> bool:
     return _backend_root() is not None
+
+
+def _ensure_cpu_checkpoint_compatibility(root: Path) -> None:
+    """Make the upstream aligner load CUDA checkpoints on CPU runtimes."""
+    script = root / "align.py"
+    source = script.read_text(encoding="utf-8")
+    patched = source.replace(
+        "torch.load('model_parameters.pth')",
+        "torch.load('model_parameters.pth', map_location=device)",
+    ).replace(
+        "device = 'cuda' if torch.cuda.is_available() else 'cpu'",
+        "device = 'cuda' if torch.cuda.is_available() and "
+        "os.environ.get('PYLRCGET_FORCE_CPU') != '1' else 'cpu'",
+    )
+    if patched != source:
+        script.write_text(patched, encoding="utf-8")
+    model_script = root / "model.py"
+    model_source = model_script.read_text(encoding="utf-8")
+    model_patched = model_source.replace(
+        "onesided=True,\n            pad_mode='reflect'",
+        "onesided=True, return_complex=False,\n            pad_mode='reflect'",
+    )
+    if model_patched != model_source:
+        model_script.write_text(model_patched, encoding="utf-8")
 
 
 def _words(text: str) -> list[str]:
@@ -70,6 +98,7 @@ def align(audio_path: str, lyrics: str, *, device: str) -> str:
         raise RuntimeError(
             "lyrics-aligner is not configured; set PYLRCGET_LYRICS_ALIGNER_PATH."
         )
+    _ensure_cpu_checkpoint_compatibility(root)
 
     with tempfile.TemporaryDirectory(prefix="pylrcget-lyrics-aligner-") as temp:
         temp_path = Path(temp)
@@ -84,8 +113,9 @@ def align(audio_path: str, lyrics: str, *, device: str) -> str:
 
         dataset = f"pylrcget_{os.getpid()}"
         _get_dictionary(root, lyrics, dataset)
+        aligner_python = resolve_ai_runtime_python() or Path(sys.executable)
         command = [
-            sys.executable,
+            str(aligner_python),
             "align.py",
             str(audio_dir),
             str(lyrics_dir),
@@ -101,8 +131,21 @@ def align(audio_path: str, lyrics: str, *, device: str) -> str:
         if device == "cpu":
             env = os.environ.copy()
             env["CUDA_VISIBLE_DEVICES"] = ""
+            env["PYLRCGET_FORCE_CPU"] = "1"
         else:
-            env = None
+            env = os.environ.copy()
+        for variable in ("PYTHONHOME", "PYTHONEXECUTABLE", "PYTHONUSERBASE"):
+            env.pop(variable, None)
+        creationflags = (
+            subprocess.CREATE_NO_WINDOW
+            if os.name == "nt"
+            else 0
+        )
+        startupinfo = None
+        if os.name == "nt":
+            startupinfo = subprocess.STARTUPINFO()
+            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+            startupinfo.wShowWindow = subprocess.SW_HIDE
         completed = subprocess.run(
             command,
             cwd=root,
@@ -110,6 +153,8 @@ def align(audio_path: str, lyrics: str, *, device: str) -> str:
             capture_output=True,
             text=True,
             check=False,
+            creationflags=creationflags,
+            startupinfo=startupinfo,
         )
         if completed.returncode:
             detail = (completed.stderr or completed.stdout).strip().splitlines()

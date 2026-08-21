@@ -472,6 +472,7 @@ def test_ai_sync_availability_does_not_require_demucs(monkeypatch):
 
 
 def test_ai_sync_availability_message_guides_exe_users(monkeypatch):
+    monkeypatch.setattr(ai_sync_runtime, "resolve_ai_runtime_python", lambda: None)
     real_import = builtins.__import__
 
     def fake_import(name, globals=None, locals=None, fromlist=(), level=0):
@@ -490,6 +491,7 @@ def test_ai_sync_availability_message_guides_exe_users(monkeypatch):
 
 
 def test_get_missing_ai_dependencies_returns_expected_packages(monkeypatch):
+    monkeypatch.setattr(ai_sync_runtime, "resolve_ai_runtime_python", lambda: None)
     real_import = builtins.__import__
 
     def fake_import(name, globals=None, locals=None, fromlist=(), level=0):

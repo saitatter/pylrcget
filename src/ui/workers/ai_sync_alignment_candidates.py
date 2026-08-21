@@ -1,26 +1,30 @@
 """Candidate scoring, gating and anchor construction for lyric alignment."""
 from __future__ import annotations
 
-from bisect import bisect_left
+from bisect import bisect_left, bisect_right
 from difflib import SequenceMatcher
+from functools import lru_cache
 
+try:
+    from rapidfuzz import fuzz as _RAPIDFUZZ_FUZZ
+except ImportError:
+    _RAPIDFUZZ_FUZZ = None
 
+@lru_cache(maxsize=8192)
 def _normalize_word(word: str) -> str:
     """Normalize word for comparison (lowercase only, no destructive stripping)."""
     return word.lower()
 
+
+@lru_cache(maxsize=200_000)
 def _words_match(w1: str, w2: str, threshold: float = 0.85) -> tuple[bool, float]:
     """Match two words using edit distance."""
     norm_w1 = _normalize_word(w1)
     norm_w2 = _normalize_word(w2)
     if norm_w1 == norm_w2:
         return True, 1.0
-    try:
-        from rapidfuzz import fuzz
-    except Exception:  # noqa: BLE001
-        fuzz = None
-    if fuzz is not None:
-        ratio = float(fuzz.ratio(norm_w1, norm_w2)) / 100.0
+    if _RAPIDFUZZ_FUZZ is not None:
+        ratio = float(_RAPIDFUZZ_FUZZ.ratio(norm_w1, norm_w2)) / 100.0
     else:
         ratio = SequenceMatcher(None, norm_w1, norm_w2).ratio()
     return ratio >= threshold, ratio
@@ -139,15 +143,26 @@ def _build_speech_candidate_mask(
 
     timed_count = sum(1 for s in starts if s is not None)
     if timed_count >= 12:
+        if len(words) * len(plain_lines) > 200_000:
+            return mask
         dense_mask = [False] * len(words)
+        timed_positions = [idx for idx, start in enumerate(starts) if start is not None]
+        timed_values = [float(starts[idx]) for idx in timed_positions]
+        eligible_prefix = [0]
+        speech_prefix = [0]
+        for idx in timed_positions:
+            eligible_prefix.append(eligible_prefix[-1] + int(mask[idx]))
+            speech_prefix.append(
+                speech_prefix[-1]
+                + int(_is_speech_like_token(str(words[idx].get("word", ""))))
+            )
         for idx, base_start in enumerate(starts):
             if not mask[idx] or base_start is None:
                 continue
-            neighbors = sum(
-                1
-                for j, other_start in enumerate(starts)
-                if mask[j] and other_start is not None
-                and abs(other_start - base_start) <= density_window_s
+            left = bisect_left(timed_values, base_start - density_window_s)
+            right = bisect_right(timed_values, base_start + density_window_s)
+            neighbors = (
+                eligible_prefix[right] - eligible_prefix[left]
             )
             if neighbors >= min_neighbors:
                 dense_mask[idx] = True
@@ -155,13 +170,12 @@ def _build_speech_candidate_mask(
         for idx, base_start in enumerate(starts):
             if not in_vocab_flags[idx] or base_start is None:
                 continue
-            neighbors = sum(
-                1
-                for j, other_start in enumerate(starts)
-                if j != idx
-                and other_start is not None
-                and _is_speech_like_token(str(words[j].get("word", "")))
-                and abs(other_start - base_start) <= density_window_s
+            left = bisect_left(timed_values, base_start - density_window_s)
+            right = bisect_right(timed_values, base_start + density_window_s)
+            neighbors = (
+                speech_prefix[right]
+                - speech_prefix[left]
+                - int(_is_speech_like_token(str(words[idx].get("word", ""))))
             )
             token_norm = token_norms[idx]
             has_lyric_match = any(

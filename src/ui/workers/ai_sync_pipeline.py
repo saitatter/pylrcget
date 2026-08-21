@@ -129,6 +129,16 @@ def _try_lyrics_aligner(
     return None
 
 
+def _complete_with_lyrics_aligner(worker, candidate: AlignmentCandidate) -> None:
+    worker._emit_stage(8, 8, "Finalizing lyrics-aligner result…")
+    worker.completed.emit(
+        True,
+        "Lyrics synchronized successfully with lyrics-aligner "
+        f"({candidate.source}).",
+        candidate.lrc,
+    )
+
+
 def run_ai_sync_pipeline(self, *, align_optional_demucs=None) -> None:
     if align_optional_demucs is None:
         align_optional_demucs = align_with_optional_demucs
@@ -164,12 +174,7 @@ def run_ai_sync_pipeline(self, *, align_optional_demucs=None) -> None:
                 router=align_optional_demucs,
             )
             if candidate is not None:
-                self.completed.emit(
-                    True,
-                    "Lyrics synchronized successfully with lyrics-aligner "
-                    f"({candidate.source}).",
-                    candidate.lrc,
-                )
+                _complete_with_lyrics_aligner(self, candidate)
                 return
 
         import whisperx
@@ -358,6 +363,7 @@ def run_ai_sync_pipeline(self, *, align_optional_demucs=None) -> None:
                     logger.warning("Language detection failed; continuing with WhisperX: %s", exc)
 
             if (detected_language or "").lower() == "en":
+                lyrics_aligner_attempted = True
                 candidate = _try_lyrics_aligner(
                     self,
                     device=device,
@@ -366,11 +372,13 @@ def run_ai_sync_pipeline(self, *, align_optional_demucs=None) -> None:
                     router=align_optional_demucs,
                 )
                 if candidate is not None:
+                    _complete_with_lyrics_aligner(self, candidate)
+                    return
+                if _lyrics_aligner_available():
                     self.completed.emit(
-                        True,
-                        "Lyrics synchronized successfully with lyrics-aligner "
-                        f"({candidate.source}).",
-                        candidate.lrc,
+                        False,
+                        "English lyrics-aligner failed; WhisperX was not used as a fallback.",
+                        "",
                     )
                     return
 
@@ -382,36 +390,7 @@ def run_ai_sync_pipeline(self, *, align_optional_demucs=None) -> None:
             f"Detected language: {selected_language}. "
             f"Selecting English lyrics-aligner or WhisperX fallback…",
         )
-        if (
-            plain_lines
-            and (detected_language or "").lower() == "en"
-            and not lyrics_aligner_attempted
-        ):
-            candidate = _try_lyrics_aligner(
-                self,
-                device=device,
-                stage=6,
-                stage_message="Using lyrics-aligner for English singing…",
-                fallback_stage=5,
-                fallback_message="lyrics-aligner failed — falling back to WhisperX…",
-                empty_message="lyrics-aligner returned no lines — falling back to WhisperX…",
-                router=align_optional_demucs,
-            )
-            if candidate is not None:
-                self.completed.emit(
-                    True,
-                    "Lyrics synchronized successfully with lyrics-aligner "
-                    f"({candidate.source}).",
-                    candidate.lrc,
-                )
-                return
-            if not _lyrics_aligner_available():
-                self._emit_stage(
-                    5,
-                    total_steps,
-                    "English detected, but lyrics-aligner is not configured — using WhisperX…",
-                )
-        elif plain_lines and selected_language == "en":
+        if plain_lines and selected_language == "en" and not _lyrics_aligner_available():
             self._emit_stage(
                 5,
                 total_steps,
@@ -424,7 +403,7 @@ def run_ai_sync_pipeline(self, *, align_optional_demucs=None) -> None:
                 targeted_window[0],
                 targeted_window[1],
             )
-        if _should_retry_with_short_windows(segments):
+        if device != "cuda" and _should_retry_with_short_windows(segments):
             logger.info(
                 "Detected a long low-density ASR segment; retrying with short windows."
             )
@@ -438,9 +417,13 @@ def run_ai_sync_pipeline(self, *, align_optional_demucs=None) -> None:
         if _should_retry_with_relaxed_vad(audio, segments, plain_lines):
             duration_s = float(len(audio)) / 16000.0 if hasattr(audio, "__len__") else 0.0
             relaxed_vad_configs = (
-                {"vad_onset": 0.15, "vad_offset": 0.05},
-                {"vad_onset": 0.10, "vad_offset": 0.03},
-                {"vad_onset": 0.02, "vad_offset": 0.01},
+                ({"vad_onset": 0.15, "vad_offset": 0.05},)
+                if device == "cuda"
+                else (
+                    {"vad_onset": 0.15, "vad_offset": 0.05},
+                    {"vad_onset": 0.10, "vad_offset": 0.03},
+                    {"vad_onset": 0.02, "vad_offset": 0.01},
+                )
             )
             relaxed_candidates: list[list[dict]] = []
             for idx, vad_options in enumerate(relaxed_vad_configs, start=1):
