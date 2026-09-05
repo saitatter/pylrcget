@@ -72,37 +72,79 @@ class LyricsScanResult:
         return self.embedded_lrc or self.sidecar_lrc
 
 
+@dataclass(frozen=True)
+class SidecarDirEntry:
+    name: str
+    path: str
+    lower_name: str
+    size: int
+    mtime_ns: int
+
+
+@dataclass(frozen=True)
+class _SidecarDirIndex:
+    by_lower_name: dict[str, SidecarDirEntry]
+    by_stem: dict[str, tuple[SidecarDirEntry, ...]]
+    by_suffix: dict[str, tuple[SidecarDirEntry, ...]]
+
+
 class SidecarLookupCache:
     def __init__(self) -> None:
-        self._dir_entries: dict[str, dict[str, str]] = {}
+        self._dir_entries: dict[str, _SidecarDirIndex] = {}
         self._lock = threading.Lock()
 
     def _dir_key(self, directory: str) -> str:
         return os.path.normcase(os.path.abspath(directory))
 
     def candidate_exists(self, candidate: str) -> bool:
-        return self.resolve_existing(candidate) is not None
+        return self.resolve_entry(candidate) is not None
 
-    def resolve_existing(self, candidate: str) -> str | None:
+    def resolve_entry(self, candidate: str) -> SidecarDirEntry | None:
         directory, filename = os.path.split(candidate)
         if not directory or not filename:
             return None
 
         dir_key = self._dir_key(directory)
         with self._lock:
-            entries = self._dir_entries.get(dir_key)
-        if entries is None:
+            index = self._dir_entries.get(dir_key)
+        if index is None:
+            by_lower_name: dict[str, SidecarDirEntry] = {}
+            by_stem: dict[str, list[SidecarDirEntry]] = {}
+            by_suffix: dict[str, list[SidecarDirEntry]] = {}
             try:
-                names = os.listdir(directory)
+                with os.scandir(directory) as entries:
+                    for entry in entries:
+                        try:
+                            stat = entry.stat(follow_symlinks=False)
+                        except OSError:
+                            continue
+                        lower_name = os.path.normcase(entry.name)
+                        item = SidecarDirEntry(
+                            name=entry.name,
+                            path=entry.path,
+                            lower_name=lower_name,
+                            size=int(stat.st_size),
+                            mtime_ns=int(stat.st_mtime_ns),
+                        )
+                        by_lower_name[lower_name] = item
+                        stem, suffix = os.path.splitext(entry.name)
+                        by_stem.setdefault(os.path.normcase(stem), []).append(item)
+                        by_suffix.setdefault(os.path.normcase(suffix), []).append(item)
             except OSError:
-                names = []
-            entries = {os.path.normcase(name): name for name in names}
+                pass
+            index = _SidecarDirIndex(
+                by_lower_name=by_lower_name,
+                by_stem={key: tuple(value) for key, value in by_stem.items()},
+                by_suffix={key: tuple(value) for key, value in by_suffix.items()},
+            )
             with self._lock:
-                self._dir_entries.setdefault(dir_key, entries)
-        actual_name = entries.get(os.path.normcase(filename))
-        if actual_name is None:
-            return None
-        return os.path.join(directory, actual_name)
+                self._dir_entries.setdefault(dir_key, index)
+                index = self._dir_entries[dir_key]
+        return index.by_lower_name.get(os.path.normcase(filename))
+
+    def resolve_existing(self, candidate: str) -> str | None:
+        entry = self.resolve_entry(candidate)
+        return entry.path if entry is not None else None
 
 
 def _read_vorbis_lyrics(audio) -> tuple[str | None, str | None]:
@@ -508,15 +550,21 @@ def get_audio_file_signature_with_lookup(
     if use_sidecar:
         sidecar_started = time.perf_counter()
         for candidate in sidecar_candidates:
-            if sidecar_lookup_cache is not None and not sidecar_lookup_cache.candidate_exists(candidate):
-                continue
-            try:
-                stat = os.stat(candidate)
-            except OSError:
-                continue
-            candidate_mtime = float(stat.st_mtime)
+            if sidecar_lookup_cache is not None:
+                entry = sidecar_lookup_cache.resolve_entry(candidate)
+                if entry is None:
+                    continue
+                candidate_mtime = entry.mtime_ns / 1_000_000_000
+                candidate_size = entry.size
+            else:
+                try:
+                    stat = os.stat(candidate)
+                except OSError:
+                    continue
+                candidate_mtime = float(stat.st_mtime)
+                candidate_size = int(stat.st_size)
             newest_mtime = candidate_mtime if newest_mtime is None else max(newest_mtime, candidate_mtime)
-            total_size += int(stat.st_size)
+            total_size += candidate_size
         if timing_hook is not None:
             timing_hook("signature_sidecar_stat_s", time.perf_counter() - sidecar_started)
     elif timing_hook is not None:
@@ -959,25 +1007,31 @@ def get_sidecar_scan_state(
         for suffix in (".txt", ".lrc"):
             candidate = base + suffix
             normalized_candidate = os.path.normcase(os.path.abspath(candidate))
-            resolved = (
-                sidecar_lookup_cache.resolve_existing(candidate)
-                if sidecar_lookup_cache is not None
-                else candidate if os.path.isfile(candidate) else None
-            )
+            entry = sidecar_lookup_cache.resolve_entry(candidate) if sidecar_lookup_cache is not None else None
+            resolved = entry.path if entry is not None else candidate if os.path.isfile(candidate) else None
             if resolved is None:
                 records.append(f"{normalized_candidate}|missing")
                 continue
             normalized = os.path.normcase(os.path.abspath(resolved))
             if normalized in seen_paths:
                 continue
-            try:
-                stat = os.stat(resolved)
-            except OSError:
-                records.append(f"{normalized_candidate}|unavailable")
-                continue
+            if sidecar_lookup_cache is not None:
+                if entry is None:
+                    records.append(f"{normalized_candidate}|unavailable")
+                    continue
+                mtime_ns = entry.mtime_ns
+                size = entry.size
+            else:
+                try:
+                    stat = os.stat(resolved)
+                except OSError:
+                    records.append(f"{normalized_candidate}|unavailable")
+                    continue
+                mtime_ns = int(stat.st_mtime_ns)
+                size = int(stat.st_size)
             seen_paths.add(normalized)
             records.append(
-                f"{normalized_candidate}|{normalized}|{int(stat.st_mtime_ns)}|{int(stat.st_size)}"
+                f"{normalized_candidate}|{normalized}|{mtime_ns}|{size}"
             )
             if suffix == ".txt":
                 txt_present = True

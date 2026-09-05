@@ -341,14 +341,14 @@ class ScanLibraryHelpersTests(unittest.TestCase):
             with (
                 patch("library.scan_library.MutagenFile", return_value=_FakeAudio()),
                 patch("library.scan_library.read_embedded_lyrics", return_value=(None, None)),
-                patch("library.scan_library.os.listdir", wraps=os.listdir) as listdir_mock,
+                patch("library.scan_library.os.scandir", wraps=os.scandir) as scandir_mock,
             ):
                 first = new_fs_track_from_path(str(audio), sidecar_lookup_cache=cache)
                 second = new_fs_track_from_path(str(audio), sidecar_lookup_cache=cache)
 
             self.assertIsNotNone(first)
             self.assertIsNotNone(second)
-            self.assertEqual(listdir_mock.call_count, 1)
+            self.assertEqual(scandir_mock.call_count, 1)
 
     def test_new_fs_track_from_path_passes_scan_mode_to_signature_lookup(self):
         with tempfile.TemporaryDirectory() as tmp:
