@@ -1,6 +1,7 @@
 # src/library/scan_library.py
 from __future__ import annotations
 
+import hashlib
 import logging
 import os
 import re
@@ -23,6 +24,7 @@ from core.embed_lyrics import (
     VORBIS_SYNCED_KEY,
 )
 from core.models import FsTrack
+from library.scan_state import TRACK_SCAN_STATE_SIGNATURE_VERSION
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +47,13 @@ class AudioMetadata:
     album_artist: str
     track_number: int | None
     duration: float
+
+
+@dataclass(frozen=True)
+class SidecarScanState:
+    signature: str
+    txt_present: bool
+    lrc_present: bool
 
 
 class SidecarLookupCache:
@@ -213,11 +222,16 @@ def _iter_audio_paths_core(
     *,
     excluded_paths: str | None = None,
     excluded_patterns: str | None = None,
-) -> tuple[list[str], dict[str, tuple[float | None, int | None]]]:
+) -> tuple[
+    list[str],
+    dict[str, tuple[float | None, int | None]],
+    dict[str, tuple[int | None, int | None]],
+]:
     excluded_roots = _normalize_excluded_paths(excluded_paths)
     compiled_patterns = _compile_excluded_patterns(excluded_patterns)
     paths: list[str] = []
     signatures: dict[str, tuple[float | None, int | None]] = {}
+    audio_signatures_ns: dict[str, tuple[int | None, int | None]] = {}
     seen: set[str] = set()
     for root in directories:
         if not root or not os.path.isdir(root):
@@ -262,11 +276,12 @@ def _iter_audio_paths_core(
                                 pass
                             else:
                                 signatures[file_path] = (float(stat.st_mtime), int(stat.st_size))
+                                audio_signatures_ns[file_path] = (int(stat.st_mtime_ns), int(stat.st_size))
             except OSError:
                 continue
 
             stack.extend(reversed(child_dirs))
-    return paths, signatures
+    return paths, signatures, audio_signatures_ns
 
 
 def iter_audio_paths(
@@ -275,7 +290,7 @@ def iter_audio_paths(
     excluded_paths: str | None = None,
     excluded_patterns: str | None = None,
 ) -> list[str]:
-    paths, _signatures = _iter_audio_paths_core(
+    paths, _signatures, _audio_signatures_ns = _iter_audio_paths_core(
         directories,
         excluded_paths=excluded_paths,
         excluded_patterns=excluded_patterns,
@@ -289,11 +304,27 @@ def iter_audio_paths_with_signatures(
     excluded_paths: str | None = None,
     excluded_patterns: str | None = None,
 ) -> tuple[list[str], dict[str, tuple[float | None, int | None]]]:
-    return _iter_audio_paths_core(
+    paths, signatures, _audio_signatures_ns = _iter_audio_paths_core(
         directories,
         excluded_paths=excluded_paths,
         excluded_patterns=excluded_patterns,
     )
+    return paths, signatures
+
+
+def iter_audio_paths_with_audio_signatures(
+    directories: list[str],
+    *,
+    excluded_paths: str | None = None,
+    excluded_patterns: str | None = None,
+) -> tuple[list[str], dict[str, tuple[int | None, int | None]]]:
+    """Enumerate audio and return an ns-precision audio-only signature."""
+    paths, _signatures, audio_signatures_ns = _iter_audio_paths_core(
+        directories,
+        excluded_paths=excluded_paths,
+        excluded_patterns=excluded_patterns,
+    )
+    return paths, audio_signatures_ns
 
 
 def preview_audio_path_exclusions(
@@ -458,6 +489,28 @@ def get_audio_file_signature_with_lookup(
         timing_hook("signature_sidecar_stat_s", 0.0)
 
     return newest_mtime, total_size if newest_mtime is not None else None
+
+
+def get_audio_signature(
+    path: str,
+    *,
+    audio_signature: tuple[int | None, int | None] | None = None,
+    timing_hook: Callable[[str, float], None] | None = None,
+) -> tuple[int | None, int | None]:
+    """Return the audio-only fingerprint used by the incremental scanner."""
+    if audio_signature is not None:
+        return audio_signature
+
+    started = time.perf_counter()
+    try:
+        stat = os.stat(path)
+    except OSError:
+        result = (None, None)
+    else:
+        result = (int(stat.st_mtime_ns), int(stat.st_size))
+    if timing_hook is not None:
+        timing_hook("audio_signature_stat_s", time.perf_counter() - started)
+    return result
 
 def _first(easy, key: str) -> str | None:
     v = easy.get(key)
@@ -840,6 +893,68 @@ def _sidecar_base_candidates(
             seen.add(rendered)
             unique.append(str(candidate))
     return unique
+
+
+def get_sidecar_scan_state(
+    path: str,
+    lyrics_lookup_subdir: str | None = None,
+    *,
+    metadata: AudioMetadata | None = None,
+    lyrics_file_pattern: str | None = None,
+    scan_lyrics_source_mode: str | None = None,
+    sidecar_lookup_cache: SidecarLookupCache | None = None,
+    timing_hook: Callable[[str, float], None] | None = None,
+) -> SidecarScanState:
+    """Return a deterministic signature and presence state for candidate sidecars."""
+    _use_embedded, use_sidecar = _scan_lyrics_source_flags(scan_lyrics_source_mode)
+    if not use_sidecar:
+        digest = hashlib.sha256(str(TRACK_SCAN_STATE_SIGNATURE_VERSION).encode("ascii")).hexdigest()
+        return SidecarScanState(signature=digest, txt_present=False, lrc_present=False)
+
+    started = time.perf_counter()
+    records: list[str] = []
+    seen_paths: set[str] = set()
+    txt_present = False
+    lrc_present = False
+    for base in _sidecar_base_candidates(
+        path,
+        lyrics_lookup_subdir,
+        metadata=metadata,
+        lyrics_file_pattern=lyrics_file_pattern,
+    ):
+        for suffix in (".txt", ".lrc"):
+            candidate = base + suffix
+            resolved = (
+                sidecar_lookup_cache.resolve_existing(candidate)
+                if sidecar_lookup_cache is not None
+                else candidate if os.path.isfile(candidate) else None
+            )
+            if resolved is None:
+                continue
+            normalized = os.path.normcase(os.path.abspath(resolved))
+            if normalized in seen_paths:
+                continue
+            try:
+                stat = os.stat(resolved)
+            except OSError:
+                continue
+            seen_paths.add(normalized)
+            records.append(f"{normalized}|{int(stat.st_mtime_ns)}|{int(stat.st_size)}")
+            if suffix == ".txt":
+                txt_present = True
+            else:
+                lrc_present = True
+
+    serialized = "\n".join(sorted(records))
+    digest_input = f"{TRACK_SCAN_STATE_SIGNATURE_VERSION}\n{serialized}".encode("utf-8")
+    digest = hashlib.sha256(digest_input).hexdigest()
+    if timing_hook is not None:
+        timing_hook("sidecar_signature_stat_s", time.perf_counter() - started)
+    return SidecarScanState(
+        signature=digest,
+        txt_present=txt_present,
+        lrc_present=lrc_present,
+    )
 
 
 def _read_sidecar(

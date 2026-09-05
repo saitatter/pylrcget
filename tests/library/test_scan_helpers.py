@@ -22,8 +22,11 @@ from library.scan_library import (
     AudioMetadata,
     MutagenError,
     SidecarLookupCache,
+    get_audio_signature,
     get_audio_file_signature,
+    get_sidecar_scan_state,
     iter_audio_paths,
+    iter_audio_paths_with_audio_signatures,
     iter_audio_paths_with_signatures,
     new_fs_track_from_path,
     preview_audio_path_exclusions,
@@ -71,6 +74,57 @@ class ScanLibraryHelpersTests(unittest.TestCase):
             self.assertIsNotNone(sig[0])
             self.assertEqual(sig[1], audio.stat().st_size + txt.stat().st_size + lrc.stat().st_size)
             self.assertEqual(sig[0], max(audio.stat().st_mtime, txt.stat().st_mtime, lrc.stat().st_mtime))
+
+    def test_audio_signature_is_independent_from_sidecar_state(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            audio = root / "track.mp3"
+            lrc = root / "track.lrc"
+            touch_text(audio, "audio")
+
+            before = get_audio_signature(str(audio))
+            touch_text(lrc, "[00:01.00]first")
+            after_add = get_audio_signature(str(audio))
+            touch_text(lrc, "[00:02.00]second")
+            after_change = get_audio_signature(str(audio))
+
+            self.assertEqual(before, after_add)
+            self.assertEqual(after_add, after_change)
+            self.assertEqual(before, (audio.stat().st_mtime_ns, audio.stat().st_size))
+
+    def test_sidecar_scan_state_changes_for_add_change_and_remove(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            audio = root / "track.mp3"
+            lrc = root / "track.lrc"
+            touch_text(audio, "audio")
+
+            no_sidecar = get_sidecar_scan_state(str(audio))
+            touch_text(lrc, "[00:01.00]first")
+            added = get_sidecar_scan_state(str(audio))
+            touch_text(lrc, "[00:02.00]second")
+            changed = get_sidecar_scan_state(str(audio))
+            lrc.unlink()
+            removed = get_sidecar_scan_state(str(audio))
+
+            self.assertFalse(no_sidecar.lrc_present)
+            self.assertTrue(added.lrc_present)
+            self.assertTrue(changed.lrc_present)
+            self.assertFalse(removed.lrc_present)
+            self.assertNotEqual(no_sidecar.signature, added.signature)
+            self.assertNotEqual(added.signature, changed.signature)
+            self.assertNotEqual(changed.signature, removed.signature)
+
+    def test_iter_audio_paths_with_audio_signatures_uses_nanoseconds(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            audio = root / "track.mp3"
+            touch_text(audio, "audio")
+
+            paths, signatures = iter_audio_paths_with_audio_signatures([str(root)])
+
+            self.assertEqual(paths, [str(audio)])
+            self.assertEqual(signatures[str(audio)], (audio.stat().st_mtime_ns, audio.stat().st_size))
 
     def test_get_audio_file_signature_includes_lookup_subfolder_sidecars(self):
         with tempfile.TemporaryDirectory() as tmp:
