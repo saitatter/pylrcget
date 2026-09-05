@@ -627,12 +627,10 @@ class LibraryScannerIncrementalTests(unittest.TestCase):
             finally:
                 db.close()
 
-    @unittest.expectedFailure
     def test_new_lrc_beside_unchanged_audio_is_detected(self):
         row, _metadata_calls = self._scan_sidecar_mutation(operation="add", suffix=".lrc")
         self.assertEqual(row["lrc_lyrics"], "new sidecar")
 
-    @unittest.expectedFailure
     def test_new_txt_beside_unchanged_audio_is_detected(self):
         row, _metadata_calls = self._scan_sidecar_mutation(operation="add", suffix=".txt")
         self.assertEqual(row["txt_lyrics"], "new sidecar")
@@ -673,7 +671,6 @@ class LibraryScannerIncrementalTests(unittest.TestCase):
         self.assertIsNone(row["lrc_lyrics"])
         self.assertEqual(metadata_calls, 1)
 
-    @unittest.expectedFailure
     def test_new_sidecar_in_configured_lookup_subdirectory_is_detected(self):
         row, _metadata_calls = self._scan_sidecar_mutation(
             operation="add",
@@ -682,7 +679,6 @@ class LibraryScannerIncrementalTests(unittest.TestCase):
         )
         self.assertEqual(row["lrc_lyrics"], "new sidecar")
 
-    @unittest.expectedFailure
     def test_new_sidecar_using_custom_pattern_is_detected(self):
         row, _metadata_calls = self._scan_sidecar_mutation(
             operation="add",
@@ -817,6 +813,67 @@ class LibraryScannerIncrementalTests(unittest.TestCase):
                 scanner.run()
 
             self.assertEqual(seen_modes, ["embedded_only", "embedded_only"])
+
+    def test_sidecar_only_change_reuses_stored_metadata_without_audio_parse(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db = initialize_database(tmp)
+            db_path = str(Path(tmp) / "pylrcget.db.sqlite3")
+            music_dir = Path(tmp) / "Music"
+            music_dir.mkdir(parents=True, exist_ok=True)
+            audio = music_dir / "track.mp3"
+            sidecar = music_dir / "track.lrc"
+            touch_text(audio, "audio")
+
+            metadata = AudioMetadata(
+                title="Track",
+                album="Album",
+                artist="Artist",
+                album_artist="Artist",
+                track_number=1,
+                duration=180.0,
+            )
+            db.close()
+            scanner = LibraryScanner(db_path, [str(music_dir)], scan_worker_count=1)
+            first_track = FsTrack(
+                file_path=str(audio),
+                file_name=audio.name,
+                title=metadata.title,
+                album=metadata.album,
+                artist=metadata.artist,
+                album_artist=metadata.album_artist,
+                duration=metadata.duration,
+                txt_lyrics=None,
+                lrc_lyrics=None,
+                track_number=metadata.track_number,
+                modified_time=audio.stat().st_mtime,
+                file_size=audio.stat().st_size,
+            )
+            with (
+                patch("ui.workers.library_scanner.read_audio_metadata_for_scan", return_value=(object(), metadata)),
+                patch("ui.workers.library_scanner.new_fs_track_from_path", return_value=first_track),
+            ):
+                scanner.run()
+
+            touch_text(sidecar, "[00:01.00]sidecar lyrics")
+            second_metadata_read = patch(
+                "ui.workers.library_scanner.read_audio_metadata_for_scan",
+                side_effect=AssertionError("sidecar-only refresh must not parse audio"),
+            )
+            second_new_track = patch(
+                "ui.workers.library_scanner.new_fs_track_from_path",
+                side_effect=AssertionError("sidecar-only refresh must not build an audio track"),
+            )
+            with second_metadata_read, second_new_track:
+                LibraryScanner(db_path, [str(music_dir)], scan_worker_count=1).run()
+
+            db = sqlite3.connect(db_path)
+            db.row_factory = sqlite3.Row
+            try:
+                row = db.execute("SELECT lrc_lyrics FROM tracks LIMIT 1").fetchone()
+                self.assertIsNotNone(row)
+                self.assertEqual(row["lrc_lyrics"], "[00:01.00]sidecar lyrics")
+            finally:
+                db.close()
 
     def test_library_scanner_skips_unchanged_reindexes_new_and_removes_missing(self):
         with tempfile.TemporaryDirectory() as tmp:

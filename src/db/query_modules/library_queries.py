@@ -184,63 +184,101 @@ def get_track_scan_state_index(db: sqlite3.Connection) -> dict[int, TrackScanSta
     }
 
 
+_UPSERT_TRACK_SCAN_STATE_SQL = """
+    INSERT INTO track_scan_state (
+        track_id,
+        audio_mtime_ns,
+        audio_size,
+        sidecar_signature,
+        embedded_txt_present,
+        embedded_lrc_present,
+        sidecar_txt_present,
+        sidecar_lrc_present,
+        embedded_txt_lyrics,
+        embedded_lrc_lyrics,
+        signature_version,
+        last_scan_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(track_id) DO UPDATE SET
+        audio_mtime_ns = excluded.audio_mtime_ns,
+        audio_size = excluded.audio_size,
+        sidecar_signature = excluded.sidecar_signature,
+        embedded_txt_present = excluded.embedded_txt_present,
+        embedded_lrc_present = excluded.embedded_lrc_present,
+        sidecar_txt_present = excluded.sidecar_txt_present,
+        sidecar_lrc_present = excluded.sidecar_lrc_present,
+        embedded_txt_lyrics = excluded.embedded_txt_lyrics,
+        embedded_lrc_lyrics = excluded.embedded_lrc_lyrics,
+        signature_version = excluded.signature_version,
+        last_scan_at = excluded.last_scan_at
+"""
+
+
+def upsert_track_scan_states(
+    db: sqlite3.Connection,
+    states: list[TrackScanState],
+    *,
+    commit: bool = True,
+) -> None:
+    if not states:
+        return
+    db.executemany(
+        _UPSERT_TRACK_SCAN_STATE_SQL,
+        [
+            (
+                int(state.track_id),
+                state.audio_mtime_ns,
+                state.audio_size,
+                state.sidecar_signature,
+                state.embedded_txt_present,
+                state.embedded_lrc_present,
+                state.sidecar_txt_present,
+                state.sidecar_lrc_present,
+                state.embedded_txt_lyrics,
+                state.embedded_lrc_lyrics,
+                int(state.signature_version),
+                state.last_scan_at,
+            )
+            for state in states
+        ],
+    )
+    if commit:
+        db.commit()
+
+
 def upsert_track_scan_state(
     db: sqlite3.Connection,
     state: TrackScanState,
     *,
     commit: bool = True,
 ) -> None:
-    db.execute(
-        """
-        INSERT INTO track_scan_state (
-            track_id,
-            audio_mtime_ns,
-            audio_size,
-            sidecar_signature,
-            embedded_txt_present,
-            embedded_lrc_present,
-            sidecar_txt_present,
-            sidecar_lrc_present,
-            embedded_txt_lyrics,
-            embedded_lrc_lyrics,
-            signature_version,
-            last_scan_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ON CONFLICT(track_id) DO UPDATE SET
-            audio_mtime_ns = excluded.audio_mtime_ns,
-            audio_size = excluded.audio_size,
-            sidecar_signature = excluded.sidecar_signature,
-            embedded_txt_present = excluded.embedded_txt_present,
-            embedded_lrc_present = excluded.embedded_lrc_present,
-            sidecar_txt_present = excluded.sidecar_txt_present,
-            sidecar_lrc_present = excluded.sidecar_lrc_present,
-            embedded_txt_lyrics = excluded.embedded_txt_lyrics,
-            embedded_lrc_lyrics = excluded.embedded_lrc_lyrics,
-            signature_version = excluded.signature_version,
-            last_scan_at = excluded.last_scan_at
-        """,
-        (
-            int(state.track_id),
-            state.audio_mtime_ns,
-            state.audio_size,
-            state.sidecar_signature,
-            state.embedded_txt_present,
-            state.embedded_lrc_present,
-            state.sidecar_txt_present,
-            state.sidecar_lrc_present,
-            state.embedded_txt_lyrics,
-            state.embedded_lrc_lyrics,
-            int(state.signature_version),
-            state.last_scan_at,
-        ),
-    )
-    if commit:
-        db.commit()
+    upsert_track_scan_states(db, [state], commit=commit)
+
+
+def get_track_ids_by_paths(db: sqlite3.Connection, paths: list[str]) -> dict[str, int]:
+    if not paths:
+        return {}
+    result: dict[str, int] = {}
+    chunk_size = 500
+    for start in range(0, len(paths), chunk_size):
+        chunk = paths[start : start + chunk_size]
+        placeholders = ",".join("?" for _ in chunk)
+        rows = db.execute(
+            f"SELECT id, file_path FROM tracks WHERE file_path IN ({placeholders})",
+            chunk,
+        ).fetchall()
+        result.update({str(row["file_path"]): int(row["id"]) for row in rows})
+    return result
 
 
 def delete_tracks_by_paths(db: sqlite3.Connection, paths: list[str], *, commit: bool = True) -> None:
     if not paths:
         return
+    track_ids = list(get_track_ids_by_paths(db, paths).values())
+    for start in range(0, len(track_ids), 500):
+        chunk = track_ids[start : start + 500]
+        placeholders = ",".join("?" for _ in chunk)
+        db.execute(f"DELETE FROM track_scan_state WHERE track_id IN ({placeholders})", chunk)
     db.executemany("DELETE FROM tracks WHERE file_path = ?", [(path,) for path in paths])
     if commit:
         db.commit()

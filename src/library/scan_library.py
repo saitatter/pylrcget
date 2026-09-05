@@ -56,6 +56,22 @@ class SidecarScanState:
     lrc_present: bool
 
 
+@dataclass(frozen=True)
+class LyricsScanResult:
+    embedded_txt: str | None
+    embedded_lrc: str | None
+    sidecar_txt: str | None
+    sidecar_lrc: str | None
+
+    @property
+    def txt(self) -> str | None:
+        return self.embedded_txt or self.sidecar_txt
+
+    @property
+    def lrc(self) -> str | None:
+        return self.embedded_lrc or self.sidecar_lrc
+
+
 class SidecarLookupCache:
     def __init__(self) -> None:
         self._dir_entries: dict[str, dict[str, str]] = {}
@@ -325,6 +341,24 @@ def iter_audio_paths_with_audio_signatures(
         excluded_patterns=excluded_patterns,
     )
     return paths, audio_signatures_ns
+
+
+def iter_audio_paths_with_signatures_and_audio_signatures(
+    directories: list[str],
+    *,
+    excluded_paths: str | None = None,
+    excluded_patterns: str | None = None,
+) -> tuple[
+    list[str],
+    dict[str, tuple[float | None, int | None]],
+    dict[str, tuple[int | None, int | None]],
+]:
+    """Enumerate once and return both legacy and ns-precision audio signatures."""
+    return _iter_audio_paths_core(
+        directories,
+        excluded_paths=excluded_paths,
+        excluded_patterns=excluded_patterns,
+    )
 
 
 def preview_audio_path_exclusions(
@@ -924,12 +958,14 @@ def get_sidecar_scan_state(
     ):
         for suffix in (".txt", ".lrc"):
             candidate = base + suffix
+            normalized_candidate = os.path.normcase(os.path.abspath(candidate))
             resolved = (
                 sidecar_lookup_cache.resolve_existing(candidate)
                 if sidecar_lookup_cache is not None
                 else candidate if os.path.isfile(candidate) else None
             )
             if resolved is None:
+                records.append(f"{normalized_candidate}|missing")
                 continue
             normalized = os.path.normcase(os.path.abspath(resolved))
             if normalized in seen_paths:
@@ -937,9 +973,12 @@ def get_sidecar_scan_state(
             try:
                 stat = os.stat(resolved)
             except OSError:
+                records.append(f"{normalized_candidate}|unavailable")
                 continue
             seen_paths.add(normalized)
-            records.append(f"{normalized}|{int(stat.st_mtime_ns)}|{int(stat.st_size)}")
+            records.append(
+                f"{normalized_candidate}|{normalized}|{int(stat.st_mtime_ns)}|{int(stat.st_size)}"
+            )
             if suffix == ".txt":
                 txt_present = True
             else:
@@ -949,7 +988,7 @@ def get_sidecar_scan_state(
     digest_input = f"{TRACK_SCAN_STATE_SIGNATURE_VERSION}\n{serialized}".encode("utf-8")
     digest = hashlib.sha256(digest_input).hexdigest()
     if timing_hook is not None:
-        timing_hook("sidecar_signature_stat_s", time.perf_counter() - started)
+        timing_hook("signature_sidecar_stat_s", time.perf_counter() - started)
     return SidecarScanState(
         signature=digest,
         txt_present=txt_present,
@@ -1005,6 +1044,52 @@ def _read_sidecar(
     txt = txt.strip() if txt else None
     lrc = lrc.strip() if lrc else None
     return txt, lrc
+
+
+def read_lyrics_for_scan(
+    path: str,
+    *,
+    audio=None,
+    lyrics_lookup_subdir: str | None = None,
+    metadata: AudioMetadata | None = None,
+    lyrics_file_pattern: str | None = None,
+    scan_lyrics_source_mode: str | None = None,
+    sidecar_lookup_cache: SidecarLookupCache | None = None,
+    timing_hook: Callable[[str, float], None] | None = None,
+) -> LyricsScanResult:
+    use_embedded, use_sidecar = _scan_lyrics_source_flags(scan_lyrics_source_mode)
+    embedded_started = time.perf_counter()
+    if use_embedded and audio is not None:
+        txt_embedded, lrc_embedded = read_embedded_lyrics_from_audio(audio, path)
+    elif use_embedded:
+        txt_embedded, lrc_embedded = read_embedded_lyrics(path)
+    else:
+        txt_embedded, lrc_embedded = None, None
+    if timing_hook is not None:
+        timing_hook("embedded_lyrics_read_s", time.perf_counter() - embedded_started)
+
+    if use_sidecar:
+        sidecar_started = time.perf_counter()
+        txt_sidecar, lrc_sidecar = _read_sidecar(
+            path,
+            lyrics_lookup_subdir,
+            metadata=metadata,
+            lyrics_file_pattern=lyrics_file_pattern,
+            sidecar_lookup_cache=sidecar_lookup_cache,
+        )
+        if timing_hook is not None:
+            timing_hook("sidecar_lookup_s", time.perf_counter() - sidecar_started)
+    else:
+        txt_sidecar, lrc_sidecar = None, None
+        if timing_hook is not None:
+            timing_hook("sidecar_lookup_s", 0.0)
+
+    return LyricsScanResult(
+        embedded_txt=txt_embedded,
+        embedded_lrc=lrc_embedded,
+        sidecar_txt=txt_sidecar,
+        sidecar_lrc=lrc_sidecar,
+    )
 
 
 def read_embedded_lyrics_from_audio(audio, path: str) -> tuple[str | None, str | None]:
@@ -1171,6 +1256,7 @@ def new_fs_track_from_path(
     sidecar_lookup_cache: SidecarLookupCache | None = None,
     metadata: AudioMetadata | None = None,
     audio=None,
+    lyrics_result: LyricsScanResult | None = None,
     timing_hook: Callable[[str, float], None] | None = None,
 ) -> FsTrack | None:
     try:
@@ -1180,38 +1266,18 @@ def new_fs_track_from_path(
                 return None
             _audio, metadata = metadata_result
 
-        use_embedded, use_sidecar = _scan_lyrics_source_flags(scan_lyrics_source_mode)
-        # Preferred order: embedded, same-folder sidecars, then optional subfolder sidecars.
-        embedded_started = time.perf_counter()
-        txt_embedded: str | None
-        lrc_embedded: str | None
-        if use_embedded and audio is not None:
-            txt_embedded, lrc_embedded = read_embedded_lyrics_from_audio(audio, path)
-        elif use_embedded:
-            txt_embedded, lrc_embedded = read_embedded_lyrics(path)
-        else:
-            txt_embedded, lrc_embedded = None, None
-        if timing_hook is not None:
-            timing_hook("embedded_lyrics_read_s", time.perf_counter() - embedded_started)
-
-        if use_sidecar:
-            sidecar_started = time.perf_counter()
-            txt_sidecar, lrc_sidecar = _read_sidecar(
-                path,
-                lyrics_lookup_subdir,
-                metadata=metadata,
-                lyrics_file_pattern=lyrics_file_pattern,
-                sidecar_lookup_cache=sidecar_lookup_cache,
-            )
-            if timing_hook is not None:
-                timing_hook("sidecar_lookup_s", time.perf_counter() - sidecar_started)
-        else:
-            txt_sidecar, lrc_sidecar = None, None
-            if timing_hook is not None:
-                timing_hook("sidecar_lookup_s", 0.0)
-
-        txt_lyrics = txt_embedded or txt_sidecar
-        lrc_lyrics = lrc_embedded or lrc_sidecar
+        lyrics = lyrics_result or read_lyrics_for_scan(
+            path,
+            audio=audio,
+            lyrics_lookup_subdir=lyrics_lookup_subdir,
+            metadata=metadata,
+            lyrics_file_pattern=lyrics_file_pattern,
+            scan_lyrics_source_mode=scan_lyrics_source_mode,
+            sidecar_lookup_cache=sidecar_lookup_cache,
+            timing_hook=timing_hook,
+        )
+        txt_lyrics = lyrics.txt
+        lrc_lyrics = lyrics.lrc
 
         signature_source = (
             signature

@@ -10,20 +10,31 @@ from dataclasses import dataclass
 
 from PySide6.QtCore import QThread, Signal
 
+from core.models import FsTrack
 from core.utils import prepare_input
 from db.database import (
     delete_tracks_by_paths,
     get_library_scan_index,
     get_orphan_lyrics_index,
+    get_track_ids_by_paths,
+    get_track_scan_state_index,
     prune_library,
+    upsert_track_scan_states,
 )
 from db.query_modules.track_queries import TrackBatchInserter
 from library.scan_library import (
     SidecarLookupCache,
+    get_audio_signature,
+    get_sidecar_scan_state,
     get_audio_file_signature,
-    iter_audio_paths_with_signatures,
+    iter_audio_paths_with_signatures_and_audio_signatures,
     new_fs_track_from_path,
     read_audio_metadata_for_scan,
+    read_lyrics_for_scan,
+)
+from library.scan_state import (
+    TRACK_SCAN_STATE_SIGNATURE_VERSION,
+    TrackScanState,
 )
 
 logger = logging.getLogger(__name__)
@@ -36,6 +47,11 @@ LIBRARY_SCAN_BATCH_SIZE = 500
 def _scan_mode_allows_sidecar(mode: str | None) -> bool:
     normalized = (mode or "both").strip().lower()
     return normalized not in {"embedded_only", "embedded-only"}
+
+
+def _scan_mode_allows_embedded(mode: str | None) -> bool:
+    normalized = (mode or "both").strip().lower()
+    return normalized not in {"sidecar_only", "sidecar-only"}
 
 
 class _ScanTimingStats:
@@ -94,6 +110,7 @@ class _ScanTaskResult:
     path: str
     replace_existing: bool
     track: object | None
+    scan_state: TrackScanState | None = None
 
 
 def _read_metadata_for_scan(path: str, *, timings: _ScanTimingStats | None = None):
@@ -121,6 +138,7 @@ def _scan_track_for_path(
     lyrics_file_pattern: str,
     scan_lyrics_source_mode: str,
     audio_signature: tuple[float | None, int | None] | None = None,
+    audio_signature_ns: tuple[int | None, int | None] | None = None,
     sidecar_lookup_cache: SidecarLookupCache | None = None,
     timings: _ScanTimingStats | None = None,
 ) -> _ScanTaskResult:
@@ -128,6 +146,15 @@ def _scan_track_for_path(
     if metadata_result is None:
         return _ScanTaskResult(path=path, replace_existing=replace_existing, track=None)
     audio, metadata = metadata_result
+    sidecar_state = get_sidecar_scan_state(
+        path,
+        lyrics_lookup_subdir,
+        metadata=metadata,
+        lyrics_file_pattern=lyrics_file_pattern,
+        scan_lyrics_source_mode=scan_lyrics_source_mode,
+        sidecar_lookup_cache=sidecar_lookup_cache,
+        timing_hook=None if timings is None else timings.record,
+    )
     sidecar_started = time.perf_counter()
     signature = get_audio_file_signature(
         path,
@@ -142,6 +169,16 @@ def _scan_track_for_path(
     )
     if timings is not None:
         timings.record("signature_lookup_s", time.perf_counter() - sidecar_started)
+    lyrics_result = read_lyrics_for_scan(
+        path,
+        audio=audio,
+        lyrics_lookup_subdir=lyrics_lookup_subdir,
+        metadata=metadata,
+        lyrics_file_pattern=lyrics_file_pattern,
+        scan_lyrics_source_mode=scan_lyrics_source_mode,
+        sidecar_lookup_cache=sidecar_lookup_cache,
+        timing_hook=None if timings is None else timings.record,
+    )
     track = new_fs_track_from_path(
         path,
         signature=signature,
@@ -152,9 +189,107 @@ def _scan_track_for_path(
         sidecar_lookup_cache=sidecar_lookup_cache,
         metadata=metadata,
         audio=audio,
+        lyrics_result=lyrics_result,
         timing_hook=None if timings is None else timings.record,
     )
-    return _ScanTaskResult(path=path, replace_existing=replace_existing, track=track)
+    if track is None:
+        return _ScanTaskResult(path=path, replace_existing=replace_existing, track=None)
+    audio_state = audio_signature_ns or get_audio_signature(path)
+    use_embedded = _scan_mode_allows_embedded(scan_lyrics_source_mode)
+    use_sidecar = _scan_mode_allows_sidecar(scan_lyrics_source_mode)
+    scan_state = TrackScanState(
+        track_id=0,
+        audio_mtime_ns=audio_state[0],
+        audio_size=audio_state[1],
+        sidecar_signature=sidecar_state.signature,
+        embedded_txt_present=lyrics_result.embedded_txt is not None if use_embedded else None,
+        embedded_lrc_present=lyrics_result.embedded_lrc is not None if use_embedded else None,
+        sidecar_txt_present=sidecar_state.txt_present if use_sidecar else None,
+        sidecar_lrc_present=sidecar_state.lrc_present if use_sidecar else None,
+        embedded_txt_lyrics=lyrics_result.embedded_txt if use_embedded else None,
+        embedded_lrc_lyrics=lyrics_result.embedded_lrc if use_embedded else None,
+        signature_version=TRACK_SCAN_STATE_SIGNATURE_VERSION,
+        last_scan_at=time.time(),
+    )
+    return _ScanTaskResult(
+        path=path,
+        replace_existing=replace_existing,
+        track=track,
+        scan_state=scan_state,
+    )
+
+
+def _scan_sidecar_only_for_path(
+    path: str,
+    *,
+    replace_existing: bool,
+    metadata,
+    previous_state: TrackScanState,
+    sidecar_state,
+    legacy_signature: tuple[float | None, int | None],
+    lyrics_lookup_subdir: str,
+    lyrics_file_pattern: str,
+    scan_lyrics_source_mode: str,
+    sidecar_lookup_cache: SidecarLookupCache,
+    timings: _ScanTimingStats | None = None,
+) -> _ScanTaskResult:
+    if _scan_mode_allows_embedded(scan_lyrics_source_mode) and (
+        previous_state.embedded_txt_present is None
+        or previous_state.embedded_lrc_present is None
+    ):
+        return _ScanTaskResult(path=path, replace_existing=replace_existing, track=None)
+
+    sidecar_lyrics = read_lyrics_for_scan(
+        path,
+        lyrics_lookup_subdir=lyrics_lookup_subdir,
+        metadata=metadata,
+        lyrics_file_pattern=lyrics_file_pattern,
+        scan_lyrics_source_mode="sidecar_only",
+        sidecar_lookup_cache=sidecar_lookup_cache,
+        timing_hook=None if timings is None else timings.record,
+    )
+    use_embedded = _scan_mode_allows_embedded(scan_lyrics_source_mode)
+    use_sidecar = _scan_mode_allows_sidecar(scan_lyrics_source_mode)
+    embedded_txt = previous_state.embedded_txt_lyrics if use_embedded else None
+    embedded_lrc = previous_state.embedded_lrc_lyrics if use_embedded else None
+    sidecar_txt = sidecar_lyrics.sidecar_txt if use_sidecar else None
+    sidecar_lrc = sidecar_lyrics.sidecar_lrc if use_sidecar else None
+    # FsTrack is intentionally constructed here instead of opening the audio
+    # file. Metadata is already represented by the DB index.
+    track = FsTrack(
+        file_path=path,
+        file_name=os.path.basename(path),
+        title=metadata.title,
+        album=metadata.album,
+        artist=metadata.artist,
+        album_artist=metadata.album_artist,
+        duration=metadata.duration,
+        txt_lyrics=embedded_txt or sidecar_txt,
+        lrc_lyrics=embedded_lrc or sidecar_lrc,
+        track_number=metadata.track_number,
+        modified_time=legacy_signature[0],
+        file_size=legacy_signature[1],
+    )
+    state = dataclasses.replace(
+        previous_state,
+        audio_mtime_ns=previous_state.audio_mtime_ns,
+        audio_size=previous_state.audio_size,
+        sidecar_signature=sidecar_state.signature,
+        embedded_txt_present=(previous_state.embedded_txt_present if use_embedded else None),
+        embedded_lrc_present=(previous_state.embedded_lrc_present if use_embedded else None),
+        sidecar_txt_present=sidecar_state.txt_present if use_sidecar else None,
+        sidecar_lrc_present=sidecar_state.lrc_present if use_sidecar else None,
+        embedded_txt_lyrics=embedded_txt,
+        embedded_lrc_lyrics=embedded_lrc,
+        signature_version=TRACK_SCAN_STATE_SIGNATURE_VERSION,
+        last_scan_at=time.time(),
+    )
+    return _ScanTaskResult(
+        path=path,
+        replace_existing=replace_existing,
+        track=track,
+        scan_state=state,
+    )
 
 
 class LibraryScanner(QThread):
@@ -203,8 +338,15 @@ class LibraryScanner(QThread):
             logger.debug("Library scan lyrics source mode: %s", self.scan_lyrics_source_mode)
 
             existing_index = get_library_scan_index(db)
+            scan_state_index = get_track_scan_state_index(db)
+            existing_track_ids = get_track_ids_by_paths(db, list(existing_index))
+            scan_state_by_path = {
+                path: scan_state_index[track_id]
+                for path, track_id in existing_track_ids.items()
+                if track_id in scan_state_index
+            }
             discovery_started = time.perf_counter()
-            paths, discovered_signatures = iter_audio_paths_with_signatures(
+            paths, discovered_signatures, discovered_audio_signatures = iter_audio_paths_with_signatures_and_audio_signatures(
                 self.directories,
                 excluded_paths=self.excluded_paths,
                 excluded_patterns=self.excluded_patterns,
@@ -228,6 +370,7 @@ class LibraryScanner(QThread):
 
             batch = []
             pending_replacements: list[str] = []
+            pending_scan_states: dict[str, TrackScanState] = {}
             max_workers = self.scan_worker_count
             max_pending = max_workers * LIBRARY_SCAN_MAX_PENDING_MULTIPLIER
             futures: dict[Future[_ScanTaskResult], None] = {}
@@ -244,15 +387,24 @@ class LibraryScanner(QThread):
                 self.finished_signal.emit(False, "Library scan cancelled.")
 
             def flush_batch(current_path: str) -> None:
-                if not batch and not pending_replacements:
+                if not batch and not pending_replacements and not pending_scan_states:
                     return
                 flush_started = time.perf_counter()
+                batch_paths = [track.file_path for track in batch]
                 with db:
                     delete_tracks_by_paths(db, pending_replacements, commit=False)
                     batch_inserter.add_tracks(batch)
+                    track_ids = get_track_ids_by_paths(db, batch_paths)
+                    states = [
+                        dataclasses.replace(state, track_id=track_ids.get(path, state.track_id))
+                        for path, state in pending_scan_states.items()
+                        if track_ids.get(path, state.track_id)
+                    ]
+                    upsert_track_scan_states(db, states, commit=False)
                 timings.record("db_flush_s", time.perf_counter() - flush_started)
                 batch.clear()
                 pending_replacements.clear()
+                pending_scan_states.clear()
                 self.progress_signal.emit(scanned, total, current_path, time.perf_counter() - started_at)
 
             def maybe_emit_progress(current_path: str) -> None:
@@ -270,6 +422,8 @@ class LibraryScanner(QThread):
                 t = result.track
                 if t is None:
                     return
+                if result.scan_state is not None:
+                    pending_scan_states[result.path] = result.scan_state
 
                 if orphan_index and not t.txt_lyrics and not t.lrc_lyrics:
                     key = (
@@ -329,14 +483,36 @@ class LibraryScanner(QThread):
                         drain_completed(block=True)
 
                     existing = existing_index.get(p)
-                    if existing is not None:
-                        existing_signature, existing_metadata, existing_has_content = existing
-                        if not existing_has_content:
-                            fast_started = time.perf_counter()
-                            current_signature = discovered_signatures.get(p)
-                            timings.record("audio_fast_path_s", time.perf_counter() - fast_started)
-                            timings.record("audio_fast_path_count", 1)
-                            if existing_signature == current_signature:
+                    previous_state = scan_state_by_path.get(p) if existing is not None else None
+                    if existing is not None and previous_state is not None:
+                        _existing_signature, existing_metadata, _existing_has_content = existing
+                        current_audio_signature = discovered_audio_signatures.get(p) or get_audio_signature(p)
+                        current_embedded_state_available = (
+                            not _scan_mode_allows_embedded(self.scan_lyrics_source_mode)
+                            or (
+                                previous_state.embedded_txt_present is not None
+                                and previous_state.embedded_lrc_present is not None
+                            )
+                        )
+                        if (
+                            previous_state.signature_version == TRACK_SCAN_STATE_SIGNATURE_VERSION
+                            and current_embedded_state_available
+                            and (previous_state.audio_mtime_ns, previous_state.audio_size) == current_audio_signature
+                        ):
+                            signature_started = time.perf_counter()
+                            current_sidecar_state = get_sidecar_scan_state(
+                                p,
+                                self.lyrics_lookup_subdir,
+                                metadata=existing_metadata,
+                                lyrics_file_pattern=self.lyrics_file_pattern,
+                                scan_lyrics_source_mode=self.scan_lyrics_source_mode,
+                                sidecar_lookup_cache=sidecar_lookup_cache,
+                                timing_hook=timings.record,
+                            )
+                            timings.record("signature_check_s", time.perf_counter() - signature_started)
+                            if previous_state.sidecar_signature == current_sidecar_state.signature:
+                                timings.record("audio_fast_path_s", 0.0000001)
+                                timings.record("audio_fast_path_count", 1)
                                 timings.record("audio_fast_path_hit_count", 1)
                                 scanned += 1
                                 unchanged += 1
@@ -344,8 +520,46 @@ class LibraryScanner(QThread):
                                 drain_completed(block=False)
                                 continue
 
-                        signature_started = time.perf_counter()
-                        signature = get_audio_file_signature(
+                            legacy_signature_started = time.perf_counter()
+                            legacy_signature = get_audio_file_signature(
+                                p,
+                                self.lyrics_lookup_subdir,
+                                metadata=existing_metadata,
+                                lyrics_file_pattern=self.lyrics_file_pattern,
+                                scan_lyrics_source_mode=self.scan_lyrics_source_mode,
+                                audio_signature=discovered_signatures.get(p),
+                                sidecar_lookup_cache=sidecar_lookup_cache,
+                                timing_hook=timings.record,
+                                count_hook=timings.record,
+                            )
+                            timings.record("signature_lookup_s", time.perf_counter() - legacy_signature_started)
+                            sidecar_result = _scan_sidecar_only_for_path(
+                                p,
+                                replace_existing=True,
+                                metadata=existing_metadata,
+                                previous_state=previous_state,
+                                sidecar_state=current_sidecar_state,
+                                legacy_signature=legacy_signature,
+                                lyrics_lookup_subdir=self.lyrics_lookup_subdir,
+                                lyrics_file_pattern=self.lyrics_file_pattern,
+                                scan_lyrics_source_mode=self.scan_lyrics_source_mode,
+                                sidecar_lookup_cache=sidecar_lookup_cache,
+                                timings=timings,
+                            )
+                            if sidecar_result.track is not None:
+                                scanned += 1
+                                handle_scan_result(sidecar_result)
+                                if len(batch) >= LIBRARY_SCAN_BATCH_SIZE:
+                                    flush_batch(p)
+                                else:
+                                    maybe_emit_progress(p)
+                                drain_completed(block=False)
+                                continue
+
+                    if existing is not None and previous_state is None:
+                        existing_signature, existing_metadata, existing_has_content = existing
+                        legacy_signature_started = time.perf_counter()
+                        legacy_signature = get_audio_file_signature(
                             p,
                             self.lyrics_lookup_subdir,
                             metadata=existing_metadata,
@@ -356,8 +570,36 @@ class LibraryScanner(QThread):
                             timing_hook=timings.record,
                             count_hook=timings.record,
                         )
-                        timings.record("signature_check_s", time.perf_counter() - signature_started)
-                        if existing_signature == signature:
+                        timings.record("signature_check_s", time.perf_counter() - legacy_signature_started)
+                        if existing_signature == legacy_signature:
+                            current_sidecar_state = get_sidecar_scan_state(
+                                p,
+                                self.lyrics_lookup_subdir,
+                                metadata=existing_metadata,
+                                lyrics_file_pattern=self.lyrics_file_pattern,
+                                scan_lyrics_source_mode=self.scan_lyrics_source_mode,
+                                sidecar_lookup_cache=sidecar_lookup_cache,
+                                timing_hook=timings.record,
+                            )
+                            track_id = existing_track_ids.get(p)
+                            if track_id is not None:
+                                use_embedded = _scan_mode_allows_embedded(self.scan_lyrics_source_mode)
+                                pending_scan_states[p] = TrackScanState(
+                                    track_id=track_id,
+                                    audio_mtime_ns=discovered_audio_signatures.get(p, (None, None))[0],
+                                    audio_size=discovered_audio_signatures.get(p, (None, None))[1],
+                                    sidecar_signature=current_sidecar_state.signature,
+                                    embedded_txt_present=False if use_embedded and not existing_has_content else None,
+                                    embedded_lrc_present=False if use_embedded and not existing_has_content else None,
+                                    sidecar_txt_present=current_sidecar_state.txt_present
+                                    if _scan_mode_allows_sidecar(self.scan_lyrics_source_mode)
+                                    else None,
+                                    sidecar_lrc_present=current_sidecar_state.lrc_present
+                                    if _scan_mode_allows_sidecar(self.scan_lyrics_source_mode)
+                                    else None,
+                                    signature_version=TRACK_SCAN_STATE_SIGNATURE_VERSION,
+                                    last_scan_at=time.time(),
+                                )
                             scanned += 1
                             unchanged += 1
                             maybe_emit_progress(p)
@@ -373,6 +615,7 @@ class LibraryScanner(QThread):
                             lyrics_file_pattern=self.lyrics_file_pattern,
                             scan_lyrics_source_mode=self.scan_lyrics_source_mode,
                             audio_signature=discovered_signatures.get(p),
+                            audio_signature_ns=discovered_audio_signatures.get(p),
                             sidecar_lookup_cache=sidecar_lookup_cache,
                             timings=timings,
                         )
@@ -388,11 +631,7 @@ class LibraryScanner(QThread):
                 executor.shutdown(wait=executor_shutdown_wait, cancel_futures=not executor_shutdown_wait)
 
             if batch or pending_replacements:
-                flush_started = time.perf_counter()
-                with db:
-                    delete_tracks_by_paths(db, pending_replacements, commit=False)
-                    batch_inserter.add_tracks(batch)
-                timings.record("db_flush_s", time.perf_counter() - flush_started)
+                flush_batch("")
 
             if removed_paths:
                 flush_started = time.perf_counter()
