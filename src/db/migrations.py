@@ -146,6 +146,35 @@ def upgrade_database_if_needed(db: sqlite3.Connection, existing_version: int) ->
         db.commit()
         current_version = 5
 
+    if current_version < 6:
+        logger.info("Upgrade database version %d -> 6...", current_version)
+        # Deliberately leave this table empty. Existing modified_time/file_size
+        # values combine audio and sidecar state, so rebuilding provenance on the
+        # first post-migration scan is safer than guessing source-specific state.
+        db.execute(
+            """
+            CREATE TABLE IF NOT EXISTS track_scan_state (
+                track_id INTEGER PRIMARY KEY,
+                audio_mtime_ns INTEGER,
+                audio_size INTEGER,
+                sidecar_signature TEXT,
+                embedded_txt_present BOOLEAN,
+                embedded_lrc_present BOOLEAN,
+                sidecar_txt_present BOOLEAN,
+                sidecar_lrc_present BOOLEAN,
+                embedded_txt_lyrics TEXT,
+                embedded_lrc_lyrics TEXT,
+                signature_version INTEGER NOT NULL DEFAULT 1,
+                last_scan_at REAL,
+                FOREIGN KEY(track_id) REFERENCES tracks(id)
+            )
+            """
+        )
+        db.execute("CREATE INDEX IF NOT EXISTS idx_track_scan_state_signature ON track_scan_state(signature_version)")
+        db.execute("PRAGMA user_version=6")
+        db.commit()
+        current_version = 6
+
     if current_version == CURRENT_DB_VERSION:
         return
 

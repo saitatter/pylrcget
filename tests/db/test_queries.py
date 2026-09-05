@@ -18,6 +18,7 @@ from db.queries import (
     get_publish_history_rows,
     get_similar_lyrics_track_rows,
     get_track_by_id,
+    get_track_scan_state_index,
     get_track_list_rows,
     get_track_rows,
     record_download_history,
@@ -27,12 +28,45 @@ from db.queries import (
     set_config,
     update_track_dirty_lyrics,
     update_track_plain_lyrics,
+    upsert_track_scan_state,
 )
+from library.scan_state import TrackScanState
 from tests import test_support as _test_support  # noqa: F401
 from tests.test_support import make_fs_track, touch_text
 
 
 class ArtistAlbumQueryTests(unittest.TestCase):
+    def test_track_scan_state_round_trips_without_overloading_track_lyrics(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db = initialize_database(tmp)
+            try:
+                audio = Path(tmp) / "song.mp3"
+                touch_text(audio, "audio")
+                add_tracks(db, [make_fs_track(audio, artist="Artist", album="Album", title="Song")])
+                track_id = int(db.execute("SELECT id FROM tracks LIMIT 1").fetchone()["id"])
+                state = TrackScanState(
+                    track_id=track_id,
+                    audio_mtime_ns=123,
+                    audio_size=456,
+                    sidecar_signature="sidecar-v1",
+                    embedded_txt_present=True,
+                    embedded_lrc_present=False,
+                    sidecar_txt_present=False,
+                    sidecar_lrc_present=True,
+                    embedded_txt_lyrics="embedded plain",
+                    embedded_lrc_lyrics=None,
+                    last_scan_at=789.0,
+                )
+
+                upsert_track_scan_state(db, state)
+
+                self.assertEqual(get_track_scan_state_index(db), {track_id: state})
+                track = get_track_by_id(db, track_id)
+                self.assertIsNone(track.txt_lyrics)
+                self.assertIsNone(track.lrc_lyrics)
+            finally:
+                db.close()
+
     def test_get_album_rows_filters_by_track_artist_not_album_artist_column(self):
         with tempfile.TemporaryDirectory() as tmp:
             db = initialize_database(tmp)

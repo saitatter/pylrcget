@@ -6,6 +6,7 @@ from core.utils import prepare_input
 from db.models import Track
 from db.query_modules.track_queries import get_track_by_id
 from library import scan_library
+from library.scan_state import TrackScanState
 
 
 def get_track_ids(
@@ -143,6 +144,98 @@ def get_library_scan_index(
         )
         for row in rows
     }
+
+
+def get_track_scan_state_index(db: sqlite3.Connection) -> dict[int, TrackScanState]:
+    rows = db.execute(
+        """
+        SELECT
+            track_id,
+            audio_mtime_ns,
+            audio_size,
+            sidecar_signature,
+            embedded_txt_present,
+            embedded_lrc_present,
+            sidecar_txt_present,
+            sidecar_lrc_present,
+            embedded_txt_lyrics,
+            embedded_lrc_lyrics,
+            signature_version,
+            last_scan_at
+        FROM track_scan_state
+        """
+    ).fetchall()
+    return {
+        int(row["track_id"]): TrackScanState(
+            track_id=int(row["track_id"]),
+            audio_mtime_ns=int(row["audio_mtime_ns"]) if row["audio_mtime_ns"] is not None else None,
+            audio_size=int(row["audio_size"]) if row["audio_size"] is not None else None,
+            sidecar_signature=str(row["sidecar_signature"]) if row["sidecar_signature"] is not None else None,
+            embedded_txt_present=bool(row["embedded_txt_present"]) if row["embedded_txt_present"] is not None else None,
+            embedded_lrc_present=bool(row["embedded_lrc_present"]) if row["embedded_lrc_present"] is not None else None,
+            sidecar_txt_present=bool(row["sidecar_txt_present"]) if row["sidecar_txt_present"] is not None else None,
+            sidecar_lrc_present=bool(row["sidecar_lrc_present"]) if row["sidecar_lrc_present"] is not None else None,
+            embedded_txt_lyrics=row["embedded_txt_lyrics"],
+            embedded_lrc_lyrics=row["embedded_lrc_lyrics"],
+            signature_version=int(row["signature_version"] or 1),
+            last_scan_at=float(row["last_scan_at"]) if row["last_scan_at"] is not None else None,
+        )
+        for row in rows
+    }
+
+
+def upsert_track_scan_state(
+    db: sqlite3.Connection,
+    state: TrackScanState,
+    *,
+    commit: bool = True,
+) -> None:
+    db.execute(
+        """
+        INSERT INTO track_scan_state (
+            track_id,
+            audio_mtime_ns,
+            audio_size,
+            sidecar_signature,
+            embedded_txt_present,
+            embedded_lrc_present,
+            sidecar_txt_present,
+            sidecar_lrc_present,
+            embedded_txt_lyrics,
+            embedded_lrc_lyrics,
+            signature_version,
+            last_scan_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(track_id) DO UPDATE SET
+            audio_mtime_ns = excluded.audio_mtime_ns,
+            audio_size = excluded.audio_size,
+            sidecar_signature = excluded.sidecar_signature,
+            embedded_txt_present = excluded.embedded_txt_present,
+            embedded_lrc_present = excluded.embedded_lrc_present,
+            sidecar_txt_present = excluded.sidecar_txt_present,
+            sidecar_lrc_present = excluded.sidecar_lrc_present,
+            embedded_txt_lyrics = excluded.embedded_txt_lyrics,
+            embedded_lrc_lyrics = excluded.embedded_lrc_lyrics,
+            signature_version = excluded.signature_version,
+            last_scan_at = excluded.last_scan_at
+        """,
+        (
+            int(state.track_id),
+            state.audio_mtime_ns,
+            state.audio_size,
+            state.sidecar_signature,
+            state.embedded_txt_present,
+            state.embedded_lrc_present,
+            state.sidecar_txt_present,
+            state.sidecar_lrc_present,
+            state.embedded_txt_lyrics,
+            state.embedded_lrc_lyrics,
+            int(state.signature_version),
+            state.last_scan_at,
+        ),
+    )
+    if commit:
+        db.commit()
 
 
 def delete_tracks_by_paths(db: sqlite3.Connection, paths: list[str], *, commit: bool = True) -> None:

@@ -51,6 +51,21 @@ class MigrationTests(unittest.TestCase):
                 self.assertTrue(
                     {"dirty_lrc_lyrics", "dirty_txt_lyrics", "dirty_lyrics_present"} <= track_columns
                 )
+                scan_state_columns = {
+                    row["name"] for row in db.execute("PRAGMA table_info(track_scan_state)").fetchall()
+                }
+                self.assertTrue(
+                    {
+                        "track_id",
+                        "audio_mtime_ns",
+                        "audio_size",
+                        "sidecar_signature",
+                        "embedded_txt_lyrics",
+                        "embedded_lrc_lyrics",
+                        "signature_version",
+                    }
+                    <= scan_state_columns
+                )
 
                 row = db.execute(
                     """
@@ -305,6 +320,35 @@ class MigrationTests(unittest.TestCase):
                     "SELECT logging_verbosity FROM config_data LIMIT 1"
                 ).fetchone()
                 self.assertEqual(row["logging_verbosity"], "info")
+            finally:
+                db.close()
+
+    def test_v5_database_creates_empty_track_scan_state(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db_path = Path(tmp) / "pylrcget.db.sqlite3"
+            db = sqlite3.connect(str(db_path))
+            db.row_factory = sqlite3.Row
+            try:
+                db.execute(
+                    """
+                    CREATE TABLE tracks (
+                        id INTEGER PRIMARY KEY,
+                        file_path TEXT UNIQUE,
+                        modified_time REAL,
+                        file_size INTEGER
+                    )
+                    """
+                )
+                db.execute("INSERT INTO tracks (file_path, modified_time, file_size) VALUES ('song.mp3', 1.0, 2)")
+                db.execute("PRAGMA user_version=5")
+                db.commit()
+
+                upgrade_database_if_needed(db, 5)
+
+                self.assertEqual(int(db.execute("PRAGMA user_version").fetchone()[0]), CURRENT_DB_VERSION)
+                columns = {row["name"] for row in db.execute("PRAGMA table_info(track_scan_state)").fetchall()}
+                self.assertIn("audio_mtime_ns", columns)
+                self.assertEqual(db.execute("SELECT COUNT(*) FROM track_scan_state").fetchone()[0], 0)
             finally:
                 db.close()
 
