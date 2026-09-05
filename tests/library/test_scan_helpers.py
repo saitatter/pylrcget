@@ -458,6 +458,185 @@ class ScanLibraryHelpersTests(unittest.TestCase):
 
 
 class LibraryScannerIncrementalTests(unittest.TestCase):
+    def _scan_sidecar_mutation(
+        self,
+        *,
+        operation: str,
+        suffix: str = ".lrc",
+        lyrics_lookup_subdir: str = "",
+        lyrics_file_pattern: str = "",
+        seed_sidecar: bool = False,
+    ) -> tuple[sqlite3.Row, int]:
+        with tempfile.TemporaryDirectory() as tmp:
+            db_path = str(Path(tmp) / "pylrcget.db.sqlite3")
+            music_dir = Path(tmp) / "Music"
+            music_dir.mkdir(parents=True, exist_ok=True)
+            audio = music_dir / "track.mp3"
+            touch_text(audio, "audio")
+
+            metadata = AudioMetadata(
+                title="Song",
+                album="Album",
+                artist="Artist",
+                album_artist="Artist",
+                track_number=1,
+                duration=180.0,
+            )
+            sidecar_dir = music_dir / lyrics_lookup_subdir if lyrics_lookup_subdir else music_dir
+            sidecar_dir.mkdir(parents=True, exist_ok=True)
+            sidecar_stem = "Artist - Song" if lyrics_file_pattern else audio.stem
+            sidecar = sidecar_dir / f"{sidecar_stem}{suffix}"
+            if seed_sidecar:
+                touch_text(sidecar, "original sidecar")
+
+            signature = get_audio_file_signature(
+                str(audio),
+                lyrics_lookup_subdir,
+                metadata=metadata,
+                lyrics_file_pattern=lyrics_file_pattern,
+            )
+            db = initialize_database(tmp)
+            add_tracks(
+                db,
+                [
+                    FsTrack(
+                        file_path=str(audio),
+                        file_name=audio.name,
+                        title=metadata.title,
+                        album=metadata.album,
+                        artist=metadata.artist,
+                        album_artist=metadata.album_artist,
+                        duration=metadata.duration,
+                        txt_lyrics="original sidecar" if seed_sidecar and suffix == ".txt" else None,
+                        lrc_lyrics="original sidecar" if seed_sidecar and suffix == ".lrc" else None,
+                        track_number=metadata.track_number,
+                        modified_time=signature[0],
+                        file_size=signature[1],
+                    )
+                ],
+            )
+            db.close()
+
+            if operation == "add":
+                touch_text(sidecar, "new sidecar")
+            elif operation == "remove":
+                sidecar.unlink()
+            elif operation == "change":
+                touch_text(sidecar, "changed sidecar")
+            elif operation == "rename":
+                sidecar.replace(sidecar_dir / f"renamed{suffix}")
+            else:
+                raise AssertionError(f"Unknown sidecar operation: {operation}")
+
+            metadata_calls = 0
+
+            def fake_read_metadata(path: str):
+                nonlocal metadata_calls
+                metadata_calls += 1
+                return object(), metadata
+
+            def fake_new_fs_track(path: str, *, signature=None, **_kwargs):
+                current = sidecar.read_text(encoding="utf-8") if sidecar.exists() else None
+                return FsTrack(
+                    file_path=path,
+                    file_name=audio.name,
+                    title=metadata.title,
+                    album=metadata.album,
+                    artist=metadata.artist,
+                    album_artist=metadata.album_artist,
+                    duration=metadata.duration,
+                    txt_lyrics=current if suffix == ".txt" else None,
+                    lrc_lyrics=current if suffix == ".lrc" else None,
+                    track_number=metadata.track_number,
+                    modified_time=signature[0] if signature else None,
+                    file_size=signature[1] if signature else None,
+                )
+
+            scanner = LibraryScanner(
+                db_path,
+                [str(music_dir)],
+                lyrics_lookup_subdir=lyrics_lookup_subdir,
+                lyrics_file_pattern=lyrics_file_pattern,
+            )
+            with (
+                patch("ui.workers.library_scanner.read_audio_metadata_for_scan", side_effect=fake_read_metadata),
+                patch("ui.workers.library_scanner.new_fs_track_from_path", side_effect=fake_new_fs_track),
+            ):
+                scanner.run()
+
+            db = sqlite3.connect(db_path)
+            db.row_factory = sqlite3.Row
+            try:
+                row = db.execute("SELECT txt_lyrics, lrc_lyrics FROM tracks LIMIT 1").fetchone()
+                assert row is not None
+                return row, metadata_calls
+            finally:
+                db.close()
+
+    @unittest.expectedFailure
+    def test_new_lrc_beside_unchanged_audio_is_detected(self):
+        row, _metadata_calls = self._scan_sidecar_mutation(operation="add", suffix=".lrc")
+        self.assertEqual(row["lrc_lyrics"], "new sidecar")
+
+    @unittest.expectedFailure
+    def test_new_txt_beside_unchanged_audio_is_detected(self):
+        row, _metadata_calls = self._scan_sidecar_mutation(operation="add", suffix=".txt")
+        self.assertEqual(row["txt_lyrics"], "new sidecar")
+
+    def test_removed_lrc_beside_unchanged_audio_is_detected(self):
+        row, metadata_calls = self._scan_sidecar_mutation(
+            operation="remove",
+            suffix=".lrc",
+            seed_sidecar=True,
+        )
+        self.assertIsNone(row["lrc_lyrics"])
+        self.assertEqual(metadata_calls, 1)
+
+    def test_removed_txt_beside_unchanged_audio_is_detected(self):
+        row, metadata_calls = self._scan_sidecar_mutation(
+            operation="remove",
+            suffix=".txt",
+            seed_sidecar=True,
+        )
+        self.assertIsNone(row["txt_lyrics"])
+        self.assertEqual(metadata_calls, 1)
+
+    def test_changed_sidecar_beside_unchanged_audio_is_detected(self):
+        row, metadata_calls = self._scan_sidecar_mutation(
+            operation="change",
+            suffix=".lrc",
+            seed_sidecar=True,
+        )
+        self.assertEqual(row["lrc_lyrics"], "changed sidecar")
+        self.assertEqual(metadata_calls, 1)
+
+    def test_renamed_sidecar_beside_unchanged_audio_is_removed_from_effective_lyrics(self):
+        row, metadata_calls = self._scan_sidecar_mutation(
+            operation="rename",
+            suffix=".lrc",
+            seed_sidecar=True,
+        )
+        self.assertIsNone(row["lrc_lyrics"])
+        self.assertEqual(metadata_calls, 1)
+
+    @unittest.expectedFailure
+    def test_new_sidecar_in_configured_lookup_subdirectory_is_detected(self):
+        row, _metadata_calls = self._scan_sidecar_mutation(
+            operation="add",
+            suffix=".lrc",
+            lyrics_lookup_subdir="lyrics",
+        )
+        self.assertEqual(row["lrc_lyrics"], "new sidecar")
+
+    @unittest.expectedFailure
+    def test_new_sidecar_using_custom_pattern_is_detected(self):
+        row, _metadata_calls = self._scan_sidecar_mutation(
+            operation="add",
+            suffix=".lrc",
+            lyrics_file_pattern="{artist} - {title}",
+        )
+        self.assertEqual(row["lrc_lyrics"], "new sidecar")
+
     def test_library_scanner_uses_worker_pool_for_first_scan(self):
         with tempfile.TemporaryDirectory() as tmp:
             db = initialize_database(tmp)
