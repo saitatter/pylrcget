@@ -9,6 +9,7 @@ from .ai_sync_alignment import (
     _align_lyrics_to_segments_viterbi,
     _repair_repeated_prefix_timestamp_gaps,
 )
+from .ai_sync_audio import get_cached_audio
 from .ai_sync_demucs import (
     AlignmentCandidate,
 )
@@ -223,7 +224,11 @@ def run_ai_sync_pipeline(self, *, align_optional_demucs=None) -> None:
             return
 
         _patch_whisperx_audio_loading()
-        audio = whisperx.load_audio(self.audio_path)
+        audio = get_cached_audio(
+            self.audio_path,
+            sample_rate=16000,
+            loader=lambda: whisperx.load_audio(self.audio_path),
+        )
         language_label = transcribe_language or "auto-detect"
         detected_language = transcribe_language
 
