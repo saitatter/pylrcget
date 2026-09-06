@@ -56,6 +56,7 @@ class BulkDownloadStats(TypedDict):
     cancelled: bool
     unique_lookup_keys: int
     deduplicated_tracks: int
+    pending_future_high_water_mark: int
 
 
 @dataclass(frozen=True)
@@ -120,6 +121,7 @@ class BulkLyricsDownloadWorker(QThread):
         jobs: list[_DownloadJob] = []
         lookup_groups: list[_DownloadLookupGroup] = []
         candidates: list[LyricsMatchCandidate] = []
+        pending_future_high_water_mark = 0
         db = None
         try:
             db = sqlite3.connect(self.db_path, timeout=15.0)
@@ -186,7 +188,7 @@ class BulkLyricsDownloadWorker(QThread):
                 max_pending = worker_count * DOWNLOAD_MAX_PENDING_MULTIPLIER
 
                 def submit_available() -> None:
-                    nonlocal next_job_index
+                    nonlocal next_job_index, pending_future_high_water_mark
                     while (
                         next_job_index < len(lookup_groups)
                         and len(pending) < max_pending
@@ -195,6 +197,7 @@ class BulkLyricsDownloadWorker(QThread):
                         group = lookup_groups[next_job_index]
                         next_job_index += 1
                         pending[executor.submit(self._fetch_job_match, group.representative)] = group
+                        pending_future_high_water_mark = max(pending_future_high_water_mark, len(pending))
 
                 try:
                     submit_available()
@@ -274,6 +277,7 @@ class BulkLyricsDownloadWorker(QThread):
             "cancelled": cancelled,
             "unique_lookup_keys": len(lookup_groups),
             "deduplicated_tracks": max(0, len(jobs) - len(lookup_groups)),
+            "pending_future_high_water_mark": pending_future_high_water_mark,
             "candidates": candidates,
             "requires_review": bool(candidates) and not cancelled,
         }

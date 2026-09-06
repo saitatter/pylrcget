@@ -55,10 +55,6 @@ class _FixtureStats:
             self.latencies_ms.append(elapsed_ms)
 
 
-def _key(artist: str, title: str, album: str, duration: int | None) -> tuple[str, str, str, int | None]:
-    return (artist.strip().casefold(), title.strip().casefold(), album.strip().casefold(), duration)
-
-
 class _FixtureAPI:
     def __init__(self, _base_url: str, fixture: dict, stats: _FixtureStats) -> None:
         self.fixture = fixture
@@ -171,6 +167,8 @@ def _run_sample(tracks: list[dict[str, object]], fixture: dict[str, object], wor
             "fixture://lrclib",
         )
         worker_count = min(max(1, workers), max(1, len(track_ids)))
+        finished_stats: list[dict[str, object]] = []
+        worker.finishedBatch.connect(lambda _ok, _message, payload: finished_stats.append(payload))
         started = time.perf_counter()
         with patch(
             "ui.workers.bulk_lyrics_download_worker.LrcLibAPI",
@@ -181,19 +179,19 @@ def _run_sample(tracks: list[dict[str, object]], fixture: dict[str, object], wor
 
     ordered = sorted(stats.latencies_ms)
     success = len(tracks) - stats.not_found - stats.failures
+    worker_stats = finished_stats[-1] if finished_stats else {}
+    unique_lookup_keys = int(worker_stats.get("unique_lookup_keys", 0))
+    deduplicated_tracks = int(worker_stats.get("deduplicated_tracks", 0))
     return {
         "total_ms": round(elapsed_ms, 3),
         "tracks_requested": len(tracks),
         "jobs_generated": len(tracks),
-        "unique_lookup_keys": len({
-            _key(str(track["artist"]), str(track["title"]), str(track.get("album", "")), int(track.get("duration") or 0))
-            for track in tracks
-        }),
+        "unique_lookup_keys": unique_lookup_keys,
         "http_requests_total": stats.requests_total,
         "get_requests": stats.get_requests,
         "search_requests": stats.search_requests,
         "requests_per_track": round(stats.requests_total / len(tracks), 4) if tracks else 0.0,
-        "deduplicated_lookups": 0,
+        "deduplicated_lookups": deduplicated_tracks,
         "retries": 0,
         "429_responses": 0,
         "404_responses": stats.not_found,
@@ -202,7 +200,7 @@ def _run_sample(tracks: list[dict[str, object]], fixture: dict[str, object], wor
         "p95_request_latency_ms": round(ordered[min(len(ordered) - 1, int(len(ordered) * 0.95))], 3) if ordered else None,
         "match_success_count": success,
         "match_failure_count": len(tracks) - success,
-        "pending_future_high_water_mark": len(tracks),
+        "pending_future_high_water_mark": int(worker_stats.get("pending_future_high_water_mark", 0)),
         "peak_rss_bytes": peak_rss_bytes(),
         "worker_count": worker_count,
     }
@@ -271,6 +269,7 @@ def main() -> int:
                     "http_requests_total",
                     "requests_per_track",
                     "unique_lookup_keys",
+                    "deduplicated_lookups",
                     "pending_future_high_water_mark",
                     "p50_request_latency_ms",
                     "p95_request_latency_ms",

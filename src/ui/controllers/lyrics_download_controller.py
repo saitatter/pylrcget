@@ -212,6 +212,9 @@ class LyricsDownloadController(QObject):
             "cancelled": bool(stats.get("cancelled")) if isinstance(stats, dict) else False,
             "unique_lookup_keys": int(stats.get("unique_lookup_keys", 0)) if isinstance(stats, dict) else 0,
             "deduplicated_tracks": int(stats.get("deduplicated_tracks", 0)) if isinstance(stats, dict) else 0,
+            "pending_future_high_water_mark": int(stats.get("pending_future_high_water_mark", 0))
+            if isinstance(stats, dict)
+            else 0,
         }
         self._overlay.finish_batch(msg, cancelled=bool(stats_dict.get("cancelled")))
         candidates = [
