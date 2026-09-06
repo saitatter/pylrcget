@@ -34,12 +34,18 @@ from ui.services.lyrics_match_retry import (
 logger = logging.getLogger(__name__)
 
 ProgressCallback = Callable[[str], None]
+BeforeRequestCallback = Callable[[], bool]
+RateLimitCallback = Callable[[float], None]
 _RETRYABLE_API_ERRORS = (RateLimitError, ServerError, requests_exceptions.Timeout, requests_exceptions.ConnectionError)
 _MAX_LRCLIB_RETRIES = 3
 _INITIAL_BACKOFF_S = 0.5
 _LRC_TIMESTAMP_RE = re.compile(r"\[(?:\d+:)?\d+:\d+(?:\.\d+)?\]")
 LRCLIB_MIN_DURATION_S = 1
 LRCLIB_MAX_DURATION_S = 3600
+
+
+class LyricsMatchCancelled(Exception):
+    """Raised when a bulk download is cancelled before issuing another request."""
 
 
 @dataclass(frozen=True)
@@ -113,11 +119,15 @@ def fetch_lyrics_with_retry(
     artist: str,
     album: str | None,
     duration_s: int | None,
+    before_request: BeforeRequestCallback | None = None,
+    on_rate_limit: RateLimitCallback | None = None,
 ):
     backoff_s = _INITIAL_BACKOFF_S
     last_error: Exception | None = None
     for attempt in range(1, _MAX_LRCLIB_RETRIES + 1):
         try:
+            if before_request is not None and not before_request():
+                raise LyricsMatchCancelled
             notify(f"Querying LRCLIB... (attempt {attempt}/{_MAX_LRCLIB_RETRIES})")
             return api.get_lyrics(
                 track_name=title,
@@ -125,8 +135,12 @@ def fetch_lyrics_with_retry(
                 album_name=album or "",
                 duration=duration_s or 0,
             )
+        except LyricsMatchCancelled:
+            raise
         except Exception as exc:
             last_error = exc
+            if isinstance(exc, RateLimitError) and on_rate_limit is not None:
+                on_rate_limit(backoff_s)
             if not _should_retry_lrclib_error(exc) or attempt >= _MAX_LRCLIB_RETRIES:
                 raise
             logger.warning("Retrying LRCLIB request for %s - %s after %s: %s", artist, title, type(exc).__name__, exc)
@@ -147,6 +161,8 @@ def find_best_lyrics_match(
     artist: str,
     album: str,
     duration_s: int | None,
+    before_request: BeforeRequestCallback | None = None,
+    on_rate_limit: RateLimitCallback | None = None,
 ) -> LyricsDownloadMatch | None:
     try:
         lyrics = fetch_lyrics_with_retry(
@@ -156,11 +172,15 @@ def find_best_lyrics_match(
             artist=artist,
             album=album or None,
             duration_s=duration_s or None,
+            before_request=before_request,
+            on_rate_limit=on_rate_limit,
         )
         if _strip_empty(getattr(lyrics, "synced_lyrics", None)) or _strip_empty(getattr(lyrics, "plain_lyrics", None)):
             logger.debug("LRCLIB exact match selected for track %s with exact metadata.", track_label)
             return LyricsDownloadMatch(lyrics, 100, "exact metadata")
         notify("Exact LRCLIB match has no usable lyrics; trying alternatives...")
+    except LyricsMatchCancelled:
+        raise
     except Exception as exc:
         if not _is_lrclib_not_found(exc):
             raise
@@ -169,6 +189,8 @@ def find_best_lyrics_match(
     best = None
     for query in build_retry_search_queries(artist=artist, title=title, album=album):
         try:
+            if before_request is not None and not before_request():
+                raise LyricsMatchCancelled
             notify(f"Searching LRCLIB with {query.label}...")
             results = api.search_lyrics(
                 query=query.query or None,
@@ -176,7 +198,11 @@ def find_best_lyrics_match(
                 artist_name=query.artist or None,
                 album_name=query.album or None,
             )
+        except LyricsMatchCancelled:
+            raise
         except Exception as exc:
+            if isinstance(exc, RateLimitError) and on_rate_limit is not None:
+                on_rate_limit(0.5)
             logger.warning("Alternative LRCLIB search failed for %s via %s: %s", track_label, query.label, exc)
             if _should_retry_lrclib_error(exc):
                 raise

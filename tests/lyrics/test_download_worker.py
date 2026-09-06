@@ -15,6 +15,7 @@ from tests import test_support as _test_support  # noqa: F401
 from tests.test_support import make_fs_track, touch_text
 from ui.workers.bulk_lyrics_download_worker import (
     MAX_PARALLEL_DOWNLOAD_WORKERS,
+    _SharedRateLimitCooldown,
     BulkLyricsDownloadWorker,
 )
 from ui.workers.lyrics_download_worker import LyricsDownloadWorker
@@ -33,6 +34,17 @@ class _ImmediateFuture:
 
 
 class LyricsDownloadWorkerTests(unittest.TestCase):
+    def test_shared_rate_limit_cooldown_waits_until_recorded_deadline(self):
+        cooldown = _SharedRateLimitCooldown()
+        with (
+            patch("ui.workers.bulk_lyrics_download_worker.time.monotonic", side_effect=[100.0, 100.1, 100.5]),
+            patch.object(cooldown._condition, "wait") as wait_mock,
+        ):
+            cooldown.record(0.5)
+            self.assertTrue(cooldown.wait(lambda: False))
+
+        wait_mock.assert_called_once_with(timeout=0.05)
+
     def test_retries_retryable_lrclib_errors_before_succeeding(self):
         with tempfile.TemporaryDirectory() as tmp:
             db = initialize_database(tmp)

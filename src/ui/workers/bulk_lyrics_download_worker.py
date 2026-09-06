@@ -15,6 +15,7 @@ from db.queries import get_tracks_for_bulk_download
 from ui.services.download_modes import normalize_download_mode
 from ui.services.lyrics_download_service import (
     LyricsDownloadMatch,
+    LyricsMatchCancelled,
     find_best_lyrics_match,
     invalid_lrclib_duration_message,
     is_valid_lrclib_duration,
@@ -24,6 +25,28 @@ from ui.services.lyrics_match_retry import LyricsMatchCandidate
 MAX_PARALLEL_DOWNLOAD_WORKERS = 4
 DOWNLOAD_MAX_PENDING_MULTIPLIER = 4
 DOWNLOAD_CANCEL_POLL_INTERVAL_S = 0.05
+
+
+class _SharedRateLimitCooldown:
+    def __init__(self) -> None:
+        self._condition = threading.Condition()
+        self._deadline = 0.0
+
+    def wait(self, is_cancelled) -> bool:
+        while True:
+            if is_cancelled():
+                return False
+            with self._condition:
+                remaining = self._deadline - time.monotonic()
+                if remaining <= 0:
+                    return not is_cancelled()
+                self._condition.wait(timeout=min(remaining, DOWNLOAD_CANCEL_POLL_INTERVAL_S))
+
+    def record(self, delay_s: float) -> None:
+        deadline = time.monotonic() + max(0.0, float(delay_s))
+        with self._condition:
+            self._deadline = max(self._deadline, deadline)
+            self._condition.notify_all()
 
 
 class BulkDownloadStats(TypedDict):
@@ -50,6 +73,7 @@ class _DownloadFetchResult:
     job: _DownloadJob
     match: LyricsDownloadMatch | None = None
     error: str = ""
+    cancelled: bool = False
 
 
 @dataclass(frozen=True)
@@ -83,10 +107,12 @@ class BulkLyricsDownloadWorker(QThread):
         self.download_mode = normalize_download_mode(download_mode)
         self._started_at = 0.0
         self._thread_local = threading.local()
+        self._rate_limit_cooldown = _SharedRateLimitCooldown()
 
     def run(self) -> None:
         total = len(self.track_ids)
         self._started_at = time.perf_counter()
+        self._rate_limit_cooldown = _SharedRateLimitCooldown()
         ok_count = 0
         fail_count = 0
         cancelled = False
@@ -192,6 +218,9 @@ class BulkLyricsDownloadWorker(QThread):
                                 result = future.result()
                             except Exception as exc:  # noqa: BLE001
                                 result = _DownloadFetchResult(job=group.representative, error=str(exc))
+                            if result.cancelled:
+                                cancelled = True
+                                break
 
                             for job in group.jobs:
                                 completed += 1
@@ -288,10 +317,20 @@ class BulkLyricsDownloadWorker(QThread):
                 artist=job.artist,
                 album=job.album,
                 duration_s=job.duration_s,
+                before_request=self._before_lrclib_request,
+                on_rate_limit=self._record_lrclib_rate_limit,
             )
             return _DownloadFetchResult(job=job, match=match)
+        except LyricsMatchCancelled:
+            return _DownloadFetchResult(job=job, cancelled=True)
         except Exception as exc:  # noqa: BLE001
             return _DownloadFetchResult(job=job, error=str(exc))
+
+    def _before_lrclib_request(self) -> bool:
+        return self._rate_limit_cooldown.wait(self.isInterruptionRequested)
+
+    def _record_lrclib_rate_limit(self, delay_s: float) -> None:
+        self._rate_limit_cooldown.record(delay_s)
 
     def _api_for_current_thread(self) -> LrcLibAPI:
         api = getattr(self._thread_local, "api", None)
