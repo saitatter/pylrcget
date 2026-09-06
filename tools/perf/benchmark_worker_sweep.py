@@ -46,12 +46,19 @@ def main() -> int:
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--warmups", type=int, default=2)
     parser.add_argument("--runs", type=int, default=3)
+    parser.add_argument(
+        "--read-only-source",
+        action="store_true",
+        help="scan the source path directly; only initial and unchanged scenarios are supported",
+    )
     parser.add_argument("--output", type=Path, default=Path("benchmarks/results/scan-worker-sweep.json"))
     args = parser.parse_args()
     if args.warmups < 0 or args.runs <= 0:
         parser.error("runs must be positive; warmups cannot be negative")
     if not args.library.is_dir():
         parser.error(f"Library directory does not exist: {args.library}")
+    if args.read_only_source and args.scenario not in {"initial", "unchanged"}:
+        parser.error("--read-only-source supports only initial and unchanged scenarios")
 
     results: dict[str, dict[str, object]] = {}
     for worker_count in args.workers:
@@ -63,6 +70,7 @@ def main() -> int:
                 fraction=args.fraction,
                 suffix=args.suffix,
                 seed=args.seed + index,
+                read_only_source=args.read_only_source,
             )
         samples = [
             _one_sample(
@@ -72,6 +80,7 @@ def main() -> int:
                 fraction=args.fraction,
                 suffix=args.suffix,
                 seed=args.seed + args.warmups + index,
+                read_only_source=args.read_only_source,
             )
             for index in range(args.runs)
         ]

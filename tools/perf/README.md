@@ -11,6 +11,7 @@ python tools/perf/benchmark_scan.py --library "\\MOS\Music" --scenario initial -
 python tools/perf/benchmark_scan.py --library "\\MOS\Music" --scenario unchanged --read-only-source --warmups 2 --runs 3
 python tools/perf/benchmark_scan.py --library "\\MOS\Music" --scenario initial --read-only-source --lightweight --warmups 2 --runs 3
 python tools/perf/benchmark_worker_sweep.py --library .\benchmarks\corpora\small --workers 1,2,4,8 --warmups 2 --runs 3
+python tools/perf/benchmark_worker_sweep.py --library "\\MOS\Music" --read-only-source --workers 1,2,4,8 --warmups 0 --runs 1
 python tools/perf/benchmark_lrclib.py --tracks 250 --duplicate-every 5 --warmups 2 --runs 3
 ```
 
