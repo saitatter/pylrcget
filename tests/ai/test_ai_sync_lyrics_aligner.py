@@ -2,12 +2,16 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import numpy as np
+import torch
+
 from tests import test_support as _test_support  # noqa: F401
 from ui.workers.ai_sync_contracts import AlignmentOptions, AlignmentRequest
 from ui.workers.ai_sync_lyrics_aligner import (
     EnglishLyricsAlignerBackend,
     _build_lrc_from_predictions,
     _result_lines,
+    _vectorized_optimal_alignment_path,
 )
 
 
@@ -61,3 +65,41 @@ def test_warm_backend_does_not_require_existing_audio_for_result_parsing(tmp_pat
     result = backend.align(_request("Hello"))
 
     assert result.lines[0].start == 0.0
+
+
+def test_vectorized_dtw_matches_reference_backtracking() -> None:
+    scores = torch.tensor(
+        [
+            [
+                [2.0, 1.0, 0.0],
+                [0.0, 3.0, 1.0],
+                [0.0, 1.0, 4.0],
+                [0.0, 0.0, 5.0],
+            ]
+        ],
+        dtype=torch.float32,
+    )
+
+    actual = _vectorized_optimal_alignment_path(scores)
+
+    accumulated = np.full((scores.shape[1] + 1, scores.shape[2] + 1), -100000.0)
+    accumulated[0, 0] = 200
+    score_array = scores.numpy().astype("float64")
+    for row in range(1, scores.shape[1] + 1):
+        accumulated[row, 1:] = score_array[0, row - 1, :] + np.maximum(
+            accumulated[row - 1, 1:],
+            accumulated[row - 1, :-1],
+        )
+    expected_scores = accumulated[1:, 1:]
+    expected = np.zeros_like(expected_scores)
+    expected[-1, -1] = 1
+    row = expected_scores.shape[0] - 2
+    column = expected_scores.shape[1] - 1
+    while column > 0:
+        step_back = np.argmax([expected_scores[row, column], expected_scores[row, column - 1]])
+        expected[row, column - step_back] = 1
+        row -= 1
+        column -= step_back
+    expected[0 : row + 1, 0] = 1
+
+    np.testing.assert_array_equal(actual, expected)

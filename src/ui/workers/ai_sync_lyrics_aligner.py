@@ -64,6 +64,61 @@ def _patch_torch_compatibility(torch_module: Any) -> None:
     torch_module.stft = compatible_stft
 
 
+def _vectorized_optimal_alignment_path(matrix: Any, *, init: int = 200) -> Any:
+    """Run the upstream DTW recurrence without per-cell Python/NumPy work.
+
+    The upstream ``align.py`` implementation converts the score matrix to
+    NumPy and walks every diagonal in Python.  That is a poor fit for CUDA:
+    the neural scores are computed on the GPU, immediately copied to the CPU,
+    and then processed by a Python loop.  The recurrence can be evaluated one
+    row at a time because each row depends only on the preceding row.  Keep
+    the accumulated matrix in float64 to preserve the existing NumPy
+    implementation's numeric behavior before copying only the completed
+    matrix back for the unchanged backtracking logic.
+    """
+
+    import numpy as np
+    import torch
+
+    if matrix.ndim != 3 or matrix.shape[0] != 1:
+        raise ValueError("lyrics-aligner DTW expects a [1, time, phoneme] matrix")
+
+    _batch, sequence_length, phoneme_length = matrix.shape
+    accumulated = torch.full(
+        (1, sequence_length + 1, phoneme_length + 1),
+        -100000.0,
+        dtype=torch.float64,
+        device=matrix.device,
+    )
+    accumulated[:, 0, 0] = init
+    scores = matrix.to(dtype=torch.float64)
+    for row in range(1, sequence_length + 1):
+        accumulated[:, row, 1:] = scores[:, row - 1, :] + torch.maximum(
+            accumulated[:, row - 1, 1:],
+            accumulated[:, row - 1, :-1],
+        )
+
+    accumulated_scores = accumulated[0, 1:, 1:].detach().cpu().numpy()
+    sequence_length, phoneme_length = accumulated_scores.shape
+    optimal_path = np.zeros((sequence_length, phoneme_length))
+    optimal_path[-1, -1] = 1
+
+    row = sequence_length - 2
+    column = phoneme_length - 1
+    while column > 0:
+        same_phoneme = accumulated_scores[row, column]
+        previous_phoneme = accumulated_scores[row, column - 1]
+        step_back = np.argmax([same_phoneme, previous_phoneme])
+        optimal_path[row, column - step_back] = 1
+        row -= 1
+        column -= step_back
+        if row == -2:
+            logger.warning("lyrics-aligner DTW backtracking reached an invalid row")
+            break
+    optimal_path[0 : row + 1, 0] = 1
+    return optimal_path
+
+
 def _load_upstream_modules(root: Path) -> tuple[Any, Any]:
     """Load upstream model/DTW modules without making them global imports."""
     cache_key = str(root.resolve())
@@ -191,14 +246,19 @@ class EnglishLyricsAlignerBackend:
         audio_tensor = torch.tensor(audio, dtype=torch.float32, device=self.device)[None, None, :]
         with torch.no_grad():
             voice_estimate, _unused, scores = self._model((audio_tensor, phonemes_idx))
-            scores = scores.cpu()
+            alignment_scores = scores if self.device == "cuda" else scores.cpu()
         if vad_threshold > 0:
             vocals_mag = voice_estimate[:, 0, 0, :].detach().cpu().numpy().sum(axis=0)
             predicted_silence = (vocals_mag < vad_threshold).nonzero()[0]
-            space_indices = torch.nonzero(phonemes_idx == 3, as_tuple=True)[1].cpu()
+            space_indices = torch.nonzero(phonemes_idx == 3, as_tuple=True)[1].to(
+                alignment_scores.device
+            )
             for frame in predicted_silence:
-                scores[:, frame, space_indices] = scores.max()
-        optimal_path = self._align_module.optimal_alignment_path(scores)
+                alignment_scores[:, int(frame), space_indices] = alignment_scores.max()
+        if self.device == "cuda":
+            optimal_path = _vectorized_optimal_alignment_path(alignment_scores)
+        else:
+            optimal_path = self._align_module.optimal_alignment_path(alignment_scores)
         phoneme_onsets = self._align_module.compute_phoneme_onsets(
             optimal_path,
             hop_length=256,
