@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import re
 import sqlite3
 import time
@@ -42,6 +43,8 @@ _INITIAL_BACKOFF_S = 0.5
 _LRC_TIMESTAMP_RE = re.compile(r"\[(?:\d+:)?\d+:\d+(?:\.\d+)?\]")
 LRCLIB_MIN_DURATION_S = 1
 LRCLIB_MAX_DURATION_S = 3600
+LRCLIB_DEFAULT_EARLY_EXIT_SCORE = 100
+LRCLIB_MIN_EARLY_EXIT_SCORE = 95
 
 
 class LyricsMatchCancelled(Exception):
@@ -109,6 +112,19 @@ def invalid_lrclib_duration_message(duration_s: int) -> str:
         f"Invalid duration for LRCLIB ({duration_s}s); "
         f"must be between {LRCLIB_MIN_DURATION_S} and {LRCLIB_MAX_DURATION_S}. Skipped without request."
     )
+
+
+def _lrclib_early_exit_score() -> int:
+    configured = os.environ.get("PYLRCGET_LRCLIB_EARLY_SCORE")
+    if configured is None:
+        return LRCLIB_DEFAULT_EARLY_EXIT_SCORE
+    try:
+        score = int(configured)
+    except (TypeError, ValueError):
+        return LRCLIB_DEFAULT_EARLY_EXIT_SCORE
+    if not LRCLIB_MIN_EARLY_EXIT_SCORE <= score <= 100:
+        return LRCLIB_DEFAULT_EARLY_EXIT_SCORE
+    return score
 
 
 def fetch_lyrics_with_retry(
@@ -187,6 +203,7 @@ def find_best_lyrics_match(
         notify("Exact LRCLIB match not found; trying alternatives...")
 
     best = None
+    early_exit_score = _lrclib_early_exit_score()
     for query in build_retry_search_queries(artist=artist, title=title, album=album):
         try:
             if before_request is not None and not before_request():
@@ -224,7 +241,7 @@ def find_best_lyrics_match(
                 query.label,
                 candidate.score,
             )
-        if best is not None and best.score >= 100:
+        if best is not None and best.score >= early_exit_score:
             break
 
     if best is None:
