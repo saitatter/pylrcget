@@ -153,6 +153,7 @@ class TrackBatchInserter:
         }
 
     def add_tracks(self, tracks: list[FsTrack]) -> None:
+        rows: list[tuple[object, ...]] = []
         for track in tracks:
             artist_key = prepare_input(track.artist)
             artist_id = self.artist_cache.get(artist_key)
@@ -169,14 +170,7 @@ class TrackBatchInserter:
             is_instrumental = track.instrumental or bool(
                 track.lrc_lyrics and re.search(r"\[au:\s*instrumental\]", track.lrc_lyrics)
             )
-            self.db.execute(
-                """
-                INSERT OR IGNORE INTO tracks (
-                    file_path, file_name, title, title_lower,
-                    album_id, artist_id, duration, track_number,
-                    txt_lyrics, lrc_lyrics, instrumental, modified_time, file_size
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
+            rows.append(
                 (
                     track.file_path,
                     track.file_name,
@@ -191,8 +185,18 @@ class TrackBatchInserter:
                     is_instrumental,
                     track.modified_time,
                     track.file_size,
-                ),
+                )
             )
+        self.db.executemany(
+            """
+            INSERT OR IGNORE INTO tracks (
+                file_path, file_name, title, title_lower,
+                album_id, artist_id, duration, track_number,
+                txt_lyrics, lrc_lyrics, instrumental, modified_time, file_size
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            rows,
+        )
 
 
 def get_existing_file_paths(db: sqlite3.Connection, paths: list[str]) -> set[str]:
