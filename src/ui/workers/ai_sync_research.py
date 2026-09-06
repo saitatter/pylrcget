@@ -15,6 +15,10 @@ class ResearchBackendSpec:
     production_default: bool = False
     model_license: str | None = None
     notes: str = ""
+    runtime: str = "isolated"
+    inference_modes: tuple[str, ...] = ()
+    model_artifacts: tuple[str, ...] = ()
+    requires_g2p: bool = False
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -26,6 +30,10 @@ class ResearchBackendSpec:
             "production_default": self.production_default,
             "model_license": self.model_license,
             "notes": self.notes,
+            "runtime": self.runtime,
+            "inference_modes": list(self.inference_modes),
+            "model_artifacts": list(self.model_artifacts),
+            "requires_g2p": self.requires_g2p,
         }
 
 
@@ -55,6 +63,25 @@ LYRICS_ALIGNMENT_MULTILINGUAL = ResearchBackendSpec(
     requires_vocal_stem=True,
     production_default=False,
     notes="Research candidate; evaluate raw mix and separated vocals independently.",
+)
+
+
+SOFA_RESEARCH = ResearchBackendSpec(
+    name="sofa",
+    repository="https://github.com/qiuqiao/SOFA",
+    code_license="MIT",
+    languages=("en",),
+    requires_vocal_stem=True,
+    production_default=False,
+    model_license="unknown",
+    notes=(
+        "Research-only singing aligner. Upstream requests Python 3.8, a "
+        "downloaded .ckpt model, and a G2P dictionary; no model is bundled."
+    ),
+    runtime="isolated-py3.8",
+    inference_modes=("pytorch", "onnx-cpu", "onnx-gpu"),
+    model_artifacts=("checkpoint.ckpt", "phoneme dictionary"),
+    requires_g2p=True,
 )
 
 
@@ -117,5 +144,6 @@ __all__ = [
     "LYRICS_ALIGNMENT_MULTILINGUAL",
     "ResearchBackendSpec",
     "ResearchRecommendation",
+    "SOFA_RESEARCH",
     "evaluate_research_candidate",
 ]
