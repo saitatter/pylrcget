@@ -10,6 +10,7 @@ from typing import TypedDict
 from PySide6.QtCore import QObject, QThread, Signal
 
 from core.lrclib_client import LrcLibAPI
+from core.utils import prepare_input
 from db.queries import get_tracks_for_bulk_download
 from ui.services.download_modes import normalize_download_mode
 from ui.services.lyrics_download_service import (
@@ -30,6 +31,8 @@ class BulkDownloadStats(TypedDict):
     ok: int
     failed: int
     cancelled: bool
+    unique_lookup_keys: int
+    deduplicated_tracks: int
 
 
 @dataclass(frozen=True)
@@ -47,6 +50,16 @@ class _DownloadFetchResult:
     job: _DownloadJob
     match: LyricsDownloadMatch | None = None
     error: str = ""
+
+
+@dataclass(frozen=True)
+class _DownloadLookupGroup:
+    key: tuple[str, str, str, int | None]
+    jobs: tuple[_DownloadJob, ...]
+
+    @property
+    def representative(self) -> _DownloadJob:
+        return self.jobs[0]
 
 
 class BulkLyricsDownloadWorker(QThread):
@@ -79,6 +92,7 @@ class BulkLyricsDownloadWorker(QThread):
         cancelled = False
         completed = 0
         jobs: list[_DownloadJob] = []
+        lookup_groups: list[_DownloadLookupGroup] = []
         candidates: list[LyricsMatchCandidate] = []
         db = None
         try:
@@ -130,8 +144,9 @@ class BulkLyricsDownloadWorker(QThread):
                     self.itemFinished.emit(int(track_id), False, label, msg)
                     self.progress.emit(completed, total, label, msg, self._elapsed())
 
-            worker_count = min(MAX_PARALLEL_DOWNLOAD_WORKERS, max(1, len(jobs)))
-            if jobs and not cancelled:
+            lookup_groups = self._group_jobs(jobs)
+            worker_count = min(MAX_PARALLEL_DOWNLOAD_WORKERS, max(1, len(lookup_groups)))
+            if lookup_groups and not cancelled:
                 self.progress.emit(
                     completed,
                     total,
@@ -147,13 +162,13 @@ class BulkLyricsDownloadWorker(QThread):
                 def submit_available() -> None:
                     nonlocal next_job_index
                     while (
-                        next_job_index < len(jobs)
+                        next_job_index < len(lookup_groups)
                         and len(pending) < max_pending
                         and not self.isInterruptionRequested()
                     ):
-                        job = jobs[next_job_index]
+                        group = lookup_groups[next_job_index]
                         next_job_index += 1
-                        pending[executor.submit(self._fetch_job_match, job)] = job
+                        pending[executor.submit(self._fetch_job_match, group.representative)] = group
 
                 try:
                     submit_available()
@@ -172,36 +187,37 @@ class BulkLyricsDownloadWorker(QThread):
                             if self.isInterruptionRequested():
                                 cancelled = True
                                 break
-                            job = pending.pop(future)
-                            completed += 1
+                            group = pending.pop(future)
                             try:
                                 result = future.result()
                             except Exception as exc:  # noqa: BLE001
-                                result = _DownloadFetchResult(job=job, error=str(exc))
+                                result = _DownloadFetchResult(job=group.representative, error=str(exc))
 
-                            if result.error:
-                                fail_count += 1
-                                msg = f"Download failed: {result.error}"
-                                self.itemFinished.emit(job.track_id, False, job.label, msg)
-                                self.progress.emit(completed, total, job.label, msg, self._elapsed())
-                                continue
-                            if result.match is None:
-                                fail_count += 1
-                                msg = "No lyrics found on LRCLIB for this track."
-                                self.itemFinished.emit(job.track_id, False, job.label, msg)
-                                self.progress.emit(completed, total, job.label, msg, self._elapsed())
-                                continue
+                            for job in group.jobs:
+                                completed += 1
+                                if result.error:
+                                    fail_count += 1
+                                    msg = f"Download failed: {result.error}"
+                                    self.itemFinished.emit(job.track_id, False, job.label, msg)
+                                    self.progress.emit(completed, total, job.label, msg, self._elapsed())
+                                    continue
+                                if result.match is None:
+                                    fail_count += 1
+                                    msg = "No lyrics found on LRCLIB for this track."
+                                    self.itemFinished.emit(job.track_id, False, job.label, msg)
+                                    self.progress.emit(completed, total, job.label, msg, self._elapsed())
+                                    continue
 
-                            candidate = self._candidate_from_match(job, result.match)
-                            if candidate is not None:
-                                candidates.append(candidate)
-                                ok_count += 1
-                                msg = f"Candidate found. Match: {candidate.score}%."
-                            else:
-                                fail_count += 1
-                                msg = "No usable lyrics found on LRCLIB for this track."
-                            self.itemFinished.emit(job.track_id, candidate is not None, job.label, msg)
-                            self.progress.emit(completed, total, job.label, msg, self._elapsed())
+                                candidate = self._candidate_from_match(job, result.match)
+                                if candidate is not None:
+                                    candidates.append(candidate)
+                                    ok_count += 1
+                                    msg = f"Candidate found. Match: {candidate.score}%."
+                                else:
+                                    fail_count += 1
+                                    msg = "No usable lyrics found on LRCLIB for this track."
+                                self.itemFinished.emit(job.track_id, candidate is not None, job.label, msg)
+                                self.progress.emit(completed, total, job.label, msg, self._elapsed())
 
                         if self.isInterruptionRequested():
                             cancelled = True
@@ -227,6 +243,8 @@ class BulkLyricsDownloadWorker(QThread):
             "ok": ok_count,
             "failed": fail_count,
             "cancelled": cancelled,
+            "unique_lookup_keys": len(lookup_groups),
+            "deduplicated_tracks": max(0, len(jobs) - len(lookup_groups)),
             "candidates": candidates,
             "requires_review": bool(candidates) and not cancelled,
         }
@@ -234,6 +252,23 @@ class BulkLyricsDownloadWorker(QThread):
             self.finishedBatch.emit(False, "Lyrics download cancelled.", stats)
         else:
             self.finishedBatch.emit(True, f"Finished lyrics download. Success: {ok_count}, Failed: {fail_count}.", stats)
+
+    @staticmethod
+    def _group_jobs(jobs: list[_DownloadJob]) -> list[_DownloadLookupGroup]:
+        groups: dict[tuple[str, str, str, int | None], list[_DownloadJob]] = {}
+        order: list[tuple[str, str, str, int | None]] = []
+        for job in jobs:
+            key = (
+                prepare_input(job.artist),
+                prepare_input(job.title),
+                prepare_input(job.album),
+                job.duration_s,
+            )
+            if key not in groups:
+                groups[key] = []
+                order.append(key)
+            groups[key].append(job)
+        return [_DownloadLookupGroup(key=key, jobs=tuple(groups[key])) for key in order]
 
     def _fetch_job_match(self, job: _DownloadJob) -> _DownloadFetchResult:
         api = self._api_for_current_thread()

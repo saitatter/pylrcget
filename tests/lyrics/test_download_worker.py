@@ -399,6 +399,44 @@ class LyricsDownloadWorkerTests(unittest.TestCase):
             finally:
                 db.close()
 
+    def test_bulk_download_deduplicates_equivalent_lookup_metadata(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db = initialize_database(tmp)
+            try:
+                tracks = []
+                for index in range(3):
+                    audio = Path(tmp) / f"duplicate_{index}.mp3"
+                    touch_text(audio, "a")
+                    tracks.append(make_fs_track(audio, artist="Same Artist", album="Same Album", title="Same Song"))
+                add_tracks(db, tracks)
+                track_ids = [int(row["id"]) for row in db.execute("SELECT id FROM tracks ORDER BY id").fetchall()]
+                worker = BulkLyricsDownloadWorker(
+                    db_path=str(Path(tmp) / "pylrcget.db.sqlite3"),
+                    track_ids=track_ids,
+                    lrclib_instance="https://lrclib.net/api",
+                )
+                finished: list[tuple[bool, str, dict]] = []
+                worker.finishedBatch.connect(lambda ok, msg, stats: finished.append((ok, msg, stats)))
+                fake_lyrics = SimpleNamespace(
+                    synced_lyrics=None,
+                    plain_lyrics="plain lyrics",
+                    track_name="Same Song",
+                    artist_name="Same Artist",
+                    album_name="Same Album",
+                    duration=180,
+                )
+
+                with patch("ui.workers.bulk_lyrics_download_worker.LrcLibAPI") as api_cls:
+                    api_cls.return_value.get_lyrics.return_value = fake_lyrics
+                    worker.run()
+
+                self.assertEqual(api_cls.return_value.get_lyrics.call_count, 1)
+                self.assertEqual(finished[0][2]["unique_lookup_keys"], 1)
+                self.assertEqual(finished[0][2]["deduplicated_tracks"], 2)
+                self.assertEqual(finished[0][2]["ok"], 3)
+            finally:
+                db.close()
+
     def test_bulk_download_cancel_does_not_wait_for_running_searches(self):
         with tempfile.TemporaryDirectory() as tmp:
             db = initialize_database(tmp)
