@@ -29,7 +29,10 @@ def test_external_runtime_handshake_and_shutdown() -> None:
     try:
         service._ensure_started_locked()
         assert service.is_running is True
-        assert "persistent_runtime" in service.capabilities
+        assert "persistent_runtime" in service.capabilities["capabilities"]
+        assert service.capabilities["protocol_version"] == AI_SYNC_PROTOCOL_VERSION
+        assert service.capabilities["runtime_python"]
+        assert "lyrics-aligner" in service.capabilities["available_backends"]
     finally:
         service.shutdown()
 

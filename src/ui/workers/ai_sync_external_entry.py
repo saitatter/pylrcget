@@ -120,6 +120,17 @@ def _run_service() -> int:
                     "type": "capabilities",
                     "job_id": job_id,
                     "protocol_version": AI_SYNC_PROTOCOL_VERSION,
+                    "runtime_python": sys.version.split()[0],
+                    "available_devices": ["cpu"],
+                    "available_backends": [
+                        "legacy-whisperx",
+                        "lyrics-aligner",
+                    ],
+                    "backend_versions": {
+                        "legacy-whisperx": "current",
+                        "lyrics-aligner": "warm-v1",
+                    },
+                    "loaded_model_cache": [],
                     "capabilities": [
                         "persistent_runtime",
                         "cached_whisperx_models",

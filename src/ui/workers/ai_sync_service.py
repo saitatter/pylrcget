@@ -12,6 +12,7 @@ import logging
 import os
 import queue
 import subprocess
+import sys
 import threading
 import time
 import uuid
@@ -57,7 +58,7 @@ class PersistentAIRuntime:
         self._messages: queue.Queue[dict[str, Any] | None] = queue.Queue()
         self._reader: threading.Thread | None = None
         self._lock = threading.RLock()
-        self._capabilities: list[str] = []
+        self._capabilities: dict[str, Any] = {}
 
     @property
     def is_running(self) -> bool:
@@ -65,9 +66,9 @@ class PersistentAIRuntime:
             return self._process is not None and self._process.poll() is None
 
     @property
-    def capabilities(self) -> tuple[str, ...]:
+    def capabilities(self) -> dict[str, Any]:
         with self._lock:
-            return tuple(self._capabilities)
+            return dict(self._capabilities)
 
     def run(
         self,
@@ -82,7 +83,14 @@ class PersistentAIRuntime:
             job_id = str(config.get("job_id") or uuid.uuid4().hex)
             request = dict(config)
             request["job_id"] = job_id
-            self._send_locked({"type": "align", "job_id": job_id, "config": request})
+            self._send_locked(
+                {
+                    "type": "align",
+                    "job_id": job_id,
+                    "protocol_version": AI_SYNC_PROTOCOL_VERSION,
+                    "config": request,
+                }
+            )
             while True:
                 if is_cancelled():
                     self._terminate_locked()
@@ -180,7 +188,7 @@ class PersistentAIRuntime:
             if int(hello.get("protocol_version", 0)) != AI_SYNC_PROTOCOL_VERSION:
                 raise RuntimeError("Persistent AI runtime protocol version mismatch.")
             capabilities = self._wait_for_type_locked("capabilities", _SERVICE_START_TIMEOUT)
-            self._capabilities = [str(item) for item in capabilities.get("capabilities", [])]
+            self._capabilities = dict(capabilities)
         except Exception:
             self._terminate_locked()
             raise
@@ -262,7 +270,7 @@ class PersistentAIRuntime:
                     pass
         self._process = None
         self._reader = None
-        self._capabilities = []
+        self._capabilities = {}
 
 
 _SERVICES_LOCK = threading.Lock()
