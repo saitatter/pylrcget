@@ -14,7 +14,9 @@ copied into the repository or the user Music share.
 - required external artifacts: a `.ckpt` model and a phoneme/G2P dictionary
 - model license: unknown until a specific checkpoint is selected
 
-The local machine has no Python 3.8 interpreter and the repository does not
-contain a pretrained checkpoint. Therefore no honest quality or latency score
-can be reported yet. SOFA stays research-only and is not installed in the
-application or Python 3.13 AI runtime.
+An isolated Python 3.8 environment was created with Torch 2.4.1 CPU,
+torchaudio 2.4.1, and the upstream requirements. The SOFA `infer.py --help`
+CLI imports successfully. The repository still does not contain a pretrained
+checkpoint, so no honest quality score can be reported. SOFA stays
+research-only and is not installed in the application or Python 3.13 AI
+runtime.

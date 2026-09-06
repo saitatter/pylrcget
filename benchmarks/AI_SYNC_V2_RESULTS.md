@@ -2,7 +2,8 @@
 
 Status: lab branch `ai/lyrics-sync-v2-lab`  
 Date: 2026-09-06  
-Reference Music folder: not accessed or modified during these experiments.
+Reference Music folder: only shortcut metadata was read; its contents were not
+traversed and no file was modified.
 
 This report separates measured runtime smoke-tests from quality measurements.
 Synthetic audio validates process/API behavior only; it is not evidence that a
@@ -15,6 +16,7 @@ backend is accurate on singing.
 | application venv | 3.14.2 | PySide6, Mutagen, existing WhisperX stack | app and full tests |
 | AI runtime | 3.13.15 | Torch 2.8.0 CPU, torchaudio 2.8.0, WhisperX 3.8.6, librosa 1.0.0, g2p-en | production AI service |
 | stable-ts research | 3.13.15 | stable-ts 2.19.1, Torch 2.14.0 CPU | isolated research |
+| SOFA research | 3.8.10 | Torch 2.4.1 CPU, torchaudio 2.4.1, upstream requirements | isolated research |
 | HubertFA ONNX research | 3.10.0 | ONNX Runtime 1.23.2 CPU, librosa 0.9.2 | isolated research |
 
 The English `lyrics-aligner` checkpoint is 40,357,640 bytes and is stored only
