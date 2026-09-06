@@ -49,6 +49,7 @@ from .ai_sync_transcription import (
 )
 
 logger = logging.getLogger(__name__)
+_DEMUCS_QUALITY_GATE = 14.0
 
 
 def align_with_optional_demucs(
@@ -68,6 +69,12 @@ def align_with_optional_demucs(
         lrc=mix_lrc, source="mix", quality=quality(mix_lrc, plain_lyrics)
     )
     if not enable_demucs_candidate or not mix.lrc.strip() or not demucs_available():
+        return mix
+    if mix.quality >= _DEMUCS_QUALITY_GATE:
+        logger.info(
+            "Skipping Demucs candidate because mix quality is already high (%.2f).",
+            mix.quality,
+        )
         return mix
 
     with separated_audio(audio_path, device=device) as vocal_path:

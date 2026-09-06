@@ -99,6 +99,35 @@ def test_optional_demucs_keeps_mix_when_candidate_proxy_does_not_win(monkeypatch
     assert candidate.quality == 1.0
 
 
+def test_optional_demucs_skips_separation_for_high_quality_mix(monkeypatch):
+    monkeypatch.setattr(
+        ai_sync_worker,
+        "_align_with_lyrics_aligner",
+        lambda path, lyrics, *, device: f"[00:01.00] {lyrics}",
+    )
+    monkeypatch.setattr(ai_sync_worker, "_demucs_available", lambda: True)
+    monkeypatch.setattr(
+        ai_sync_worker,
+        "_demucs_candidate_quality",
+        lambda raw, lyrics: 16.0,
+    )
+
+    def fail_separation(*_args, **_kwargs):
+        raise AssertionError("Demucs should be gated for a high-quality mix")
+
+    monkeypatch.setattr(ai_sync_worker, "_separated_vocal_audio", fail_separation)
+
+    candidate = ai_sync_worker._align_with_optional_demucs(
+        "track.flac",
+        "line",
+        device="cpu",
+        enable_demucs_candidate=True,
+    )
+
+    assert candidate.source == "mix"
+    assert candidate.quality == 16.0
+
+
 class _fake_vocal_context:
     def __enter__(self):
         return "vocals.wav"
