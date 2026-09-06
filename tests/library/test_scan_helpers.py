@@ -31,6 +31,7 @@ from library.scan_library import (
     new_fs_track_from_path,
     preview_audio_path_exclusions,
     read_audio_metadata_from_audio,
+    read_lyrics_for_scan,
 )
 from tests import test_support as _test_support  # noqa: F401
 from tests.test_support import make_fs_track, touch_text
@@ -349,6 +350,25 @@ class ScanLibraryHelpersTests(unittest.TestCase):
             self.assertIsNotNone(first)
             self.assertIsNotNone(second)
             self.assertEqual(scandir_mock.call_count, 1)
+
+    def test_read_lyrics_for_scan_can_skip_independent_sidecar_content_types(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            audio = root / "track.mp3"
+            touch_text(audio, "audio")
+            touch_text(root / "track.txt", "plain sidecar")
+            touch_text(root / "track.lrc", "[00:01.00]synced sidecar")
+
+            result = read_lyrics_for_scan(
+                str(audio),
+                scan_lyrics_source_mode="sidecar_only",
+                read_sidecar_txt=False,
+                read_sidecar_lrc=True,
+                sidecar_lookup_cache=SidecarLookupCache(),
+            )
+
+            self.assertIsNone(result.sidecar_txt)
+            self.assertEqual(result.sidecar_lrc, "[00:01.00]synced sidecar")
 
     def test_new_fs_track_from_path_passes_scan_mode_to_signature_lookup(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -246,6 +246,14 @@ def _scan_sidecar_only_for_path(
         lyrics_file_pattern=lyrics_file_pattern,
         scan_lyrics_source_mode="sidecar_only",
         sidecar_lookup_cache=sidecar_lookup_cache,
+        read_sidecar_txt=not (
+            _scan_mode_allows_embedded(scan_lyrics_source_mode)
+            and bool(previous_state.embedded_txt_present)
+        ),
+        read_sidecar_lrc=not (
+            _scan_mode_allows_embedded(scan_lyrics_source_mode)
+            and bool(previous_state.embedded_lrc_present)
+        ),
         timing_hook=None if timings is None else timings.record,
     )
     use_embedded = _scan_mode_allows_embedded(scan_lyrics_source_mode)

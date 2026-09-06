@@ -1081,6 +1081,8 @@ def _read_sidecar(
     metadata: AudioMetadata | None = None,
     lyrics_file_pattern: str | None = None,
     sidecar_lookup_cache: SidecarLookupCache | None = None,
+    read_txt: bool = True,
+    read_lrc: bool = True,
 ) -> tuple[str | None, str | None]:
     txt = None
     lrc = None
@@ -1094,29 +1096,31 @@ def _read_sidecar(
         txt_path = base + ".txt"
         lrc_path = base + ".lrc"
 
-        resolved_txt_path = (
-            sidecar_lookup_cache.resolve_existing(txt_path)
-            if sidecar_lookup_cache is not None
-            else txt_path if os.path.isfile(txt_path) else None
-        )
-        if txt is None and resolved_txt_path is not None:
-            try:
-                txt = Path(resolved_txt_path).read_text(encoding="utf-8", errors="replace")
-            except OSError:
-                txt = None
+        if read_txt:
+            resolved_txt_path = (
+                sidecar_lookup_cache.resolve_existing(txt_path)
+                if sidecar_lookup_cache is not None
+                else txt_path if os.path.isfile(txt_path) else None
+            )
+            if txt is None and resolved_txt_path is not None:
+                try:
+                    txt = Path(resolved_txt_path).read_text(encoding="utf-8", errors="replace")
+                except OSError:
+                    txt = None
 
-        resolved_lrc_path = (
-            sidecar_lookup_cache.resolve_existing(lrc_path)
-            if sidecar_lookup_cache is not None
-            else lrc_path if os.path.isfile(lrc_path) else None
-        )
-        if lrc is None and resolved_lrc_path is not None:
-            try:
-                lrc = Path(resolved_lrc_path).read_text(encoding="utf-8", errors="replace")
-            except OSError:
-                lrc = None
+        if read_lrc:
+            resolved_lrc_path = (
+                sidecar_lookup_cache.resolve_existing(lrc_path)
+                if sidecar_lookup_cache is not None
+                else lrc_path if os.path.isfile(lrc_path) else None
+            )
+            if lrc is None and resolved_lrc_path is not None:
+                try:
+                    lrc = Path(resolved_lrc_path).read_text(encoding="utf-8", errors="replace")
+                except OSError:
+                    lrc = None
 
-        if txt is not None and lrc is not None:
+        if (not read_txt or txt is not None) and (not read_lrc or lrc is not None):
             break
 
     txt = txt.strip() if txt else None
@@ -1133,6 +1137,8 @@ def read_lyrics_for_scan(
     lyrics_file_pattern: str | None = None,
     scan_lyrics_source_mode: str | None = None,
     sidecar_lookup_cache: SidecarLookupCache | None = None,
+    read_sidecar_txt: bool = True,
+    read_sidecar_lrc: bool = True,
     timing_hook: Callable[[str, float], None] | None = None,
 ) -> LyricsScanResult:
     use_embedded, use_sidecar = _scan_lyrics_source_flags(scan_lyrics_source_mode)
@@ -1154,6 +1160,8 @@ def read_lyrics_for_scan(
             metadata=metadata,
             lyrics_file_pattern=lyrics_file_pattern,
             sidecar_lookup_cache=sidecar_lookup_cache,
+            read_txt=read_sidecar_txt,
+            read_lrc=read_sidecar_lrc,
         )
         if timing_hook is not None:
             timing_hook("sidecar_lookup_s", time.perf_counter() - sidecar_started)
