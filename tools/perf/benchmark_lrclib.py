@@ -102,9 +102,15 @@ def _environment() -> dict[str, object]:
     }
 
 
-def _make_fixture(track_count: int, duplicate_every: int) -> tuple[list[dict[str, object]], dict[str, object]]:
+def _make_fixture(
+    track_count: int,
+    duplicate_every: int,
+    *,
+    fallback: bool = False,
+) -> tuple[list[dict[str, object]], dict[str, object]]:
     tracks: list[dict[str, object]] = []
     get_responses: dict[str, dict[str, object]] = {}
+    search_responses: dict[str, list[dict[str, object]]] = {}
     for index in range(track_count):
         group = index // max(1, duplicate_every)
         artist = f"Artist {group:04d}"
@@ -127,9 +133,23 @@ def _make_fixture(track_count: int, duplicate_every: int) -> tuple[list[dict[str
             "release_date": None,
         }
         get_key = "\t".join((artist.casefold(), title.casefold(), album.casefold(), str(duration)))
-        get_responses[get_key] = response
+        if not fallback:
+            get_responses[get_key] = response
+        else:
+            search_key = json.dumps(
+                {
+                    "query": None,
+                    "track_name": title,
+                    "artist_name": artist,
+                    "album_name": album,
+                },
+                sort_keys=True,
+            )
+            fallback_response = dict(response)
+            fallback_response["album_name"] = ""
+            search_responses[search_key] = [fallback_response]
         tracks.append({"artist": artist, "title": title, "album": album, "duration": duration})
-    return tracks, {"get": get_responses, "search": {}}
+    return tracks, {"get": get_responses, "search": search_responses}
 
 
 def _load_fixture(path: Path) -> tuple[list[dict[str, object]], dict[str, object]]:
@@ -178,8 +198,8 @@ def _run_sample(tracks: list[dict[str, object]], fixture: dict[str, object], wor
         elapsed_ms = (time.perf_counter() - started) * 1000
 
     ordered = sorted(stats.latencies_ms)
-    success = len(tracks) - stats.not_found - stats.failures
     worker_stats = finished_stats[-1] if finished_stats else {}
+    success = int(worker_stats.get("ok", len(tracks) - stats.not_found - stats.failures))
     unique_lookup_keys = int(worker_stats.get("unique_lookup_keys", 0))
     deduplicated_tracks = int(worker_stats.get("deduplicated_tracks", 0))
     return {
@@ -191,6 +211,7 @@ def _run_sample(tracks: list[dict[str, object]], fixture: dict[str, object], wor
         "get_requests": stats.get_requests,
         "search_requests": stats.search_requests,
         "requests_per_track": round(stats.requests_total / len(tracks), 4) if tracks else 0.0,
+        "fallback_queries_per_track": round(stats.search_requests / len(tracks), 4) if tracks else 0.0,
         "deduplicated_lookups": deduplicated_tracks,
         "retries": 0,
         "429_responses": 0,
@@ -223,6 +244,7 @@ def main() -> int:
     parser.add_argument("--fixture", type=Path)
     parser.add_argument("--tracks", type=int, default=250)
     parser.add_argument("--duplicate-every", type=int, default=1, help="Tracks per equivalent lookup key")
+    parser.add_argument("--fallback", action="store_true", help="force exact misses and provide a fallback search result")
     parser.add_argument("--workers", type=int, default=4)
     parser.add_argument("--warmups", type=int, default=2)
     parser.add_argument("--runs", type=int, default=3)
@@ -235,7 +257,7 @@ def main() -> int:
     if args.fixture:
         tracks, fixture = _load_fixture(args.fixture)
     else:
-        tracks, fixture = _make_fixture(args.tracks, args.duplicate_every)
+        tracks, fixture = _make_fixture(args.tracks, args.duplicate_every, fallback=args.fallback)
     for _ in range(args.warmups):
         _run_sample(tracks, fixture, workers=args.workers)
     samples = [_run_sample(tracks, fixture, workers=args.workers) for _ in range(args.runs)]
@@ -268,6 +290,7 @@ def main() -> int:
                     "total_ms",
                     "http_requests_total",
                     "requests_per_track",
+                    "fallback_queries_per_track",
                     "unique_lookup_keys",
                     "deduplicated_lookups",
                     "pending_future_high_water_mark",
