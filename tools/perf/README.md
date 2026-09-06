@@ -7,6 +7,8 @@ changing application state. Run them with the project virtual environment:
 python tools/perf/generate_test_library.py .\benchmarks\corpora\small --tracks 1000 --formats wav
 python tools/perf/benchmark_scan.py --library .\benchmarks\corpora\small --scenario initial --warmups 2 --runs 3
 python tools/perf/benchmark_scan.py --library .\benchmarks\corpora\small --scenario unchanged --warmups 2 --runs 3
+python tools/perf/benchmark_scan.py --library "\\MOS\Music" --scenario initial --read-only-source --warmups 2 --runs 3
+python tools/perf/benchmark_scan.py --library "\\MOS\Music" --scenario unchanged --read-only-source --warmups 2 --runs 3
 python tools/perf/benchmark_worker_sweep.py --library .\benchmarks\corpora\small --workers 1,2,4,8 --warmups 2 --runs 3
 python tools/perf/benchmark_lrclib.py --tracks 250 --duplicate-every 5 --warmups 2 --runs 3
 ```

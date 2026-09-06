@@ -298,10 +298,20 @@ def _one_sample(
     fraction: float,
     suffix: str,
     seed: int,
+    read_only_source: bool = False,
 ) -> dict[str, object]:
-    with tempfile.TemporaryDirectory(prefix="pylrcget-scan-corpus-") as sample_dir:
-        sample_root = Path(sample_dir) / "library"
-        shutil.copytree(library_root, sample_root)
+    if read_only_source and scenario not in {"initial", "unchanged"}:
+        raise ValueError("read-only source mode supports only initial and unchanged scenarios")
+    library_context = (
+        contextlib.nullcontext(library_root)
+        if read_only_source
+        else tempfile.TemporaryDirectory(prefix="pylrcget-scan-corpus-")
+    )
+    with library_context as sample_root_value:
+        sample_root = Path(sample_root_value)
+        if not read_only_source:
+            shutil.copytree(library_root, sample_root / "library")
+            sample_root = sample_root / "library"
         with tempfile.TemporaryDirectory(prefix="pylrcget-scan-db-") as database_dir:
             database_path = Path(database_dir)
             if scenario == "initial":
@@ -393,6 +403,11 @@ def main() -> int:
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--warmups", type=int, default=2)
     parser.add_argument("--runs", type=int, default=3)
+    parser.add_argument(
+        "--read-only-source",
+        action="store_true",
+        help="scan the source path directly; only initial and unchanged scenarios are supported",
+    )
     parser.add_argument("--output", type=Path, default=Path("benchmarks/results/scan.json"))
     parser.add_argument("--report", type=Path)
     args = parser.parse_args()
@@ -400,6 +415,8 @@ def main() -> int:
         parser.error("workers and runs must be positive; warmups cannot be negative")
     if not args.library.is_dir():
         parser.error(f"Library directory does not exist: {args.library}")
+    if args.read_only_source and args.scenario not in {"initial", "unchanged"}:
+        parser.error("--read-only-source supports only initial and unchanged scenarios")
 
     for _ in range(args.warmups):
         with contextlib.redirect_stdout(io.StringIO()):
@@ -410,6 +427,7 @@ def main() -> int:
                 fraction=args.fraction,
                 suffix=args.suffix,
                 seed=args.seed,
+                read_only_source=args.read_only_source,
             )
 
     samples = [
@@ -420,6 +438,7 @@ def main() -> int:
             fraction=args.fraction,
             suffix=args.suffix,
             seed=args.seed + index,
+            read_only_source=args.read_only_source,
         )
         for index in range(args.runs)
     ]
