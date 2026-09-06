@@ -35,6 +35,7 @@ from .ai_sync_runtime import (
     _patch_whisperx_audio_loading,
     _preferred_whisper_compute_type,
 )
+from .ai_sync_router import build_default_router
 from .ai_sync_transcription import (
     _align_segments_per_chunks,
     _approximate_word_timestamps_from_segments,
@@ -50,6 +51,15 @@ from .ai_sync_transcription import (
 
 logger = logging.getLogger(__name__)
 _DEMUCS_QUALITY_GATE = 14.0
+_BACKEND_ROUTER = build_default_router()
+
+
+def _select_alignment_backend(language: str | None, *, device: str):
+    return _BACKEND_ROUTER.select(
+        language,
+        device=device,
+        available_backends={"lyrics-aligner": _lyrics_aligner_available()},
+    )
 
 
 def align_with_optional_demucs(
@@ -176,7 +186,8 @@ def run_ai_sync_pipeline(self, *, align_optional_demucs=None) -> None:
         if (
             plain_lines
             and transcribe_language == "en"
-            and _lyrics_aligner_available()
+            and _select_alignment_backend(transcribe_language, device=device).backend_name
+            == "lyrics-aligner"
         ):
             lyrics_aligner_attempted = True
             candidate = _try_lyrics_aligner(
@@ -360,7 +371,7 @@ def run_ai_sync_pipeline(self, *, align_optional_demucs=None) -> None:
                     return recovered_segments
             return aligned_segments
 
-        if plain_lines and _lyrics_aligner_available() and not lyrics_aligner_attempted:
+        if plain_lines and not lyrics_aligner_attempted:
             if transcribe_language == "en":
                 detected_language = "en"
             elif transcribe_language is None:
@@ -377,7 +388,10 @@ def run_ai_sync_pipeline(self, *, align_optional_demucs=None) -> None:
                 except (RuntimeError, TypeError, ValueError) as exc:
                     logger.warning("Language detection failed; continuing with WhisperX: %s", exc)
 
-            if (detected_language or "").lower() == "en":
+            if (
+                _select_alignment_backend(detected_language, device=device).backend_name
+                == "lyrics-aligner"
+            ):
                 lyrics_aligner_attempted = True
                 candidate = _try_lyrics_aligner(
                     self,
