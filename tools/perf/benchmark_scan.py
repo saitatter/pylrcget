@@ -140,11 +140,12 @@ def _run_scan(
     worker_count: int,
     instrumentation: _Instrumentation,
     database_dir: Path | None = None,
+    instrumentation_enabled: bool = True,
 ) -> dict[str, object]:
     log_capture = _LogCapture()
     logger = logging.getLogger("ui.workers.library_scanner")
     previous_level = logger.level
-    logger.setLevel(logging.DEBUG)
+    logger.setLevel(logging.DEBUG if instrumentation_enabled else logging.INFO)
     logger.addHandler(log_capture)
 
     original_connect = sqlite3.connect
@@ -209,17 +210,35 @@ def _run_scan(
         started = time.perf_counter()
         cpu_started = time.process_time()
         try:
-            with (
-                patch.object(scan_library, "MutagenFile", side_effect=counted_mutagen_file),
-                patch.object(library_scanner, "read_audio_metadata_for_scan", side_effect=counted_metadata_read),
-                patch.object(scan_library, "read_embedded_lyrics_from_audio", side_effect=counted_embedded_read),
-                patch.object(scan_library, "_read_sidecar", side_effect=counted_sidecar_read),
-                patch.object(scan_library.SidecarLookupCache, "resolve_entry", new=counted_sidecar_resolve_entry),
-                patch.object(scan_library.os, "scandir", side_effect=counted_scandir),
-                patch.object(scan_library.os, "listdir", side_effect=counted_listdir),
-                patch.object(scan_library.os, "stat", side_effect=counted_stat),
-                patch.object(library_scanner.sqlite3, "connect", side_effect=counted_connect),
-            ):
+            with contextlib.ExitStack() as instrumentation_stack:
+                if instrumentation_enabled:
+                    instrumentation_stack.enter_context(
+                        patch.object(scan_library, "MutagenFile", side_effect=counted_mutagen_file)
+                    )
+                    instrumentation_stack.enter_context(
+                        patch.object(library_scanner, "read_audio_metadata_for_scan", side_effect=counted_metadata_read)
+                    )
+                    instrumentation_stack.enter_context(
+                        patch.object(scan_library, "read_embedded_lyrics_from_audio", side_effect=counted_embedded_read)
+                    )
+                    instrumentation_stack.enter_context(
+                        patch.object(scan_library, "_read_sidecar", side_effect=counted_sidecar_read)
+                    )
+                    instrumentation_stack.enter_context(
+                        patch.object(scan_library.SidecarLookupCache, "resolve_entry", new=counted_sidecar_resolve_entry)
+                    )
+                    instrumentation_stack.enter_context(
+                        patch.object(scan_library.os, "scandir", side_effect=counted_scandir)
+                    )
+                    instrumentation_stack.enter_context(
+                        patch.object(scan_library.os, "listdir", side_effect=counted_listdir)
+                    )
+                    instrumentation_stack.enter_context(
+                        patch.object(scan_library.os, "stat", side_effect=counted_stat)
+                    )
+                    instrumentation_stack.enter_context(
+                        patch.object(library_scanner.sqlite3, "connect", side_effect=counted_connect)
+                    )
                 scanner = library_scanner.LibraryScanner(
                     str(database_path),
                     [str(library_root)],
@@ -240,20 +259,21 @@ def _run_scan(
             "tracks_per_second": round((result.get("files_scanned", 0) / (elapsed_ms / 1000)), 3)
             if elapsed_ms > 0
             else 0.0,
-            "audio_files_opened": instrumentation.mutagen_calls,
-            "mutagen_file_calls": instrumentation.mutagen_calls,
-            "metadata_extraction_count": instrumentation.metadata_reads,
-            "embedded_lyrics_parse_count": instrumentation.embedded_lyrics_reads,
-            "sidecar_lookup_count": instrumentation.sidecar_reads,
-            "sidecar_directory_scans": instrumentation.sidecar_directory_scans,
-            "scandir_calls": instrumentation.scandir_calls,
-            "stat_calls": instrumentation.stat_calls,
-            "db_read_count": instrumentation.sql_reads,
-            "db_write_count": instrumentation.sql_writes,
-            "insert_count": instrumentation.insert_count,
-            "update_count": instrumentation.update_count,
-            "delete_count": instrumentation.delete_count,
+            "audio_files_opened": instrumentation.mutagen_calls if instrumentation_enabled else None,
+            "mutagen_file_calls": instrumentation.mutagen_calls if instrumentation_enabled else None,
+            "metadata_extraction_count": instrumentation.metadata_reads if instrumentation_enabled else None,
+            "embedded_lyrics_parse_count": instrumentation.embedded_lyrics_reads if instrumentation_enabled else None,
+            "sidecar_lookup_count": instrumentation.sidecar_reads if instrumentation_enabled else None,
+            "sidecar_directory_scans": instrumentation.sidecar_directory_scans if instrumentation_enabled else None,
+            "scandir_calls": instrumentation.scandir_calls if instrumentation_enabled else None,
+            "stat_calls": instrumentation.stat_calls if instrumentation_enabled else None,
+            "db_read_count": instrumentation.sql_reads if instrumentation_enabled else None,
+            "db_write_count": instrumentation.sql_writes if instrumentation_enabled else None,
+            "insert_count": instrumentation.insert_count if instrumentation_enabled else None,
+            "update_count": instrumentation.update_count if instrumentation_enabled else None,
+            "delete_count": instrumentation.delete_count if instrumentation_enabled else None,
             "worker_count": worker_count,
+            "instrumentation_enabled": instrumentation_enabled,
             "peak_rss_bytes": peak_rss_bytes(),
             "timing": {
                 key: result.get(key)
@@ -299,6 +319,7 @@ def _one_sample(
     suffix: str,
     seed: int,
     read_only_source: bool = False,
+    instrumentation_enabled: bool = True,
 ) -> dict[str, object]:
     if read_only_source and scenario not in {"initial", "unchanged"}:
         raise ValueError("read-only source mode supports only initial and unchanged scenarios")
@@ -321,6 +342,7 @@ def _one_sample(
                     worker_count=worker_count,
                     instrumentation=instrumentation,
                     database_dir=database_path,
+                    instrumentation_enabled=instrumentation_enabled,
                 )
 
             # Seed sidecar state before the warmup when the measured operation is a
@@ -334,6 +356,7 @@ def _one_sample(
                 worker_count=worker_count,
                 instrumentation=warmup_instrumentation,
                 database_dir=database_path,
+                instrumentation_enabled=instrumentation_enabled,
             )
             _prepare_mutation(sample_root, scenario, fraction, suffix, seed)
             instrumentation = _Instrumentation()
@@ -342,6 +365,7 @@ def _one_sample(
                 worker_count=worker_count,
                 instrumentation=instrumentation,
                 database_dir=database_path,
+                instrumentation_enabled=instrumentation_enabled,
             )
 
 
@@ -408,6 +432,11 @@ def main() -> int:
         action="store_true",
         help="scan the source path directly; only initial and unchanged scenarios are supported",
     )
+    parser.add_argument(
+        "--lightweight",
+        action="store_true",
+        help="disable per-call instrumentation for accurate wall-clock timing",
+    )
     parser.add_argument("--output", type=Path, default=Path("benchmarks/results/scan.json"))
     parser.add_argument("--report", type=Path)
     args = parser.parse_args()
@@ -428,6 +457,7 @@ def main() -> int:
                 suffix=args.suffix,
                 seed=args.seed,
                 read_only_source=args.read_only_source,
+                instrumentation_enabled=not args.lightweight,
             )
 
     samples = [
@@ -439,6 +469,7 @@ def main() -> int:
             suffix=args.suffix,
             seed=args.seed + index,
             read_only_source=args.read_only_source,
+            instrumentation_enabled=not args.lightweight,
         )
         for index in range(args.runs)
     ]
