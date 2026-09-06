@@ -129,11 +129,13 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
     samples: list[dict[str, Any]] = []
     for _ in range(max(1, args.runs)):
         started = time.perf_counter()
+        cpu_started = time.process_time()
         cases_run = [
             _align_case(backend, case, mode=args.mode, segments_path=args.segments)
             for case in cases
         ]
         elapsed_ms = (time.perf_counter() - started) * 1000.0
+        cpu_time_ms = (time.process_time() - cpu_started) * 1000.0
         samples.append(
             {
                 "stage_timings_ms": {
@@ -157,7 +159,7 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
                     )
                 },
                 "resources": {"peak_rss_bytes": None},
-                "cpu_time_ms": None,
+                "cpu_time_ms": cpu_time_ms,
                 "case_results": cases_run,
             }
         )
