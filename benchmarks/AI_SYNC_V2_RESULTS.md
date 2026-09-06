@@ -37,6 +37,17 @@ quality reference:
 Those values are historical measurements from the existing real five-track
 corpus. They were not replaced by synthetic-audio results.
 
+An additional read-only share sample contained four usable English audio/LRC
+pairs. Three sequential service runs produced the following aggregate:
+
+| Sample | Repeated runs | Median wall/run | Macro mean error | Macro p95 error | Coverage |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| read-only share English sample | 3 | 50.873 s | 3.244 s | 20.005 s | 100% |
+
+This sample uses the sidecar LRC timestamps as ground truth and is useful as a
+local sanity check, but it is not directly comparable to the historical
+five-track macro because the cases differ.
+
 ## Warm English runtime
 
 The real `lyrics-aligner` backend was exercised with a local synthetic six-
@@ -51,6 +62,11 @@ The second job is approximately 33.8x faster than the first in this smoke
 test. The persistent service stayed alive between jobs and reported Python
 3.13.15. This demonstrates removal of per-job process/checkpoint overhead; it
 does not establish the five-track quality gate.
+
+On the four-case read-only share sample, every request completed through the
+warm English backend with `enable_demucs_candidate=false`; all three measured
+runs returned 100% line coverage. The service was reused across the complete
+sequence.
 
 The backend also ran directly in 3,198.6 ms with one checkpoint load,
 `audio_copied: false`, and `align_subprocess: false`.
@@ -157,8 +173,9 @@ meets coverage, p95, catastrophic-error, packaging, and licensing gates.
    per job.
 3. Yes. Known ordinary English lyrics route from text evidence without full
    Whisper language detection.
-4. The conditional Demucs path is implemented, but a new real corpus count is
-   still required before quantifying necessity.
+4. The conditional Demucs path is implemented and was disabled for the strict
+   four-case warm-backend measurement; a corpus comparison is still required
+   before quantifying necessity.
 5. No Romanian backend can be recommended from the available measured data;
    legacy WhisperX remains the safe fallback.
 6. The same applies to French/German/Spanish/Italian; the multilingual
@@ -166,8 +183,9 @@ meets coverage, p95, catastrophic-error, packaging, and licensing gates.
 7. Generic CTC has not been promoted because no model-specific singing result
    and license evidence are available.
 8. Source-separation benefit remains confidence-gated and corpus-dependent.
-9. Structural DP and stress tests protect monotonic/repeated-block behavior,
-   but real quality deltas require the five-track corpus.
+9. Structural DP and stress tests protect monotonic/repeated-block behavior;
+   the four-case share sample also reached 100% line coverage, but real
+   comparative deltas still require the five-track corpus.
 10. The default retry change avoids the automatic extra full-song passes; the
     exact count must be measured on a real fallback corpus.
 11. Legacy WhisperX remains the fallback for unsupported or failed backends.
