@@ -529,7 +529,7 @@ def main() -> int:
     write_json(args.output, report)
     report_path = args.report or args.output.with_suffix(".md")
     report_path.parent.mkdir(parents=True, exist_ok=True)
-    report_path.write_text(_markdown_report(report) + "\n", encoding="utf-8")
+    report_path.write_text(_markdown_report(report).rstrip() + "\n", encoding="utf-8")
     print(json.dumps(report["median"], indent=2))
     print(f"JSON report: {args.output}")
     print(f"Markdown report: {report_path}")
