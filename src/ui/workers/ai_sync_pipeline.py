@@ -25,6 +25,7 @@ from .ai_sync_lrc import (
     _build_lrc_from_segments,
     _format_ts,
 )
+from .ai_sync_language import detect_text_language
 from .ai_sync_lyrics_aligner import align as _align_with_lyrics_aligner
 from .ai_sync_lyrics_aligner import is_available as _lyrics_aligner_available
 from .ai_sync_runtime import (
@@ -158,6 +159,13 @@ def run_ai_sync_pipeline(self, *, align_optional_demucs=None) -> None:
         plain_lines = self.plain_lyrics.splitlines() if self.plain_lyrics else []
         lyrics_aligner_attempted = False
         transcribe_language = _normalized_transcribe_language(self._language)
+        text_detection = (
+            detect_text_language(self.plain_lyrics)
+            if plain_lines and transcribe_language is None
+            else None
+        )
+        if text_detection is not None and text_detection.language is not None:
+            transcribe_language = text_detection.language
         if (
             plain_lines
             and transcribe_language == "en"
