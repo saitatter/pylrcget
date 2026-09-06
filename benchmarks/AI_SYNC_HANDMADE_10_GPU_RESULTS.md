@@ -49,6 +49,24 @@ The production-oriented `lyrics-aligner` GPU run did use CUDA, but its
 end-to-end cost is dominated by audio preparation and alignment overhead. GPU
 is therefore available, not automatically faster.
 
+### Follow-up: vectorized CUDA DTW
+
+The initial GPU result above used the upstream NumPy DTW path. A controlled
+same-process comparison on the same ten tracks isolated that path:
+
+| DTW implementation | Total |
+|---|---:|
+| NumPy/CPU DTW | 159.17s |
+| Vectorized CUDA DTW | 127.50s |
+| Change | **19.9% faster** |
+
+All ten generated LRC outputs were byte-for-byte equivalent between the two
+DTW implementations. The CUDA implementation is now used only when the
+lyrics-aligner device is CUDA; CPU and MPS keep the existing upstream path.
+The original CPU/GPU table remains as the pre-optimization baseline, while
+this controlled result isolates the optimization without mixing in model-load
+or process-lifetime differences.
+
 ## Device support conclusion
 
 | Component | CUDA tested | Notes |
