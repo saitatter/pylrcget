@@ -51,6 +51,52 @@ def get_track_by_id(db: sqlite3.Connection, track_id: int) -> Track:
     return Track.from_row(row)
 
 
+def get_tracks_for_bulk_download(
+    db: sqlite3.Connection,
+    track_ids: list[int],
+    *,
+    chunk_size: int = 500,
+) -> dict[int, Track]:
+    """Load all metadata needed by a bulk download in bounded SQL batches."""
+    unique_ids = list(dict.fromkeys(int(track_id) for track_id in track_ids))
+    if not unique_ids:
+        return {}
+    result: dict[int, Track] = {}
+    for start in range(0, len(unique_ids), max(1, int(chunk_size))):
+        chunk = unique_ids[start : start + max(1, int(chunk_size))]
+        placeholders = ",".join("?" for _ in chunk)
+        rows = db.execute(
+            f"""
+            SELECT
+                tracks.id,
+                file_path,
+                file_name,
+                title,
+                artists.name AS artist_name,
+                tracks.artist_id,
+                albums.name AS album_name,
+                albums.album_artist_name,
+                album_id,
+                duration,
+                track_number,
+                albums.image_path,
+                txt_lyrics,
+                lrc_lyrics,
+                dirty_txt_lyrics,
+                dirty_lrc_lyrics,
+                dirty_lyrics_present,
+                instrumental
+            FROM tracks
+            JOIN albums ON tracks.album_id = albums.id
+            JOIN artists ON tracks.artist_id = artists.id
+            WHERE tracks.id IN ({placeholders})
+            """,
+            chunk,
+        ).fetchall()
+        result.update({int(row["id"]): Track.from_row(row) for row in rows})
+    return result
+
+
 def add_track(db: sqlite3.Connection, track: FsTrack, *, commit: bool = True) -> None:
     try:
         artist_id = find_artist(db, track.artist)

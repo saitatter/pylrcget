@@ -18,6 +18,7 @@ from db.queries import (
     get_publish_history_rows,
     get_similar_lyrics_track_rows,
     get_track_by_id,
+    get_tracks_for_bulk_download,
     get_track_scan_state_index,
     get_track_list_rows,
     get_track_rows,
@@ -36,6 +37,32 @@ from tests.test_support import make_fs_track, touch_text
 
 
 class ArtistAlbumQueryTests(unittest.TestCase):
+    def test_get_tracks_for_bulk_download_uses_one_query_for_small_batch(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db = initialize_database(tmp)
+            try:
+                audio_paths = [Path(tmp) / f"song_{index}.mp3" for index in range(3)]
+                for index, path in enumerate(audio_paths):
+                    touch_text(path, str(index))
+                add_tracks(
+                    db,
+                    [
+                        make_fs_track(path, artist="Artist", album="Album", title=f"Song {index}")
+                        for index, path in enumerate(audio_paths)
+                    ],
+                )
+                track_ids = [int(row["id"]) for row in db.execute("SELECT id FROM tracks ORDER BY id")]
+                statements: list[str] = []
+                db.set_trace_callback(statements.append)
+
+                tracks = get_tracks_for_bulk_download(db, track_ids)
+
+                self.assertEqual(list(tracks), track_ids)
+                self.assertEqual({track.title for track in tracks.values()}, {"Song 0", "Song 1", "Song 2"})
+                self.assertEqual(sum(statement.lstrip().upper().startswith("SELECT") for statement in statements), 1)
+            finally:
+                db.close()
+
     def test_track_scan_state_round_trips_without_overloading_track_lyrics(self):
         with tempfile.TemporaryDirectory() as tmp:
             db = initialize_database(tmp)

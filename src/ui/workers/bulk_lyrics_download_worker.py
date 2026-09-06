@@ -10,7 +10,7 @@ from typing import TypedDict
 from PySide6.QtCore import QObject, QThread, Signal
 
 from core.lrclib_client import LrcLibAPI
-from db.queries import get_track_by_id
+from db.queries import get_tracks_for_bulk_download
 from ui.services.download_modes import normalize_download_mode
 from ui.services.lyrics_download_service import (
     LyricsDownloadMatch,
@@ -84,12 +84,15 @@ class BulkLyricsDownloadWorker(QThread):
             db = sqlite3.connect(self.db_path, timeout=15.0)
             db.row_factory = sqlite3.Row
 
+            tracks_by_id = get_tracks_for_bulk_download(db, self.track_ids)
             for track_id in self.track_ids:
                 if self.isInterruptionRequested():
                     cancelled = True
                     break
                 try:
-                    track = get_track_by_id(db, track_id)
+                    track = tracks_by_id.get(int(track_id))
+                    if track is None:
+                        raise KeyError(f"Track not found: {track_id}")
                     title = (track.title or "").strip()
                     artist = (track.artist_name or "").strip()
                     label = f"{artist} - {title}".strip(" -") or f"Track {track_id}"
