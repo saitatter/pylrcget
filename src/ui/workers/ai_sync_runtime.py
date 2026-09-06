@@ -3,14 +3,25 @@ from __future__ import annotations
 
 import subprocess
 import threading
+from collections import OrderedDict
 from pathlib import Path
 
 from .ai_runtime import resolve_ai_runtime_python
 from .ai_sync_lyrics_aligner import is_available as _lyrics_aligner_available
 
 _INFERENCE_CACHE_LOCK = threading.Lock()
-_WHISPERX_MODEL_CACHE: dict[tuple[str, str, str, str | None, tuple[tuple[str, float], ...]], object] = {}
-_ALIGN_MODEL_CACHE: dict[tuple[str, str], tuple[object, object]] = {}
+_WHISPERX_MODEL_CACHE: OrderedDict[
+    tuple[str, str, str, str | None, tuple[tuple[str, float], ...]], object
+] = OrderedDict()
+_ALIGN_MODEL_CACHE: OrderedDict[tuple[str, str], tuple[object, object]] = OrderedDict()
+_CACHE_STATS = {
+    "whisperx_hits": 0,
+    "whisperx_loads": 0,
+    "whisperx_evictions": 0,
+    "align_hits": 0,
+    "align_loads": 0,
+    "align_evictions": 0,
+}
 
 
 def _cuda_compute_capability() -> tuple[int, int] | None:
@@ -41,6 +52,36 @@ def _clear_inference_caches() -> None:
     with _INFERENCE_CACHE_LOCK:
         _WHISPERX_MODEL_CACHE.clear()
         _ALIGN_MODEL_CACHE.clear()
+        for key in _CACHE_STATS:
+            _CACHE_STATS[key] = 0
+
+
+def _cache_limit(name: str, default: int) -> int:
+    import os
+
+    try:
+        return max(1, int(os.environ.get(name, default)))
+    except (TypeError, ValueError):
+        return default
+
+
+def get_inference_cache_stats() -> dict[str, int]:
+    with _INFERENCE_CACHE_LOCK:
+        return dict(_CACHE_STATS)
+
+
+def _evict_whisperx_if_needed() -> None:
+    limit = _cache_limit("PYLRCGET_AI_WHISPER_CACHE_SIZE", 4)
+    while len(_WHISPERX_MODEL_CACHE) > limit:
+        _WHISPERX_MODEL_CACHE.popitem(last=False)
+        _CACHE_STATS["whisperx_evictions"] += 1
+
+
+def _evict_align_if_needed() -> None:
+    limit = _cache_limit("PYLRCGET_AI_ALIGN_CACHE_SIZE", 8)
+    while len(_ALIGN_MODEL_CACHE) > limit:
+        _ALIGN_MODEL_CACHE.popitem(last=False)
+        _CACHE_STATS["align_evictions"] += 1
 
 
 def _canonical_vad_options(vad_options: dict | None) -> tuple[tuple[str, float], ...]:
@@ -176,6 +217,8 @@ def _get_cached_whisperx_model(
     with _INFERENCE_CACHE_LOCK:
         cached = _WHISPERX_MODEL_CACHE.get(key)
         if cached is not None:
+            _WHISPERX_MODEL_CACHE.move_to_end(key)
+            _CACHE_STATS["whisperx_hits"] += 1
             return cached
 
     import inspect
@@ -191,6 +234,9 @@ def _get_cached_whisperx_model(
     model = whisperx_module.load_model(model_name, **kwargs)
     with _INFERENCE_CACHE_LOCK:
         _WHISPERX_MODEL_CACHE[key] = model
+        _WHISPERX_MODEL_CACHE.move_to_end(key)
+        _CACHE_STATS["whisperx_loads"] += 1
+        _evict_whisperx_if_needed()
     return model
 
 
@@ -210,10 +256,15 @@ def _get_cached_align_model(
     with _INFERENCE_CACHE_LOCK:
         cached = _ALIGN_MODEL_CACHE.get(key)
         if cached is not None:
+            _ALIGN_MODEL_CACHE.move_to_end(key)
+            _CACHE_STATS["align_hits"] += 1
             return cached
     align_model, metadata = whisperx_module.load_align_model(language_code=normalized_lang, device=device)
     with _INFERENCE_CACHE_LOCK:
         _ALIGN_MODEL_CACHE[key] = (align_model, metadata)
+        _ALIGN_MODEL_CACHE.move_to_end(key)
+        _CACHE_STATS["align_loads"] += 1
+        _evict_align_if_needed()
     return align_model, metadata
 
 
@@ -331,6 +382,7 @@ __all__ = [
     "_clear_inference_caches",
     "_get_cached_align_model",
     "_get_cached_whisperx_model",
+    "get_inference_cache_stats",
     "_module_available",
     "_patch_faster_whisper_compatibility",
     "_patch_pyannote_compatibility",
