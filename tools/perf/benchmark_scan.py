@@ -67,6 +67,7 @@ class _Instrumentation:
         self.metadata_reads = 0
         self.embedded_lyrics_reads = 0
         self.sidecar_reads = 0
+        self.sidecar_directory_scans = 0
         self.scandir_calls = 0
         self.listdir_calls = 0
         self.stat_calls = 0
@@ -151,6 +152,7 @@ def _run_scan(
     original_metadata_read = library_scanner.read_audio_metadata_for_scan
     original_embedded_read = scan_library.read_embedded_lyrics_from_audio
     original_sidecar_read = scan_library._read_sidecar
+    original_sidecar_resolve_entry = scan_library.SidecarLookupCache.resolve_entry
     original_scandir = scan_library.os.scandir
     original_listdir = scan_library.os.listdir
     original_stat = scan_library.os.stat
@@ -180,6 +182,12 @@ def _run_scan(
         instrumentation.scandir_calls += 1
         return original_scandir(*args, **kwargs)
 
+    def counted_sidecar_resolve_entry(cache, candidate):
+        before = len(cache._dir_entries)
+        result = original_sidecar_resolve_entry(cache, candidate)
+        instrumentation.sidecar_directory_scans += max(0, len(cache._dir_entries) - before)
+        return result
+
     def counted_listdir(*args, **kwargs):
         instrumentation.listdir_calls += 1
         return original_listdir(*args, **kwargs)
@@ -206,6 +214,7 @@ def _run_scan(
                 patch.object(library_scanner, "read_audio_metadata_for_scan", side_effect=counted_metadata_read),
                 patch.object(scan_library, "read_embedded_lyrics_from_audio", side_effect=counted_embedded_read),
                 patch.object(scan_library, "_read_sidecar", side_effect=counted_sidecar_read),
+                patch.object(scan_library.SidecarLookupCache, "resolve_entry", new=counted_sidecar_resolve_entry),
                 patch.object(scan_library.os, "scandir", side_effect=counted_scandir),
                 patch.object(scan_library.os, "listdir", side_effect=counted_listdir),
                 patch.object(scan_library.os, "stat", side_effect=counted_stat),
@@ -236,7 +245,7 @@ def _run_scan(
             "metadata_extraction_count": instrumentation.metadata_reads,
             "embedded_lyrics_parse_count": instrumentation.embedded_lyrics_reads,
             "sidecar_lookup_count": instrumentation.sidecar_reads,
-            "sidecar_directory_scans": instrumentation.listdir_calls,
+            "sidecar_directory_scans": instrumentation.sidecar_directory_scans,
             "scandir_calls": instrumentation.scandir_calls,
             "stat_calls": instrumentation.stat_calls,
             "db_read_count": instrumentation.sql_reads,
