@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from tests import test_support as _test_support  # noqa: F401
+from ui.workers.ai_sync_contracts import ManualAnchor
 from ui.workers.ai_sync_structural_dp import LineCandidate, select_structural_candidates
 
 
@@ -55,3 +56,29 @@ def test_structural_dp_bounds_candidate_layers() -> None:
 
 def test_structural_dp_handles_empty_song() -> None:
     assert select_structural_candidates({}, expected_line_count=0) == []
+
+
+def test_structural_dp_soft_manual_anchor_prefers_nearby_candidate() -> None:
+    result = select_structural_candidates(
+        {
+            0: [_candidate(0, 1.0, 0.95), _candidate(0, 8.0, 0.7)],
+            1: [_candidate(1, 10.0, 0.8)],
+        },
+        expected_line_count=2,
+        audio_duration_seconds=12,
+        manual_anchors=[ManualAnchor(line_index=0, time_ms=8000)],
+    )
+
+    assert result is not None
+    assert result[0].start == 8.0
+
+
+def test_structural_dp_hard_manual_anchor_can_reject_missing_window() -> None:
+    result = select_structural_candidates(
+        {0: [_candidate(0, 1.0, 1.0)]},
+        expected_line_count=1,
+        manual_anchors=[ManualAnchor(line_index=0, time_ms=8000)],
+        hard_manual_anchors=True,
+    )
+
+    assert result is None

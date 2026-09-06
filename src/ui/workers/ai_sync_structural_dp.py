@@ -2,7 +2,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Mapping, Sequence
+from typing import Iterable, Mapping, Sequence
+
+from .ai_sync_contracts import ManualAnchor
 
 
 @dataclass(slots=True)
@@ -40,12 +42,16 @@ def select_structural_candidates(
     expected_line_count: int,
     audio_duration_seconds: float | None = None,
     max_candidates_per_line: int = 5,
+    manual_anchors: Iterable[ManualAnchor] = (),
+    hard_manual_anchors: bool = False,
+    manual_anchor_tolerance_seconds: float = 3.0,
 ) -> list[LineCandidate] | None:
     """Select a bounded monotone candidate path using structural evidence."""
     count = max(0, int(expected_line_count))
     if count == 0:
         return []
     limit = max(1, min(5, int(max_candidates_per_line)))
+    anchors = {anchor.line_index: anchor for anchor in manual_anchors}
     layers: list[list[LineCandidate]] = []
     for line_index in range(count):
         layer = [
@@ -53,6 +59,14 @@ def select_structural_candidates(
             for candidate in candidates_by_line.get(line_index, ())
             if candidate.line_index == line_index and candidate.start >= 0
         ]
+        if hard_manual_anchors and line_index in anchors:
+            anchor = anchors[line_index]
+            layer = [
+                candidate
+                for candidate in layer
+                if abs(candidate.start - anchor.time_ms / 1000.0)
+                <= max(0.01, manual_anchor_tolerance_seconds)
+            ]
         layer.sort(key=lambda candidate: candidate.score(), reverse=True)
         layer = layer[:limit]
         if not layer:
@@ -66,6 +80,11 @@ def select_structural_candidates(
         layer_predecessors: dict[int, int | None] = {}
         for candidate_index, candidate in enumerate(layer):
             own_score = candidate.score()
+            own_score += _manual_anchor_score(
+                candidate,
+                anchors.get(candidate.line_index),
+                tolerance_seconds=manual_anchor_tolerance_seconds,
+            )
             if line_index == 0:
                 layer_scores[candidate_index] = own_score + _relative_position_score(
                     candidate, line_index, count, audio_duration_seconds
@@ -156,6 +175,18 @@ def _normalize_score(value: float | None) -> float:
     if numeric > 1.0:
         numeric /= 100.0
     return max(0.0, min(1.0, numeric))
+
+
+def _manual_anchor_score(
+    candidate: LineCandidate,
+    anchor: ManualAnchor | None,
+    *,
+    tolerance_seconds: float,
+) -> float:
+    if anchor is None:
+        return 0.0
+    distance = abs(candidate.start - anchor.time_ms / 1000.0)
+    return max(-2.0, 0.75 - distance / max(0.01, tolerance_seconds))
 
 
 __all__ = ["LineCandidate", "select_structural_candidates"]
