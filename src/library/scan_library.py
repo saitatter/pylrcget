@@ -56,6 +56,8 @@ class SidecarScanState:
     txt_present: bool
     lrc_present: bool
     file_signature: tuple[float | None, int | None] | None = None
+    txt_path: str | None = None
+    lrc_path: str | None = None
 
 
 @dataclass(frozen=True)
@@ -1032,6 +1034,8 @@ def get_sidecar_scan_state(
     seen_paths: set[str] = set()
     txt_present = False
     lrc_present = False
+    txt_path: str | None = None
+    lrc_path: str | None = None
     newest_mtime = audio_signature[0] if audio_signature is not None else None
     total_size = audio_signature[1] if audio_signature is not None else 0
     for base in _sidecar_base_candidates(
@@ -1074,8 +1078,10 @@ def get_sidecar_scan_state(
             )
             if suffix == ".txt":
                 txt_present = True
+                txt_path = txt_path or resolved
             else:
                 lrc_present = True
+                lrc_path = lrc_path or resolved
 
     serialized = "\n".join(sorted(records))
     digest_input = f"{TRACK_SCAN_STATE_SIGNATURE_VERSION}\n{serialized}".encode("utf-8")
@@ -1087,6 +1093,8 @@ def get_sidecar_scan_state(
         txt_present=txt_present,
         lrc_present=lrc_present,
         file_signature=(newest_mtime, total_size) if newest_mtime is not None else None,
+        txt_path=txt_path,
+        lrc_path=lrc_path,
     )
 
 
@@ -1097,11 +1105,31 @@ def _read_sidecar(
     metadata: AudioMetadata | None = None,
     lyrics_file_pattern: str | None = None,
     sidecar_lookup_cache: SidecarLookupCache | None = None,
+    sidecar_state: SidecarScanState | None = None,
     read_txt: bool = True,
     read_lrc: bool = True,
 ) -> tuple[str | None, str | None]:
     txt = None
     lrc = None
+
+    fallback_to_candidate_lookup = False
+    resolved_txt_path = sidecar_state.txt_path if sidecar_state is not None else None
+    resolved_lrc_path = sidecar_state.lrc_path if sidecar_state is not None else None
+    if sidecar_state is not None and read_txt and resolved_txt_path is not None:
+        try:
+            txt = Path(resolved_txt_path).read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            fallback_to_candidate_lookup = True
+    if sidecar_state is not None and read_lrc and resolved_lrc_path is not None:
+        try:
+            lrc = Path(resolved_lrc_path).read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            fallback_to_candidate_lookup = True
+
+    if sidecar_state is not None and not fallback_to_candidate_lookup:
+        txt = txt.strip() if txt else None
+        lrc = lrc.strip() if lrc else None
+        return txt, lrc
 
     for base in _sidecar_base_candidates(
         path,
@@ -1153,6 +1181,7 @@ def read_lyrics_for_scan(
     lyrics_file_pattern: str | None = None,
     scan_lyrics_source_mode: str | None = None,
     sidecar_lookup_cache: SidecarLookupCache | None = None,
+    sidecar_state: SidecarScanState | None = None,
     read_sidecar_txt: bool = True,
     read_sidecar_lrc: bool = True,
     timing_hook: Callable[[str, float], None] | None = None,
@@ -1178,6 +1207,7 @@ def read_lyrics_for_scan(
             sidecar_lookup_cache=sidecar_lookup_cache,
             read_txt=read_sidecar_txt,
             read_lrc=read_sidecar_lrc,
+            sidecar_state=sidecar_state,
         )
         if timing_hook is not None:
             timing_hook("sidecar_lookup_s", time.perf_counter() - sidecar_started)

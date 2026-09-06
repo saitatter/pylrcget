@@ -381,6 +381,26 @@ class ScanLibraryHelpersTests(unittest.TestCase):
             self.assertIsNone(result.sidecar_txt)
             self.assertEqual(result.sidecar_lrc, "[00:01.00]synced sidecar")
 
+    def test_read_lyrics_for_scan_reuses_resolved_sidecar_state(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            audio = root / "track.mp3"
+            touch_text(audio, "audio")
+            touch_text(root / "track.txt", "plain sidecar")
+            touch_text(root / "track.lrc", "[00:01.00]synced sidecar")
+            cache = SidecarLookupCache()
+            state = get_sidecar_scan_state(str(audio), sidecar_lookup_cache=cache)
+
+            with patch.object(cache, "resolve_existing", side_effect=AssertionError("sidecar state should be reused")):
+                result = read_lyrics_for_scan(
+                    str(audio),
+                    sidecar_lookup_cache=cache,
+                    sidecar_state=state,
+                )
+
+            self.assertEqual(result.sidecar_txt, "plain sidecar")
+            self.assertEqual(result.sidecar_lrc, "[00:01.00]synced sidecar")
+
     def test_new_fs_track_from_path_passes_scan_mode_to_signature_lookup(self):
         with tempfile.TemporaryDirectory() as tmp:
             audio = Path(tmp) / "track.mp3"

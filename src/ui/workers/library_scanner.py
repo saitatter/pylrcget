@@ -188,6 +188,7 @@ def _scan_track_for_path(
         lyrics_file_pattern=lyrics_file_pattern,
         scan_lyrics_source_mode=scan_lyrics_source_mode,
         sidecar_lookup_cache=sidecar_lookup_cache,
+        sidecar_state=sidecar_state,
         timing_hook=None if timings is None else timings.record,
     )
     track = new_fs_track_from_path(
@@ -257,6 +258,7 @@ def _scan_sidecar_only_for_path(
         lyrics_file_pattern=lyrics_file_pattern,
         scan_lyrics_source_mode="sidecar_only",
         sidecar_lookup_cache=sidecar_lookup_cache,
+        sidecar_state=sidecar_state,
         read_sidecar_txt=not (
             _scan_mode_allows_embedded(scan_lyrics_source_mode)
             and bool(previous_state.embedded_txt_present)
