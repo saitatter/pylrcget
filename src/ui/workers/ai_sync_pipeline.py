@@ -58,7 +58,36 @@ from .ai_sync_transcription import (
 
 logger = logging.getLogger(__name__)
 _DEMUCS_QUALITY_GATE = 14.0
+_LEGACY_FULL_RETRIES_ENV = "PYLRCGET_AI_LEGACY_FULL_RETRIES"
 _BACKEND_ROUTER = build_default_router()
+
+
+def _legacy_full_retries_enabled() -> bool:
+    """Return whether the pre-v2 stack of full-song retries is requested."""
+    return os.environ.get(_LEGACY_FULL_RETRIES_ENV, "0").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+
+
+def _relaxed_vad_retry_configs(
+    *,
+    device: str,
+    legacy_full_retries: bool,
+) -> tuple[dict[str, float], ...]:
+    """Return conservative retries by default, or the legacy full stack."""
+    configs: tuple[dict[str, float], ...]
+    if device == "cuda":
+        configs = ({"vad_onset": 0.15, "vad_offset": 0.05},)
+    else:
+        configs = (
+            {"vad_onset": 0.15, "vad_offset": 0.05},
+            {"vad_onset": 0.10, "vad_offset": 0.03},
+            {"vad_onset": 0.02, "vad_offset": 0.01},
+        )
+    return configs if legacy_full_retries else configs[:1]
 
 
 def _select_alignment_backend(language: str | None, *, device: str):
@@ -167,6 +196,7 @@ def _complete_with_lyrics_aligner(worker, candidate: AlignmentCandidate) -> None
 def run_ai_sync_pipeline(self, *, align_optional_demucs=None) -> None:
     if align_optional_demucs is None:
         align_optional_demucs = align_with_optional_demucs
+    legacy_full_retries = _legacy_full_retries_enabled()
     try:
         ok, msg = _check_ai_sync_available()
         if not ok:
@@ -277,7 +307,7 @@ def run_ai_sync_pipeline(self, *, align_optional_demucs=None) -> None:
             chunk_language = transcribe_language or _normalized_transcribe_language(
                 result_local.get("language")
             )
-            if audio_duration - raw_tail >= 20.0:
+            if legacy_full_retries and audio_duration - raw_tail >= 20.0:
                 chunked_segments = _transcribe_fixed_windows(
                     model_obj,
                     audio,
@@ -471,7 +501,11 @@ def run_ai_sync_pipeline(self, *, align_optional_demucs=None) -> None:
                         rescued_segments,
                         rescue_windows,
                     )
-        if device != "cuda" and _should_retry_with_short_windows(segments):
+        if (
+            legacy_full_retries
+            and device != "cuda"
+            and _should_retry_with_short_windows(segments)
+        ):
             logger.info(
                 "Detected a long low-density ASR segment; retrying with short windows."
             )
@@ -484,14 +518,9 @@ def run_ai_sync_pipeline(self, *, align_optional_demucs=None) -> None:
         self._emit_stage(5, total_steps, "Checking speech coverage and selecting best pass…")
         if _should_retry_with_relaxed_vad(audio, segments, plain_lines):
             duration_s = float(len(audio)) / 16000.0 if hasattr(audio, "__len__") else 0.0
-            relaxed_vad_configs = (
-                ({"vad_onset": 0.15, "vad_offset": 0.05},)
-                if device == "cuda"
-                else (
-                    {"vad_onset": 0.15, "vad_offset": 0.05},
-                    {"vad_onset": 0.10, "vad_offset": 0.03},
-                    {"vad_onset": 0.02, "vad_offset": 0.01},
-                )
+            relaxed_vad_configs = _relaxed_vad_retry_configs(
+                device=device,
+                legacy_full_retries=legacy_full_retries,
             )
             relaxed_candidates: list[list[dict]] = []
             for idx, vad_options in enumerate(relaxed_vad_configs, start=1):
