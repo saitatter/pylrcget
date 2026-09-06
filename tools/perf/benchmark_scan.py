@@ -153,7 +153,8 @@ def _run_scan(
     original_metadata_read = library_scanner.read_audio_metadata_for_scan
     original_embedded_read = scan_library.read_embedded_lyrics_from_audio
     original_sidecar_read = scan_library._read_sidecar
-    original_sidecar_resolve_entry = scan_library.SidecarLookupCache.resolve_entry
+    original_sidecar_resolve_entry = getattr(scan_library.SidecarLookupCache, "resolve_entry", None)
+    original_sidecar_resolve_existing = getattr(scan_library.SidecarLookupCache, "resolve_existing", None)
     original_scandir = scan_library.os.scandir
     original_listdir = scan_library.os.listdir
     original_stat = scan_library.os.stat
@@ -186,6 +187,12 @@ def _run_scan(
     def counted_sidecar_resolve_entry(cache, candidate):
         before = len(cache._dir_entries)
         result = original_sidecar_resolve_entry(cache, candidate)
+        instrumentation.sidecar_directory_scans += max(0, len(cache._dir_entries) - before)
+        return result
+
+    def counted_sidecar_resolve_existing(cache, candidate):
+        before = len(cache._dir_entries)
+        result = original_sidecar_resolve_existing(cache, candidate)
         instrumentation.sidecar_directory_scans += max(0, len(cache._dir_entries) - before)
         return result
 
@@ -224,9 +231,22 @@ def _run_scan(
                     instrumentation_stack.enter_context(
                         patch.object(scan_library, "_read_sidecar", side_effect=counted_sidecar_read)
                     )
-                    instrumentation_stack.enter_context(
-                        patch.object(scan_library.SidecarLookupCache, "resolve_entry", new=counted_sidecar_resolve_entry)
-                    )
+                    if original_sidecar_resolve_entry is not None:
+                        instrumentation_stack.enter_context(
+                            patch.object(
+                                scan_library.SidecarLookupCache,
+                                "resolve_entry",
+                                new=counted_sidecar_resolve_entry,
+                            )
+                        )
+                    elif original_sidecar_resolve_existing is not None:
+                        instrumentation_stack.enter_context(
+                            patch.object(
+                                scan_library.SidecarLookupCache,
+                                "resolve_existing",
+                                new=counted_sidecar_resolve_existing,
+                            )
+                        )
                     instrumentation_stack.enter_context(
                         patch.object(scan_library.os, "scandir", side_effect=counted_scandir)
                     )
