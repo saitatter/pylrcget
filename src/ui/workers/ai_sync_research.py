@@ -85,6 +85,26 @@ SOFA_RESEARCH = ResearchBackendSpec(
 )
 
 
+HUBERTFA_RESEARCH = ResearchBackendSpec(
+    name="hubertfa",
+    repository="https://github.com/wolfgitpr/HubertFA",
+    code_license="Apache-2.0",
+    languages=("zh", "ja", "en", "yue"),
+    requires_vocal_stem=False,
+    production_default=False,
+    model_license="unknown",
+    notes=(
+        "Research-only singing aligner based on HuBERT. Upstream documents "
+        "Python 3.10, ONNX inference, external models, and language-specific "
+        "phoneme dictionaries."
+    ),
+    runtime="isolated-py3.10",
+    inference_modes=("pytorch", "onnx-cpu", "onnx-gpu"),
+    model_artifacts=("ONNX model", "phoneme dictionary"),
+    requires_g2p=True,
+)
+
+
 def evaluate_research_candidate(
     metrics: Mapping[str, float | int | None],
     *,
@@ -144,6 +164,7 @@ __all__ = [
     "LYRICS_ALIGNMENT_MULTILINGUAL",
     "ResearchBackendSpec",
     "ResearchRecommendation",
+    "HUBERTFA_RESEARCH",
     "SOFA_RESEARCH",
     "evaluate_research_candidate",
 ]

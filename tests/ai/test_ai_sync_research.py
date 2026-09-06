@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from tests import test_support as _test_support  # noqa: F401
 from ui.workers.ai_sync_research import (
+    HUBERTFA_RESEARCH,
     LYRICS_ALIGNMENT_MULTILINGUAL,
     SOFA_RESEARCH,
     evaluate_research_candidate,
@@ -21,6 +22,15 @@ def test_sofa_manifest_keeps_legacy_runtime_and_model_gates_visible() -> None:
     assert SOFA_RESEARCH.requires_g2p is True
     assert SOFA_RESEARCH.model_license == "unknown"
     assert "checkpoint.ckpt" in SOFA_RESEARCH.model_artifacts
+
+
+def test_hubertfa_manifest_is_specialized_and_onnx_ready_but_not_default() -> None:
+    assert HUBERTFA_RESEARCH.production_default is False
+    assert HUBERTFA_RESEARCH.runtime == "isolated-py3.10"
+    assert HUBERTFA_RESEARCH.languages == ("zh", "ja", "en", "yue")
+    assert "onnx-cpu" in HUBERTFA_RESEARCH.inference_modes
+    assert HUBERTFA_RESEARCH.requires_g2p is True
+    assert HUBERTFA_RESEARCH.model_license == "unknown"
 
 
 def test_research_gate_requires_coverage() -> None:
