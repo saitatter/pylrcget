@@ -653,6 +653,46 @@ def _extract_text_from_mutagen_value(value) -> str | None:
     return None
 
 
+def build_normalized_tag_index(audio) -> dict[str, str]:
+    """Build one normalized text lookup map for an opened Mutagen object."""
+    index: dict[str, str] = {}
+    tags = getattr(audio, "tags", None)
+    for source in (audio, tags):
+        if source is None:
+            continue
+        keys_func = getattr(source, "keys", None)
+        getter = getattr(source, "get", None)
+        if not callable(keys_func) or not callable(getter):
+            continue
+        try:
+            source_keys = list(keys_func())
+        except Exception:  # noqa: BLE001, S112
+            continue
+        for source_key in source_keys:
+            normalized = _normalize_tag_key(str(source_key))
+            if normalized in index:
+                continue
+            try:
+                extracted = _extract_text_from_mutagen_value(getter(source_key))
+            except Exception:  # noqa: BLE001, S112
+                continue
+            if extracted:
+                index[normalized] = extracted
+    return index
+
+
+def _cached_normalized_tag_index(audio) -> dict[str, str]:
+    cached = getattr(audio, "_pylrcget_normalized_tag_index", None)
+    if isinstance(cached, dict):
+        return cached
+    index = build_normalized_tag_index(audio)
+    try:
+        setattr(audio, "_pylrcget_normalized_tag_index", index)
+    except Exception:  # noqa: BLE001
+        pass
+    return index
+
+
 def _first_audio_tag_text(audio, keys: tuple[str, ...]) -> str | None:
     tags = getattr(audio, "tags", None)
     for key in keys:
@@ -672,27 +712,11 @@ def _first_audio_tag_text(audio, keys: tuple[str, ...]) -> str | None:
             if extracted:
                 return extracted
 
-    req_norms = {_normalize_tag_key(k) for k in keys}
-    for source in (audio, tags):
-        if source is None:
-            continue
-        keys_func = getattr(source, "keys", None)
-        getter = getattr(source, "get", None)
-        if not callable(keys_func) or not callable(getter):
-            continue
-        try:
-            source_keys = list(keys_func())
-        except Exception:  # noqa: BLE001, S112
-            continue
-        for skey in source_keys:
-            if _normalize_tag_key(str(skey)) in req_norms:
-                try:
-                    val = getter(skey)
-                    extracted = _extract_text_from_mutagen_value(val)
-                    if extracted:
-                        return extracted
-                except Exception:  # noqa: BLE001, S110
-                    pass
+    tag_index = _cached_normalized_tag_index(audio)
+    for key in keys:
+        extracted = tag_index.get(_normalize_tag_key(key))
+        if extracted:
+            return extracted
     return None
 
 
