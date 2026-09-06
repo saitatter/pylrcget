@@ -109,9 +109,9 @@ class _CurrentWorkerContext:
         self.completed_result = (bool(ok), str(message), str(output))
 
     def _resolve_device(self) -> str:
-        if self._device != "auto":
-            return self._device
-        return "cpu"
+        from ui.workers.ai_runtime import resolve_torch_device
+
+        return resolve_torch_device(self._device)
 
     def _emit_stage(self, current: int, total: int, message: str) -> None:
         self.profiler.set_metadata("last_progress", message)

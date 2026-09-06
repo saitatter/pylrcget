@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from .ai_runtime import resolve_torch_device
 from .ai_sync_contracts import AlignmentRequest, AlignmentResult, AlignedLine
 
 _WORD_RE = re.compile(r"[^\W_]+(?:['’][^\W_]+)*", re.UNICODE)
@@ -161,7 +162,8 @@ class StableTsResearchBackend:
             raise RuntimeError(
                 "stable-ts research backend requires the isolated stable-ts runtime."
             ) from exc
-        kwargs: dict[str, object] = {"device": device}
+        resolved_device = resolve_torch_device(device)
+        kwargs: dict[str, object] = {"device": resolved_device}
         if download_root is not None:
             kwargs["download_root"] = str(download_root)
         model = stable_whisper.load_model(model_name, **kwargs)
@@ -170,7 +172,7 @@ class StableTsResearchBackend:
             align_function=align,
             align_words_function=align_words,
             model_name=model_name,
-            device=device,
+            device=resolved_device,
         )
 
     def supports_language(self, language: str) -> bool:

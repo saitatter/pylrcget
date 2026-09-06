@@ -12,7 +12,11 @@ import uuid
 
 from PySide6.QtCore import QThread, Signal
 
-from .ai_runtime import resolve_ai_runtime_python, resolve_ai_runtime_source
+from .ai_runtime import (
+    resolve_ai_runtime_python,
+    resolve_ai_runtime_source,
+    resolve_torch_device,
+)
 from .ai_sync_alignment import (
     _align_lyrics_to_segments,
     _align_lyrics_to_segments_viterbi,
@@ -132,19 +136,7 @@ class AiSyncWorker(QThread):
         self._enable_demucs_candidate = bool(enable_demucs_candidate)
 
     def _resolve_device(self) -> str:
-        import torch
-        if self._device and self._device != "auto":
-            if self._device == "cuda" and not torch.cuda.is_available():
-                raise RuntimeError(
-                    "CUDA was selected, but the external Torch runtime has no CUDA support. "
-                    "Install a CUDA-enabled Torch build or select Auto/CPU."
-                )
-            return self._device
-        if torch.cuda.is_available():
-            return "cuda"
-        if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
-            return "mps"
-        return "cpu"
+        return resolve_torch_device(self._device)
 
     def _emit_stage(self, current: int, total: int, message: str) -> None:
         self.progress.emit(f"{self._PROGRESS_MARKER}|{int(current)}|{int(total)}|{message}")

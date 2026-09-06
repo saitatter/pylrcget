@@ -82,7 +82,7 @@ def _align_case(
         plain_lyrics=case.lyrics,
         requested_language=case.language,
         manual_anchors=[],
-        device="cpu",
+        device=backend.device,
         options=AlignmentOptions(extras=extras),
     )
     started = time.perf_counter()
@@ -117,7 +117,7 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
     load_started = time.perf_counter()
     backend = StableTsResearchBackend.load(
         args.model,
-        device="cpu",
+        device=args.device,
         download_root=model_root,
     )
     model_load_ms = (time.perf_counter() - load_started) * 1000.0
@@ -169,7 +169,7 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
             "backend": "stable-ts-research",
             "model": args.model,
             "mode": args.mode,
-            "device": "cpu",
+            "device": backend.device,
             "corpus": str(args.corpus),
             "warmups": args.warmups,
             "runs": args.runs,
@@ -193,6 +193,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--download-root", type=Path)
     parser.add_argument("--warmups", type=int, default=1)
     parser.add_argument("--runs", type=int, default=3)
+    parser.add_argument("--device", choices=("auto", "cpu", "cuda", "mps"), default="auto")
     parser.add_argument("--output", type=Path, required=True)
     return parser
 
