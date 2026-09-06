@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import os
 from pathlib import Path
 
 from .ai_sync_alignment import (
@@ -27,6 +28,11 @@ from .ai_sync_lrc import (
     _format_ts,
 )
 from .ai_sync_language import detect_text_language
+from .ai_sync_local_rescue import (
+    build_rescue_windows,
+    replace_segments_in_windows,
+    transcribe_local_rescue,
+)
 from .ai_sync_lyrics_aligner import align as _align_with_lyrics_aligner
 from .ai_sync_lyrics_aligner import is_available as _lyrics_aligner_available
 from .ai_sync_runtime import (
@@ -444,6 +450,27 @@ def run_ai_sync_pipeline(self, *, align_optional_demucs=None) -> None:
                 targeted_window[0],
                 targeted_window[1],
             )
+            if os.environ.get("PYLRCGET_AI_LOCAL_RESCUE", "0") == "1":
+                duration_s = float(len(audio)) / 16000.0 if hasattr(audio, "__len__") else 0.0
+                rescue_windows = build_rescue_windows(
+                    [targeted_window],
+                    audio_duration_seconds=duration_s,
+                    max_windows=1,
+                )
+                self._emit_stage(5, total_steps, "Rescuing uncertain local lyric window…")
+                rescued_segments = transcribe_local_rescue(
+                    model,
+                    audio,
+                    rescue_windows,
+                    language=transcribe_language,
+                    is_cancelled=self.isInterruptionRequested,
+                )
+                if rescued_segments:
+                    segments = replace_segments_in_windows(
+                        segments,
+                        rescued_segments,
+                        rescue_windows,
+                    )
         if device != "cuda" and _should_retry_with_short_windows(segments):
             logger.info(
                 "Detected a long low-density ASR segment; retrying with short windows."
