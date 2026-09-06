@@ -68,6 +68,7 @@ class _Instrumentation:
         self.embedded_lyrics_reads = 0
         self.sidecar_reads = 0
         self.sidecar_directory_scans = 0
+        self.sidecar_candidate_checks = 0
         self.scandir_calls = 0
         self.listdir_calls = 0
         self.stat_calls = 0
@@ -155,6 +156,7 @@ def _run_scan(
     original_sidecar_read = scan_library._read_sidecar
     original_sidecar_resolve_entry = getattr(scan_library.SidecarLookupCache, "resolve_entry", None)
     original_sidecar_resolve_existing = getattr(scan_library.SidecarLookupCache, "resolve_existing", None)
+    original_sidecar_resolve_entries = getattr(scan_library.SidecarLookupCache, "resolve_entries", None)
     original_scandir = scan_library.os.scandir
     original_listdir = scan_library.os.listdir
     original_stat = scan_library.os.stat
@@ -188,6 +190,14 @@ def _run_scan(
         before = len(cache._dir_entries)
         result = original_sidecar_resolve_entry(cache, candidate)
         instrumentation.sidecar_directory_scans += max(0, len(cache._dir_entries) - before)
+        instrumentation.sidecar_candidate_checks += 1
+        return result
+
+    def counted_sidecar_resolve_entries(cache, candidates):
+        before = len(cache._dir_entries)
+        result = original_sidecar_resolve_entries(cache, candidates)
+        instrumentation.sidecar_directory_scans += max(0, len(cache._dir_entries) - before)
+        instrumentation.sidecar_candidate_checks += len(candidates)
         return result
 
     def counted_sidecar_resolve_existing(cache, candidate):
@@ -239,6 +249,14 @@ def _run_scan(
                                 new=counted_sidecar_resolve_entry,
                             )
                         )
+                    if original_sidecar_resolve_entries is not None:
+                        instrumentation_stack.enter_context(
+                            patch.object(
+                                scan_library.SidecarLookupCache,
+                                "resolve_entries",
+                                new=counted_sidecar_resolve_entries,
+                            )
+                        )
                     elif original_sidecar_resolve_existing is not None:
                         instrumentation_stack.enter_context(
                             patch.object(
@@ -285,6 +303,7 @@ def _run_scan(
             "embedded_lyrics_parse_count": instrumentation.embedded_lyrics_reads if instrumentation_enabled else None,
             "sidecar_lookup_count": instrumentation.sidecar_reads if instrumentation_enabled else None,
             "sidecar_directory_scans": instrumentation.sidecar_directory_scans if instrumentation_enabled else None,
+            "sidecar_candidate_checks": instrumentation.sidecar_candidate_checks if instrumentation_enabled else None,
             "scandir_calls": instrumentation.scandir_calls if instrumentation_enabled else None,
             "stat_calls": instrumentation.stat_calls if instrumentation_enabled else None,
             "db_read_count": instrumentation.sql_reads if instrumentation_enabled else None,

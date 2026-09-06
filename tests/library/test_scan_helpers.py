@@ -194,6 +194,24 @@ class ScanLibraryHelpersTests(unittest.TestCase):
             self.assertEqual(sig[1], audio_size)
             self.assertEqual(sig[0], audio_mtime)
 
+    def test_sidecar_cache_resolves_candidates_from_one_directory_with_one_index_lookup(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            txt = root / "track.txt"
+            lrc = root / "track.lrc"
+            touch_text(txt, "plain")
+            touch_text(lrc, "[00:01.00]synced")
+            cache = SidecarLookupCache()
+            candidates = [str(txt), str(lrc), str(root / "missing.lrc")]
+
+            with patch.object(cache, "_index_for_directory", wraps=cache._index_for_directory) as index_mock:
+                entries = cache.resolve_entries(candidates)
+
+            self.assertEqual(index_mock.call_count, 1)
+            self.assertEqual(entries[str(txt)].path, str(txt))
+            self.assertEqual(entries[str(lrc)].path, str(lrc))
+            self.assertIsNone(entries[str(root / "missing.lrc")])
+
     def test_get_audio_file_signature_uses_provided_audio_signature(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
