@@ -27,6 +27,21 @@ existing alignment pipeline and writes reports under the requested output
 path. Model downloads and optional AI runtime setup must be performed
 separately.
 
+The stable-ts research runner must use its isolated interpreter. It supports
+full known-text alignment and local alignment from a separate JSON file of
+candidate segments:
+
+```powershell
+$stable = "$env:LOCALAPPDATA\PyLrcGet\research\stable-ts\Scripts\python.exe"
+& $stable tools\ai_sync_bench\run_stable_ts.py `
+  --corpus .\benchmarks\ai_sync\local-corpus.json `
+  --mode full --warmups 1 --runs 3 `
+  --output .\benchmarks\ai_sync\stable-ts-full.json
+```
+
+The stable-ts runner is research-only and defaults its model cache to
+`%LOCALAPPDATA%\PyLrcGet\models\stable-ts`.
+
 Compare reports with:
 
 ```powershell
