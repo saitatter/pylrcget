@@ -177,6 +177,8 @@ def run_ai_sync_pipeline(self, *, align_optional_demucs=None) -> None:
         plain_lines = self.plain_lyrics.splitlines() if self.plain_lyrics else []
         lyrics_aligner_attempted = False
         transcribe_language = _normalized_transcribe_language(self._language)
+        if plain_lines and transcribe_language is None:
+            self._emit_stage(1, total_steps, "Detecting lyrics language from supplied text…")
         text_detection = (
             detect_text_language(self.plain_lyrics)
             if plain_lines and transcribe_language is None
@@ -184,6 +186,11 @@ def run_ai_sync_pipeline(self, *, align_optional_demucs=None) -> None:
         )
         if text_detection is not None and text_detection.language is not None:
             transcribe_language = text_detection.language
+            self._emit_stage(
+                1,
+                total_steps,
+                f"Detected lyrics language: {transcribe_language} (text evidence).",
+            )
         if (
             plain_lines
             and transcribe_language == "en"

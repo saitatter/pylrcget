@@ -71,3 +71,4 @@ def test_auto_known_english_routes_before_whisper_language_detection(monkeypatch
     assert worker.completed.values == [
         (True, "Lyrics synchronized successfully with lyrics-aligner (mix).", "[00:01.00] I know the road is open")
     ]
+    assert any("text evidence" in values[2] for values in worker.progress.values)
