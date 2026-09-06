@@ -21,6 +21,7 @@ from typing import Any
 
 from .ai_runtime import default_lyrics_aligner_dir
 from .ai_sync_contracts import AlignmentOptions, AlignmentRequest, AlignmentResult, AlignedLine
+from .ai_sync_phonemization import EnglishG2PPhonemizer
 
 logger = logging.getLogger(__name__)
 
@@ -108,8 +109,7 @@ class EnglishLyricsAlignerBackend:
         self._model: Any | None = None
         self._align_module: Any | None = None
         self._phoneme2idx: dict[str, int] | None = None
-        self._g2p: Any | None = None
-        self._word_phoneme_cache: dict[str, str | None] = {}
+        self._phonemizer = EnglishG2PPhonemizer()
         self._load_count = 0
 
     def supports_language(self, language: str) -> bool:
@@ -123,12 +123,12 @@ class EnglishLyricsAlignerBackend:
         if self._model is not None and self._align_module is not None:
             return
         try:
-            import g2p_en
             import torch
         except ImportError as exc:
             raise RuntimeError(
                 "lyrics-aligner requires the optional g2p-en and torch packages."
             ) from exc
+        self._phonemizer.warm()
         _patch_torch_compatibility(torch)
         model_module, align_module = _load_upstream_modules(self.root)
         with (self.root / "files" / "phoneme2idx.pickle").open("rb") as handle:
@@ -143,26 +143,13 @@ class EnglishLyricsAlignerBackend:
         self._model = model
         self._align_module = align_module
         self._phoneme2idx = {str(key): int(value) for key, value in phoneme2idx.items()}
-        self._g2p = g2p_en.G2p()
         self._load_count += 1
 
     def _word_phonemes(self, word: str) -> str:
-        cached = self._word_phoneme_cache.get(word)
-        if cached is not None:
-            return cached
-        if word in self._word_phoneme_cache:
-            raise RuntimeError(f"lyrics-aligner could not phonemize word {word!r}.")
-        source_word = word.strip("'")
-        phonemes = []
-        assert self._g2p is not None
-        for token in self._g2p(source_word):
-            if re.fullmatch(r"[A-Z]+[012]?", token):
-                phonemes.append(token.rstrip("012"))
-        value = " ".join(phonemes) or None
-        self._word_phoneme_cache[word] = value
-        if value is None:
-            raise RuntimeError(f"lyrics-aligner could not phonemize word {word!r}.")
-        return value
+        try:
+            return self._phonemizer.phonemize_word(word)
+        except ValueError as exc:
+            raise RuntimeError(str(exc)) from exc
 
     def _phoneme_inputs(self, lyrics: str, torch_module: Any) -> tuple[list[str], list[str], Any]:
         assert self._phoneme2idx is not None
@@ -242,7 +229,7 @@ class EnglishLyricsAlignerBackend:
                 "audio_copied": False,
                 "align_subprocess": False,
                 "checkpoint_loads": self._load_count,
-                "g2p_cache_size": len(self._word_phoneme_cache),
+                "g2p_cache_size": self._phonemizer.cache_size,
                 "predicted_words": len(predicted),
             },
         )
