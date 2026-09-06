@@ -76,6 +76,11 @@ class ScanLibraryHelpersTests(unittest.TestCase):
             self.assertIsNotNone(sig[0])
             self.assertEqual(sig[1], audio.stat().st_size + txt.stat().st_size + lrc.stat().st_size)
             self.assertEqual(sig[0], max(audio.stat().st_mtime, txt.stat().st_mtime, lrc.stat().st_mtime))
+            combined_state = get_sidecar_scan_state(
+                str(audio),
+                audio_signature=(audio.stat().st_mtime, audio.stat().st_size),
+            )
+            self.assertEqual(combined_state.file_signature, sig)
 
     def test_audio_signature_is_independent_from_sidecar_state(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -323,8 +328,10 @@ class ScanLibraryHelpersTests(unittest.TestCase):
             root = Path(tmp)
             audio = root / "track.mp3"
             sidecar = root / "track.txt"
+            unrelated_audio = root / "other.flac"
             touch_text(audio, "audio")
             touch_text(sidecar, "plain sidecar")
+            touch_text(unrelated_audio, "audio")
 
             class _FakeAudio:
                 def __init__(self) -> None:
@@ -351,6 +358,8 @@ class ScanLibraryHelpersTests(unittest.TestCase):
             self.assertIsNotNone(first)
             self.assertIsNotNone(second)
             self.assertEqual(scandir_mock.call_count, 1)
+            index = cache._dir_entries[cache._dir_key(str(root))]
+            self.assertNotIn("other.flac", index.by_lower_name)
 
     def test_read_lyrics_for_scan_can_skip_independent_sidecar_content_types(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -792,10 +801,7 @@ class LibraryScannerIncrementalTests(unittest.TestCase):
 
             self.assertEqual(created_workers, [expected_workers])
             self.assertEqual(read_metadata.call_count, 2)
-            self.assertEqual(signature_mock.call_count, 2)
-            for call in signature_mock.call_args_list:
-                self.assertIsNotNone(call.kwargs["audio_signature"])
-                self.assertIsNotNone(call.kwargs["sidecar_lookup_cache"])
+            self.assertEqual(signature_mock.call_count, 0)
             self.assertEqual(len(seen_track_kwargs), 2)
             for kwargs in seen_track_kwargs:
                 self.assertIsNotNone(kwargs["audio_signature"])
@@ -853,7 +859,7 @@ class LibraryScannerIncrementalTests(unittest.TestCase):
             ):
                 scanner.run()
 
-            self.assertEqual(seen_modes, ["embedded_only", "embedded_only"])
+            self.assertEqual(seen_modes, ["embedded_only"])
 
     def test_sidecar_only_change_reuses_stored_metadata_without_audio_parse(self):
         with tempfile.TemporaryDirectory() as tmp:

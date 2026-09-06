@@ -29,6 +29,7 @@ from library.scan_state import TRACK_SCAN_STATE_SIGNATURE_VERSION
 logger = logging.getLogger(__name__)
 
 AUDIO_EXTS = {".mp3", ".m4a", ".flac", ".ogg", ".opus", ".wav", ".wma", ".asf", ".dsf", ".dff", ".mpc"}
+SIDECAR_EXTS = {".txt", ".lrc"}
 SCAN_LYRICS_SOURCE_BOTH = "both"
 SCAN_LYRICS_SOURCE_EMBEDDED_ONLY = "embedded_only"
 SCAN_LYRICS_SOURCE_SIDECAR_ONLY = "sidecar_only"
@@ -54,6 +55,7 @@ class SidecarScanState:
     signature: str
     txt_present: bool
     lrc_present: bool
+    file_signature: tuple[float | None, int | None] | None = None
 
 
 @dataclass(frozen=True)
@@ -114,6 +116,9 @@ class SidecarLookupCache:
             try:
                 with os.scandir(directory) as entries:
                     for entry in entries:
+                        stem, suffix = os.path.splitext(entry.name)
+                        if os.path.normcase(suffix) not in SIDECAR_EXTS:
+                            continue
                         try:
                             stat = entry.stat(follow_symlinks=False)
                         except OSError:
@@ -127,7 +132,6 @@ class SidecarLookupCache:
                             mtime_ns=int(stat.st_mtime_ns),
                         )
                         by_lower_name[lower_name] = item
-                        stem, suffix = os.path.splitext(entry.name)
                         by_stem.setdefault(os.path.normcase(stem), []).append(item)
                         by_suffix.setdefault(os.path.normcase(suffix), []).append(item)
             except OSError:
@@ -1009,19 +1013,27 @@ def get_sidecar_scan_state(
     lyrics_file_pattern: str | None = None,
     scan_lyrics_source_mode: str | None = None,
     sidecar_lookup_cache: SidecarLookupCache | None = None,
+    audio_signature: tuple[float | None, int | None] | None = None,
     timing_hook: Callable[[str, float], None] | None = None,
 ) -> SidecarScanState:
     """Return a deterministic signature and presence state for candidate sidecars."""
     _use_embedded, use_sidecar = _scan_lyrics_source_flags(scan_lyrics_source_mode)
     if not use_sidecar:
         digest = hashlib.sha256(str(TRACK_SCAN_STATE_SIGNATURE_VERSION).encode("ascii")).hexdigest()
-        return SidecarScanState(signature=digest, txt_present=False, lrc_present=False)
+        return SidecarScanState(
+            signature=digest,
+            txt_present=False,
+            lrc_present=False,
+            file_signature=audio_signature,
+        )
 
     started = time.perf_counter()
     records: list[str] = []
     seen_paths: set[str] = set()
     txt_present = False
     lrc_present = False
+    newest_mtime = audio_signature[0] if audio_signature is not None else None
+    total_size = audio_signature[1] if audio_signature is not None else 0
     for base in _sidecar_base_candidates(
         path,
         lyrics_lookup_subdir,
@@ -1037,8 +1049,6 @@ def get_sidecar_scan_state(
                 records.append(f"{normalized_candidate}|missing")
                 continue
             normalized = os.path.normcase(os.path.abspath(resolved))
-            if normalized in seen_paths:
-                continue
             if sidecar_lookup_cache is not None:
                 if entry is None:
                     records.append(f"{normalized_candidate}|unavailable")
@@ -1053,6 +1063,11 @@ def get_sidecar_scan_state(
                     continue
                 mtime_ns = int(stat.st_mtime_ns)
                 size = int(stat.st_size)
+            candidate_mtime = mtime_ns / 1_000_000_000
+            newest_mtime = candidate_mtime if newest_mtime is None else max(newest_mtime, candidate_mtime)
+            total_size += size
+            if normalized in seen_paths:
+                continue
             seen_paths.add(normalized)
             records.append(
                 f"{normalized_candidate}|{normalized}|{mtime_ns}|{size}"
@@ -1071,6 +1086,7 @@ def get_sidecar_scan_state(
         signature=digest,
         txt_present=txt_present,
         lrc_present=lrc_present,
+        file_signature=(newest_mtime, total_size) if newest_mtime is not None else None,
     )
 
 
