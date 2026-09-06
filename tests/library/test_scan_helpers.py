@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import sqlite3
 import tempfile
+import threading
 import time
 import unittest
 from concurrent.futures import ThreadPoolExecutor as RealThreadPoolExecutor
@@ -35,7 +36,7 @@ from library.scan_library import (
 )
 from tests import test_support as _test_support  # noqa: F401
 from tests.test_support import make_fs_track, touch_text
-from ui.workers.library_scanner import LibraryScanner, _scan_worker_count
+from ui.workers.library_scanner import LibraryScanner, _ScanTimingStats, _scan_worker_count
 
 
 class ScanLibraryHelpersTests(unittest.TestCase):
@@ -532,6 +533,26 @@ class ScanLibraryHelpersTests(unittest.TestCase):
 
 
 class LibraryScannerIncrementalTests(unittest.TestCase):
+    def test_scan_timing_stats_accumulate_worker_local_buckets(self):
+        timings = _ScanTimingStats()
+
+        def record_worker_metrics() -> None:
+            for _ in range(100):
+                timings.record("metadata_read_s", 0.001)
+                timings.record("metadata_read_count", 1)
+                timings.record("signature_sidecar_candidate_count", 3)
+
+        workers = [threading.Thread(target=record_worker_metrics) for _ in range(4)]
+        for worker in workers:
+            worker.start()
+        for worker in workers:
+            worker.join()
+        timings.merge()
+
+        self.assertAlmostEqual(timings.metadata_read_s, 0.4)
+        self.assertEqual(timings.metadata_read_count, 400)
+        self.assertEqual(timings.signature_sidecar_candidate_count, 1200)
+
     def _scan_sidecar_mutation(
         self,
         *,

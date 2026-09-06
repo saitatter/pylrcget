@@ -75,34 +75,38 @@ class _ScanTimingStats:
         self.embedded_lyrics_read_count = 0
         self.sidecar_lookup_count = 0
         self.db_flush_count = 0
-        self._lock = threading.Lock()
+        self._local = threading.local()
+        self._buckets: list[dict[str, dict[str, float]]] = []
+        self._buckets_lock = threading.Lock()
+
+    def _bucket(self) -> dict[str, dict[str, float]]:
+        bucket = getattr(self._local, "bucket", None)
+        if bucket is None:
+            bucket = {"timings": {}, "counts": {}}
+            with self._buckets_lock:
+                self._buckets.append(bucket)
+            self._local.bucket = bucket
+        return bucket
 
     def record(self, field_name: str, elapsed_s: float) -> None:
         if elapsed_s <= 0:
             return
-        with self._lock:
-            current = getattr(self, field_name)
-            setattr(self, field_name, current + elapsed_s)
-            if field_name == "path_discovery_s":
-                self.path_discovery_count += 1
-            elif field_name == "audio_fast_path_s":
-                self.audio_fast_path_count += 1
-            elif field_name == "audio_fast_path_hit_count":
-                self.audio_fast_path_hit_count += int(elapsed_s)
-            elif field_name == "signature_check_s":
-                self.signature_check_count += 1
-            elif field_name == "signature_lookup_s":
-                pass
-            elif field_name == "signature_sidecar_candidate_count":
-                self.signature_sidecar_candidate_count += int(elapsed_s)
-            elif field_name == "metadata_read_s":
-                self.metadata_read_count += 1
-            elif field_name == "embedded_lyrics_read_s":
-                self.embedded_lyrics_read_count += 1
-            elif field_name == "sidecar_lookup_s":
-                self.sidecar_lookup_count += 1
-            elif field_name == "db_flush_s":
-                self.db_flush_count += 1
+        bucket = self._bucket()
+        if field_name.endswith("_count"):
+            counts = bucket["counts"]
+            counts[field_name] = counts.get(field_name, 0.0) + int(elapsed_s)
+            return
+        timings = bucket["timings"]
+        timings[field_name] = timings.get(field_name, 0.0) + elapsed_s
+
+    def merge(self) -> None:
+        with self._buckets_lock:
+            buckets = list(self._buckets)
+        for bucket in buckets:
+            for field_name, elapsed_s in bucket["timings"].items():
+                setattr(self, field_name, getattr(self, field_name) + elapsed_s)
+            for field_name, count in bucket["counts"].items():
+                setattr(self, field_name, getattr(self, field_name) + int(count))
 
 
 @dataclass(frozen=True)
@@ -649,6 +653,7 @@ class LibraryScanner(QThread):
             prune_started = time.perf_counter()
             prune_library(db)
             timings.record("db_flush_s", time.perf_counter() - prune_started)
+            timings.merge()
             self.progress_signal.emit(scanned, total, "", time.perf_counter() - started_at)
 
             total_elapsed = time.perf_counter() - started_at
