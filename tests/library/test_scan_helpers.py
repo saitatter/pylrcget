@@ -13,6 +13,7 @@ from unittest.mock import patch
 
 from core.models import FsTrack
 from db.database import (
+    add_artist,
     add_tracks,
     get_config,
     get_library_file_index,
@@ -921,6 +922,63 @@ class LibraryScannerIncrementalTests(unittest.TestCase):
                 self.assertEqual(row["lrc_lyrics"], "[00:01.00]sidecar lyrics")
             finally:
                 db.close()
+
+    def test_missing_sidecar_candidate_alias_does_not_reindex_track(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db = initialize_database(tmp)
+            db_path = str(Path(tmp) / "pylrcget.db.sqlite3")
+            music_dir = Path(tmp) / "Music"
+            music_dir.mkdir(parents=True, exist_ok=True)
+            audio = music_dir / "track.mp3"
+            touch_text(audio, "audio")
+
+            # The normalized artist key collides, so the DB keeps a display name
+            # different from the original audio metadata used for scan state.
+            add_artist(db, "Maenpaa")
+            db.close()
+
+            metadata = AudioMetadata(
+                title="Song",
+                album="Album",
+                artist="Mäenpää",
+                album_artist="Mäenpää",
+                track_number=1,
+                duration=180.0,
+            )
+
+            def fake_new_fs_track(path: str, *, signature=None, **_kwargs):
+                return FsTrack(
+                    file_path=path,
+                    file_name=audio.name,
+                    title=metadata.title,
+                    album=metadata.album,
+                    artist=metadata.artist,
+                    album_artist=metadata.album_artist,
+                    duration=metadata.duration,
+                    txt_lyrics=None,
+                    lrc_lyrics=None,
+                    track_number=metadata.track_number,
+                    modified_time=signature[0] if signature else None,
+                    file_size=signature[1] if signature else None,
+                )
+
+            with (
+                patch("ui.workers.library_scanner.read_audio_metadata_for_scan", return_value=(object(), metadata)),
+                patch("ui.workers.library_scanner.new_fs_track_from_path", side_effect=fake_new_fs_track),
+            ):
+                LibraryScanner(db_path, [str(music_dir)], scan_worker_count=1).run()
+
+            with (
+                patch(
+                    "ui.workers.library_scanner.read_audio_metadata_for_scan",
+                    side_effect=AssertionError("unchanged audio must not be reparsed"),
+                ),
+                patch(
+                    "ui.workers.library_scanner.read_lyrics_for_scan",
+                    side_effect=AssertionError("missing sidecar aliases must not refresh lyrics"),
+                ),
+            ):
+                LibraryScanner(db_path, [str(music_dir)], scan_worker_count=1).run()
 
     def test_library_scanner_skips_unchanged_reindexes_new_and_removes_missing(self):
         with tempfile.TemporaryDirectory() as tmp:

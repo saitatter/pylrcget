@@ -54,6 +54,10 @@ def _scan_mode_allows_embedded(mode: str | None) -> bool:
     return normalized not in {"sidecar_only", "sidecar-only"}
 
 
+def _no_sidecars_present(state: TrackScanState) -> bool:
+    return state.sidecar_txt_present is False and state.sidecar_lrc_present is False
+
+
 class _ScanTimingStats:
     def __init__(self) -> None:
         self.path_discovery_s = 0.0
@@ -157,22 +161,25 @@ def _scan_track_for_path(
         lyrics_file_pattern=lyrics_file_pattern,
         scan_lyrics_source_mode=scan_lyrics_source_mode,
         sidecar_lookup_cache=sidecar_lookup_cache,
-        timing_hook=None if timings is None else timings.record,
-    )
-    sidecar_started = time.perf_counter()
-    signature = get_audio_file_signature(
-        path,
-        lyrics_lookup_subdir,
-        metadata=metadata,
-        lyrics_file_pattern=lyrics_file_pattern,
-        scan_lyrics_source_mode=scan_lyrics_source_mode,
         audio_signature=audio_signature,
-        sidecar_lookup_cache=sidecar_lookup_cache,
         timing_hook=None if timings is None else timings.record,
-        count_hook=None if timings is None else timings.record,
     )
-    if timings is not None:
-        timings.record("signature_lookup_s", time.perf_counter() - sidecar_started)
+    signature = sidecar_state.file_signature
+    if signature is None:
+        sidecar_started = time.perf_counter()
+        signature = get_audio_file_signature(
+            path,
+            lyrics_lookup_subdir,
+            metadata=metadata,
+            lyrics_file_pattern=lyrics_file_pattern,
+            scan_lyrics_source_mode=scan_lyrics_source_mode,
+            audio_signature=audio_signature,
+            sidecar_lookup_cache=sidecar_lookup_cache,
+            timing_hook=None if timings is None else timings.record,
+            count_hook=None if timings is None else timings.record,
+        )
+        if timings is not None:
+            timings.record("signature_lookup_s", time.perf_counter() - sidecar_started)
     lyrics_result = read_lyrics_for_scan(
         path,
         audio=audio,
@@ -519,6 +526,7 @@ class LibraryScanner(QThread):
                                 lyrics_file_pattern=self.lyrics_file_pattern,
                                 scan_lyrics_source_mode=self.scan_lyrics_source_mode,
                                 sidecar_lookup_cache=sidecar_lookup_cache,
+                                audio_signature=discovered_signatures.get(p),
                                 timing_hook=timings.record,
                             )
                             timings.record("signature_check_s", time.perf_counter() - signature_started)
@@ -532,19 +540,42 @@ class LibraryScanner(QThread):
                                 drain_completed(block=False)
                                 continue
 
-                            legacy_signature_started = time.perf_counter()
-                            legacy_signature = get_audio_file_signature(
-                                p,
-                                self.lyrics_lookup_subdir,
-                                metadata=existing_metadata,
-                                lyrics_file_pattern=self.lyrics_file_pattern,
-                                scan_lyrics_source_mode=self.scan_lyrics_source_mode,
-                                audio_signature=discovered_signatures.get(p),
-                                sidecar_lookup_cache=sidecar_lookup_cache,
-                                timing_hook=timings.record,
-                                count_hook=timings.record,
-                            )
-                            timings.record("signature_lookup_s", time.perf_counter() - legacy_signature_started)
+                            # Normalized DB entity names can render a different set
+                            # of missing metadata-based candidates than the original
+                            # audio tags. If neither state has a sidecar, this hash-only
+                            # difference cannot change effective lyrics; update only the
+                            # scan state instead of replacing the track row.
+                            if _no_sidecars_present(previous_state) and (
+                                not current_sidecar_state.txt_present and not current_sidecar_state.lrc_present
+                            ):
+                                pending_scan_states[p] = dataclasses.replace(
+                                    previous_state,
+                                    sidecar_signature=current_sidecar_state.signature,
+                                    sidecar_txt_present=False,
+                                    sidecar_lrc_present=False,
+                                    last_scan_at=time.time(),
+                                )
+                                scanned += 1
+                                unchanged += 1
+                                maybe_emit_progress(p)
+                                drain_completed(block=False)
+                                continue
+
+                            legacy_signature = current_sidecar_state.file_signature
+                            if legacy_signature is None:
+                                legacy_signature_started = time.perf_counter()
+                                legacy_signature = get_audio_file_signature(
+                                    p,
+                                    self.lyrics_lookup_subdir,
+                                    metadata=existing_metadata,
+                                    lyrics_file_pattern=self.lyrics_file_pattern,
+                                    scan_lyrics_source_mode=self.scan_lyrics_source_mode,
+                                    audio_signature=discovered_signatures.get(p),
+                                    sidecar_lookup_cache=sidecar_lookup_cache,
+                                    timing_hook=timings.record,
+                                    count_hook=timings.record,
+                                )
+                                timings.record("signature_lookup_s", time.perf_counter() - legacy_signature_started)
                             sidecar_result = _scan_sidecar_only_for_path(
                                 p,
                                 replace_existing=True,
@@ -591,6 +622,7 @@ class LibraryScanner(QThread):
                                 lyrics_file_pattern=self.lyrics_file_pattern,
                                 scan_lyrics_source_mode=self.scan_lyrics_source_mode,
                                 sidecar_lookup_cache=sidecar_lookup_cache,
+                                audio_signature=discovered_signatures.get(p),
                                 timing_hook=timings.record,
                             )
                             track_id = existing_track_ids.get(p)
