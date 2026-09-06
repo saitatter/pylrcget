@@ -364,14 +364,19 @@ class LyricsDownloadWorkerTests(unittest.TestCase):
                 fake_lyrics = SimpleNamespace(synced_lyrics=None, plain_lyrics="plain text")
                 with patch("ui.workers.bulk_lyrics_download_worker.LrcLibAPI") as api_cls, patch(
                     "ui.workers.bulk_lyrics_download_worker.ThreadPoolExecutor"
-                ) as executor_cls:
+                ) as executor_cls, patch(
+                    "ui.workers.bulk_lyrics_download_worker.DOWNLOAD_MAX_PENDING_MULTIPLIER",
+                    1,
+                ):
                     api_cls.return_value.get_lyrics.return_value = fake_lyrics
                     executor_cls.return_value.submit.side_effect = _ImmediateFuture
 
+                    pending_sizes: list[int] = []
                     with patch("ui.workers.bulk_lyrics_download_worker.wait") as wait_mock:
                         def fake_wait(pending, timeout, return_when):
                             del timeout
                             del return_when
+                            pending_sizes.append(len(pending))
                             future = next(iter(pending))
                             return {future}, set(pending) - {future}
 
@@ -380,6 +385,7 @@ class LyricsDownloadWorkerTests(unittest.TestCase):
 
                 executor_cls.assert_called_once()
                 self.assertLessEqual(executor_cls.call_args.kwargs["max_workers"], MAX_PARALLEL_DOWNLOAD_WORKERS)
+                self.assertLessEqual(max(pending_sizes), executor_cls.call_args.kwargs["max_workers"])
                 self.assertEqual(len(finished), 1)
                 self.assertEqual(finished[0][2]["ok"], len(track_ids))
                 completed_values = [current for current, *_ in progress if current >= 0]
@@ -414,7 +420,7 @@ class LyricsDownloadWorkerTests(unittest.TestCase):
                 with patch("ui.workers.bulk_lyrics_download_worker.ThreadPoolExecutor") as executor_cls:
                     future = executor_cls.return_value.submit.return_value
 
-                    with patch.object(worker, "isInterruptionRequested", side_effect=[False, True, True, True]):
+                    with patch.object(worker, "isInterruptionRequested", side_effect=[False, False, True, True]):
                         worker.run()
 
                 future.cancel.assert_called_once()

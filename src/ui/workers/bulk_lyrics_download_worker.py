@@ -21,6 +21,7 @@ from ui.services.lyrics_download_service import (
 from ui.services.lyrics_match_retry import LyricsMatchCandidate
 
 MAX_PARALLEL_DOWNLOAD_WORKERS = 4
+DOWNLOAD_MAX_PENDING_MULTIPLIER = 4
 DOWNLOAD_CANCEL_POLL_INTERVAL_S = 0.05
 
 
@@ -140,8 +141,22 @@ class BulkLyricsDownloadWorker(QThread):
                 )
                 executor = ThreadPoolExecutor(max_workers=worker_count)
                 pending = {}
+                next_job_index = 0
+                max_pending = worker_count * DOWNLOAD_MAX_PENDING_MULTIPLIER
+
+                def submit_available() -> None:
+                    nonlocal next_job_index
+                    while (
+                        next_job_index < len(jobs)
+                        and len(pending) < max_pending
+                        and not self.isInterruptionRequested()
+                    ):
+                        job = jobs[next_job_index]
+                        next_job_index += 1
+                        pending[executor.submit(self._fetch_job_match, job)] = job
+
                 try:
-                    pending = {executor.submit(self._fetch_job_match, job): job for job in jobs}
+                    submit_available()
                     while pending:
                         if self.isInterruptionRequested():
                             cancelled = True
@@ -187,6 +202,11 @@ class BulkLyricsDownloadWorker(QThread):
                                 msg = "No usable lyrics found on LRCLIB for this track."
                             self.itemFinished.emit(job.track_id, candidate is not None, job.label, msg)
                             self.progress.emit(completed, total, job.label, msg, self._elapsed())
+
+                        if self.isInterruptionRequested():
+                            cancelled = True
+                            break
+                        submit_available()
 
                     if self.isInterruptionRequested():
                         cancelled = True
