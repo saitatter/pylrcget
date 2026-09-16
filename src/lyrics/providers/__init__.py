@@ -34,6 +34,7 @@ from .tidal import (
     TidalTrack,
     TidalTrackResolution,
 )
+from .tidal_auth import TidalAccessContext, TidalSessionProvider
 from .tidal_cache import CachedTidalCatalogueResolver
 from .tidal_transport import (
     ExternalTidalHelperError,
@@ -59,11 +60,13 @@ __all__ = [
     "LyricsResultSelector",
     "MatchQuality",
     "SelectionDecision",
+    "TidalAccessContext",
     "TidalCatalogueClient",
     "TidalCatalogueError",
     "TidalCatalogueNotFoundError",
     "TidalLyricsPayload",
     "TidalLyricsTransport",
+    "TidalSessionProvider",
     "TidalTrack",
     "TidalTrackResolution",
     "TrackLookupContext",
