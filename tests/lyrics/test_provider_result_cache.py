@@ -33,6 +33,17 @@ def test_provider_result_cache_can_store_successful_match():
     assert cached is result
 
 
+def test_provider_result_cache_evicts_oldest_entry_at_bound():
+    cache = ProviderLookupResultCache(max_entries=2)
+
+    cache.put(_key(), None)
+    cache.put(("lrclib", "isrc-2", "artist", "title", "album", 180), None)
+    cache.put(("lrclib", "isrc-3", "artist", "title", "album", 180), None)
+
+    assert cache.get(_key()) == (False, None)
+    assert cache.size == 2
+
+
 def test_bulk_worker_reuses_completed_lookup_result():
     worker = BulkLyricsDownloadWorker("unused.sqlite", [], "https://lrclib.net/api")
     job = _job(track_id=1)

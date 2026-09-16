@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import threading
+from collections import OrderedDict
 from typing import cast
 
 from .contracts import LyricsProviderResult
@@ -13,9 +14,12 @@ class ProviderLookupResultCache:
 
     _NOT_CACHED = object()
 
-    def __init__(self) -> None:
+    def __init__(self, max_entries: int = 8192) -> None:
+        if int(max_entries) < 1:
+            raise ValueError("Provider result cache must allow at least one entry")
         self._lock = threading.Lock()
-        self._values: dict[LookupKey, LyricsProviderResult | None] = {}
+        self._max_entries = int(max_entries)
+        self._values: OrderedDict[LookupKey, LyricsProviderResult | None] = OrderedDict()
         self._hits = 0
 
     def get(self, key: LookupKey) -> tuple[bool, LyricsProviderResult | None]:
@@ -23,6 +27,7 @@ class ProviderLookupResultCache:
             value = self._values.get(key, self._NOT_CACHED)
             if value is self._NOT_CACHED:
                 return False, None
+            self._values.move_to_end(key)
             self._hits += 1
             return True, cast(LyricsProviderResult | None, value)
 
@@ -31,6 +36,9 @@ class ProviderLookupResultCache:
 
         with self._lock:
             self._values[key] = result
+            self._values.move_to_end(key)
+            while len(self._values) > self._max_entries:
+                self._values.popitem(last=False)
 
     @property
     def hits(self) -> int:
