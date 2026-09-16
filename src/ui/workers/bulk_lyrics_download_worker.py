@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import sqlite3
 import threading
 import time
@@ -17,7 +18,10 @@ from lyrics.providers import (
     LyricsProviderRouter,
     ProviderHealthState,
     ProviderLookupResultCache,
+    build_lookup_diagnostics,
     get_provider_execution_policy,
+    log_lookup_diagnostics,
+    lyrics_result_type,
 )
 from lyrics.providers.contracts import LyricsProviderResult, TrackLookupContext
 from lyrics.source_settings import LYRICS_SOURCE_LABELS
@@ -370,6 +374,29 @@ class BulkLyricsDownloadWorker(QThread):
         lookup_key = self._lookup_key(job)
         cache_hit, cached_result = self._lookup_result_cache.get(lookup_key)
         if cache_hit:
+            log_lookup_diagnostics(
+                logging.getLogger(__name__),
+                build_lookup_diagnostics(
+                    provider=job.provider_id,
+                    track_id=job.track_id,
+                    lookup_method="bulk_result_cache",
+                    isrc_lookup="not_requested",
+                    candidate_count=1 if cached_result is not None else 0,
+                    selected_remote_id=(cached_result.provider_track_id if cached_result is not None else None),
+                    score=(cached_result.match_score if cached_result is not None else None),
+                    reason="cache_hit",
+                    result_type=(
+                        lyrics_result_type(
+                            cached_result.plain_lyrics,
+                            cached_result.synced_lyrics,
+                        )
+                        if cached_result is not None
+                        else "no_match"
+                    ),
+                    elapsed_ms=0.0,
+                    cache_hit=True,
+                ),
+            )
             return _DownloadFetchResult(job=job, match=cached_result)
 
         api = self._api_for_current_thread()

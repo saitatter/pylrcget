@@ -7,6 +7,12 @@ from .contracts import (
     LyricsProviderResult,
     TrackLookupContext,
 )
+from .diagnostics import (
+    build_lookup_diagnostics,
+    http_status_category,
+    log_lookup_diagnostics,
+    lyrics_result_type,
+)
 from .errors import ProviderError, ProviderErrorKind, classify_provider_error
 from .execution import ProviderExecutionPolicy, get_provider_execution_policy
 from .health import ProviderHealthState, is_fatal_provider_error
@@ -82,10 +88,14 @@ __all__ = [
     "TrackLookupContext",
     "TrackMatchMetadata",
     "TrackMatchScore",
+    "build_lookup_diagnostics",
     "classify_provider_error",
     "get_provider_execution_policy",
+    "http_status_category",
     "is_fatal_provider_error",
     "local_metadata_fingerprint",
+    "log_lookup_diagnostics",
+    "lyrics_result_type",
     "normalize_isrc",
     "normalize_match_text",
     "provider_result_metadata",

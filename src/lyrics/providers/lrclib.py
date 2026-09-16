@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import logging
 import threading
+import time
 from collections.abc import Callable
 
 from core.lrclib_client import LrcLibAPI
@@ -11,6 +13,13 @@ from .contracts import (
     LyricsProviderResult,
     TrackLookupContext,
 )
+from .diagnostics import (
+    build_lookup_diagnostics,
+    log_lookup_diagnostics,
+    lyrics_result_type,
+)
+
+logger = logging.getLogger(__name__)
 
 
 class LrclibProvider:
@@ -67,23 +76,69 @@ class LrclibProvider:
                 return False
             return self._before_request is None or self._before_request()
 
-        match = find_best_lyrics_match(
-            self._api,
-            notify=self._notify,
-            track_id=int(track.track_id or 0),
-            track_label=label,
-            title=title,
-            artist=artist,
-            album=album,
-            duration_s=duration_s,
-            before_request=before_request,
-            on_rate_limit=self._on_rate_limit,
-        )
+        started_at = time.perf_counter()
+        try:
+            match = find_best_lyrics_match(
+                self._api,
+                notify=self._notify,
+                track_id=int(track.track_id or 0),
+                track_label=label,
+                title=title,
+                artist=artist,
+                album=album,
+                duration_s=duration_s,
+                before_request=before_request,
+                on_rate_limit=self._on_rate_limit,
+            )
+        except Exception as error:
+            diagnostics = build_lookup_diagnostics(
+                provider=self.provider_id,
+                track_id=track.track_id,
+                lookup_method="lrclib",
+                isrc_lookup="not_supported",
+                candidate_count=0,
+                selected_remote_id=None,
+                score=None,
+                reason=type(error).__name__,
+                result_type="error",
+                elapsed_ms=(time.perf_counter() - started_at) * 1000,
+            )
+            log_lookup_diagnostics(logger, diagnostics)
+            raise
         if match is None:
+            diagnostics = build_lookup_diagnostics(
+                provider=self.provider_id,
+                track_id=track.track_id,
+                lookup_method="lrclib",
+                isrc_lookup="not_supported",
+                candidate_count=0,
+                selected_remote_id=None,
+                score=None,
+                reason="no_match",
+                result_type="no_match",
+                elapsed_ms=(time.perf_counter() - started_at) * 1000,
+            )
+            log_lookup_diagnostics(logger, diagnostics)
             return None
 
         source = match.result
         provider_track_id = getattr(source, "id", None)
+        diagnostics = build_lookup_diagnostics(
+            provider=self.provider_id,
+            track_id=track.track_id,
+            lookup_method=match.query_label,
+            isrc_lookup="not_supported",
+            candidate_count=1,
+            selected_remote_id=str(provider_track_id) if provider_track_id is not None else None,
+            score=match.score,
+            reason="match",
+            result_type=lyrics_result_type(
+                getattr(source, "plain_lyrics", None),
+                getattr(source, "synced_lyrics", None),
+            ),
+            elapsed_ms=(time.perf_counter() - started_at) * 1000,
+        )
+        log_lookup_diagnostics(logger, diagnostics)
         return LyricsProviderResult(
             provider=self.provider_id,
             provider_track_id=str(provider_track_id) if provider_track_id is not None else None,
@@ -99,5 +154,5 @@ class LrclibProvider:
                 float(source.duration) if getattr(source, "duration", None) is not None else None
             ),
             remote_isrc=getattr(source, "isrc", None),
-            diagnostics={"query_label": match.query_label},
+            diagnostics={"query_label": match.query_label, **diagnostics},
         )

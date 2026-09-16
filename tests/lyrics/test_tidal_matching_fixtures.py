@@ -42,6 +42,9 @@ def test_fixture_exact_isrc_match_is_deterministic_and_single_request():
     assert result.track.provider_track_id == "tidal-exact"
     assert result.score.quality is MatchQuality.EXACT_ID
     assert result.score.method == "exact isrc"
+    assert result.score.diagnostics["isrc_lookup"] == "hit"
+    assert result.score.diagnostics["candidate_count"] == 1
+    assert result.score.diagnostics["selected_remote_id"] == "tidal-exact"
     assert session.get.call_count == 1
 
 

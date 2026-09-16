@@ -1,13 +1,16 @@
 from __future__ import annotations
 
+import logging
 import re
+import time
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from urllib.parse import quote
 
 import requests
 
 from .contracts import TrackLookupContext
+from .diagnostics import build_lookup_diagnostics, log_lookup_diagnostics
 from .matching import (
     MatchQuality,
     TrackMatchMetadata,
@@ -15,6 +18,8 @@ from .matching import (
     normalize_isrc,
     score_track_match,
 )
+
+logger = logging.getLogger(__name__)
 
 TIDAL_CATALOGUE_BASE_URL = "https://openapi.tidal.com/v2"
 TIDAL_DEFAULT_TIMEOUT_S = 10.0
@@ -127,13 +132,31 @@ class TidalCatalogueClient:
         return tracks[0]
 
     def resolve_track(self, local: TrackLookupContext) -> TidalTrackResolution | None:
+        started_at = time.perf_counter()
         candidates: list[TidalTrack] = []
+        lookup_method = "metadata"
+        isrc_lookup = "not_requested"
         if local.isrc:
             candidates.extend(self.lookup_by_isrc(local.isrc))
+            isrc_lookup = "hit" if candidates else "miss"
+            lookup_method = "isrc" if candidates else "metadata"
         if not candidates:
             primary_artist = local.artists[0] if local.artists else ""
             candidates.extend(self.search_tracks(local.title or "", primary_artist))
         if not candidates:
+            diagnostics = build_lookup_diagnostics(
+                provider="tidal",
+                track_id=local.track_id,
+                lookup_method=lookup_method,
+                isrc_lookup=isrc_lookup,
+                candidate_count=0,
+                selected_remote_id=None,
+                score=None,
+                reason="no_candidates",
+                result_type="no_match",
+                elapsed_ms=(time.perf_counter() - started_at) * 1000,
+            )
+            log_lookup_diagnostics(logger, diagnostics)
             return None
 
         scored = [
@@ -143,8 +166,37 @@ class TidalCatalogueClient:
         scored.sort(key=lambda item: (-item[0].score, item[1].provider_track_id))
         score, track = scored[0]
         if score.quality not in {MatchQuality.EXACT_ID, MatchQuality.HIGH}:
+            diagnostics = build_lookup_diagnostics(
+                provider="tidal",
+                track_id=local.track_id,
+                lookup_method=lookup_method,
+                isrc_lookup=isrc_lookup,
+                candidate_count=len(candidates),
+                selected_remote_id=track.provider_track_id,
+                score=score.score,
+                reason="low_confidence",
+                result_type="low_confidence",
+                elapsed_ms=(time.perf_counter() - started_at) * 1000,
+            )
+            log_lookup_diagnostics(logger, diagnostics)
             return None
-        return TidalTrackResolution(track=track, score=score)
+        diagnostics = build_lookup_diagnostics(
+            provider="tidal",
+            track_id=local.track_id,
+            lookup_method=lookup_method,
+            isrc_lookup=isrc_lookup,
+            candidate_count=len(candidates),
+            selected_remote_id=track.provider_track_id,
+            score=score.score,
+            reason=score.method,
+            result_type="match",
+            elapsed_ms=(time.perf_counter() - started_at) * 1000,
+        )
+        log_lookup_diagnostics(logger, diagnostics)
+        return TidalTrackResolution(
+            track=track,
+            score=replace(score, diagnostics={**score.diagnostics, **diagnostics}),
+        )
 
     def _get(self, path: str, *, params: dict[str, object]) -> dict:
         headers = {
