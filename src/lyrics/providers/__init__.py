@@ -14,7 +14,11 @@ from .diagnostics import (
     lyrics_result_type,
 )
 from .errors import ProviderError, ProviderErrorKind, classify_provider_error
-from .execution import ProviderExecutionPolicy, get_provider_execution_policy
+from .execution import (
+    ProviderExecutionCoordinator,
+    ProviderExecutionPolicy,
+    get_provider_execution_policy,
+)
 from .health import ProviderHealthState, is_fatal_provider_error
 from .lrclib import LrclibProvider
 from .matching import (
@@ -73,6 +77,7 @@ __all__ = [
     "MatchQuality",
     "ProviderError",
     "ProviderErrorKind",
+    "ProviderExecutionCoordinator",
     "ProviderExecutionPolicy",
     "ProviderHealthState",
     "ProviderLookupResultCache",

@@ -20,6 +20,7 @@ from lyrics.providers import (
     LrclibProvider,
     LyricsProvider,
     LyricsProviderRouter,
+    ProviderExecutionCoordinator,
     ProviderHealthState,
     ProviderLookupResultCache,
     TidalCatalogueClient,
@@ -144,6 +145,7 @@ class BulkLyricsDownloadWorker(QThread):
         self._thread_local = threading.local()
         self._rate_limit_cooldown = _SharedRateLimitCooldown()
         self._lookup_result_cache = ProviderLookupResultCache()
+        self._execution_coordinator = ProviderExecutionCoordinator()
         self._provider_health = ProviderHealthState()
         self._lyrics_source_settings: dict[str, object] = default_lyrics_source_settings()
 
@@ -152,6 +154,7 @@ class BulkLyricsDownloadWorker(QThread):
         self._started_at = time.perf_counter()
         self._rate_limit_cooldown = _SharedRateLimitCooldown()
         self._lookup_result_cache.clear()
+        self._execution_coordinator.clear()
         self._provider_health.clear()
         ok_count = 0
         fail_count = 0
@@ -440,6 +443,7 @@ class BulkLyricsDownloadWorker(QThread):
                 lookup_context,
                 requested_mode=self.download_mode,
                 health_state=self._provider_health,
+                execution_coordinator=self._execution_coordinator,
             )
             self._lookup_result_cache.put(lookup_key, match)
             return _DownloadFetchResult(job=job, match=match)

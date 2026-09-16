@@ -12,6 +12,7 @@ from .contracts import (
     TrackLookupContext,
 )
 from .errors import ProviderErrorKind, classify_provider_error
+from .execution import ProviderExecutionCoordinator
 from .health import ProviderHealthState
 
 ACCEPT_FINAL: Final = "ACCEPT_FINAL"
@@ -65,6 +66,7 @@ class LyricsProviderRouter:
         requested_mode: DownloadMode,
         cancel_event: threading.Event | None = None,
         health_state: ProviderHealthState | None = None,
+        execution_coordinator: ProviderExecutionCoordinator | None = None,
     ) -> LyricsProviderResult | None:
         selector = LyricsResultSelector()
         fallback: LyricsProviderResult | None = None
@@ -75,6 +77,11 @@ class LyricsProviderRouter:
             provider_id = getattr(provider, "provider_id", provider.__class__.__name__)
             if health_state is not None and not health_state.is_available(provider_id):
                 continue
+            if execution_coordinator is not None and not execution_coordinator.acquire(
+                provider_id,
+                lambda: cancel_event is not None and cancel_event.is_set(),
+            ):
+                return None
             try:
                 candidate = provider.lookup(
                     track,
@@ -89,6 +96,9 @@ class LyricsProviderRouter:
                 if index == len(self.providers) - 1:
                     raise
                 continue
+            finally:
+                if execution_coordinator is not None:
+                    execution_coordinator.release(provider_id)
             if candidate is None:
                 continue
 

@@ -2,7 +2,14 @@ from __future__ import annotations
 
 import pytest
 
-from lyrics.providers import ProviderExecutionPolicy, get_provider_execution_policy
+from lyrics.providers import (
+    LyricsProviderCapabilities,
+    LyricsProviderRouter,
+    ProviderExecutionCoordinator,
+    ProviderExecutionPolicy,
+    TrackLookupContext,
+    get_provider_execution_policy,
+)
 
 
 def test_provider_policies_are_conservative_and_lrclib_keeps_current_limit():
@@ -20,3 +27,33 @@ def test_provider_execution_policy_rejects_invalid_limits():
         ProviderExecutionPolicy(max_concurrency=0)
     with pytest.raises(ValueError):
         ProviderExecutionPolicy(max_concurrency=1, min_request_interval=-1)
+
+
+def test_execution_coordinator_allows_and_releases_provider_slot():
+    coordinator = ProviderExecutionCoordinator()
+
+    assert coordinator.acquire("lrclib", lambda: False) is True
+    coordinator.release("lrclib")
+
+
+def test_router_releases_provider_slot_after_lookup():
+    class Provider:
+        provider_id = "lrclib"
+        display_name = "LRCLIB"
+
+        def capabilities(self):
+            return LyricsProviderCapabilities(True, True, True, False, False)
+
+        def lookup(self, track, *, requested_mode, cancel_event=None):
+            del track, requested_mode, cancel_event
+
+    track = TrackLookupContext(1, "song.mp3", "Song", ("Artist",), "Album", "Artist", 180.0, 1, None)
+    coordinator = ProviderExecutionCoordinator()
+
+    assert LyricsProviderRouter((Provider(),)).lookup(
+        track,
+        requested_mode="prefer_synced",
+        execution_coordinator=coordinator,
+    ) is None
+    assert coordinator.acquire("lrclib", lambda: False) is True
+    coordinator.release("lrclib")
