@@ -26,6 +26,13 @@ from .router import (
     LyricsResultSelector,
     SelectionDecision,
 )
+from .tidal import (
+    TidalCatalogueClient,
+    TidalCatalogueError,
+    TidalCatalogueNotFoundError,
+    TidalTrack,
+    TidalTrackResolution,
+)
 
 __all__ = [
     "ACCEPT_FINAL",
@@ -41,6 +48,11 @@ __all__ = [
     "LyricsResultSelector",
     "MatchQuality",
     "SelectionDecision",
+    "TidalCatalogueClient",
+    "TidalCatalogueError",
+    "TidalCatalogueNotFoundError",
+    "TidalTrack",
+    "TidalTrackResolution",
     "TrackLookupContext",
     "TrackMatchMetadata",
     "TrackMatchScore",
