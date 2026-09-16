@@ -23,9 +23,10 @@ from db.database import (
 from library.scan_library import (
     AudioMetadata,
     MutagenError,
+    ScanRootUnavailableError,
     SidecarLookupCache,
-    get_audio_signature,
     get_audio_file_signature,
+    get_audio_signature,
     get_sidecar_scan_state,
     iter_audio_paths,
     iter_audio_paths_with_audio_signatures,
@@ -37,7 +38,11 @@ from library.scan_library import (
 )
 from tests import test_support as _test_support  # noqa: F401
 from tests.test_support import make_fs_track, touch_text
-from ui.workers.library_scanner import LibraryScanner, _ScanTimingStats, _scan_worker_count
+from ui.workers.library_scanner import (
+    LibraryScanner,
+    _scan_worker_count,
+    _ScanTimingStats,
+)
 
 
 class ScanLibraryHelpersTests(unittest.TestCase):
@@ -581,6 +586,111 @@ class ScanLibraryHelpersTests(unittest.TestCase):
 
 
 class LibraryScannerIncrementalTests(unittest.TestCase):
+    def test_unavailable_configured_root_aborts_without_reconciling_tracks(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db = initialize_database(tmp)
+            db_path = str(Path(tmp) / "pylrcget.db.sqlite3")
+            music_dir = Path(tmp) / "Music"
+            music_dir.mkdir(parents=True, exist_ok=True)
+            audio = music_dir / "song.mp3"
+            touch_text(audio, "audio")
+            add_tracks(
+                db,
+                [
+                    replace(
+                        make_fs_track(audio, artist="Artist", album="Album", title="Song"),
+                        txt_lyrics="saved lyrics",
+                    )
+                ],
+            )
+            db.close()
+
+            missing_root = Path(tmp) / "offline-share"
+            with self.assertRaises(ScanRootUnavailableError):
+                iter_audio_paths_with_signatures(
+                    [str(missing_root)],
+                    strict_roots=True,
+                )
+
+            finished: list[tuple[bool, str]] = []
+            scanner = LibraryScanner(db_path, [str(missing_root)], scan_worker_count=1)
+            scanner.finished_signal.connect(lambda ok, message: finished.append((ok, message)))
+            scanner.run()
+
+            self.assertEqual(len(finished), 1)
+            self.assertFalse(finished[0][0])
+            self.assertIn("unavailable", finished[0][1])
+
+            db = sqlite3.connect(db_path)
+            db.row_factory = sqlite3.Row
+            try:
+                row = db.execute(
+                    "SELECT title, txt_lyrics FROM tracks WHERE file_path = ?",
+                    (str(audio),),
+                ).fetchone()
+                self.assertIsNotNone(row)
+                self.assertEqual(row["title"], "Song")
+                self.assertEqual(row["txt_lyrics"], "saved lyrics")
+            finally:
+                db.close()
+
+    def test_library_scanner_cancels_before_discovery(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db = initialize_database(tmp)
+            db_path = str(Path(tmp) / "pylrcget.db.sqlite3")
+            db.close()
+            scanner = LibraryScanner(db_path, [str(Path(tmp) / "Music")], scan_worker_count=1)
+            scanner.isInterruptionRequested = lambda: True
+            finished: list[tuple[bool, str]] = []
+            scanner.finished_signal.connect(lambda ok, message: finished.append((ok, message)))
+
+            with patch(
+                "ui.workers.library_scanner.iter_audio_paths_with_signatures_and_audio_signatures",
+                side_effect=AssertionError("cancelled scan must not start discovery"),
+            ):
+                scanner.run()
+
+            self.assertEqual(finished, [(False, "Library scan cancelled.")])
+
+    def test_library_scanner_cancels_after_discovery_without_reconciling_tracks(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db = initialize_database(tmp)
+            db_path = str(Path(tmp) / "pylrcget.db.sqlite3")
+            music_dir = Path(tmp) / "Music"
+            music_dir.mkdir(parents=True, exist_ok=True)
+            audio = music_dir / "song.mp3"
+            touch_text(audio, "audio")
+            add_tracks(
+                db,
+                [make_fs_track(audio, artist="Artist", album="Album", title="Song")],
+            )
+            db.close()
+
+            interrupted_checks = 0
+
+            def is_interrupted() -> bool:
+                nonlocal interrupted_checks
+                interrupted_checks += 1
+                return interrupted_checks >= 2
+
+            scanner = LibraryScanner(db_path, [str(music_dir)], scan_worker_count=1)
+            scanner.isInterruptionRequested = is_interrupted
+            finished: list[tuple[bool, str]] = []
+            scanner.finished_signal.connect(lambda ok, message: finished.append((ok, message)))
+
+            with patch(
+                "ui.workers.library_scanner.iter_audio_paths_with_signatures_and_audio_signatures",
+                return_value=([], {}, {}),
+            ):
+                scanner.run()
+
+            self.assertEqual(finished, [(False, "Library scan cancelled.")])
+            db = sqlite3.connect(db_path)
+            try:
+                self.assertEqual(db.execute("SELECT COUNT(*) FROM tracks").fetchone()[0], 1)
+            finally:
+                db.close()
+
     def test_scan_timing_stats_accumulate_worker_local_buckets(self):
         timings = _ScanTimingStats()
 

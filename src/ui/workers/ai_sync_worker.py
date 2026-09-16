@@ -8,10 +8,15 @@ import os
 import queue
 import subprocess
 import threading
+import uuid
 
 from PySide6.QtCore import QThread, Signal
 
-from .ai_runtime import resolve_ai_runtime_python, resolve_ai_runtime_source
+from .ai_runtime import (
+    resolve_ai_runtime_python,
+    resolve_ai_runtime_source,
+    resolve_torch_device,
+)
 from .ai_sync_alignment import (
     _align_lyrics_to_segments,
     _align_lyrics_to_segments_viterbi,
@@ -131,19 +136,7 @@ class AiSyncWorker(QThread):
         self._enable_demucs_candidate = bool(enable_demucs_candidate)
 
     def _resolve_device(self) -> str:
-        import torch
-        if self._device and self._device != "auto":
-            if self._device == "cuda" and not torch.cuda.is_available():
-                raise RuntimeError(
-                    "CUDA was selected, but the external Torch runtime has no CUDA support. "
-                    "Install a CUDA-enabled Torch build or select Auto/CPU."
-                )
-            return self._device
-        if torch.cuda.is_available():
-            return "cuda"
-        if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
-            return "mps"
-        return "cpu"
+        return resolve_torch_device(self._device)
 
     def _emit_stage(self, current: int, total: int, message: str) -> None:
         self.progress.emit(f"{self._PROGRESS_MARKER}|{int(current)}|{int(total)}|{message}")
@@ -157,7 +150,7 @@ class AiSyncWorker(QThread):
     def _run_in_subprocess(self) -> None:
         external_python = resolve_ai_runtime_python()
         if external_python is not None:
-            self._run_in_external_subprocess(external_python)
+            self._run_in_persistent_external_runtime(external_python)
             return
 
         from .ai_sync_process import run_ai_sync_process
@@ -215,6 +208,47 @@ class AiSyncWorker(QThread):
                 process.terminate()
             process.join(timeout=2.0)
             messages.close()
+
+    def _run_in_persistent_external_runtime(self, python_path) -> None:
+        source_root = resolve_ai_runtime_source()
+        if source_root is None:
+            self.completed.emit(
+                False,
+                "External AI runtime is configured but the PyLrcGet source runtime is unavailable.",
+                "",
+            )
+            return
+        from .ai_sync_service import get_persistent_ai_runtime
+
+        config = {
+            "job_id": uuid.uuid4().hex,
+            "audio_path": self.audio_path,
+            "plain_lyrics": self.plain_lyrics,
+            "manual_anchors": self.manual_anchors,
+            "whisper_model": self.whisper_model,
+            "device": self._device,
+            "language": self._language,
+            "enable_fuzzy": self._enable_fuzzy,
+            "fuzzy_threshold": self._fuzzy_threshold,
+            "fuzzy_window_words": self._fuzzy_window_words,
+            "enable_demucs_candidate": self._enable_demucs_candidate,
+        }
+        service = get_persistent_ai_runtime(
+            python_path,
+            source_root,
+            device=self._device,
+        )
+        try:
+            ok, message, output = service.run(
+                config,
+                on_progress=self.progress.emit,
+                is_cancelled=self.isInterruptionRequested,
+            )
+        except (OSError, RuntimeError) as exc:
+            logger.warning("Persistent AI runtime failed; using one-shot fallback: %s", exc)
+            self._run_in_external_subprocess(python_path)
+            return
+        self.completed.emit(ok, message, output)
 
     def _run_in_external_subprocess(self, python_path) -> None:
         source_root = resolve_ai_runtime_source()

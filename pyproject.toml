@@ -18,6 +18,11 @@ ai = [
     "soundfile",
     "g2p-en",
 ]
+dev = [
+    "pytest==9.1.1",
+    "pytest-cov==7.1.0",
+    "ruff==0.16.7",
+]
 
 [tool.semantic_release]
 version_toml = ["pyproject.toml:project.version"]
@@ -50,3 +55,14 @@ ignore_merge_commits = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+addopts = ["--strict-markers"]
+markers = [
+    "slow: tests that are intentionally slower than the unit-test budget",
+    "gpu: tests that require a CUDA or other accelerator runtime",
+    "network: tests that access an external network service",
+    "integration: tests that cross a process, database, or external-runtime boundary",
+    "readonly: tests that may inspect a user-selected library but must not modify it",
+]
+
+[tool.ruff]
+target-version = "py310"

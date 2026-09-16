@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import tempfile
+from pathlib import Path
 from unittest import TestCase
 from unittest.mock import MagicMock, patch
 
 import requests
 
+from db.database import initialize_database
 from tests import test_support as _test_support  # noqa: F401
 from ui.dialogs.publish_lyrics_dialog import PublishWorker
 from ui.workers.bulk_publish_instrumental_worker import BulkPublishInstrumentalWorker
@@ -12,6 +15,29 @@ from ui.workers.bulk_publish_worker import BulkPublishWorker
 
 
 class PublishRetryTests(TestCase):
+    def test_bulk_instrumental_publish_reports_cancellation_as_failure(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db = initialize_database(tmp)
+            db.close()
+            worker = BulkPublishInstrumentalWorker(
+                str(Path(tmp) / "pylrcget.db.sqlite3"),
+                [1],
+                "https://example.invalid/api",
+            )
+            finished: list[tuple[bool, str, dict]] = []
+            worker.finished.connect(lambda ok, msg, stats: finished.append((ok, msg, stats)))
+            worker.isInterruptionRequested = lambda: True
+
+            with patch("ui.workers.bulk_publish_instrumental_worker.LrcLibAPI"):
+                worker.run()
+
+            self.assertEqual(len(finished), 1)
+            ok, message, stats = finished[0]
+            self.assertFalse(ok)
+            self.assertIn("cancelled", message.lower())
+            self.assertTrue(stats["cancelled"])
+            self.assertEqual(stats["ok"], 0)
+
     def test_publish_dialog_retries_request_challenge_timeout(self):
         payload = {
             "title": "Song",

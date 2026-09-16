@@ -1000,6 +1000,12 @@ class MainWindow(QMainWindow):
                 )
                 event.ignore()
                 return
+        try:
+            from ui.workers.ai_sync_service import shutdown_all_ai_runtimes
+
+            shutdown_all_ai_runtimes()
+        except (ImportError, OSError, RuntimeError):
+            pass
         self.downloads.cancel()
         if self.scanner is not None and self.scanner.isRunning():
             self.scanner.requestInterruption()

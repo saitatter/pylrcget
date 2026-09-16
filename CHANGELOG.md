@@ -209,7 +209,7 @@ updated-dependencies:
   - Report staged progress (load/transcribe/align/select/build) to the UI
   - Cache WhisperX + alignment models; add relaxed-VAD retry and pass selection
   - Add tail-rescue for late repeated lines collapsing onto earlier clusters
-  - Document detection/alignment methods (AI_SYNC_WORKER_METHODS.md) and add tests
+  - Document detection/alignment methods and add tests
   Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
 * Harden ai sync alignment and document scoring pipeline ([55b413d](https://github.com/saitatter/pylrcget/commit/55b413dc849fdd2ca2d55e4becac4cc965dd6134))
   Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>

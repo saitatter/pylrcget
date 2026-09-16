@@ -23,10 +23,11 @@ from db.database import (
 )
 from db.query_modules.track_queries import TrackBatchInserter
 from library.scan_library import (
+    ScanRootUnavailableError,
     SidecarLookupCache,
+    get_audio_file_signature,
     get_audio_signature,
     get_sidecar_scan_state,
-    get_audio_file_signature,
     iter_audio_paths_with_signatures_and_audio_signatures,
     new_fs_track_from_path,
     read_audio_metadata_for_scan,
@@ -366,13 +367,20 @@ class LibraryScanner(QThread):
                 for path, track_id in existing_track_ids.items()
                 if track_id in scan_state_index
             }
+            if self.isInterruptionRequested():
+                self.finished_signal.emit(False, "Library scan cancelled.")
+                return
             discovery_started = time.perf_counter()
             paths, discovered_signatures, discovered_audio_signatures = iter_audio_paths_with_signatures_and_audio_signatures(
                 self.directories,
                 excluded_paths=self.excluded_paths,
                 excluded_patterns=self.excluded_patterns,
+                strict_roots=True,
             )
             timings.record("path_discovery_s", time.perf_counter() - discovery_started)
+            if self.isInterruptionRequested():
+                self.finished_signal.emit(False, "Library scan cancelled.")
+                return
             total = len(paths)
             scanned = 0
             unchanged = 0
@@ -784,7 +792,11 @@ class LibraryScanner(QThread):
             if reattached:
                 msg += f" Reattached lyrics for {reattached} moved file(s)."
             self.finished_signal.emit(True, msg)
-        except Exception as e:  # noqa: BLE001
+        except ScanRootUnavailableError as exc:
+            logger.error("Library scan aborted before reconciliation: %s", exc)
+            self.finished_signal.emit(False, f"Scan failed: {exc}")
+        except Exception as e:
+            logger.exception("Library scan failed")
             self.finished_signal.emit(False, f"Scan failed: {e}")
         finally:
             if db is not None:

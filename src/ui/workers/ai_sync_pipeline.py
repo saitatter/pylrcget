@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import os
 from pathlib import Path
 
 from .ai_sync_alignment import (
@@ -9,6 +10,7 @@ from .ai_sync_alignment import (
     _align_lyrics_to_segments_viterbi,
     _repair_repeated_prefix_timestamp_gaps,
 )
+from .ai_sync_audio import get_cached_audio
 from .ai_sync_demucs import (
     AlignmentCandidate,
 )
@@ -21,12 +23,19 @@ from .ai_sync_demucs import (
 from .ai_sync_demucs import (
     separated_vocal_audio as _separated_vocal_audio,
 )
+from .ai_sync_language import detect_text_language
+from .ai_sync_local_rescue import (
+    build_rescue_windows,
+    replace_segments_in_windows,
+    transcribe_local_rescue,
+)
 from .ai_sync_lrc import (
     _build_lrc_from_segments,
     _format_ts,
 )
 from .ai_sync_lyrics_aligner import align as _align_with_lyrics_aligner
 from .ai_sync_lyrics_aligner import is_available as _lyrics_aligner_available
+from .ai_sync_router import build_default_router
 from .ai_sync_runtime import (
     _check_ai_sync_available,
     _get_cached_align_model,
@@ -48,6 +57,45 @@ from .ai_sync_transcription import (
 )
 
 logger = logging.getLogger(__name__)
+_DEMUCS_QUALITY_GATE = 14.0
+_LEGACY_FULL_RETRIES_ENV = "PYLRCGET_AI_LEGACY_FULL_RETRIES"
+_BACKEND_ROUTER = build_default_router()
+
+
+def _legacy_full_retries_enabled() -> bool:
+    """Return whether the pre-v2 stack of full-song retries is requested."""
+    return os.environ.get(_LEGACY_FULL_RETRIES_ENV, "0").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+
+
+def _relaxed_vad_retry_configs(
+    *,
+    device: str,
+    legacy_full_retries: bool,
+) -> tuple[dict[str, float], ...]:
+    """Return conservative retries by default, or the legacy full stack."""
+    configs: tuple[dict[str, float], ...]
+    if device == "cuda":
+        configs = ({"vad_onset": 0.15, "vad_offset": 0.05},)
+    else:
+        configs = (
+            {"vad_onset": 0.15, "vad_offset": 0.05},
+            {"vad_onset": 0.10, "vad_offset": 0.03},
+            {"vad_onset": 0.02, "vad_offset": 0.01},
+        )
+    return configs if legacy_full_retries else configs[:1]
+
+
+def _select_alignment_backend(language: str | None, *, device: str):
+    return _BACKEND_ROUTER.select(
+        language,
+        device=device,
+        available_backends={"lyrics-aligner": _lyrics_aligner_available()},
+    )
 
 
 def align_with_optional_demucs(
@@ -67,6 +115,12 @@ def align_with_optional_demucs(
         lrc=mix_lrc, source="mix", quality=quality(mix_lrc, plain_lyrics)
     )
     if not enable_demucs_candidate or not mix.lrc.strip() or not demucs_available():
+        return mix
+    if mix.quality >= _DEMUCS_QUALITY_GATE:
+        logger.info(
+            "Skipping Demucs candidate because mix quality is already high (%.2f).",
+            mix.quality,
+        )
         return mix
 
     with separated_audio(audio_path, device=device) as vocal_path:
@@ -142,6 +196,7 @@ def _complete_with_lyrics_aligner(worker, candidate: AlignmentCandidate) -> None
 def run_ai_sync_pipeline(self, *, align_optional_demucs=None) -> None:
     if align_optional_demucs is None:
         align_optional_demucs = align_with_optional_demucs
+    legacy_full_retries = _legacy_full_retries_enabled()
     try:
         ok, msg = _check_ai_sync_available()
         if not ok:
@@ -158,10 +213,25 @@ def run_ai_sync_pipeline(self, *, align_optional_demucs=None) -> None:
         plain_lines = self.plain_lyrics.splitlines() if self.plain_lyrics else []
         lyrics_aligner_attempted = False
         transcribe_language = _normalized_transcribe_language(self._language)
+        if plain_lines and transcribe_language is None:
+            self._emit_stage(1, total_steps, "Detecting lyrics language from supplied text…")
+        text_detection = (
+            detect_text_language(self.plain_lyrics)
+            if plain_lines and transcribe_language is None
+            else None
+        )
+        if text_detection is not None and text_detection.language is not None:
+            transcribe_language = text_detection.language
+            self._emit_stage(
+                1,
+                total_steps,
+                f"Detected lyrics language: {transcribe_language} (text evidence).",
+            )
         if (
             plain_lines
             and transcribe_language == "en"
-            and _lyrics_aligner_available()
+            and _select_alignment_backend(transcribe_language, device=device).backend_name
+            == "lyrics-aligner"
         ):
             lyrics_aligner_attempted = True
             candidate = _try_lyrics_aligner(
@@ -197,7 +267,11 @@ def run_ai_sync_pipeline(self, *, align_optional_demucs=None) -> None:
             return
 
         _patch_whisperx_audio_loading()
-        audio = whisperx.load_audio(self.audio_path)
+        audio = get_cached_audio(
+            self.audio_path,
+            sample_rate=16000,
+            loader=lambda: whisperx.load_audio(self.audio_path),
+        )
         language_label = transcribe_language or "auto-detect"
         detected_language = transcribe_language
 
@@ -233,7 +307,7 @@ def run_ai_sync_pipeline(self, *, align_optional_demucs=None) -> None:
             chunk_language = transcribe_language or _normalized_transcribe_language(
                 result_local.get("language")
             )
-            if audio_duration - raw_tail >= 20.0:
+            if legacy_full_retries and audio_duration - raw_tail >= 20.0:
                 chunked_segments = _transcribe_fixed_windows(
                     model_obj,
                     audio,
@@ -345,7 +419,7 @@ def run_ai_sync_pipeline(self, *, align_optional_demucs=None) -> None:
                     return recovered_segments
             return aligned_segments
 
-        if plain_lines and _lyrics_aligner_available() and not lyrics_aligner_attempted:
+        if plain_lines and not lyrics_aligner_attempted:
             if transcribe_language == "en":
                 detected_language = "en"
             elif transcribe_language is None:
@@ -362,7 +436,10 @@ def run_ai_sync_pipeline(self, *, align_optional_demucs=None) -> None:
                 except (RuntimeError, TypeError, ValueError) as exc:
                     logger.warning("Language detection failed; continuing with WhisperX: %s", exc)
 
-            if (detected_language or "").lower() == "en":
+            if (
+                _select_alignment_backend(detected_language, device=device).backend_name
+                == "lyrics-aligner"
+            ):
                 lyrics_aligner_attempted = True
                 candidate = _try_lyrics_aligner(
                     self,
@@ -403,7 +480,32 @@ def run_ai_sync_pipeline(self, *, align_optional_demucs=None) -> None:
                 targeted_window[0],
                 targeted_window[1],
             )
-        if device != "cuda" and _should_retry_with_short_windows(segments):
+            if os.environ.get("PYLRCGET_AI_LOCAL_RESCUE", "0") == "1":
+                duration_s = float(len(audio)) / 16000.0 if hasattr(audio, "__len__") else 0.0
+                rescue_windows = build_rescue_windows(
+                    [targeted_window],
+                    audio_duration_seconds=duration_s,
+                    max_windows=1,
+                )
+                self._emit_stage(5, total_steps, "Rescuing uncertain local lyric window…")
+                rescued_segments = transcribe_local_rescue(
+                    model,
+                    audio,
+                    rescue_windows,
+                    language=transcribe_language,
+                    is_cancelled=self.isInterruptionRequested,
+                )
+                if rescued_segments:
+                    segments = replace_segments_in_windows(
+                        segments,
+                        rescued_segments,
+                        rescue_windows,
+                    )
+        if (
+            legacy_full_retries
+            and device != "cuda"
+            and _should_retry_with_short_windows(segments)
+        ):
             logger.info(
                 "Detected a long low-density ASR segment; retrying with short windows."
             )
@@ -416,14 +518,9 @@ def run_ai_sync_pipeline(self, *, align_optional_demucs=None) -> None:
         self._emit_stage(5, total_steps, "Checking speech coverage and selecting best pass…")
         if _should_retry_with_relaxed_vad(audio, segments, plain_lines):
             duration_s = float(len(audio)) / 16000.0 if hasattr(audio, "__len__") else 0.0
-            relaxed_vad_configs = (
-                ({"vad_onset": 0.15, "vad_offset": 0.05},)
-                if device == "cuda"
-                else (
-                    {"vad_onset": 0.15, "vad_offset": 0.05},
-                    {"vad_onset": 0.10, "vad_offset": 0.03},
-                    {"vad_onset": 0.02, "vad_offset": 0.01},
-                )
+            relaxed_vad_configs = _relaxed_vad_retry_configs(
+                device=device,
+                legacy_full_retries=legacy_full_retries,
             )
             relaxed_candidates: list[list[dict]] = []
             for idx, vad_options in enumerate(relaxed_vad_configs, start=1):

@@ -7,10 +7,69 @@ from pathlib import Path
 
 from db.database import CURRENT_DB_VERSION
 from db.migrations import upgrade_database_if_needed
+from db.schema import SCHEMA_V1_SQL
 from tests import test_support as _test_support  # noqa: F401
 
 
 class MigrationTests(unittest.TestCase):
+    def test_v5_upgrade_preserves_existing_track_and_lyrics_data(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db_path = Path(tmp) / "pylrcget.db.sqlite3"
+            db = sqlite3.connect(str(db_path))
+            db.row_factory = sqlite3.Row
+            try:
+                db.executescript(SCHEMA_V1_SQL)
+                db.execute("DROP TABLE track_scan_state")
+                db.execute("PRAGMA user_version=5")
+                db.execute(
+                    "INSERT INTO artists (id, name, name_lower) VALUES (1, 'Artist', 'artist')"
+                )
+                db.execute(
+                    """
+                    INSERT INTO albums (
+                        id, name, artist_id, name_lower, album_artist_name, album_artist_name_lower
+                    ) VALUES (1, 'Album', 1, 'album', 'Artist', 'artist')
+                    """
+                )
+                db.execute(
+                    """
+                    INSERT INTO tracks (
+                        id, file_path, file_name, title, title_lower, album_id, artist_id,
+                        duration, lrc_lyrics, txt_lyrics, dirty_lyrics_present, track_number,
+                        modified_time, file_size
+                    ) VALUES (1, 'song.mp3', 'song.mp3', 'Song', 'song', 1, 1,
+                              180.0, '[00:01.00]synced', 'plain', 0, 1, 123.0, 456)
+                    """
+                )
+                db.execute(
+                    """
+                    INSERT INTO download_history (
+                        track_id, title, artist_name, album_name, download_mode,
+                        download_status, message, lrclib_instance, downloaded_at
+                    ) VALUES (1, 'Song', 'Artist', 'Album', 'prefer_synced',
+                              'synced', 'Downloaded.', 'https://lrclib.net', 'now')
+                    """
+                )
+                db.commit()
+
+                upgrade_database_if_needed(db, 5)
+                upgrade_database_if_needed(db, CURRENT_DB_VERSION)
+
+                self.assertEqual(int(db.execute("PRAGMA user_version").fetchone()[0]), CURRENT_DB_VERSION)
+                track = db.execute(
+                    "SELECT file_path, title, lrc_lyrics, txt_lyrics, modified_time, file_size FROM tracks"
+                ).fetchone()
+                self.assertEqual(
+                    tuple(track),
+                    ("song.mp3", "Song", "[00:01.00]synced", "plain", 123.0, 456),
+                )
+                self.assertEqual(db.execute("SELECT COUNT(*) FROM artists").fetchone()[0], 1)
+                self.assertEqual(db.execute("SELECT COUNT(*) FROM albums").fetchone()[0], 1)
+                self.assertEqual(db.execute("SELECT COUNT(*) FROM download_history").fetchone()[0], 1)
+                self.assertEqual(db.execute("SELECT COUNT(*) FROM track_scan_state").fetchone()[0], 0)
+            finally:
+                db.close()
+
     def test_fresh_database_initializes_current_schema(self):
         with tempfile.TemporaryDirectory() as tmp:
             db_path = Path(tmp) / "pylrcget.db.sqlite3"

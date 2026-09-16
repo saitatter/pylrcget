@@ -142,6 +142,52 @@ def nvidia_gpu_available() -> bool:
     return result.returncode == 0 and bool(result.stdout.strip())
 
 
+def resolve_torch_device(requested: str = "auto") -> str:
+    """Resolve a requested Torch device, preferring an available accelerator."""
+    normalized = str(requested or "auto").strip().lower()
+    if normalized not in {"auto", "cpu", "cuda", "mps"}:
+        raise ValueError(f"Unsupported AI device: {requested!r}")
+
+    import torch
+
+    if normalized == "cuda":
+        if not torch.cuda.is_available():
+            raise RuntimeError(
+                "CUDA was selected, but the active Torch runtime has no CUDA support. "
+                "Install a CUDA-enabled Torch build or select Auto/CPU."
+            )
+        return "cuda"
+    if normalized == "mps":
+        if not hasattr(torch.backends, "mps") or not torch.backends.mps.is_available():
+            raise RuntimeError(
+                "MPS was selected, but the active Torch runtime has no MPS support. "
+                "Select Auto/CPU or use a compatible Apple runtime."
+            )
+        return "mps"
+    if normalized == "cpu":
+        return "cpu"
+    if torch.cuda.is_available():
+        return "cuda"
+    if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+        return "mps"
+    return "cpu"
+
+
+def available_torch_devices() -> list[str]:
+    """Return devices usable by the active Torch runtime, in preference order."""
+    try:
+        import torch
+    except ImportError:
+        return ["cpu"]
+
+    devices = ["cpu"]
+    if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+        devices.insert(0, "mps")
+    if torch.cuda.is_available():
+        devices.insert(0, "cuda")
+    return devices
+
+
 def resolve_ai_runtime_source() -> Path | None:
     """Return the source tree imported by an external AI runtime."""
     configured = os.environ.get("PYLRCGET_AI_RUNTIME_SOURCE", "").strip()
@@ -168,9 +214,11 @@ def resolve_ai_runtime_source() -> Path | None:
 
 
 __all__ = [
+    "available_torch_devices",
     "default_ai_runtime_dir",
     "nvidia_gpu_available",
     "resolve_ai_install_command",
     "resolve_ai_runtime_python",
     "resolve_ai_runtime_source",
+    "resolve_torch_device",
 ]

@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from tools.perf.benchmark_common import median, percentile
 from tools.perf import benchmark_scan
+from tools.perf.benchmark_common import median, percentile
 
 
 def test_percentile_interpolates_between_samples() -> None:
