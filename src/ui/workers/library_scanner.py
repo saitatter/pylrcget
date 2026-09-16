@@ -292,6 +292,8 @@ def _scan_sidecar_only_for_path(
         modified_time=legacy_signature[0],
         file_size=legacy_signature[1],
         isrc=metadata.isrc,
+        txt_lyrics_source="embedded" if embedded_txt else "sidecar" if sidecar_txt else None,
+        lrc_lyrics_source="embedded" if embedded_lrc else "sidecar" if sidecar_lrc else None,
     )
     state = dataclasses.replace(
         previous_state,
@@ -468,6 +470,8 @@ class LibraryScanner(QThread):
                             txt_lyrics=orphan[0],
                             lrc_lyrics=orphan[1],
                             instrumental=orphan[2],
+                            txt_lyrics_source=orphan[3],
+                            lrc_lyrics_source=orphan[4],
                         )
                         reattached += 1
                         logger.info("Reattached orphan lyrics to: %s", result.path)

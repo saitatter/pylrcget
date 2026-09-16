@@ -384,4 +384,5 @@ class BulkLyricsDownloadWorker(QThread):
             kind="Synced" if synced else "Plain",
             plain_lyrics=plain,
             synced_lyrics=synced,
+            provider=match.provider,
         )

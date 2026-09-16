@@ -20,3 +20,5 @@ class FsTrack:
     file_size: int | None = None
     instrumental: bool = False
     isrc: str | None = None
+    txt_lyrics_source: str | None = None
+    lrc_lyrics_source: str | None = None

@@ -81,6 +81,8 @@ CREATE TABLE tracks (
     modified_time REAL,
     file_size INTEGER,
     isrc TEXT,
+    txt_lyrics_source TEXT,
+    lrc_lyrics_source TEXT,
     FOREIGN KEY(artist_id) REFERENCES artists(id),
     FOREIGN KEY(album_id) REFERENCES albums(id)
 );

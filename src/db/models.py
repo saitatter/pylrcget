@@ -25,6 +25,8 @@ class Track:
     dirty_lrc_lyrics: str | None = None
     dirty_lyrics_present: bool = False
     isrc: str | None = None
+    txt_lyrics_source: str | None = None
+    lrc_lyrics_source: str | None = None
 
     @staticmethod
     def from_row(row: sqlite3.Row) -> Track:
@@ -53,6 +55,8 @@ class Track:
             image_path=opt("image_path"),
             instrumental=bool(row["instrumental"]),
             isrc=opt("isrc"),
+            txt_lyrics_source=opt("txt_lyrics_source"),
+            lrc_lyrics_source=opt("lrc_lyrics_source"),
         )
 
 

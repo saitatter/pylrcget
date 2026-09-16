@@ -26,6 +26,7 @@ from db.database import (
     update_track_synced_lyrics,
 )
 from db.models import Config, Track
+from lyrics.provenance import normalize_lyrics_source
 from lyrics.providers.contracts import LyricsProviderResult, TrackLookupContext
 from ui.services.download_modes import normalize_download_mode
 from ui.services.lyrics_match_retry import (
@@ -319,6 +320,7 @@ def apply_lyrics_match_to_track(
     else:
         lyrics = match
         score = int(match.match_score)
+    source = normalize_lyrics_source(match.provider) if isinstance(match, LyricsProviderResult) else "lrclib"
     synced = _strip_empty(getattr(lyrics, "synced_lyrics", None))
     plain = _strip_empty(getattr(lyrics, "plain_lyrics", None))
     score_note = f" Match: {score}%."
@@ -326,7 +328,7 @@ def apply_lyrics_match_to_track(
     if mode == "plain_only":
         if plain:
             notify("Saving plain lyrics...")
-            update_track_plain_lyrics(db, track_id, plain)
+            update_track_plain_lyrics(db, track_id, plain, source=source)
             track = get_track_by_id(db, track_id)
             sync_track_outputs(db, track, notify, config=config)
             return True, f"Downloaded plain lyrics.{score_note}", track
@@ -334,7 +336,7 @@ def apply_lyrics_match_to_track(
             derived_plain = _strip_empty(_strip_timestamps(synced))
             if derived_plain:
                 notify("Saving plain lyrics derived from synced lyrics...")
-                update_track_plain_lyrics(db, track_id, derived_plain)
+                update_track_plain_lyrics(db, track_id, derived_plain, source=source)
                 track = get_track_by_id(db, track_id)
                 sync_track_outputs(db, track, notify, config=config)
                 return True, f"Downloaded plain lyrics.{score_note}", track
@@ -343,7 +345,13 @@ def apply_lyrics_match_to_track(
     if synced:
         notify("Saving synced lyrics...")
         existing_track = get_track_by_id(db, track_id)
-        update_track_synced_lyrics(db, track_id, synced, existing_track.txt_lyrics or "")
+        update_track_synced_lyrics(
+            db,
+            track_id,
+            synced,
+            existing_track.txt_lyrics or "",
+            source=source,
+        )
         track = get_track_by_id(db, track_id)
         sync_track_outputs(db, track, notify, config=config)
         return True, f"Downloaded synced lyrics.{score_note}", track
@@ -352,7 +360,7 @@ def apply_lyrics_match_to_track(
         if mode == "synced_only":
             return False, f"Only plain lyrics were found; synced-only mode is enabled.{score_note}", None
         notify("Saving plain lyrics...")
-        update_track_plain_lyrics(db, track_id, plain)
+        update_track_plain_lyrics(db, track_id, plain, source=source)
         track = get_track_by_id(db, track_id)
         sync_track_outputs(db, track, notify, config=config)
         return True, f"Downloaded plain lyrics.{score_note}", track

@@ -14,6 +14,7 @@ from db.queries import (
     update_track_plain_lyrics,
     update_track_synced_lyrics,
 )
+from lyrics.provenance import normalize_lyrics_source
 from ui.services.download_modes import normalize_download_mode
 from ui.services.lyrics_download_service import sync_track_outputs_with_result
 from ui.services.lyrics_match_retry import LyricsMatchCandidate
@@ -70,18 +71,25 @@ class LyricsApplyCandidatesWorker(QThread):
         mode = normalize_download_mode(self.download_mode)
         synced_text = (candidate.synced_lyrics or "").strip()
         plain_text = (candidate.plain_lyrics or "").strip()
+        source = normalize_lyrics_source(candidate.provider) or "lrclib"
 
         if mode == "plain_only":
             if not plain_text:
                 plain_text = plain_text_from_lrc(synced_text)
             if not plain_text:
                 return None
-            update_track_plain_lyrics(db, int(candidate.track_id), plain_text)
+            update_track_plain_lyrics(db, int(candidate.track_id), plain_text, source=source)
         elif synced_text:
             existing_track = get_track_by_id(db, int(candidate.track_id))
-            update_track_synced_lyrics(db, int(candidate.track_id), synced_text, existing_track.txt_lyrics or "")
+            update_track_synced_lyrics(
+                db,
+                int(candidate.track_id),
+                synced_text,
+                existing_track.txt_lyrics or "",
+                source=source,
+            )
         elif plain_text and mode != "synced_only":
-            update_track_plain_lyrics(db, int(candidate.track_id), plain_text)
+            update_track_plain_lyrics(db, int(candidate.track_id), plain_text, source=source)
         else:
             return None
 

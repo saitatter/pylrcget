@@ -84,6 +84,22 @@ class LyricsScanResult:
     def lrc(self) -> str | None:
         return self.embedded_lrc or self.sidecar_lrc
 
+    @property
+    def txt_source(self) -> str | None:
+        if self.embedded_txt:
+            return "embedded"
+        if self.sidecar_txt:
+            return "sidecar"
+        return None
+
+    @property
+    def lrc_source(self) -> str | None:
+        if self.embedded_lrc:
+            return "embedded"
+        if self.sidecar_lrc:
+            return "sidecar"
+        return None
+
 
 @dataclass(frozen=True)
 class SidecarDirEntry:
@@ -1527,6 +1543,8 @@ def new_fs_track_from_path(
             modified_time=modified_time,
             file_size=file_size,
             isrc=metadata.isrc,
+            txt_lyrics_source=lyrics.txt_source,
+            lrc_lyrics_source=lyrics.lrc_source,
         )
     except (MutagenError, Exception) as exc:  # noqa: BLE001
         logger.warning("Skipping unreadable audio file during scan: %s (%s)", path, exc)

@@ -289,18 +289,19 @@ def delete_tracks_by_paths(db: sqlite3.Connection, paths: list[str], *, commit: 
 def get_orphan_lyrics_index(
     db: sqlite3.Connection,
     paths: list[str],
-) -> dict[tuple[str, str, int], tuple[str | None, str | None, bool]]:
+) -> dict[tuple[str, str, int], tuple[str | None, str | None, bool, str | None, str | None]]:
     if not paths:
         return {}
     chunk_size = 900
-    index: dict[tuple[str, str, int], tuple[str | None, str | None, bool]] = {}
+    index: dict[tuple[str, str, int], tuple[str | None, str | None, bool, str | None, str | None]] = {}
     for start in range(0, len(paths), chunk_size):
         chunk = paths[start : start + chunk_size]
         placeholders = ",".join("?" for _ in chunk)
         rows = db.execute(
             f"""
             SELECT t.title_lower, a.name_lower AS artist_lower,
-                   t.duration, t.txt_lyrics, t.lrc_lyrics, t.instrumental
+                   t.duration, t.txt_lyrics, t.lrc_lyrics, t.instrumental,
+                   t.txt_lyrics_source, t.lrc_lyrics_source
             FROM tracks t
             JOIN artists a ON t.artist_id = a.id
             WHERE t.file_path IN ({placeholders})
@@ -310,7 +311,13 @@ def get_orphan_lyrics_index(
         ).fetchall()
         for row in rows:
             key = (row["title_lower"] or "", row["artist_lower"] or "", round(row["duration"] or 0))
-            index[key] = (row["txt_lyrics"], row["lrc_lyrics"], bool(row["instrumental"]))
+            index[key] = (
+                row["txt_lyrics"],
+                row["lrc_lyrics"],
+                bool(row["instrumental"]),
+                row["txt_lyrics_source"],
+                row["lrc_lyrics_source"],
+            )
     return index
 
 

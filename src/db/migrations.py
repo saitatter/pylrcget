@@ -223,6 +223,23 @@ def upgrade_database_if_needed(db: sqlite3.Connection, existing_version: int) ->
         db.commit()
         current_version = 8
 
+    if current_version < 9:
+        logger.info("Upgrade database version %d -> 9...", current_version)
+        track_table = db.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='tracks'"
+        ).fetchone()
+        if track_table is not None:
+            track_columns = {
+                row["name"] for row in db.execute("PRAGMA table_info(tracks)").fetchall()
+            }
+            if "txt_lyrics_source" not in track_columns:
+                db.execute("ALTER TABLE tracks ADD COLUMN txt_lyrics_source TEXT")
+            if "lrc_lyrics_source" not in track_columns:
+                db.execute("ALTER TABLE tracks ADD COLUMN lrc_lyrics_source TEXT")
+        db.execute("PRAGMA user_version=9")
+        db.commit()
+        current_version = 9
+
     if current_version == CURRENT_DB_VERSION:
         return
 

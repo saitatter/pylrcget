@@ -33,6 +33,7 @@ class LyricsMatchCandidate:
     kind: str
     plain_lyrics: str
     synced_lyrics: str
+    provider: str | None = None
 
 
 def build_retry_search_queries(*, artist: str, title: str, album: str) -> list[RetrySearchQuery]:
