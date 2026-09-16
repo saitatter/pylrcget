@@ -12,11 +12,11 @@ from PySide6.QtCore import QObject, QThread, Signal
 from core.lrclib_client import LrcLibAPI
 from core.utils import prepare_input
 from db.queries import get_tracks_for_bulk_download
+from lyrics.providers.contracts import LyricsProviderResult, TrackLookupContext
+from lyrics.providers.lrclib import LrclibProvider
 from ui.services.download_modes import normalize_download_mode
 from ui.services.lyrics_download_service import (
-    LyricsDownloadMatch,
     LyricsMatchCancelled,
-    find_best_lyrics_match,
     invalid_lrclib_duration_message,
     is_valid_lrclib_duration,
 )
@@ -63,16 +63,19 @@ class BulkDownloadStats(TypedDict):
 class _DownloadJob:
     track_id: int
     label: str
+    file_path: str
     title: str
     artist: str
     album: str
+    album_artist: str | None
+    track_number: int | None
     duration_s: int | None
 
 
 @dataclass(frozen=True)
 class _DownloadFetchResult:
     job: _DownloadJob
-    match: LyricsDownloadMatch | None = None
+    match: LyricsProviderResult | None = None
     error: str = ""
     cancelled: bool = False
 
@@ -158,9 +161,12 @@ class BulkLyricsDownloadWorker(QThread):
                         _DownloadJob(
                             track_id=int(track_id),
                             label=label,
+                            file_path=track.file_path,
                             title=title,
                             artist=artist,
                             album=(track.album_name or "").strip(),
+                            album_artist=track.album_artist_name,
+                            track_number=track.track_number,
                             duration_s=duration_s,
                         )
                     )
@@ -312,18 +318,25 @@ class BulkLyricsDownloadWorker(QThread):
             self.progress.emit(-1, len(self.track_ids), job.label, status, self._elapsed())
 
         try:
-            match = find_best_lyrics_match(
-                api,
+            provider = LrclibProvider(
+                self.lrclib_instance,
+                api=api,
                 notify=_notify,
-                track_id=job.track_id,
-                track_label=job.label,
-                title=job.title,
-                artist=job.artist,
-                album=job.album,
-                duration_s=job.duration_s,
                 before_request=self._before_lrclib_request,
                 on_rate_limit=self._record_lrclib_rate_limit,
             )
+            lookup_context = TrackLookupContext(
+                track_id=job.track_id,
+                file_path=job.file_path,
+                title=job.title,
+                artists=(job.artist,),
+                album=job.album,
+                album_artist=job.album_artist,
+                duration_seconds=float(job.duration_s) if job.duration_s else None,
+                track_number=job.track_number,
+                isrc=None,
+            )
+            match = provider.lookup(lookup_context, requested_mode=self.download_mode)
             return _DownloadFetchResult(job=job, match=match)
         except LyricsMatchCancelled:
             return _DownloadFetchResult(job=job, cancelled=True)
@@ -348,21 +361,20 @@ class BulkLyricsDownloadWorker(QThread):
             return 0.0
         return time.perf_counter() - self._started_at
 
-    def _candidate_from_match(self, job: _DownloadJob, match: LyricsDownloadMatch) -> LyricsMatchCandidate | None:
-        result = match.result
-        synced = str(getattr(result, "synced_lyrics", "") or "")
-        plain = str(getattr(result, "plain_lyrics", "") or "")
+    def _candidate_from_match(self, job: _DownloadJob, match: LyricsProviderResult) -> LyricsMatchCandidate | None:
+        synced = str(match.synced_lyrics or "")
+        plain = str(match.plain_lyrics or "")
         if not synced and not plain:
             return None
         return LyricsMatchCandidate(
             track_id=job.track_id,
             track_label=job.label,
-            query_label=match.query_label,
-            score=int(match.score),
-            artist_name=str(getattr(result, "artist_name", "") or job.artist),
-            track_name=str(getattr(result, "track_name", "") or job.title),
-            album_name=str(getattr(result, "album_name", "") or job.album),
-            duration=int(getattr(result, "duration", 0) or job.duration_s or 0),
+            query_label=match.match_method,
+            score=int(match.match_score),
+            artist_name=str(match.remote_artist or job.artist),
+            track_name=str(match.remote_title or job.title),
+            album_name=str(match.remote_album or job.album),
+            duration=int(match.remote_duration_seconds or job.duration_s or 0),
             kind="Synced" if synced else "Plain",
             plain_lyrics=plain,
             synced_lyrics=synced,

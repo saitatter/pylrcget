@@ -26,6 +26,7 @@ from db.database import (
     update_track_synced_lyrics,
 )
 from db.models import Config, Track
+from lyrics.providers.contracts import LyricsProviderResult, TrackLookupContext
 from ui.services.download_modes import normalize_download_mode
 from ui.services.lyrics_match_retry import (
     build_retry_search_queries,
@@ -306,16 +307,21 @@ def apply_lyrics_match_to_track(
     db: sqlite3.Connection,
     *,
     track_id: int,
-    match: LyricsDownloadMatch,
+    match: LyricsDownloadMatch | LyricsProviderResult,
     download_mode: str,
     notify: ProgressCallback,
     config: Config | None = None,
 ) -> tuple[bool, str, Track | None]:
     mode = normalize_download_mode(download_mode)
-    lyrics = match.result
+    if isinstance(match, LyricsDownloadMatch):
+        lyrics = match.result
+        score = match.score
+    else:
+        lyrics = match
+        score = int(match.match_score)
     synced = _strip_empty(getattr(lyrics, "synced_lyrics", None))
     plain = _strip_empty(getattr(lyrics, "plain_lyrics", None))
-    score_note = f" Match: {match.score}%."
+    score_note = f" Match: {score}%."
 
     if mode == "plain_only":
         if plain:
@@ -390,17 +396,25 @@ def download_track_lyrics(
         if not is_valid_lrclib_duration(duration_s):
             return False, invalid_lrclib_duration_message(duration_s), track_id, title_for_ui
 
-        api_instance = api or LrcLibAPI(lrclib_instance)
-        match = find_best_lyrics_match(
-            api_instance,
+        from lyrics.providers.lrclib import LrclibProvider
+
+        provider = LrclibProvider(
+            lrclib_instance,
+            api=api or LrcLibAPI(lrclib_instance),
             notify=notify,
-            track_id=track_id,
-            track_label=title_for_ui,
-            title=title,
-            artist=artist,
-            album=album,
-            duration_s=duration_s or None,
         )
+        lookup_context = TrackLookupContext(
+            track_id=track_id,
+            file_path=track.file_path,
+            title=title,
+            artists=(artist,),
+            album=album,
+            album_artist=track.album_artist_name,
+            duration_seconds=float(duration_s) if duration_s else None,
+            track_number=track.track_number,
+            isrc=None,
+        )
+        match = provider.lookup(lookup_context, requested_mode=mode)
         if match is None:
             return False, "No lyrics found on LRCLIB for this track.", track_id, title_for_ui
         ok, msg, _track = apply_lyrics_match_to_track(

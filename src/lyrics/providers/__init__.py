@@ -7,9 +7,11 @@ from .contracts import (
     LyricsProviderResult,
     TrackLookupContext,
 )
+from .lrclib import LrclibProvider
 
 __all__ = [
     "DownloadMode",
+    "LrclibProvider",
     "LyricsProvider",
     "LyricsProviderCapabilities",
     "LyricsProviderResult",
