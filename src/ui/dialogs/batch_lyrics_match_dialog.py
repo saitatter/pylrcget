@@ -11,6 +11,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
+from lyrics.source_settings import LYRICS_SOURCE_LABELS
 from ui.services.lyrics_match_retry import LyricsMatchCandidate
 
 CANDIDATE_ROLE = Qt.ItemDataRole.UserRole
@@ -19,19 +20,21 @@ CANDIDATE_ROLE = Qt.ItemDataRole.UserRole
 class BatchLyricsMatchDialog(QDialog):
     def __init__(self, candidates: list[LyricsMatchCandidate], parent=None) -> None:
         super().__init__(parent)
-        self.setWindowTitle("Review LRCLIB Matches")
+        self.setWindowTitle("Review Lyrics Matches")
         self.resize(980, 520)
         self._candidates = list(candidates)
 
         layout = QVBoxLayout(self)
         self.summary_label = QLabel(
-            f"Review {len(self._candidates)} LRCLIB match candidate(s). Checked rows will be written to your library."
+            f"Review {len(self._candidates)} lyrics match candidate(s). Checked rows will be written to your library."
         )
         self.summary_label.setWordWrap(True)
         layout.addWidget(self.summary_label)
 
-        self.table = QTableWidget(0, 7)
-        self.table.setHorizontalHeaderLabels(["Apply", "Track", "Best match", "Album", "Score", "Type", "Found by"])
+        self.table = QTableWidget(0, 8)
+        self.table.setHorizontalHeaderLabels(
+            ["Apply", "Track", "Best match", "Album", "Score", "Type", "Source", "Found by"]
+        )
         self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
         self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
@@ -44,6 +47,7 @@ class BatchLyricsMatchDialog(QDialog):
         header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(5, QHeaderView.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(6, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(7, QHeaderView.ResizeMode.ResizeToContents)
         layout.addWidget(self.table, 1)
 
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
@@ -83,4 +87,7 @@ class BatchLyricsMatchDialog(QDialog):
             self.table.setItem(row, 3, QTableWidgetItem(candidate.album_name))
             self.table.setItem(row, 4, QTableWidgetItem(f"{candidate.score}%"))
             self.table.setItem(row, 5, QTableWidgetItem(candidate.kind))
-            self.table.setItem(row, 6, QTableWidgetItem(candidate.query_label))
+            provider = str(candidate.provider or "lrclib").casefold()
+            source = LYRICS_SOURCE_LABELS.get(provider, provider.title())
+            self.table.setItem(row, 6, QTableWidgetItem(source))
+            self.table.setItem(row, 7, QTableWidgetItem(candidate.query_label))

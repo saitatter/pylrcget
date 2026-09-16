@@ -14,6 +14,7 @@ from core.utils import prepare_input
 from db.queries import get_tracks_for_bulk_download
 from lyrics.providers import LrclibProvider, LyricsProviderRouter
 from lyrics.providers.contracts import LyricsProviderResult, TrackLookupContext
+from lyrics.source_settings import LYRICS_SOURCE_LABELS
 from ui.services.download_modes import normalize_download_mode
 from ui.services.lyrics_download_service import (
     LyricsMatchCancelled,
@@ -254,7 +255,11 @@ class BulkLyricsDownloadWorker(QThread):
                                 if candidate is not None:
                                     candidates.append(candidate)
                                     ok_count += 1
-                                    msg = f"Candidate found. Match: {candidate.score}%."
+                                    provider_label = LYRICS_SOURCE_LABELS.get(
+                                        str(candidate.provider or "lrclib").casefold(),
+                                        str(candidate.provider or "lrclib").title(),
+                                    )
+                                    msg = f"Candidate found · {provider_label}. Match: {candidate.score}%."
                                 else:
                                     fail_count += 1
                                     msg = "No usable lyrics found on LRCLIB for this track."
