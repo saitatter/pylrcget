@@ -34,6 +34,10 @@ SCAN_LYRICS_SOURCE_BOTH = "both"
 SCAN_LYRICS_SOURCE_EMBEDDED_ONLY = "embedded_only"
 SCAN_LYRICS_SOURCE_SIDECAR_ONLY = "sidecar_only"
 
+
+class ScanRootUnavailableError(RuntimeError):
+    """Raised when an authoritative scan root cannot be inspected safely."""
+
 ASF_PLAIN_KEYS = ("WM/Lyrics", "LYRICS", "UNSYNCEDLYRICS")
 ASF_SYNCED_KEYS = ("LRCLIB_LRC", "SYNCEDLYRICS")
 APE_PLAIN_KEYS = ("UNSYNCEDLYRICS", "lyrics")
@@ -309,6 +313,7 @@ def _iter_audio_paths_core(
     *,
     excluded_paths: str | None = None,
     excluded_patterns: str | None = None,
+    strict_roots: bool = False,
 ) -> tuple[
     list[str],
     dict[str, tuple[float | None, int | None]],
@@ -322,6 +327,10 @@ def _iter_audio_paths_core(
     seen: set[str] = set()
     for root in directories:
         if not root or not os.path.isdir(root):
+            if strict_roots:
+                raise ScanRootUnavailableError(
+                    f"Configured library folder is unavailable: {root or '<empty path>'}"
+                )
             continue
         stack = [root]
         while stack:
@@ -364,7 +373,11 @@ def _iter_audio_paths_core(
                             else:
                                 signatures[file_path] = (float(stat.st_mtime), int(stat.st_size))
                                 audio_signatures_ns[file_path] = (int(stat.st_mtime_ns), int(stat.st_size))
-            except OSError:
+            except OSError as exc:
+                if strict_roots and dirpath == root:
+                    raise ScanRootUnavailableError(
+                        f"Could not enumerate configured library folder: {root}"
+                    ) from exc
                 continue
 
             stack.extend(reversed(child_dirs))
@@ -390,11 +403,13 @@ def iter_audio_paths_with_signatures(
     *,
     excluded_paths: str | None = None,
     excluded_patterns: str | None = None,
+    strict_roots: bool = False,
 ) -> tuple[list[str], dict[str, tuple[float | None, int | None]]]:
     paths, signatures, _audio_signatures_ns = _iter_audio_paths_core(
         directories,
         excluded_paths=excluded_paths,
         excluded_patterns=excluded_patterns,
+        strict_roots=strict_roots,
     )
     return paths, signatures
 
@@ -404,12 +419,14 @@ def iter_audio_paths_with_audio_signatures(
     *,
     excluded_paths: str | None = None,
     excluded_patterns: str | None = None,
+    strict_roots: bool = False,
 ) -> tuple[list[str], dict[str, tuple[int | None, int | None]]]:
     """Enumerate audio and return an ns-precision audio-only signature."""
     paths, _signatures, audio_signatures_ns = _iter_audio_paths_core(
         directories,
         excluded_paths=excluded_paths,
         excluded_patterns=excluded_patterns,
+        strict_roots=strict_roots,
     )
     return paths, audio_signatures_ns
 
@@ -419,6 +436,7 @@ def iter_audio_paths_with_signatures_and_audio_signatures(
     *,
     excluded_paths: str | None = None,
     excluded_patterns: str | None = None,
+    strict_roots: bool = False,
 ) -> tuple[
     list[str],
     dict[str, tuple[float | None, int | None]],
@@ -429,6 +447,7 @@ def iter_audio_paths_with_signatures_and_audio_signatures(
         directories,
         excluded_paths=excluded_paths,
         excluded_patterns=excluded_patterns,
+        strict_roots=strict_roots,
     )
 
 

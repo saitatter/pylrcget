@@ -23,6 +23,7 @@ from db.database import (
 from library.scan_library import (
     AudioMetadata,
     MutagenError,
+    ScanRootUnavailableError,
     SidecarLookupCache,
     get_audio_signature,
     get_audio_file_signature,
@@ -581,6 +582,54 @@ class ScanLibraryHelpersTests(unittest.TestCase):
 
 
 class LibraryScannerIncrementalTests(unittest.TestCase):
+    def test_unavailable_configured_root_aborts_without_reconciling_tracks(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db = initialize_database(tmp)
+            db_path = str(Path(tmp) / "pylrcget.db.sqlite3")
+            music_dir = Path(tmp) / "Music"
+            music_dir.mkdir(parents=True, exist_ok=True)
+            audio = music_dir / "song.mp3"
+            touch_text(audio, "audio")
+            add_tracks(
+                db,
+                [
+                    replace(
+                        make_fs_track(audio, artist="Artist", album="Album", title="Song"),
+                        txt_lyrics="saved lyrics",
+                    )
+                ],
+            )
+            db.close()
+
+            missing_root = Path(tmp) / "offline-share"
+            with self.assertRaises(ScanRootUnavailableError):
+                iter_audio_paths_with_signatures(
+                    [str(missing_root)],
+                    strict_roots=True,
+                )
+
+            finished: list[tuple[bool, str]] = []
+            scanner = LibraryScanner(db_path, [str(missing_root)], scan_worker_count=1)
+            scanner.finished_signal.connect(lambda ok, message: finished.append((ok, message)))
+            scanner.run()
+
+            self.assertEqual(len(finished), 1)
+            self.assertFalse(finished[0][0])
+            self.assertIn("unavailable", finished[0][1])
+
+            db = sqlite3.connect(db_path)
+            db.row_factory = sqlite3.Row
+            try:
+                row = db.execute(
+                    "SELECT title, txt_lyrics FROM tracks WHERE file_path = ?",
+                    (str(audio),),
+                ).fetchone()
+                self.assertIsNotNone(row)
+                self.assertEqual(row["title"], "Song")
+                self.assertEqual(row["txt_lyrics"], "saved lyrics")
+            finally:
+                db.close()
+
     def test_scan_timing_stats_accumulate_worker_local_buckets(self):
         timings = _ScanTimingStats()
 
