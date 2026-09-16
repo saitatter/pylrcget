@@ -5,7 +5,13 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock
 
-from lyrics.providers import MatchQuality, TidalCatalogueClient, TrackLookupContext
+from lyrics.providers import (
+    MatchQuality,
+    TidalCatalogueClient,
+    TrackLookupContext,
+    TrackMatchMetadata,
+    score_track_match,
+)
 
 FIXTURE_PATH = Path(__file__).parents[1] / "fixtures" / "tidal_matching_cases.json"
 CASES = json.loads(FIXTURE_PATH.read_text(encoding="utf-8"))
@@ -68,3 +74,32 @@ def test_fixture_rejects_metadata_mismatch():
     client = TidalCatalogueClient("token", session=session)
 
     assert client.resolve_track(_context(case)) is None
+
+
+def test_fixture_preserves_czech_and_unicode_metadata():
+    case = CASES["unicode_czech"]
+    session = Mock()
+    session.get.return_value = _response(case["payload"])
+
+    result = TidalCatalogueClient("token", session=session).resolve_track(_context(case))
+
+    assert result is not None
+    assert result.track.title == "Příliš Žluťoučký"
+    assert result.track.artists == ("Český Interpret",)
+
+
+def test_fixture_exposes_live_studio_version_penalty():
+    case = CASES["version_mismatch"]
+    local = _context(case)
+    score = score_track_match(
+        local,
+        TrackMatchMetadata(
+            title="Song",
+            artists=("Artist",),
+            album="Album",
+            duration_seconds=180,
+            track_number=1,
+        ),
+    )
+
+    assert score.diagnostics["version_penalty"] == 30

@@ -84,5 +84,55 @@
         }
       ]
     }
+  },
+  "unicode_czech": {
+    "local": {
+      "title": "Příliš Žluťoučký",
+      "artist": "Český Interpret",
+      "album": "Živě",
+      "duration": 180,
+      "track_number": 1,
+      "isrc": null
+    },
+    "payload": {
+      "data": [
+        {
+          "type": "tracks",
+          "id": "unicode-cz",
+          "attributes": {
+            "title": "Příliš Žluťoučký",
+            "duration": 180,
+            "trackNumber": 1,
+            "artist": "Český Interpret",
+            "album": "Živě"
+          }
+        }
+      ]
+    }
+  },
+  "version_mismatch": {
+    "local": {
+      "title": "Song (Live)",
+      "artist": "Artist",
+      "album": "Album",
+      "duration": 180,
+      "track_number": 1,
+      "isrc": null
+    },
+    "payload": {
+      "data": [
+        {
+          "type": "tracks",
+          "id": "studio-version",
+          "attributes": {
+            "title": "Song",
+            "duration": 180,
+            "trackNumber": 1,
+            "artist": "Artist",
+            "album": "Album"
+          }
+        }
+      ]
+    }
   }
 }
