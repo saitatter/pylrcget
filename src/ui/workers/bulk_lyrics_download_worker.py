@@ -12,8 +12,8 @@ from PySide6.QtCore import QObject, QThread, Signal
 from core.lrclib_client import LrcLibAPI
 from core.utils import prepare_input
 from db.queries import get_tracks_for_bulk_download
+from lyrics.providers import LrclibProvider, LyricsProviderRouter
 from lyrics.providers.contracts import LyricsProviderResult, TrackLookupContext
-from lyrics.providers.lrclib import LrclibProvider
 from ui.services.download_modes import normalize_download_mode
 from ui.services.lyrics_download_service import (
     LyricsMatchCancelled,
@@ -325,6 +325,7 @@ class BulkLyricsDownloadWorker(QThread):
                 before_request=self._before_lrclib_request,
                 on_rate_limit=self._record_lrclib_rate_limit,
             )
+            router = LyricsProviderRouter((provider,))
             lookup_context = TrackLookupContext(
                 track_id=job.track_id,
                 file_path=job.file_path,
@@ -336,7 +337,7 @@ class BulkLyricsDownloadWorker(QThread):
                 track_number=job.track_number,
                 isrc=None,
             )
-            match = provider.lookup(lookup_context, requested_mode=self.download_mode)
+            match = router.lookup(lookup_context, requested_mode=self.download_mode)
             return _DownloadFetchResult(job=job, match=match)
         except LyricsMatchCancelled:
             return _DownloadFetchResult(job=job, cancelled=True)

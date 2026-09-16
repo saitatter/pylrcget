@@ -396,13 +396,14 @@ def download_track_lyrics(
         if not is_valid_lrclib_duration(duration_s):
             return False, invalid_lrclib_duration_message(duration_s), track_id, title_for_ui
 
-        from lyrics.providers.lrclib import LrclibProvider
+        from lyrics.providers import LrclibProvider, LyricsProviderRouter
 
         provider = LrclibProvider(
             lrclib_instance,
             api=api or LrcLibAPI(lrclib_instance),
             notify=notify,
         )
+        router = LyricsProviderRouter((provider,))
         lookup_context = TrackLookupContext(
             track_id=track_id,
             file_path=track.file_path,
@@ -414,7 +415,7 @@ def download_track_lyrics(
             track_number=track.track_number,
             isrc=None,
         )
-        match = provider.lookup(lookup_context, requested_mode=mode)
+        match = router.lookup(lookup_context, requested_mode=mode)
         if match is None:
             return False, "No lyrics found on LRCLIB for this track.", track_id, title_for_ui
         ok, msg, _track = apply_lyrics_match_to_track(
