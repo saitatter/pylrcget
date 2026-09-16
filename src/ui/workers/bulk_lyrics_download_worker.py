@@ -81,6 +81,7 @@ class _DownloadJob:
     has_synced_lyrics: bool
     cached_tidal_track_id: str | None
     cached_tidal_metadata_fingerprint: str | None
+    provider_id: str = "lrclib"
 
 
 @dataclass(frozen=True)
@@ -93,7 +94,7 @@ class _DownloadFetchResult:
 
 @dataclass(frozen=True)
 class _DownloadLookupGroup:
-    key: tuple[str, str, str, int | None]
+    key: tuple[str, str, str, str, str, int | None]
     jobs: tuple[_DownloadJob, ...]
 
     @property
@@ -327,10 +328,12 @@ class BulkLyricsDownloadWorker(QThread):
 
     @staticmethod
     def _group_jobs(jobs: list[_DownloadJob]) -> list[_DownloadLookupGroup]:
-        groups: dict[tuple[str, str, str, int | None], list[_DownloadJob]] = {}
-        order: list[tuple[str, str, str, int | None]] = []
+        groups: dict[tuple[str, str, str, str, str, int | None], list[_DownloadJob]] = {}
+        order: list[tuple[str, str, str, str, str, int | None]] = []
         for job in jobs:
             key = (
+                job.provider_id,
+                prepare_input(job.isrc or ""),
                 prepare_input(job.artist),
                 prepare_input(job.title),
                 prepare_input(job.album),
