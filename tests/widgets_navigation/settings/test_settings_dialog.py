@@ -147,3 +147,37 @@ class SettingsDialogTests(unittest.TestCase):
                     dialog.deleteLater()
             finally:
                 app_state.db.close()
+
+    def test_settings_dialog_loads_and_saves_lyrics_source_preferences(self):
+        with TemporaryDirectory() as tmp:
+            app_state = simple_app_state(initialize_database(tmp))
+            try:
+                dialog = MusicFoldersDialog(app_state)
+                try:
+                    self.assertEqual(dialog.lyrics_source_list.count(), 3)
+                    self.assertEqual(
+                        [dialog.lyrics_source_list.item(i).data(Qt.UserRole) for i in range(3)],
+                        ["lrclib", "tidal", "external"],
+                    )
+                    dialog.lyrics_source_list.item(1).setCheckState(Qt.Checked)
+                    dialog.lyrics_source_list.setCurrentRow(1)
+                    dialog._move_lyrics_source(-1)
+                    dialog.tidal_country_edit.setText("ro")
+                    dialog.tidal_helper_edit.setText("C:/Tools/tidal_helper.py")
+                    dialog.save()
+                finally:
+                    dialog.deleteLater()
+
+                reloaded = MusicFoldersDialog(app_state)
+                try:
+                    self.assertEqual(
+                        [reloaded.lyrics_source_list.item(i).data(Qt.UserRole) for i in range(3)],
+                        ["tidal", "lrclib", "external"],
+                    )
+                    self.assertEqual(reloaded.lyrics_source_list.item(0).checkState(), Qt.Checked)
+                    self.assertEqual(reloaded.tidal_country_edit.text(), "RO")
+                    self.assertEqual(reloaded.tidal_helper_edit.text(), "C:/Tools/tidal_helper.py")
+                finally:
+                    reloaded.deleteLater()
+            finally:
+                app_state.db.close()

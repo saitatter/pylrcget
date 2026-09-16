@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QLineEdit,
     QListWidget,
+    QListWidgetItem,
     QMessageBox,
     QPushButton,
     QScrollArea,
@@ -32,6 +33,12 @@ from PySide6.QtWidgets import (
 from core.lyrics_sidecar import DEFAULT_LYRICS_FILE_PATTERN
 from db.database import get_config, get_directories, set_config, set_directories
 from library.scan_library import preview_audio_path_exclusions
+from lyrics.source_settings import (
+    LYRICS_SOURCE_IDS,
+    LYRICS_SOURCE_LABELS,
+    load_lyrics_source_settings,
+    merge_lyrics_source_settings,
+)
 from ui.ai_sync_settings import (
     AI_SYNC_DEVICE_OPTIONS,
     AI_SYNC_LANGUAGE_OPTIONS,
@@ -417,6 +424,53 @@ class MusicFoldersDialog(QDialog):
         lrclib_layout.addWidget(lrclib_hint, 1, 0, 1, 3)
         lyrics_download_layout.addWidget(lrclib_box)
 
+        sources_box = QGroupBox("Lyrics Sources")
+        sources_layout = QGridLayout(sources_box)
+        self.lyrics_source_list = QListWidget()
+        self.lyrics_source_list.setMaximumHeight(112)
+        sources_layout.addWidget(QLabel("Priority"), 0, 0)
+        sources_layout.addWidget(self.lyrics_source_list, 1, 0, 1, 3)
+        source_buttons = QHBoxLayout()
+        self.lyrics_source_up_btn = QPushButton("Move Up")
+        self.lyrics_source_down_btn = QPushButton("Move Down")
+        source_buttons.addWidget(self.lyrics_source_up_btn)
+        source_buttons.addWidget(self.lyrics_source_down_btn)
+        source_buttons.addStretch(1)
+        sources_layout.addLayout(source_buttons, 2, 0, 1, 3)
+        self.lyrics_source_continue_plain_chk = QCheckBox(
+            "Continue when synced lyrics are requested but only plain lyrics are found"
+        )
+        sources_layout.addWidget(self.lyrics_source_continue_plain_chk, 3, 0, 1, 3)
+        sources_hint = QLabel("Provider order and enablement apply to the lyrics download pipeline.")
+        sources_hint.setWordWrap(True)
+        sources_layout.addWidget(sources_hint, 4, 0, 1, 3)
+        lyrics_download_layout.addWidget(sources_box)
+
+        tidal_box = QGroupBox("TIDAL")
+        tidal_layout = QGridLayout(tidal_box)
+        self.tidal_country_edit = QLineEdit()
+        self.tidal_country_edit.setPlaceholderText("Auto")
+        tidal_layout.addWidget(QLabel("Country"), 0, 0)
+        tidal_layout.addWidget(self.tidal_country_edit, 0, 1)
+        self.tidal_transport_combo = QComboBox()
+        self.tidal_transport_combo.addItem("Official API", "official")
+        self.tidal_transport_combo.addItem("External helper", "external_helper")
+        self.tidal_transport_combo.addItem("Experimental internal", "experimental_internal")
+        tidal_layout.addWidget(QLabel("Lyrics transport"), 1, 0)
+        tidal_layout.addWidget(self.tidal_transport_combo, 1, 1)
+        self.tidal_helper_edit = QLineEdit()
+        self.tidal_helper_edit.setPlaceholderText("Optional helper executable or script command")
+        self.tidal_helper_browse_btn = QPushButton("Browse")
+        tidal_layout.addWidget(QLabel("Helper command"), 2, 0)
+        tidal_layout.addWidget(self.tidal_helper_edit, 2, 1)
+        tidal_layout.addWidget(self.tidal_helper_browse_btn, 2, 2)
+        tidal_hint = QLabel(
+            "TIDAL catalogue access and lyrics transport are separate. Official lyrics remain disabled until supported by the API."
+        )
+        tidal_hint.setWordWrap(True)
+        tidal_layout.addWidget(tidal_hint, 3, 0, 1, 3)
+        lyrics_download_layout.addWidget(tidal_box)
+
         lyrics_download_layout.addStretch(1)
         lyrics_files_layout.addStretch(1)
         lyrics_embed_layout.addStretch(1)
@@ -466,6 +520,9 @@ class MusicFoldersDialog(QDialog):
         self.excluded_patterns_edit.textChanged.connect(self._validate_regex_patterns)
         self.lrclib_reset_btn.clicked.connect(lambda: self.lrclib_instance_edit.setText(""))
         self.shortcuts_reset_btn.clicked.connect(self._reset_hotkeys_to_defaults)
+        self.lyrics_source_up_btn.clicked.connect(lambda: self._move_lyrics_source(-1))
+        self.lyrics_source_down_btn.clicked.connect(lambda: self._move_lyrics_source(1))
+        self.tidal_helper_browse_btn.clicked.connect(self._browse_tidal_helper)
 
     def _load(self):
         directories = get_directories(self.app_state.db)
@@ -510,6 +567,7 @@ class MusicFoldersDialog(QDialog):
         if not isinstance(ui_state, dict):
             ui_state = {}
         self.auto_edit_on_add_line_chk.setChecked(bool(ui_state.get("editor_auto_edit_on_add_line", False)))
+        self._load_lyrics_source_settings(load_lyrics_source_settings(config.ui_state_json))
 
         ai_settings = load_ai_sync_settings(getattr(config, "ui_state_json", ""))
         ai_device_idx = self.ai_device_combo.findData(str(ai_settings.get("device") or "auto"))
@@ -895,9 +953,13 @@ class MusicFoldersDialog(QDialog):
         if not isinstance(ui_state, dict):
             ui_state = {}
         ui_state["editor_auto_edit_on_add_line"] = self.auto_edit_on_add_line_chk.isChecked()
+        ui_state_json = merge_lyrics_source_settings(
+            json.dumps(ui_state, ensure_ascii=True, separators=(",", ":")),
+            self._current_lyrics_source_settings(),
+        )
 
         ai_state_json = merge_ai_sync_settings(
-            json.dumps(ui_state, ensure_ascii=True, separators=(",", ":")),
+            ui_state_json,
             {
                 "device": str(self.ai_device_combo.currentData() or "auto"),
                 "language": str(self.ai_language_combo.currentData() or "auto"),
@@ -937,3 +999,63 @@ class MusicFoldersDialog(QDialog):
         set_config(self.app_state.db, new_config)
         self.directories_changed = folders != previous_folders
         self.accept()
+
+    def _load_lyrics_source_settings(self, settings: dict[str, object]) -> None:
+        self.lyrics_source_list.clear()
+        priority = [str(value) for value in settings.get("priority", LYRICS_SOURCE_IDS)]
+        enabled = settings.get("enabled", {})
+        enabled = enabled if isinstance(enabled, dict) else {}
+        for provider_id in priority:
+            item = QListWidgetItem(LYRICS_SOURCE_LABELS.get(provider_id, provider_id.title()))
+            item.setData(Qt.ItemDataRole.UserRole, provider_id)
+            item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+            item.setCheckState(
+                Qt.CheckState.Checked if bool(enabled.get(provider_id, False)) else Qt.CheckState.Unchecked
+            )
+            self.lyrics_source_list.addItem(item)
+        self.lyrics_source_continue_plain_chk.setChecked(
+            bool(settings.get("continue_when_plain_for_synced", True))
+        )
+        tidal = settings.get("tidal", {})
+        tidal = tidal if isinstance(tidal, dict) else {}
+        self.tidal_country_edit.setText(str(tidal.get("country_code") or "Auto"))
+        transport_idx = self.tidal_transport_combo.findData(str(tidal.get("transport") or "external_helper"))
+        self.tidal_transport_combo.setCurrentIndex(max(0, transport_idx))
+        external = settings.get("external", {})
+        external = external if isinstance(external, dict) else {}
+        self.tidal_helper_edit.setText(str(external.get("helper_command") or ""))
+
+    def _current_lyrics_source_settings(self) -> dict[str, object]:
+        priority: list[str] = []
+        enabled: dict[str, bool] = {}
+        for index in range(self.lyrics_source_list.count()):
+            item = self.lyrics_source_list.item(index)
+            provider_id = str(item.data(Qt.ItemDataRole.UserRole) or "").strip().casefold()
+            if not provider_id:
+                continue
+            priority.append(provider_id)
+            enabled[provider_id] = item.checkState() == Qt.CheckState.Checked
+        return {
+            "priority": priority,
+            "enabled": enabled,
+            "continue_when_plain_for_synced": self.lyrics_source_continue_plain_chk.isChecked(),
+            "tidal": {
+                "country_code": self.tidal_country_edit.text().strip() or "Auto",
+                "transport": str(self.tidal_transport_combo.currentData() or "external_helper"),
+            },
+            "external": {"helper_command": self.tidal_helper_edit.text().strip()},
+        }
+
+    def _move_lyrics_source(self, delta: int) -> None:
+        row = self.lyrics_source_list.currentRow()
+        target = row + int(delta)
+        if row < 0 or target < 0 or target >= self.lyrics_source_list.count():
+            return
+        item = self.lyrics_source_list.takeItem(row)
+        self.lyrics_source_list.insertItem(target, item)
+        self.lyrics_source_list.setCurrentRow(target)
+
+    def _browse_tidal_helper(self) -> None:
+        selected = self._pick_file("Select TIDAL helper", self.tidal_helper_edit.text().strip())
+        if selected:
+            self.tidal_helper_edit.setText(selected)
