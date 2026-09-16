@@ -7,6 +7,7 @@ from .contracts import (
     LyricsProviderResult,
     TrackLookupContext,
 )
+from .errors import ProviderError, ProviderErrorKind, classify_provider_error
 from .execution import ProviderExecutionPolicy, get_provider_execution_policy
 from .health import ProviderHealthState, is_fatal_provider_error
 from .lrclib import LrclibProvider
@@ -63,6 +64,8 @@ __all__ = [
     "LyricsProviderRouter",
     "LyricsResultSelector",
     "MatchQuality",
+    "ProviderError",
+    "ProviderErrorKind",
     "ProviderExecutionPolicy",
     "ProviderHealthState",
     "ProviderLookupResultCache",
@@ -79,6 +82,7 @@ __all__ = [
     "TrackLookupContext",
     "TrackMatchMetadata",
     "TrackMatchScore",
+    "classify_provider_error",
     "get_provider_execution_policy",
     "is_fatal_provider_error",
     "local_metadata_fingerprint",

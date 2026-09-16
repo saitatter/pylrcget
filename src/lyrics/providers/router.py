@@ -11,6 +11,7 @@ from .contracts import (
     LyricsProviderResult,
     TrackLookupContext,
 )
+from .errors import ProviderErrorKind, classify_provider_error
 from .health import ProviderHealthState
 
 ACCEPT_FINAL: Final = "ACCEPT_FINAL"
@@ -81,6 +82,8 @@ class LyricsProviderRouter:
                     cancel_event=cancel_event,
                 )
             except Exception as error:
+                if classify_provider_error(error) is ProviderErrorKind.CANCELLED:
+                    raise
                 if health_state is not None:
                     health_state.record_failure(provider_id, error)
                 if index == len(self.providers) - 1:

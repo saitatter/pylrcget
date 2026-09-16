@@ -3,8 +3,7 @@ from __future__ import annotations
 import threading
 from dataclasses import dataclass
 
-from .tidal import TidalCatalogueError
-from .tidal_transport import ExternalTidalHelperError
+from .errors import ProviderErrorKind, classify_provider_error
 
 
 @dataclass
@@ -18,11 +17,12 @@ class _ProviderStatus:
 def is_fatal_provider_error(error: Exception) -> bool:
     """Return whether an error makes a provider unusable for this batch."""
 
-    if isinstance(error, ExternalTidalHelperError):
-        return True
-    if isinstance(error, TidalCatalogueError):
-        return error.status_code in {401, 403}
-    return False
+    return classify_provider_error(error) in {
+        ProviderErrorKind.AUTH_REQUIRED,
+        ProviderErrorKind.AUTH_EXPIRED,
+        ProviderErrorKind.FATAL,
+        ProviderErrorKind.INVALID_RESPONSE,
+    }
 
 
 class ProviderHealthState:
