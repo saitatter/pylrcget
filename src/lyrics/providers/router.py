@@ -11,6 +11,7 @@ from .contracts import (
     LyricsProviderResult,
     TrackLookupContext,
 )
+from .health import ProviderHealthState
 
 ACCEPT_FINAL: Final = "ACCEPT_FINAL"
 KEEP_AS_FALLBACK: Final = "KEEP_AS_FALLBACK"
@@ -62,6 +63,7 @@ class LyricsProviderRouter:
         *,
         requested_mode: DownloadMode,
         cancel_event: threading.Event | None = None,
+        health_state: ProviderHealthState | None = None,
     ) -> LyricsProviderResult | None:
         selector = LyricsResultSelector()
         fallback: LyricsProviderResult | None = None
@@ -69,13 +71,18 @@ class LyricsProviderRouter:
         for index, provider in enumerate(self.providers):
             if cancel_event is not None and cancel_event.is_set():
                 return None
+            provider_id = getattr(provider, "provider_id", provider.__class__.__name__)
+            if health_state is not None and not health_state.is_available(provider_id):
+                continue
             try:
                 candidate = provider.lookup(
                     track,
                     requested_mode=requested_mode,
                     cancel_event=cancel_event,
                 )
-            except Exception:
+            except Exception as error:
+                if health_state is not None:
+                    health_state.record_failure(provider_id, error)
                 if index == len(self.providers) - 1:
                     raise
                 continue

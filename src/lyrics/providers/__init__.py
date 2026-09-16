@@ -8,6 +8,7 @@ from .contracts import (
     TrackLookupContext,
 )
 from .execution import ProviderExecutionPolicy, get_provider_execution_policy
+from .health import ProviderHealthState, is_fatal_provider_error
 from .lrclib import LrclibProvider
 from .matching import (
     MatchQuality,
@@ -63,6 +64,7 @@ __all__ = [
     "LyricsResultSelector",
     "MatchQuality",
     "ProviderExecutionPolicy",
+    "ProviderHealthState",
     "ProviderLookupResultCache",
     "SelectionDecision",
     "TidalAccessContext",
@@ -78,6 +80,7 @@ __all__ = [
     "TrackMatchMetadata",
     "TrackMatchScore",
     "get_provider_execution_policy",
+    "is_fatal_provider_error",
     "local_metadata_fingerprint",
     "normalize_isrc",
     "normalize_match_text",

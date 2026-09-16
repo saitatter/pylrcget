@@ -15,6 +15,7 @@ from db.queries import get_remote_track_mappings, get_tracks_for_bulk_download
 from lyrics.providers import (
     LrclibProvider,
     LyricsProviderRouter,
+    ProviderHealthState,
     ProviderLookupResultCache,
     get_provider_execution_policy,
 )
@@ -63,6 +64,7 @@ class BulkDownloadStats(TypedDict):
     unique_lookup_keys: int
     deduplicated_tracks: int
     lookup_cache_hits: int
+    provider_health: dict[str, dict[str, object]]
     pending_future_high_water_mark: int
 
 
@@ -127,12 +129,14 @@ class BulkLyricsDownloadWorker(QThread):
         self._thread_local = threading.local()
         self._rate_limit_cooldown = _SharedRateLimitCooldown()
         self._lookup_result_cache = ProviderLookupResultCache()
+        self._provider_health = ProviderHealthState()
 
     def run(self) -> None:
         total = len(self.track_ids)
         self._started_at = time.perf_counter()
         self._rate_limit_cooldown = _SharedRateLimitCooldown()
         self._lookup_result_cache.clear()
+        self._provider_health.clear()
         ok_count = 0
         fail_count = 0
         cancelled = False
@@ -322,6 +326,7 @@ class BulkLyricsDownloadWorker(QThread):
             "unique_lookup_keys": len(lookup_groups),
             "deduplicated_tracks": max(0, len(jobs) - len(lookup_groups)),
             "lookup_cache_hits": self._lookup_result_cache.hits,
+            "provider_health": self._provider_health.snapshot(),
             "pending_future_high_water_mark": pending_future_high_water_mark,
             "candidates": candidates,
             "requires_review": bool(candidates) and not cancelled,
@@ -395,7 +400,11 @@ class BulkLyricsDownloadWorker(QThread):
                 isrc=job.isrc,
                 instrumental=job.instrumental,
             )
-            match = router.lookup(lookup_context, requested_mode=self.download_mode)
+            match = router.lookup(
+                lookup_context,
+                requested_mode=self.download_mode,
+                health_state=self._provider_health,
+            )
             self._lookup_result_cache.put(lookup_key, match)
             return _DownloadFetchResult(job=job, match=match)
         except LyricsMatchCancelled:
