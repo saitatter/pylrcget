@@ -1,0 +1,88 @@
+{
+  "exact_isrc": {
+    "local": {
+      "title": "Song",
+      "artist": "Artist",
+      "album": "Album",
+      "duration": 180,
+      "track_number": 1,
+      "isrc": "US-AAA-00-00001"
+    },
+    "payload": {
+      "data": [
+        {
+          "type": "tracks",
+          "id": "tidal-exact",
+          "attributes": {
+            "title": "Song",
+            "duration": 180,
+            "trackNumber": 1,
+            "isrc": "USAAA0000001",
+            "artist": "Artist",
+            "album": "Album"
+          }
+        }
+      ]
+    }
+  },
+  "metadata_tie": {
+    "local": {
+      "title": "Song",
+      "artist": "Artist",
+      "album": "Album",
+      "duration": 180,
+      "track_number": 1,
+      "isrc": null
+    },
+    "payload": {
+      "data": [
+        {
+          "type": "tracks",
+          "id": "200",
+          "attributes": {
+            "title": "Song",
+            "duration": 180,
+            "trackNumber": 1,
+            "artist": "Artist",
+            "album": "Album"
+          }
+        },
+        {
+          "type": "tracks",
+          "id": "100",
+          "attributes": {
+            "title": "Song",
+            "duration": 180,
+            "trackNumber": 1,
+            "artist": "Artist",
+            "album": "Album"
+          }
+        }
+      ]
+    }
+  },
+  "reject_mismatch": {
+    "local": {
+      "title": "Song",
+      "artist": "Artist",
+      "album": "Album",
+      "duration": 180,
+      "track_number": 1,
+      "isrc": null
+    },
+    "payload": {
+      "data": [
+        {
+          "type": "tracks",
+          "id": "wrong",
+          "attributes": {
+            "title": "Completely Different",
+            "duration": 12,
+            "artist": "Unknown Artist",
+            "album": "Other Album"
+          }
+        }
+      ]
+    }
+  }
+}
