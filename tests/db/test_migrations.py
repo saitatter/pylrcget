@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import sqlite3
 import tempfile
 import unittest
@@ -159,7 +160,7 @@ class MigrationTests(unittest.TestCase):
                 self.assertEqual(row["lyrics_sidecar_format"], "both")
                 self.assertEqual(row["lyrics_embed_format"], "both")
                 self.assertEqual(row["hotkey_bindings_json"], "")
-                self.assertEqual(row["ui_state_json"], "")
+                self.assertTrue(json.loads(row["ui_state_json"] or "{}")["lyrics_sources"])
             finally:
                 db.close()
 
@@ -263,7 +264,7 @@ class MigrationTests(unittest.TestCase):
                 self.assertEqual(row["lyrics_sidecar_format"], "both")
                 self.assertEqual(row["lyrics_embed_format"], "both")
                 self.assertEqual(row["hotkey_bindings_json"], "")
-                self.assertEqual(row["ui_state_json"], "")
+                self.assertTrue(json.loads(row["ui_state_json"])["lyrics_sources"])
             finally:
                 db.close()
 
@@ -300,7 +301,7 @@ class MigrationTests(unittest.TestCase):
                     "SELECT hotkey_bindings_json, ui_state_json FROM config_data LIMIT 1"
                 ).fetchone()
                 self.assertEqual(row["hotkey_bindings_json"], "")
-                self.assertEqual(row["ui_state_json"], "")
+                self.assertTrue(json.loads(row["ui_state_json"] or "{}")["lyrics_sources"])
             finally:
                 db.close()
 

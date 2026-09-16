@@ -240,7 +240,7 @@ INSERT INTO config_data (
     0.7,
     '',
     '',
-    '',
+    '{"lyrics_sources":{"priority":["lrclib","tidal","external"],"enabled":{"lrclib":true,"tidal":false,"external":false},"continue_when_plain_for_synced":true,"tidal":{"country_code":"Auto","transport":"external_helper"},"external":{"helper_command":""}}}',
     0
 );
 """

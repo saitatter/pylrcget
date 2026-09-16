@@ -6,6 +6,10 @@ import sqlite3
 
 from db.database import CURRENT_DB_VERSION
 from db.schema import SCHEMA_V1_SQL
+from lyrics.source_settings import (
+    load_lyrics_source_settings,
+    merge_lyrics_source_settings,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -239,6 +243,25 @@ def upgrade_database_if_needed(db: sqlite3.Connection, existing_version: int) ->
         db.execute("PRAGMA user_version=9")
         db.commit()
         current_version = 9
+
+    if current_version < 10:
+        logger.info("Upgrade database version %d -> 10...", current_version)
+        config_table = db.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='config_data'"
+        ).fetchone()
+        if config_table is not None:
+            rows = db.execute("SELECT id, ui_state_json FROM config_data").fetchall()
+            for row in rows:
+                current_state = row["ui_state_json"] or ""
+                defaults = load_lyrics_source_settings(current_state)
+                migrated_state = merge_lyrics_source_settings(current_state, defaults)
+                db.execute(
+                    "UPDATE config_data SET ui_state_json = ? WHERE id = ?",
+                    (migrated_state, int(row["id"])),
+                )
+        db.execute("PRAGMA user_version=10")
+        db.commit()
+        current_version = 10
 
     if current_version == CURRENT_DB_VERSION:
         return
