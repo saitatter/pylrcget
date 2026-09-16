@@ -102,6 +102,8 @@ PyLrcGet goes beyond bulk lyric downloads and turns the app into a full desktop 
 
 The consolidated scanner, LRCLIB, AI synchronization, and TagLib conclusions
 are available in the [benchmark summary](benchmarks/RESULTS_SUMMARY.md).
+The multi-provider/TIDAL implementation results are in
+[MULTI_PROVIDER_TIDAL_RESULTS.md](docs/MULTI_PROVIDER_TIDAL_RESULTS.md).
 
 ## Multi-provider lyrics and TIDAL
 
