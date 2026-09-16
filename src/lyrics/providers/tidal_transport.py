@@ -41,6 +41,7 @@ class ExternalTidalLyricsTransport:
 
     provider_id = "external"
     protocol_version = 1
+    default_max_output_bytes = 1_000_000
 
     def __init__(
         self,
@@ -50,6 +51,7 @@ class ExternalTidalLyricsTransport:
         cwd: str | None = None,
         env: Mapping[str, str] | None = None,
         poll_interval_s: float = 0.05,
+        max_output_bytes: int = default_max_output_bytes,
     ) -> None:
         if isinstance(command, (str, bytes)):
             raise TypeError("Helper command must be an argv sequence, not a shell string")
@@ -60,6 +62,9 @@ class ExternalTidalLyricsTransport:
         self.cwd = cwd
         self.env = dict(env) if env is not None else None
         self.poll_interval_s = max(0.01, float(poll_interval_s))
+        self.max_output_bytes = int(max_output_bytes)
+        if self.max_output_bytes < 1:
+            raise ValueError("Helper output limit must be positive")
 
     def get_lyrics(
         self,
@@ -96,7 +101,7 @@ class ExternalTidalLyricsTransport:
         result_holder: dict[str, object] = {}
         communication = threading.Thread(
             target=self._communicate,
-            args=(process, result_holder, request_text + "\n"),
+            args=(process, result_holder, request_text + "\n", self.max_output_bytes),
             daemon=True,
         )
         communication.start()
@@ -116,6 +121,10 @@ class ExternalTidalLyricsTransport:
 
         stdout = str(result_holder.get("stdout", ""))
         stderr = str(result_holder.get("stderr", ""))
+        if bool(result_holder.get("output_too_large", False)):
+            raise ExternalTidalHelperError(
+                f"TIDAL lyrics helper output exceeded {self.max_output_bytes} bytes"
+            )
         return self._parse_response(
             stdout,
             stderr=stderr,
@@ -124,11 +133,21 @@ class ExternalTidalLyricsTransport:
         )
 
     @staticmethod
-    def _communicate(process: subprocess.Popen, result_holder: dict[str, object], input_text: str) -> None:
+    def _communicate(
+        process: subprocess.Popen,
+        result_holder: dict[str, object],
+        input_text: str,
+        max_output_bytes: int,
+    ) -> None:
         stdout, stderr = process.communicate(input_text)
+        output_too_large = any(
+            len(value.encode("utf-8", errors="replace")) > max_output_bytes
+            for value in (stdout or "", stderr or "")
+        )
         result_holder.update(
             stdout=stdout or "",
             stderr=stderr or "",
+            output_too_large=output_too_large,
             return_code=process.returncode if process.returncode is not None else 0,
         )
 

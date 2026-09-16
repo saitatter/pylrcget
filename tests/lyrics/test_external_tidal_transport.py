@@ -95,3 +95,16 @@ def test_external_helper_requires_argv_and_never_enables_shell_execution():
     with patch("lyrics.providers.tidal_transport.subprocess.Popen", return_value=process) as popen:
         assert transport.get_lyrics("123") is None
     assert popen.call_args.kwargs["shell"] is False
+
+
+def test_external_helper_rejects_output_over_configured_limit():
+    code = "print('x' * 100)"
+    transport = ExternalTidalLyricsTransport(
+        [sys.executable, "-c", code],
+        max_output_bytes=32,
+        timeout_s=2.0,
+        poll_interval_s=0.01,
+    )
+
+    with pytest.raises(ExternalTidalHelperError, match="exceeded 32 bytes"):
+        transport.get_lyrics("123")
