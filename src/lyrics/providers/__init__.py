@@ -46,6 +46,7 @@ from .tidal import (
 )
 from .tidal_auth import TidalAccessContext, TidalSessionProvider
 from .tidal_cache import CachedTidalCatalogueResolver
+from .tidal_provider import TidalCatalogueResolver, TidalProvider
 from .tidal_transport import (
     ExternalTidalHelperError,
     ExternalTidalLyricsTransport,
@@ -80,8 +81,10 @@ __all__ = [
     "TidalCatalogueClient",
     "TidalCatalogueError",
     "TidalCatalogueNotFoundError",
+    "TidalCatalogueResolver",
     "TidalLyricsPayload",
     "TidalLyricsTransport",
+    "TidalProvider",
     "TidalSessionProvider",
     "TidalTrack",
     "TidalTrackResolution",
