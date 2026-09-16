@@ -13,6 +13,7 @@ python tools/perf/benchmark_scan.py --library "\\MOS\Music" --scenario initial -
 python tools/perf/benchmark_worker_sweep.py --library .\benchmarks\corpora\small --workers 1,2,4,8 --warmups 2 --runs 3
 python tools/perf/benchmark_worker_sweep.py --library "\\MOS\Music" --read-only-source --workers 1,2,4,8 --warmups 0 --runs 1
 python tools/perf/benchmark_lrclib.py --tracks 250 --duplicate-every 5 --warmups 2 --runs 3
+python tools/perf/benchmark_multi_provider.py --tracks 250 --duplicate-every 5 --workers 4 --warmups 2 --runs 3
 ```
 
 The scripts write JSON and Markdown reports below `benchmarks/results/` by
@@ -23,6 +24,10 @@ deterministic mutation, and then measure the second scan.
 `benchmark_lrclib.py` is fixture-backed by default. It never sends requests to
 the public LRCLIB service. The generated fixture provides exact matches and
 can be made duplicate-heavy with `--duplicate-every`.
+
+`benchmark_multi_provider.py` is also fixture-backed. It exercises the
+provider router, provider health state, bounded futures, and duplicate
+collapse without contacting LRCLIB, TIDAL, or an external helper.
 
 Supported scan scenarios are:
 
