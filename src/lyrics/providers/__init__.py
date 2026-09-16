@@ -35,7 +35,12 @@ from .tidal import (
     TidalTrackResolution,
 )
 from .tidal_cache import CachedTidalCatalogueResolver
-from .tidal_transport import TidalLyricsPayload, TidalLyricsTransport
+from .tidal_transport import (
+    ExternalTidalHelperError,
+    ExternalTidalLyricsTransport,
+    TidalLyricsPayload,
+    TidalLyricsTransport,
+)
 
 __all__ = [
     "ACCEPT_FINAL",
@@ -44,6 +49,8 @@ __all__ = [
     "REJECT",
     "CachedTidalCatalogueResolver",
     "DownloadMode",
+    "ExternalTidalHelperError",
+    "ExternalTidalLyricsTransport",
     "LrclibProvider",
     "LyricsProvider",
     "LyricsProviderCapabilities",
