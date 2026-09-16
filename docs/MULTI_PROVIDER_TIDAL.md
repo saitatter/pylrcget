@@ -13,7 +13,8 @@ The supported bridge in this branch is the external helper transport:
 2. Enable TIDAL in Lyrics Sources and move it to the desired priority.
 3. Select `External helper` as the TIDAL lyrics transport.
 4. Set the helper command, for example `python C:\\Tools\\tidal_helper.py`.
-5. Save the settings, then use Download missing lyrics.
+5. Use `Test TIDAL helper` to validate the JSON protocol.
+6. Save the settings, then use Download missing lyrics.
 
 The TIDAL provider resolves local metadata to a catalogue track first. ISRC is
 preferred; artist/title metadata is used when ISRC is unavailable. The
@@ -48,6 +49,11 @@ Commands are parsed into argv and launched with `shell=False`. The helper has
 a bounded timeout, stderr is captured for diagnostics, and cancellation
 terminates the process with a kill fallback. The default request does not
 include a local path, library root, OS username, or lyrics content.
+
+The helper bridge adds no Python package or native library to the application;
+the helper remains user-owned. The branch does not add a TIDAL SDK, keyring
+dependency, or native lyrics backend, so the existing Windows/macOS/Linux
+packaging footprint is unchanged.
 
 ## Native API status
 

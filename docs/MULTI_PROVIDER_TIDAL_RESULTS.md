@@ -117,6 +117,10 @@ Do not add a large TIDAL SDK or persist raw credentials in PyLrcGet settings;
 the session abstraction remains available for a future secure OAuth/keyring
 integration.
 
+Packaging impact: no TIDAL SDK, keyring package, native library, or bundled
+helper was added. The existing application package remains responsible only
+for PyLrcGet; the user controls the optional helper executable/script.
+
 ## Future-provider notes
 
 Future providers should implement only the provider contract and return
