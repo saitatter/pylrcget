@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import sys
 
 from lyrics.source_settings import (
     load_lyrics_source_settings,
@@ -54,3 +55,7 @@ def test_parse_helper_command_preserves_windows_argv_without_shell_expansion():
         "tidal",
     )
     assert parse_helper_command('python "unterminated') == ()
+    assert parse_helper_command("C:\\Tools\\tidal_helper.py") == (
+        sys.executable,
+        "C:\\Tools\\tidal_helper.py",
+    )

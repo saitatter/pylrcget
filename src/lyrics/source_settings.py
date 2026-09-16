@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import re
 import shlex
+import sys
 from collections.abc import Mapping
 
 LYRICS_SOURCE_IDS: tuple[str, ...] = ("lrclib", "tidal", "external")
@@ -115,6 +116,8 @@ def parse_helper_command(value: str | None) -> tuple[str, ...]:
             part = part[1:-1]
         if part:
             normalized.append(part)
+    if normalized and normalized[0].casefold().endswith(".py"):
+        return (sys.executable, *normalized)
     return tuple(normalized)
 
 
