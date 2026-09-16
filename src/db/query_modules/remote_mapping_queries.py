@@ -31,6 +31,47 @@ def get_remote_track_mapping(
     ).fetchone()
 
 
+def get_remote_track_mappings(
+    db: sqlite3.Connection,
+    track_ids: list[int],
+    provider: str,
+    *,
+    chunk_size: int = 500,
+) -> dict[int, sqlite3.Row]:
+    """Load remote mappings for a bulk operation using bounded IN queries."""
+
+    unique_ids = list(dict.fromkeys(int(track_id) for track_id in track_ids))
+    if not unique_ids:
+        return {}
+    result: dict[int, sqlite3.Row] = {}
+    size = max(1, int(chunk_size))
+    for start in range(0, len(unique_ids), size):
+        chunk = unique_ids[start : start + size]
+        placeholders = ",".join("?" for _ in chunk)
+        rows = db.execute(
+            f"""
+            SELECT
+                track_id,
+                provider,
+                provider_track_id,
+                match_method,
+                match_score,
+                remote_isrc,
+                remote_title,
+                remote_artist,
+                remote_album,
+                remote_duration,
+                verified_at,
+                local_metadata_fingerprint
+            FROM remote_track_mapping
+            WHERE provider = ? AND track_id IN ({placeholders})
+            """,
+            [str(provider), *chunk],
+        ).fetchall()
+        result.update({int(row["track_id"]): row for row in rows})
+    return result
+
+
 def upsert_remote_track_mapping(
     db: sqlite3.Connection,
     *,

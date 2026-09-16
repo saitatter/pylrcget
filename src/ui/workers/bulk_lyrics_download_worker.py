@@ -11,7 +11,7 @@ from PySide6.QtCore import QObject, QThread, Signal
 
 from core.lrclib_client import LrcLibAPI
 from core.utils import prepare_input
-from db.queries import get_tracks_for_bulk_download
+from db.queries import get_remote_track_mappings, get_tracks_for_bulk_download
 from lyrics.providers import LrclibProvider, LyricsProviderRouter
 from lyrics.providers.contracts import LyricsProviderResult, TrackLookupContext
 from lyrics.source_settings import LYRICS_SOURCE_LABELS
@@ -73,6 +73,10 @@ class _DownloadJob:
     isrc: str | None
     instrumental: bool
     duration_s: int | None
+    has_plain_lyrics: bool
+    has_synced_lyrics: bool
+    cached_tidal_track_id: str | None
+    cached_tidal_metadata_fingerprint: str | None
 
 
 @dataclass(frozen=True)
@@ -134,6 +138,7 @@ class BulkLyricsDownloadWorker(QThread):
             db.row_factory = sqlite3.Row
 
             tracks_by_id = get_tracks_for_bulk_download(db, self.track_ids)
+            remote_mappings = get_remote_track_mappings(db, self.track_ids, "tidal")
             for track_id in self.track_ids:
                 if self.isInterruptionRequested():
                     cancelled = True
@@ -173,6 +178,18 @@ class BulkLyricsDownloadWorker(QThread):
                             isrc=track.isrc,
                             instrumental=track.instrumental,
                             duration_s=duration_s,
+                            has_plain_lyrics=bool(track.txt_lyrics),
+                            has_synced_lyrics=bool(track.lrc_lyrics and not track.instrumental),
+                            cached_tidal_track_id=(
+                                str(remote_mappings[int(track_id)]["provider_track_id"])
+                                if int(track_id) in remote_mappings
+                                else None
+                            ),
+                            cached_tidal_metadata_fingerprint=(
+                                str(remote_mappings[int(track_id)]["local_metadata_fingerprint"])
+                                if int(track_id) in remote_mappings
+                                else None
+                            ),
                         )
                     )
                 except (sqlite3.Error, AttributeError, TypeError) as exc:
