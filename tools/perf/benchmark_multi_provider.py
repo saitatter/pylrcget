@@ -96,7 +96,7 @@ class _FixtureProvider:
         if cancel_event is not None and cancel_event.is_set():
             return None
         method = "direct_id" if track.isrc else "search"
-        group_id = int(track.track_id or 0)
+        group_id = int(str(track.title or "").rsplit(" ", 1)[-1])
         if self.provider_id == "lrclib":
             result_type = "plain" if group_id % 5 == 0 else "synced"
             result = _result(
