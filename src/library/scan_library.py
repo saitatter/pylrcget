@@ -839,8 +839,8 @@ def read_audio_metadata_from_audio(audio, path: str) -> AudioMetadata:
         )
         track_number = _parse_track_number(_first_audio_tag_text(audio, ("tracknumber",)))
     elif ext in {".m4a", ".mp4"}:
-        title = _first_audio_tag_text(audio, ("©nam",)) or os.path.splitext(os.path.basename(path))[0]
-        album = _first_audio_tag_text(audio, ("©alb",)) or "Unknown Album"
+        title = _first_audio_tag_text(audio, ("\xa9nam",)) or os.path.splitext(os.path.basename(path))[0]
+        album = _first_audio_tag_text(audio, ("\xa9alb",)) or "Unknown Album"
         artist = _first_audio_tag_text(audio, ("©ART", "artist")) or "Unknown Artist"
         album_artist = (
             _first_audio_tag_text(
@@ -906,8 +906,8 @@ def read_audio_metadata_from_audio(audio, path: str) -> AudioMetadata:
         )
         track_number = _parse_track_number(_first_audio_tag_text(audio, ("TRCK",)))
     else:
-        title = _first_audio_tag_text(audio, ("title", "TIT2", "©nam", "Title")) or os.path.splitext(os.path.basename(path))[0]
-        album = _first_audio_tag_text(audio, ("album", "TALB", "©alb", "WM/AlbumTitle")) or "Unknown Album"
+        title = _first_audio_tag_text(audio, ("title", "TIT2", "\xa9nam", "Title")) or os.path.splitext(os.path.basename(path))[0]
+        album = _first_audio_tag_text(audio, ("album", "TALB", "\xa9alb", "WM/AlbumTitle")) or "Unknown Album"
         artist = _first_audio_tag_text(audio, ("artist", "TPE1", "©ART", "Author", "WM/Artist")) or "Unknown Artist"
         album_artist = (
             _first_audio_tag_text(
