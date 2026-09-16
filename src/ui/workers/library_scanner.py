@@ -291,6 +291,7 @@ def _scan_sidecar_only_for_path(
         track_number=metadata.track_number,
         modified_time=legacy_signature[0],
         file_size=legacy_signature[1],
+        isrc=metadata.isrc,
     )
     state = dataclasses.replace(
         previous_state,

@@ -39,7 +39,8 @@ def get_track_by_id(db: sqlite3.Connection, track_id: int) -> Track:
             dirty_txt_lyrics,
             dirty_lrc_lyrics,
             dirty_lyrics_present,
-            instrumental
+            instrumental,
+            isrc
         FROM tracks
         JOIN albums ON tracks.album_id = albums.id
         JOIN artists ON tracks.artist_id = artists.id
@@ -85,7 +86,8 @@ def get_tracks_for_bulk_download(
                 dirty_txt_lyrics,
                 dirty_lrc_lyrics,
                 dirty_lyrics_present,
-                instrumental
+                instrumental,
+                isrc
             FROM tracks
             JOIN albums ON tracks.album_id = albums.id
             JOIN artists ON tracks.artist_id = artists.id
@@ -117,8 +119,8 @@ def add_track(db: sqlite3.Connection, track: FsTrack, *, commit: bool = True) ->
         INSERT INTO tracks (
             file_path, file_name, title, title_lower,
             album_id, artist_id, duration, track_number,
-            txt_lyrics, lrc_lyrics, instrumental, modified_time, file_size
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            txt_lyrics, lrc_lyrics, instrumental, modified_time, file_size, isrc
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             track.file_path,
@@ -134,6 +136,7 @@ def add_track(db: sqlite3.Connection, track: FsTrack, *, commit: bool = True) ->
             is_instrumental,
             track.modified_time,
             track.file_size,
+            track.isrc,
         ),
     )
     if commit:
@@ -185,6 +188,7 @@ class TrackBatchInserter:
                     is_instrumental,
                     track.modified_time,
                     track.file_size,
+                    track.isrc,
                 )
             )
         self.db.executemany(
@@ -192,8 +196,8 @@ class TrackBatchInserter:
             INSERT OR IGNORE INTO tracks (
                 file_path, file_name, title, title_lower,
                 album_id, artist_id, duration, track_number,
-                txt_lyrics, lrc_lyrics, instrumental, modified_time, file_size
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                txt_lyrics, lrc_lyrics, instrumental, modified_time, file_size, isrc
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             rows,
         )
@@ -232,7 +236,7 @@ def get_tracks(db: sqlite3.Connection) -> list[Track]:
             artists.name AS artist_name, tracks.artist_id,
             albums.name AS album_name, albums.album_artist_name,
             album_id, duration, track_number, modified_time, file_size,
-            albums.image_path, txt_lyrics, lrc_lyrics, dirty_txt_lyrics, dirty_lrc_lyrics, dirty_lyrics_present, instrumental
+            albums.image_path, txt_lyrics, lrc_lyrics, dirty_txt_lyrics, dirty_lrc_lyrics, dirty_lyrics_present, instrumental, isrc
         FROM tracks
         JOIN albums ON tracks.album_id = albums.id
         JOIN artists ON tracks.artist_id = artists.id
@@ -607,7 +611,8 @@ def refresh_track_from_file(db: sqlite3.Connection, track_id: int) -> Track | No
             dirty_lyrics_present = 0,
             instrumental = ?,
             modified_time = ?,
-            file_size = ?
+            file_size = ?,
+            isrc = ?
         WHERE id = ?
         """,
         (
@@ -624,6 +629,7 @@ def refresh_track_from_file(db: sqlite3.Connection, track_id: int) -> Track | No
             is_instrumental,
             refreshed.modified_time,
             refreshed.file_size,
+            refreshed.isrc,
             int(track_id),
         ),
     )

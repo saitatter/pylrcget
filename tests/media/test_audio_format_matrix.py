@@ -10,7 +10,7 @@ import pytest
 from mutagen._vorbis import VCommentDict
 from mutagen.apev2 import APETextValue, APEv2
 from mutagen.asf import ASFTags, ASFUnicodeAttribute
-from mutagen.id3 import ID3, TALB, TIT2, TPE1, TPE2, TRCK, TXXX, USLT
+from mutagen.id3 import ID3, TALB, TIT2, TPE1, TPE2, TRCK, TSRC, TXXX, USLT
 from mutagen.mp4 import MP4Tags
 
 from core.embed_lyrics import (
@@ -39,6 +39,7 @@ EXPECTED_METADATA = {
     "album_artist": "Matrix Album Artist",
     "track_number": 3,
     "duration": 12.5,
+    "isrc": "USAAA0000001",
 }
 
 
@@ -58,6 +59,7 @@ def _id3_tags() -> ID3:
     tags.add(TPE1(encoding=3, text=EXPECTED_METADATA["artist"]))
     tags.add(TPE2(encoding=3, text=EXPECTED_METADATA["album_artist"]))
     tags.add(TRCK(encoding=3, text="3/10"))
+    tags.add(TSRC(encoding=3, text="US-AAA-00-00001"))
     tags.add(USLT(encoding=3, lang="und", desc="", text=PLAIN_LYRICS))
     tags.add(TXXX(encoding=3, desc=ID3_SYNCED_DESC, text=SYNCED_LYRICS))
     return tags
@@ -70,6 +72,7 @@ def _vorbis_tags() -> VCommentDict:
     tags["artist"] = [EXPECTED_METADATA["artist"]]
     tags["albumartist"] = [EXPECTED_METADATA["album_artist"]]
     tags["tracknumber"] = ["3/10"]
+    tags["ISRC"] = ["us-aaa-00-00001"]
     tags[VORBIS_PLAIN_KEY] = [PLAIN_LYRICS]
     tags[VORBIS_SYNCED_KEY] = [SYNCED_LYRICS]
     return tags
@@ -82,6 +85,7 @@ def _mp4_tags() -> MP4Tags:
     tags["\xa9ART"] = [EXPECTED_METADATA["artist"]]
     tags["aART"] = [EXPECTED_METADATA["album_artist"]]
     tags["trkn"] = [(3, 10)]
+    tags["----:com.apple.iTunes:ISRC"] = [b"US-AAA-00-00001"]
     tags[MP4_PLAIN_KEY] = [PLAIN_LYRICS]
     tags[MP4_SYNCED_KEY] = [SYNCED_LYRICS.encode()]
     return tags
@@ -94,6 +98,7 @@ def _asf_tags() -> ASFTags:
     tags["Author"] = [ASFUnicodeAttribute(EXPECTED_METADATA["artist"])]
     tags["WM/AlbumArtist"] = [ASFUnicodeAttribute(EXPECTED_METADATA["album_artist"])]
     tags["WM/TrackNumber"] = [ASFUnicodeAttribute("3")]
+    tags["WM/ISRC"] = [ASFUnicodeAttribute("US-AAA-00-00001")]
     tags[ASF_PLAIN_KEY] = [ASFUnicodeAttribute(PLAIN_LYRICS)]
     tags[ASF_SYNCED_KEY] = [ASFUnicodeAttribute(SYNCED_LYRICS)]
     return tags
@@ -106,6 +111,7 @@ def _ape_tags() -> APEv2:
     tags["artist"] = APETextValue(EXPECTED_METADATA["artist"])
     tags["albumartist"] = APETextValue(EXPECTED_METADATA["album_artist"])
     tags["tracknumber"] = APETextValue("3/10")
+    tags["ISRC"] = APETextValue("US-AAA-00-00001")
     tags["UNSYNCEDLYRICS"] = APETextValue(PLAIN_LYRICS)
     tags["LYRICS"] = APETextValue(SYNCED_LYRICS)
     return tags
@@ -137,6 +143,30 @@ def test_supported_formats_normalize_real_mutagen_tags(extension, tag_factory) -
 
     plain, synced = read_embedded_lyrics_from_audio(audio, f"matrix{extension}")
     assert (plain, synced) == (PLAIN_LYRICS, SYNCED_LYRICS)
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ("US-AAA-00-00001", "USAAA0000001"),
+        (" usaaa0000001 ", "USAAA0000001"),
+        ("not-an-isrc", None),
+        ("US-AAA-00-0000", None),
+    ],
+)
+def test_isrc_normalization_is_conservative(raw: str, expected: str | None) -> None:
+    audio = _TagAudio(
+        {
+            "title": ["Song"],
+            "album": ["Album"],
+            "artist": ["Artist"],
+            "isrc": [raw],
+        }
+    )
+
+    metadata = read_audio_metadata_from_audio(audio, "matrix.flac")
+
+    assert metadata.isrc == expected
 
 
 def test_wav_lyrics_round_trip_uses_real_mutagen_file(tmp_path: Path) -> None:

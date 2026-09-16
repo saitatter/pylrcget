@@ -80,6 +80,7 @@ CREATE TABLE tracks (
     track_number INTEGER,
     modified_time REAL,
     file_size INTEGER,
+    isrc TEXT,
     FOREIGN KEY(artist_id) REFERENCES artists(id),
     FOREIGN KEY(album_id) REFERENCES albums(id)
 );

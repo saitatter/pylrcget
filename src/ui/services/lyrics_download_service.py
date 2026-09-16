@@ -413,7 +413,7 @@ def download_track_lyrics(
             album_artist=track.album_artist_name,
             duration_seconds=float(duration_s) if duration_s else None,
             track_number=track.track_number,
-            isrc=None,
+            isrc=track.isrc,
         )
         match = router.lookup(lookup_context, requested_mode=mode)
         if match is None:

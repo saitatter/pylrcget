@@ -63,6 +63,7 @@ class MigrationTests(unittest.TestCase):
                     tuple(track),
                     ("song.mp3", "Song", "[00:01.00]synced", "plain", 123.0, 456),
                 )
+                self.assertIsNone(db.execute("SELECT isrc FROM tracks WHERE id = 1").fetchone()["isrc"])
                 self.assertEqual(db.execute("SELECT COUNT(*) FROM artists").fetchone()[0], 1)
                 self.assertEqual(db.execute("SELECT COUNT(*) FROM albums").fetchone()[0], 1)
                 self.assertEqual(db.execute("SELECT COUNT(*) FROM download_history").fetchone()[0], 1)
@@ -108,7 +109,7 @@ class MigrationTests(unittest.TestCase):
                     row["name"] for row in db.execute("PRAGMA table_info(tracks)").fetchall()
                 }
                 self.assertTrue(
-                    {"dirty_lrc_lyrics", "dirty_txt_lyrics", "dirty_lyrics_present"} <= track_columns
+                    {"dirty_lrc_lyrics", "dirty_txt_lyrics", "dirty_lyrics_present", "isrc"} <= track_columns
                 )
                 scan_state_columns = {
                     row["name"] for row in db.execute("PRAGMA table_info(track_scan_state)").fetchall()
@@ -407,6 +408,7 @@ class MigrationTests(unittest.TestCase):
                 self.assertEqual(int(db.execute("PRAGMA user_version").fetchone()[0]), CURRENT_DB_VERSION)
                 columns = {row["name"] for row in db.execute("PRAGMA table_info(track_scan_state)").fetchall()}
                 self.assertIn("audio_mtime_ns", columns)
+                self.assertIn("isrc", {row["name"] for row in db.execute("PRAGMA table_info(tracks)").fetchall()})
                 self.assertEqual(db.execute("SELECT COUNT(*) FROM track_scan_state").fetchone()[0], 0)
             finally:
                 db.close()

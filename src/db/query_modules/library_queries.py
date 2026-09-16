@@ -118,6 +118,7 @@ def get_library_scan_index(
             tracks.txt_lyrics,
             tracks.lrc_lyrics,
             tracks.instrumental,
+            tracks.isrc,
             artists.name AS artist_name,
             albums.name AS album_name,
             COALESCE(NULLIF(albums.album_artist_name, ''), artists.name, '') AS album_artist_name
@@ -139,6 +140,7 @@ def get_library_scan_index(
                 album_artist=str(row["album_artist_name"] or row["artist_name"] or "Unknown Artist"),
                 track_number=int(row["track_number"]) if row["track_number"] is not None else None,
                 duration=float(row["duration"] or 0.0),
+                isrc=row["isrc"],
             ),
             bool(row["txt_lyrics"] or row["lrc_lyrics"] or row["instrumental"]),
         )
@@ -363,7 +365,8 @@ def get_similar_lyrics_track_rows(
             dirty_txt_lyrics,
             dirty_lrc_lyrics,
             dirty_lyrics_present,
-            instrumental
+            instrumental,
+            isrc
         FROM tracks
         JOIN albums ON tracks.album_id = albums.id
         JOIN artists ON tracks.artist_id = artists.id
@@ -418,7 +421,7 @@ def get_album_tracks(db: sqlite3.Connection, album_id: int) -> list[Track]:
             artists.name AS artist_name, tracks.artist_id,
             albums.name AS album_name, albums.album_artist_name,
             album_id, duration, track_number,
-            albums.image_path, txt_lyrics, lrc_lyrics, dirty_txt_lyrics, dirty_lrc_lyrics, dirty_lyrics_present, instrumental
+            albums.image_path, txt_lyrics, lrc_lyrics, dirty_txt_lyrics, dirty_lrc_lyrics, dirty_lyrics_present, instrumental, isrc
         FROM tracks
         JOIN albums ON tracks.album_id = albums.id
         JOIN artists ON tracks.artist_id = artists.id
@@ -436,7 +439,7 @@ def get_artist_tracks(db: sqlite3.Connection, artist_id: int) -> list[Track]:
             artists.name AS artist_name, tracks.artist_id,
             albums.name AS album_name, albums.album_artist_name,
             album_id, duration, track_number,
-            albums.image_path, txt_lyrics, lrc_lyrics, dirty_txt_lyrics, dirty_lrc_lyrics, dirty_lyrics_present, instrumental
+            albums.image_path, txt_lyrics, lrc_lyrics, dirty_txt_lyrics, dirty_lrc_lyrics, dirty_lyrics_present, instrumental, isrc
         FROM tracks
         JOIN albums ON tracks.album_id = albums.id
         JOIN artists ON tracks.artist_id = artists.id

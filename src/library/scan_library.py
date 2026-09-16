@@ -42,6 +42,10 @@ ASF_PLAIN_KEYS = ("WM/Lyrics", "LYRICS", "UNSYNCEDLYRICS")
 ASF_SYNCED_KEYS = ("LRCLIB_LRC", "SYNCEDLYRICS")
 APE_PLAIN_KEYS = ("UNSYNCEDLYRICS", "lyrics")
 APE_SYNCED_KEYS = ("LYRICS", "LRCLIB_LRC")
+ID3_ISRC_KEYS = ("TSRC", "TXXX:ISRC", "ISRC")
+VORBIS_ISRC_KEYS = ("isrc", "ISRC")
+MP4_ISRC_KEYS = ("----:com.apple.iTunes:ISRC", "ISRC", "isrc")
+ASF_ISRC_KEYS = ("WM/ISRC", "ISRC")
 
 
 @dataclass(frozen=True)
@@ -52,6 +56,7 @@ class AudioMetadata:
     album_artist: str
     track_number: int | None
     duration: float
+    isrc: str | None = None
 
 
 @dataclass(frozen=True)
@@ -773,6 +778,32 @@ def _first_audio_tag_text(audio, keys: tuple[str, ...]) -> str | None:
     return None
 
 
+_ISRC_COMPACT_RE = re.compile(r"[A-Z]{2}[A-Z0-9]{3}[0-9]{7}")
+
+
+def _normalize_isrc(raw: str | None) -> str | None:
+    if not raw:
+        return None
+    compact = re.sub(r"\s+", "", str(raw).strip().upper()).replace("-", "")
+    if not _ISRC_COMPACT_RE.fullmatch(compact):
+        return None
+    return compact
+
+
+def _extract_isrc(audio, ext: str) -> str | None:
+    if ext in {".mp3", ".wav", ".dsf", ".dff"}:
+        keys = ID3_ISRC_KEYS
+    elif ext in {".flac", ".ogg", ".oga", ".opus", ".mpc"}:
+        keys = VORBIS_ISRC_KEYS
+    elif ext in {".m4a", ".mp4"}:
+        keys = MP4_ISRC_KEYS
+    elif ext in {".wma", ".asf"}:
+        keys = ASF_ISRC_KEYS
+    else:
+        keys = (*ID3_ISRC_KEYS, *VORBIS_ISRC_KEYS, *MP4_ISRC_KEYS, *ASF_ISRC_KEYS)
+    return _normalize_isrc(_first_audio_tag_text(audio, keys))
+
+
 def _parse_track_number_value(value) -> int | None:
     if value is None:
         return None
@@ -943,6 +974,7 @@ def read_audio_metadata_from_audio(audio, path: str) -> AudioMetadata:
         album_artist=album_artist,
         track_number=track_number,
         duration=duration,
+        isrc=_extract_isrc(audio, ext),
     )
 
 
@@ -1494,6 +1526,7 @@ def new_fs_track_from_path(
             track_number=metadata.track_number,
             modified_time=modified_time,
             file_size=file_size,
+            isrc=metadata.isrc,
         )
     except (MutagenError, Exception) as exc:  # noqa: BLE001
         logger.warning("Skipping unreadable audio file during scan: %s (%s)", path, exc)

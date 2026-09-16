@@ -69,6 +69,7 @@ class _DownloadJob:
     album: str
     album_artist: str | None
     track_number: int | None
+    isrc: str | None
     duration_s: int | None
 
 
@@ -167,6 +168,7 @@ class BulkLyricsDownloadWorker(QThread):
                             album=(track.album_name or "").strip(),
                             album_artist=track.album_artist_name,
                             track_number=track.track_number,
+                            isrc=track.isrc,
                             duration_s=duration_s,
                         )
                     )
@@ -335,7 +337,7 @@ class BulkLyricsDownloadWorker(QThread):
                 album_artist=job.album_artist,
                 duration_seconds=float(job.duration_s) if job.duration_s else None,
                 track_number=job.track_number,
-                isrc=None,
+                isrc=job.isrc,
             )
             match = router.lookup(lookup_context, requested_mode=self.download_mode)
             return _DownloadFetchResult(job=job, match=match)

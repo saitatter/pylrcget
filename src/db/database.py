@@ -8,7 +8,7 @@ into migrations + queries.
 from __future__ import annotations
 
 # Public DB version (single source of truth for the app)
-CURRENT_DB_VERSION = 6
+CURRENT_DB_VERSION = 7
 
 from db.migrations import *
 from db.queries import *
