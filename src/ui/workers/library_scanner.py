@@ -367,6 +367,9 @@ class LibraryScanner(QThread):
                 for path, track_id in existing_track_ids.items()
                 if track_id in scan_state_index
             }
+            if self.isInterruptionRequested():
+                self.finished_signal.emit(False, "Library scan cancelled.")
+                return
             discovery_started = time.perf_counter()
             paths, discovered_signatures, discovered_audio_signatures = iter_audio_paths_with_signatures_and_audio_signatures(
                 self.directories,
@@ -375,6 +378,9 @@ class LibraryScanner(QThread):
                 strict_roots=True,
             )
             timings.record("path_discovery_s", time.perf_counter() - discovery_started)
+            if self.isInterruptionRequested():
+                self.finished_signal.emit(False, "Library scan cancelled.")
+                return
             total = len(paths)
             scanned = 0
             unchanged = 0

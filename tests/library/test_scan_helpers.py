@@ -630,6 +630,63 @@ class LibraryScannerIncrementalTests(unittest.TestCase):
             finally:
                 db.close()
 
+    def test_library_scanner_cancels_before_discovery(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db = initialize_database(tmp)
+            db_path = str(Path(tmp) / "pylrcget.db.sqlite3")
+            db.close()
+            scanner = LibraryScanner(db_path, [str(Path(tmp) / "Music")], scan_worker_count=1)
+            scanner.isInterruptionRequested = lambda: True
+            finished: list[tuple[bool, str]] = []
+            scanner.finished_signal.connect(lambda ok, message: finished.append((ok, message)))
+
+            with patch(
+                "ui.workers.library_scanner.iter_audio_paths_with_signatures_and_audio_signatures",
+                side_effect=AssertionError("cancelled scan must not start discovery"),
+            ):
+                scanner.run()
+
+            self.assertEqual(finished, [(False, "Library scan cancelled.")])
+
+    def test_library_scanner_cancels_after_discovery_without_reconciling_tracks(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db = initialize_database(tmp)
+            db_path = str(Path(tmp) / "pylrcget.db.sqlite3")
+            music_dir = Path(tmp) / "Music"
+            music_dir.mkdir(parents=True, exist_ok=True)
+            audio = music_dir / "song.mp3"
+            touch_text(audio, "audio")
+            add_tracks(
+                db,
+                [make_fs_track(audio, artist="Artist", album="Album", title="Song")],
+            )
+            db.close()
+
+            interrupted_checks = 0
+
+            def is_interrupted() -> bool:
+                nonlocal interrupted_checks
+                interrupted_checks += 1
+                return interrupted_checks >= 2
+
+            scanner = LibraryScanner(db_path, [str(music_dir)], scan_worker_count=1)
+            scanner.isInterruptionRequested = is_interrupted
+            finished: list[tuple[bool, str]] = []
+            scanner.finished_signal.connect(lambda ok, message: finished.append((ok, message)))
+
+            with patch(
+                "ui.workers.library_scanner.iter_audio_paths_with_signatures_and_audio_signatures",
+                return_value=([], {}, {}),
+            ):
+                scanner.run()
+
+            self.assertEqual(finished, [(False, "Library scan cancelled.")])
+            db = sqlite3.connect(db_path)
+            try:
+                self.assertEqual(db.execute("SELECT COUNT(*) FROM tracks").fetchone()[0], 1)
+            finally:
+                db.close()
+
     def test_scan_timing_stats_accumulate_worker_local_buckets(self):
         timings = _ScanTimingStats()
 
