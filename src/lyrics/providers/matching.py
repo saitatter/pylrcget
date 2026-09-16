@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import json
 import re
 import unicodedata
 from dataclasses import dataclass, field
@@ -53,6 +55,30 @@ def normalize_match_text(value: str | None) -> str:
     normalized = unicodedata.normalize("NFKC", str(value or "")).casefold()
     words = _WORD_RE.findall(normalized)
     return " ".join(words)
+
+
+def local_metadata_fingerprint(local: TrackLookupContext) -> str:
+    """Return a stable fingerprint for fields that can change catalogue identity."""
+
+    payload = {
+        "title": normalize_match_text(local.title),
+        "artists": [normalize_match_text(value) for value in local.artists],
+        "album": normalize_match_text(local.album),
+        "album_artist": normalize_match_text(local.album_artist),
+        "duration_seconds": round(float(local.duration_seconds), 1)
+        if local.duration_seconds is not None
+        else None,
+        "track_number": int(local.track_number) if local.track_number is not None else None,
+        "isrc": normalize_isrc(local.isrc),
+        "instrumental": bool(local.instrumental),
+    }
+    encoded = json.dumps(
+        payload,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
 
 
 def provider_result_metadata(result: LyricsProviderResult) -> TrackMatchMetadata:

@@ -156,6 +156,27 @@ CREATE INDEX idx_download_history_downloaded_at ON download_history(downloaded_a
 CREATE INDEX idx_download_history_track_id ON download_history(track_id);
 CREATE INDEX idx_search_history_searched_at ON search_history(searched_at DESC);
 
+CREATE TABLE remote_track_mapping (
+    id INTEGER PRIMARY KEY,
+    track_id INTEGER NOT NULL,
+    provider TEXT NOT NULL,
+    provider_track_id TEXT NOT NULL,
+    match_method TEXT NOT NULL,
+    match_score REAL NOT NULL,
+    remote_isrc TEXT,
+    remote_title TEXT,
+    remote_artist TEXT,
+    remote_album TEXT,
+    remote_duration REAL,
+    verified_at REAL NOT NULL,
+    local_metadata_fingerprint TEXT NOT NULL,
+    UNIQUE(track_id, provider),
+    FOREIGN KEY(track_id) REFERENCES tracks(id) ON DELETE CASCADE
+);
+
+CREATE INDEX idx_remote_track_mapping_provider_id
+    ON remote_track_mapping(provider, provider_track_id);
+
 INSERT INTO library_data (init) VALUES (0);
 INSERT INTO config_data (
     skip_not_needed_tracks,

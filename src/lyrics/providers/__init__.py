@@ -12,6 +12,7 @@ from .matching import (
     MatchQuality,
     TrackMatchMetadata,
     TrackMatchScore,
+    local_metadata_fingerprint,
     normalize_isrc,
     normalize_match_text,
     provider_result_metadata,
@@ -33,12 +34,14 @@ from .tidal import (
     TidalTrack,
     TidalTrackResolution,
 )
+from .tidal_cache import CachedTidalCatalogueResolver
 
 __all__ = [
     "ACCEPT_FINAL",
     "CONTINUE",
     "KEEP_AS_FALLBACK",
     "REJECT",
+    "CachedTidalCatalogueResolver",
     "DownloadMode",
     "LrclibProvider",
     "LyricsProvider",
@@ -56,6 +59,7 @@ __all__ = [
     "TrackLookupContext",
     "TrackMatchMetadata",
     "TrackMatchScore",
+    "local_metadata_fingerprint",
     "normalize_isrc",
     "normalize_match_text",
     "provider_result_metadata",

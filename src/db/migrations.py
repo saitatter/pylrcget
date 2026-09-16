@@ -190,6 +190,39 @@ def upgrade_database_if_needed(db: sqlite3.Connection, existing_version: int) ->
         db.commit()
         current_version = 7
 
+    if current_version < 8:
+        logger.info("Upgrade database version %d -> 8...", current_version)
+        db.execute(
+            """
+            CREATE TABLE IF NOT EXISTS remote_track_mapping (
+                id INTEGER PRIMARY KEY,
+                track_id INTEGER NOT NULL,
+                provider TEXT NOT NULL,
+                provider_track_id TEXT NOT NULL,
+                match_method TEXT NOT NULL,
+                match_score REAL NOT NULL,
+                remote_isrc TEXT,
+                remote_title TEXT,
+                remote_artist TEXT,
+                remote_album TEXT,
+                remote_duration REAL,
+                verified_at REAL NOT NULL,
+                local_metadata_fingerprint TEXT NOT NULL,
+                UNIQUE(track_id, provider),
+                FOREIGN KEY(track_id) REFERENCES tracks(id) ON DELETE CASCADE
+            )
+            """
+        )
+        db.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_remote_track_mapping_provider_id
+                ON remote_track_mapping(provider, provider_track_id)
+            """
+        )
+        db.execute("PRAGMA user_version=8")
+        db.commit()
+        current_version = 8
+
     if current_version == CURRENT_DB_VERSION:
         return
 
