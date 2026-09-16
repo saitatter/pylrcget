@@ -4,7 +4,7 @@ import sqlite3
 from pathlib import Path
 from unittest.mock import Mock
 
-from db.database import add_tracks, initialize_database
+from db.database import CURRENT_DB_VERSION, add_tracks, initialize_database
 from db.migrations import upgrade_database_if_needed
 from db.query_modules.remote_mapping_queries import (
     get_remote_track_mapping,
@@ -190,6 +190,6 @@ def test_v7_database_migration_creates_remote_mapping_table():
         assert table is not None
         columns = {row["name"] for row in db.execute("PRAGMA table_info(remote_track_mapping)")}
         assert {"track_id", "provider", "provider_track_id", "local_metadata_fingerprint"} <= columns
-        assert int(db.execute("PRAGMA user_version").fetchone()[0]) == 8
+        assert int(db.execute("PRAGMA user_version").fetchone()[0]) == CURRENT_DB_VERSION
     finally:
         db.close()
