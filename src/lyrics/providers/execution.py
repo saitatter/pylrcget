@@ -71,6 +71,13 @@ class ProviderExecutionCoordinator:
                 semaphore.release()
             self._condition.notify_all()
 
+    def record_rate_limit(self, provider_id: str, delay_s: float) -> None:
+        normalized = str(provider_id or "unknown").strip().casefold() or "unknown"
+        deadline = time.monotonic() + max(0.0, float(delay_s))
+        with self._condition:
+            self._next_allowed[normalized] = max(self._next_allowed.get(normalized, 0.0), deadline)
+            self._condition.notify_all()
+
     def clear(self) -> None:
         with self._condition:
             self._semaphores.clear()

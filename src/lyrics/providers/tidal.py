@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import re
 import time
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, replace
 from urllib.parse import quote
 
@@ -27,9 +27,10 @@ _TIDAL_ID_RE = re.compile(r"^[A-Za-z0-9:_-]+$")
 
 
 class TidalCatalogueError(RuntimeError):
-    def __init__(self, status_code: int, message: str) -> None:
+    def __init__(self, status_code: int, message: str, *, retry_after_s: float | None = None) -> None:
         self.status_code = int(status_code)
         self.message = message
+        self.retry_after_s = retry_after_s
         super().__init__(f"TIDAL catalogue request failed ({self.status_code}): {message}")
 
 
@@ -78,6 +79,7 @@ class TidalCatalogueClient:
         session: requests.Session | None = None,
         timeout_s: float = TIDAL_DEFAULT_TIMEOUT_S,
         search_limit: int = 10,
+        on_rate_limit: Callable[[float], None] | None = None,
     ) -> None:
         self._access_token = access_token
         self.country_code = country_code
@@ -85,6 +87,7 @@ class TidalCatalogueClient:
         self._session = session or requests.Session()
         self.timeout_s = float(timeout_s)
         self.search_limit = max(1, int(search_limit))
+        self._on_rate_limit = on_rate_limit
 
     def lookup_by_isrc(self, isrc: str) -> list[TidalTrack]:
         normalized = normalize_isrc(isrc)
@@ -215,7 +218,14 @@ class TidalCatalogueClient:
             raise TidalCatalogueNotFoundError(404, "Not found")
         if response.status_code >= 400:
             message = (getattr(response, "text", "") or "")[:200]
-            raise TidalCatalogueError(response.status_code, message or "HTTP error")
+            retry_after_s = _retry_after_seconds(response) if response.status_code == 429 else None
+            if retry_after_s is not None and self._on_rate_limit is not None:
+                self._on_rate_limit(retry_after_s)
+            raise TidalCatalogueError(
+                response.status_code,
+                message or "HTTP error",
+                retry_after_s=retry_after_s,
+            )
         try:
             payload = response.json()
         except ValueError as exc:
@@ -328,6 +338,16 @@ def _first_text(value) -> str | None:
         return None
     rendered = str(value).strip()
     return rendered or None
+
+
+def _retry_after_seconds(response) -> float | None:
+    headers = getattr(response, "headers", None)
+    raw_value = headers.get("Retry-After") if hasattr(headers, "get") else None
+    try:
+        value = float(raw_value)
+    except (TypeError, ValueError):
+        return None
+    return max(0.0, min(value, 3600.0))
 
 
 def _number(value) -> float | None:

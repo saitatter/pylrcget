@@ -168,3 +168,22 @@ def test_http_errors_are_explicit_and_invalid_json_is_not_accepted():
     session.get.return_value = SimpleNamespace(status_code=200, text="not-json", json=lambda: (_ for _ in ()).throw(ValueError()))
     with pytest.raises(TidalCatalogueError, match="Invalid JSON"):
         client.lookup_by_isrc("USAAA0000001")
+
+
+def test_tidal_rate_limit_propagates_retry_after_to_shared_callback():
+    session = Mock()
+    session.get.return_value = SimpleNamespace(
+        status_code=429,
+        text="slow down",
+        headers={"Retry-After": "2"},
+        json=dict,
+    )
+    on_rate_limit = Mock()
+    client = TidalCatalogueClient("token", session=session, on_rate_limit=on_rate_limit)
+
+    with pytest.raises(TidalCatalogueError) as raised:
+        client.lookup_by_isrc("USAAA0000001")
+
+    assert raised.value.status_code == 429
+    assert raised.value.retry_after_s == 2.0
+    on_rate_limit.assert_called_once_with(2.0)

@@ -494,6 +494,7 @@ class BulkLyricsDownloadWorker(QThread):
         mapping_db.row_factory = sqlite3.Row
         client = TidalCatalogueClient(
             country_code=str(tidal_settings.get("country_code") or "Auto"),
+            on_rate_limit=lambda delay_s: self._execution_coordinator.record_rate_limit("tidal", delay_s),
         )
         resolver = CachedTidalCatalogueResolver(client, mapping_db)
         transport = ExternalTidalLyricsTransport(command)

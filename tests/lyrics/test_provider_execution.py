@@ -36,6 +36,14 @@ def test_execution_coordinator_allows_and_releases_provider_slot():
     coordinator.release("lrclib")
 
 
+def test_execution_coordinator_records_provider_specific_rate_limit():
+    coordinator = ProviderExecutionCoordinator()
+
+    coordinator.record_rate_limit("tidal", 0.0)
+    assert coordinator.acquire("lrclib", lambda: False) is True
+    coordinator.release("lrclib")
+
+
 def test_router_releases_provider_slot_after_lookup():
     class Provider:
         provider_id = "lrclib"

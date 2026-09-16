@@ -89,8 +89,14 @@ class LyricsProviderRouter:
                     cancel_event=cancel_event,
                 )
             except Exception as error:
-                if classify_provider_error(error) is ProviderErrorKind.CANCELLED:
+                error_kind = classify_provider_error(error)
+                if error_kind is ProviderErrorKind.CANCELLED:
                     raise
+                if error_kind is ProviderErrorKind.RATE_LIMITED and execution_coordinator is not None:
+                    execution_coordinator.record_rate_limit(
+                        provider_id,
+                        getattr(error, "retry_after_s", None) or 0.5,
+                    )
                 if health_state is not None:
                     health_state.record_failure(provider_id, error)
                 if index == len(self.providers) - 1:
