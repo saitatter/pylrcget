@@ -32,6 +32,7 @@ PyLrcGet goes beyond bulk lyric downloads and turns the app into a full desktop 
 - AI-powered auto-sync with lyrics-aligner for English and WhisperX fallback (see [AI Auto-Sync](#-ai-auto-sync))
 - Configurable download modes: `Prefer synced`, `Synced only`, `Plain only`
 - Bulk `Download missing lyrics` action based on the active download mode
+- Configurable multi-provider lyrics routing with an external TIDAL helper bridge (see [TIDAL #57](docs/MULTI_PROVIDER_TIDAL.md))
 - Per-selection download overrides from the track context menu
 - Separate output format choices for sidecar files and embedded lyrics
 - Real-time synced lyrics editor with per-line snapping while audio is playing
@@ -102,6 +103,14 @@ PyLrcGet goes beyond bulk lyric downloads and turns the app into a full desktop 
 The consolidated scanner, LRCLIB, AI synchronization, and TagLib conclusions
 are available in the [benchmark summary](benchmarks/RESULTS_SUMMARY.md).
 
+## Multi-provider lyrics and TIDAL
+
+LRCLIB remains enabled by default. TIDAL can be enabled and ordered in
+Settings → Lyrics → Lyrics Sources. The supported bridge currently uses a
+user-configured external helper; the catalogue resolver prefers ISRC and falls
+back to confident artist/title matching. See the [TIDAL #57 setup guide](docs/MULTI_PROVIDER_TIDAL.md)
+for the JSON helper protocol, security boundaries, and native API limitations.
+
 ---
 
 ## ⚙️ Settings
@@ -109,7 +118,7 @@ are available in the [benchmark summary](benchmarks/RESULTS_SUMMARY.md).
 | Category | Options |
 |----------|---------|
 | **Library** | Music folders, excluded paths, excluded regex patterns, exclusion preview/test, auto-refresh after folder changes |
-| **Lyrics** | Download mode, save lyrics files, file contents, embed lyrics, embedded contents, download directory, filename pattern with live preview, lyrics lookup subfolder, reaction delay, LRCLIB server URL |
+| **Lyrics** | Download mode, save lyrics files, file contents, embed lyrics, embedded contents, download directory, filename pattern with live preview, lyrics lookup subfolder, reaction delay, LRCLIB server URL, provider priority, TIDAL transport/helper |
 | **Appearance** | Theme selection, UI scale (90–125%), font size (Small/Normal/Large), album art toggle, startup view |
 | **Updates** | In-app version check, release notes preview, download/install actions |
 
