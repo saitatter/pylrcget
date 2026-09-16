@@ -4,6 +4,7 @@ import logging
 import sqlite3
 import threading
 import time
+from collections.abc import Callable, Sequence
 from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from dataclasses import dataclass
 from typing import TypedDict
@@ -14,17 +15,27 @@ from core.lrclib_client import LrcLibAPI
 from core.utils import prepare_input
 from db.queries import get_remote_track_mappings, get_tracks_for_bulk_download
 from lyrics.providers import (
+    CachedTidalCatalogueResolver,
+    ExternalTidalLyricsTransport,
     LrclibProvider,
+    LyricsProvider,
     LyricsProviderRouter,
     ProviderHealthState,
     ProviderLookupResultCache,
+    TidalCatalogueClient,
+    TidalProvider,
     build_lookup_diagnostics,
     get_provider_execution_policy,
     log_lookup_diagnostics,
     lyrics_result_type,
 )
 from lyrics.providers.contracts import LyricsProviderResult, TrackLookupContext
-from lyrics.source_settings import LYRICS_SOURCE_LABELS
+from lyrics.source_settings import (
+    LYRICS_SOURCE_LABELS,
+    default_lyrics_source_settings,
+    load_lyrics_source_settings,
+    parse_helper_command,
+)
 from ui.services.download_modes import normalize_download_mode
 from ui.services.lyrics_download_service import (
     LyricsMatchCancelled,
@@ -134,6 +145,7 @@ class BulkLyricsDownloadWorker(QThread):
         self._rate_limit_cooldown = _SharedRateLimitCooldown()
         self._lookup_result_cache = ProviderLookupResultCache()
         self._provider_health = ProviderHealthState()
+        self._lyrics_source_settings: dict[str, object] = default_lyrics_source_settings()
 
     def run(self) -> None:
         total = len(self.track_ids)
@@ -153,6 +165,9 @@ class BulkLyricsDownloadWorker(QThread):
         try:
             db = sqlite3.connect(self.db_path, timeout=15.0)
             db.row_factory = sqlite3.Row
+            config_row = db.execute("SELECT ui_state_json FROM config_data LIMIT 1").fetchone()
+            ui_state_json = config_row["ui_state_json"] if config_row is not None else ""
+            self._lyrics_source_settings = load_lyrics_source_settings(ui_state_json)
 
             tracks_by_id = get_tracks_for_bulk_download(db, self.track_ids)
             remote_mappings = get_remote_track_mappings(db, self.track_ids, "tidal")
@@ -207,6 +222,7 @@ class BulkLyricsDownloadWorker(QThread):
                                 if int(track_id) in remote_mappings
                                 else None
                             ),
+                            provider_id="router",
                         )
                     )
                 except (sqlite3.Error, AttributeError, TypeError) as exc:
@@ -407,14 +423,7 @@ class BulkLyricsDownloadWorker(QThread):
             self.progress.emit(-1, len(self.track_ids), job.label, status, self._elapsed())
 
         try:
-            provider = LrclibProvider(
-                self.lrclib_instance,
-                api=api,
-                notify=_notify,
-                before_request=self._before_lrclib_request,
-                on_rate_limit=self._record_lrclib_rate_limit,
-            )
-            router = LyricsProviderRouter((provider,))
+            router = LyricsProviderRouter(self._providers_for_current_thread(api, _notify))
             lookup_context = TrackLookupContext(
                 track_id=job.track_id,
                 file_path=job.file_path,
@@ -438,6 +447,56 @@ class BulkLyricsDownloadWorker(QThread):
             return _DownloadFetchResult(job=job, cancelled=True)
         except Exception as exc:  # noqa: BLE001
             return _DownloadFetchResult(job=job, error=str(exc))
+
+    def _providers_for_current_thread(
+        self,
+        api: LrcLibAPI,
+        notify: Callable[[str], None],
+    ) -> Sequence[LyricsProvider]:
+        settings = self._lyrics_source_settings
+        raw_enabled = settings.get("enabled")
+        enabled = raw_enabled if isinstance(raw_enabled, dict) else {}
+        raw_priority = settings.get("priority")
+        priority = raw_priority if isinstance(raw_priority, list) else ["lrclib"]
+        providers: dict[str, LyricsProvider] = {}
+        if bool(enabled.get("lrclib", True)):
+            providers["lrclib"] = LrclibProvider(
+                self.lrclib_instance,
+                api=api,
+                notify=notify,
+                before_request=self._before_lrclib_request,
+                on_rate_limit=self._record_lrclib_rate_limit,
+            )
+        if bool(enabled.get("tidal", False)):
+            tidal_provider = self._tidal_provider_for_current_thread()
+            if tidal_provider is not None:
+                providers["tidal"] = tidal_provider
+        return tuple(providers[provider_id] for provider_id in priority if provider_id in providers)
+
+    def _tidal_provider_for_current_thread(self) -> TidalProvider | None:
+        cached = getattr(self._thread_local, "tidal_provider", None)
+        if cached is not None:
+            return cached
+        raw_tidal = self._lyrics_source_settings.get("tidal")
+        tidal_settings = raw_tidal if isinstance(raw_tidal, dict) else {}
+        if str(tidal_settings.get("transport") or "external_helper") != "external_helper":
+            return None
+        raw_external = self._lyrics_source_settings.get("external")
+        external_settings = raw_external if isinstance(raw_external, dict) else {}
+        command = parse_helper_command(str(external_settings.get("helper_command") or ""))
+        if not command:
+            return None
+        mapping_db = sqlite3.connect(self.db_path, timeout=15.0)
+        mapping_db.row_factory = sqlite3.Row
+        client = TidalCatalogueClient(
+            country_code=str(tidal_settings.get("country_code") or "Auto"),
+        )
+        resolver = CachedTidalCatalogueResolver(client, mapping_db)
+        transport = ExternalTidalLyricsTransport(command)
+        provider = TidalProvider(resolver, transport)
+        self._thread_local.tidal_provider = provider
+        self._thread_local.tidal_mapping_db = mapping_db
+        return provider
 
     def _before_lrclib_request(self) -> bool:
         return self._rate_limit_cooldown.wait(self.isInterruptionRequested)

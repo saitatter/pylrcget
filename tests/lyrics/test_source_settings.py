@@ -5,6 +5,7 @@ import json
 from lyrics.source_settings import (
     load_lyrics_source_settings,
     merge_lyrics_source_settings,
+    parse_helper_command,
 )
 
 
@@ -43,3 +44,13 @@ def test_source_settings_merge_preserves_unrelated_ui_state():
     state = json.loads(merged)
     assert state["editor_auto_edit_on_add_line"] is True
     assert state["lyrics_sources"]["enabled"]["external"] is True
+
+
+def test_parse_helper_command_preserves_windows_argv_without_shell_expansion():
+    assert parse_helper_command('python "C:\\Program Files\\helper.py" --mode tidal') == (
+        "python",
+        "C:\\Program Files\\helper.py",
+        "--mode",
+        "tidal",
+    )
+    assert parse_helper_command('python "unterminated') == ()

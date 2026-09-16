@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import re
+import shlex
 from collections.abc import Mapping
 
 LYRICS_SOURCE_IDS: tuple[str, ...] = ("lrclib", "tidal", "external")
@@ -96,6 +97,25 @@ def merge_lyrics_source_settings(
     normalized = normalize_lyrics_source_settings(settings)
     state["lyrics_sources"] = normalized
     return json.dumps(state, ensure_ascii=True, separators=(",", ":"))
+
+
+def parse_helper_command(value: str | None) -> tuple[str, ...]:
+    """Parse a configured helper command into argv without invoking a shell."""
+
+    command = str(value or "").strip()
+    if not command:
+        return ()
+    try:
+        parts = shlex.split(command, posix=False)
+    except ValueError:
+        return ()
+    normalized: list[str] = []
+    for part in parts:
+        if len(part) >= 2 and part[0] == part[-1] and part[0] in {'"', "'"}:
+            part = part[1:-1]
+        if part:
+            normalized.append(part)
+    return tuple(normalized)
 
 
 def _coerce_bool(value: object, default: bool) -> bool:
