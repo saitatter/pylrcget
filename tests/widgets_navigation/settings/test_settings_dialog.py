@@ -181,3 +181,16 @@ class SettingsDialogTests(unittest.TestCase):
                     reloaded.deleteLater()
             finally:
                 app_state.db.close()
+
+    def test_settings_dialog_exposes_tidal_helper_test_action(self):
+        with TemporaryDirectory() as tmp:
+            app_state = simple_app_state(initialize_database(tmp))
+            try:
+                dialog = MusicFoldersDialog(app_state)
+                try:
+                    self.assertEqual(dialog.tidal_test_btn.text(), "Test TIDAL helper")
+                    self.assertTrue(dialog.tidal_test_btn.isEnabled())
+                finally:
+                    dialog.deleteLater()
+            finally:
+                app_state.db.close()

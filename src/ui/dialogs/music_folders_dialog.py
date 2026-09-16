@@ -33,11 +33,17 @@ from PySide6.QtWidgets import (
 from core.lyrics_sidecar import DEFAULT_LYRICS_FILE_PATTERN
 from db.database import get_config, get_directories, set_config, set_directories
 from library.scan_library import preview_audio_path_exclusions
+from lyrics.providers import (
+    ExternalTidalHelperError,
+    ExternalTidalLyricsTransport,
+    TrackLookupContext,
+)
 from lyrics.source_settings import (
     LYRICS_SOURCE_IDS,
     LYRICS_SOURCE_LABELS,
     load_lyrics_source_settings,
     merge_lyrics_source_settings,
+    parse_helper_command,
 )
 from ui.ai_sync_settings import (
     AI_SYNC_DEVICE_OPTIONS,
@@ -464,11 +470,13 @@ class MusicFoldersDialog(QDialog):
         tidal_layout.addWidget(QLabel("Helper command"), 2, 0)
         tidal_layout.addWidget(self.tidal_helper_edit, 2, 1)
         tidal_layout.addWidget(self.tidal_helper_browse_btn, 2, 2)
+        self.tidal_test_btn = QPushButton("Test TIDAL helper")
+        tidal_layout.addWidget(self.tidal_test_btn, 3, 0, 1, 3)
         tidal_hint = QLabel(
             "TIDAL catalogue access and lyrics transport are separate. Official lyrics remain disabled until supported by the API."
         )
         tidal_hint.setWordWrap(True)
-        tidal_layout.addWidget(tidal_hint, 3, 0, 1, 3)
+        tidal_layout.addWidget(tidal_hint, 4, 0, 1, 3)
         lyrics_download_layout.addWidget(tidal_box)
 
         lyrics_download_layout.addStretch(1)
@@ -523,6 +531,7 @@ class MusicFoldersDialog(QDialog):
         self.lyrics_source_up_btn.clicked.connect(lambda: self._move_lyrics_source(-1))
         self.lyrics_source_down_btn.clicked.connect(lambda: self._move_lyrics_source(1))
         self.tidal_helper_browse_btn.clicked.connect(self._browse_tidal_helper)
+        self.tidal_test_btn.clicked.connect(self._test_tidal_helper)
 
     def _load(self):
         directories = get_directories(self.app_state.db)
@@ -1059,3 +1068,35 @@ class MusicFoldersDialog(QDialog):
         selected = self._pick_file("Select TIDAL helper", self.tidal_helper_edit.text().strip())
         if selected:
             self.tidal_helper_edit.setText(selected)
+
+    def _test_tidal_helper(self) -> None:
+        command = parse_helper_command(self.tidal_helper_edit.text())
+        if not command:
+            QMessageBox.warning(self, "TIDAL helper", "Set a helper executable or command first.")
+            return
+        transport = ExternalTidalLyricsTransport(command, timeout_s=10.0)
+        test_track = TrackLookupContext(
+            track_id=None,
+            file_path="settings-test",
+            title="PyLrcGet helper test",
+            artists=("PyLrcGet",),
+            album=None,
+            album_artist=None,
+            duration_seconds=None,
+            track_number=None,
+            isrc=None,
+        )
+        try:
+            payload = transport.get_lyrics(
+                "settings-test",
+                track=test_track,
+                requested_mode="prefer_synced",
+            )
+        except (ExternalTidalHelperError, OSError, ValueError) as exc:
+            QMessageBox.warning(self, "TIDAL helper", f"Helper test failed: {exc}")
+            return
+        if payload is None:
+            QMessageBox.information(self, "TIDAL helper", "Helper protocol is valid; it returned no lyrics for the test track.")
+            return
+        result_type = "synced" if payload.synced_lyrics else "plain"
+        QMessageBox.information(self, "TIDAL helper", f"Helper protocol is valid and returned {result_type} lyrics.")
