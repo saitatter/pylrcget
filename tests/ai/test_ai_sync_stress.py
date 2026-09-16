@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from itertools import pairwise
+
 import pytest
 
 from tests import test_support as _test_support  # noqa: F401
@@ -54,7 +56,7 @@ def test_structural_dp_stays_bounded_and_monotone_for_repeated_chorus_candidates
     assert len(selected) == 60
     assert all(
         current.start > previous.start
-        for previous, current in zip(selected, selected[1:])
+        for previous, current in pairwise(selected)
     )
     assert all(abs(candidate.start - index * 4.0) <= 1.5 for index, candidate in enumerate(selected))
 

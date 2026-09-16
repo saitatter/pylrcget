@@ -1,8 +1,8 @@
 """Research backend manifests and promotion gates for AI sync experiments."""
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Mapping
 
 
 @dataclass(slots=True, frozen=True)
@@ -161,10 +161,10 @@ def evaluate_research_candidate(
 
 
 __all__ = [
+    "HUBERTFA_RESEARCH",
     "LYRICS_ALIGNMENT_MULTILINGUAL",
+    "SOFA_RESEARCH",
     "ResearchBackendSpec",
     "ResearchRecommendation",
-    "HUBERTFA_RESEARCH",
-    "SOFA_RESEARCH",
     "evaluate_research_candidate",
 ]

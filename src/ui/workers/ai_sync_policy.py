@@ -80,8 +80,8 @@ def backend_can_be_default(manifest: BackendLicenseManifest) -> bool:
 
 
 __all__ = [
-    "BackendLicenseManifest",
     "LYRICS_ALIGNER_MANIFEST",
     "MMS_RESEARCH_MANIFEST",
+    "BackendLicenseManifest",
     "backend_can_be_default",
 ]

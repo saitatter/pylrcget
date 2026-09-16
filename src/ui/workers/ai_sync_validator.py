@@ -2,8 +2,9 @@
 from __future__ import annotations
 
 import math
+from collections.abc import Iterable
 from dataclasses import dataclass, field
-from typing import Iterable
+from itertools import pairwise
 
 from .ai_sync_contracts import AlignedLine, AlignmentResult, ManualAnchor
 
@@ -67,7 +68,7 @@ def validate_alignment(
     valid_lines = [line for line in lines if math.isfinite(line.start) and line.start >= 0]
     gaps = [
         current.start - previous.start
-        for previous, current in zip(valid_lines, valid_lines[1:])
+        for previous, current in pairwise(valid_lines)
     ]
     monotonic_pairs = sum(gap > 0 for gap in gaps)
     monotonicity = monotonic_pairs / len(gaps) if gaps else 1.0
@@ -186,7 +187,7 @@ def _repeat_order_score(lines: list[AlignedLine]) -> float:
         return 1.0
     increasing = sum(
         current.source_line_index > previous.source_line_index
-        for previous, current in zip(lines, lines[1:])
+        for previous, current in pairwise(lines)
     )
     return increasing / (len(lines) - 1)
 

@@ -10,7 +10,6 @@ from ui.workers.ai_sync_service import (
     build_runtime_environment,
 )
 
-
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SRC_ROOT = REPO_ROOT / "src"
 

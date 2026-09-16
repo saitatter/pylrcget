@@ -23,18 +23,19 @@ from .ai_sync_demucs import (
 from .ai_sync_demucs import (
     separated_vocal_audio as _separated_vocal_audio,
 )
-from .ai_sync_lrc import (
-    _build_lrc_from_segments,
-    _format_ts,
-)
 from .ai_sync_language import detect_text_language
 from .ai_sync_local_rescue import (
     build_rescue_windows,
     replace_segments_in_windows,
     transcribe_local_rescue,
 )
+from .ai_sync_lrc import (
+    _build_lrc_from_segments,
+    _format_ts,
+)
 from .ai_sync_lyrics_aligner import align as _align_with_lyrics_aligner
 from .ai_sync_lyrics_aligner import is_available as _lyrics_aligner_available
+from .ai_sync_router import build_default_router
 from .ai_sync_runtime import (
     _check_ai_sync_available,
     _get_cached_align_model,
@@ -42,7 +43,6 @@ from .ai_sync_runtime import (
     _patch_whisperx_audio_loading,
     _preferred_whisper_compute_type,
 )
-from .ai_sync_router import build_default_router
 from .ai_sync_transcription import (
     _align_segments_per_chunks,
     _approximate_word_timestamps_from_segments,

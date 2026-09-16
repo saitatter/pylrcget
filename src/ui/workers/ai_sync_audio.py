@@ -4,9 +4,10 @@ from __future__ import annotations
 import os
 import threading
 from collections import OrderedDict
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 
 @dataclass(slots=True, frozen=True)
@@ -98,7 +99,7 @@ def _estimate_size_bytes(data: Any) -> int:
     if isinstance(value, (int, float)):
         return max(1, int(value))
     try:
-        return max(1, int(len(data)) * 4)
+        return max(1, len(data) * 4)
     except (TypeError, AttributeError):
         return 1
 

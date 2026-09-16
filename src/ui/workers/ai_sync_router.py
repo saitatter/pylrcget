@@ -1,8 +1,8 @@
 """Conservative language-aware selection of AI alignment backends."""
 from __future__ import annotations
 
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
-from typing import Iterable, Mapping
 
 
 @dataclass(slots=True, frozen=True)

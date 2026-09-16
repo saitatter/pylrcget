@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-
 TRACK_SCAN_STATE_SIGNATURE_VERSION = 1
 
 

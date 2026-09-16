@@ -25,9 +25,9 @@ from db.query_modules.track_queries import TrackBatchInserter
 from library.scan_library import (
     ScanRootUnavailableError,
     SidecarLookupCache,
+    get_audio_file_signature,
     get_audio_signature,
     get_sidecar_scan_state,
-    get_audio_file_signature,
     iter_audio_paths_with_signatures_and_audio_signatures,
     new_fs_track_from_path,
     read_audio_metadata_for_scan,
@@ -795,7 +795,7 @@ class LibraryScanner(QThread):
         except ScanRootUnavailableError as exc:
             logger.error("Library scan aborted before reconciliation: %s", exc)
             self.finished_signal.emit(False, f"Scan failed: {exc}")
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             logger.exception("Library scan failed")
             self.finished_signal.emit(False, f"Scan failed: {e}")
         finally:

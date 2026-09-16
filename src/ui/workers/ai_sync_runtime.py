@@ -382,12 +382,12 @@ __all__ = [
     "_clear_inference_caches",
     "_get_cached_align_model",
     "_get_cached_whisperx_model",
-    "get_inference_cache_stats",
     "_module_available",
     "_patch_faster_whisper_compatibility",
     "_patch_pyannote_compatibility",
     "_patch_whisperx_audio_loading",
     "_preferred_whisper_compute_type",
+    "get_inference_cache_stats",
     "get_missing_ai_dependencies",
     "is_ai_sync_available",
 ]

@@ -13,7 +13,6 @@ from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from typing import Any
 
-
 AI_SYNC_STAGES = (
     "process_startup",
     "runtime_initialization",
@@ -126,10 +125,10 @@ class StageProfiler:
             elapsed_ms = (self._clock() - started) / 1_000_000
             self._durations_ms[name] = self._durations_ms.get(name, 0.0) + elapsed_ms
 
-    def increment(self, name: str, value: int | float = 1) -> None:
+    def increment(self, name: str, value: float = 1) -> None:
         self._counters[name] = self._counters.get(name, 0) + value
 
-    def observe(self, name: str, value: int | float) -> None:
+    def observe(self, name: str, value: float) -> None:
         self._observations.setdefault(name, []).append(float(value))
 
     def set_metadata(self, name: str, value: Any) -> None:

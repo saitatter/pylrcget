@@ -15,8 +15,8 @@ from tests import test_support as _test_support  # noqa: F401
 from tests.test_support import make_fs_track, touch_text
 from ui.workers.bulk_lyrics_download_worker import (
     MAX_PARALLEL_DOWNLOAD_WORKERS,
-    _SharedRateLimitCooldown,
     BulkLyricsDownloadWorker,
+    _SharedRateLimitCooldown,
 )
 from ui.workers.lyrics_download_worker import LyricsDownloadWorker
 

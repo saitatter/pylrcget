@@ -1,8 +1,8 @@
 """Bounded structural sequence selection for known-lyrics alignment."""
 from __future__ import annotations
 
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Iterable, Mapping, Sequence
 
 from .ai_sync_contracts import ManualAnchor
 

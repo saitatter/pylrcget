@@ -25,8 +25,8 @@ from library.scan_library import (
     MutagenError,
     ScanRootUnavailableError,
     SidecarLookupCache,
-    get_audio_signature,
     get_audio_file_signature,
+    get_audio_signature,
     get_sidecar_scan_state,
     iter_audio_paths,
     iter_audio_paths_with_audio_signatures,
@@ -38,7 +38,11 @@ from library.scan_library import (
 )
 from tests import test_support as _test_support  # noqa: F401
 from tests.test_support import make_fs_track, touch_text
-from ui.workers.library_scanner import LibraryScanner, _ScanTimingStats, _scan_worker_count
+from ui.workers.library_scanner import (
+    LibraryScanner,
+    _scan_worker_count,
+    _ScanTimingStats,
+)
 
 
 class ScanLibraryHelpersTests(unittest.TestCase):

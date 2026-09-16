@@ -20,13 +20,18 @@ from pathlib import Path
 from typing import Any
 
 from .ai_runtime import default_lyrics_aligner_dir
-from .ai_sync_contracts import AlignmentOptions, AlignmentRequest, AlignmentResult, AlignedLine
+from .ai_sync_contracts import (
+    AlignedLine,
+    AlignmentOptions,
+    AlignmentRequest,
+    AlignmentResult,
+)
 from .ai_sync_phonemization import EnglishG2PPhonemizer
 
 logger = logging.getLogger(__name__)
 
 _BACKEND_LOCK = threading.Lock()
-_BACKEND_CACHE: dict[tuple[str, str], "EnglishLyricsAlignerBackend"] = {}
+_BACKEND_CACHE: dict[tuple[str, str], EnglishLyricsAlignerBackend] = {}
 
 
 def _backend_root() -> Path | None:

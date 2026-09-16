@@ -11,10 +11,9 @@ import time
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 
 from .ai_runtime import resolve_torch_device
-from .ai_sync_contracts import AlignmentRequest, AlignmentResult, AlignedLine
+from .ai_sync_contracts import AlignedLine, AlignmentRequest, AlignmentResult
 
 _WORD_RE = re.compile(r"[^\W_]+(?:['’][^\W_]+)*", re.UNICODE)
 
@@ -154,7 +153,7 @@ class StableTsResearchBackend:
         *,
         device: str = "cpu",
         download_root: Path | None = None,
-    ) -> "StableTsResearchBackend":
+    ) -> StableTsResearchBackend:
         try:
             import stable_whisper
             from stable_whisper.alignment import align, align_words

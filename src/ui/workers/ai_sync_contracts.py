@@ -7,8 +7,9 @@ prevents each backend from inventing a slightly different result shape.
 from __future__ import annotations
 
 import math
+from collections.abc import Mapping
 from dataclasses import asdict, dataclass, field
-from typing import Any, Mapping, Protocol
+from typing import Any, Protocol
 
 
 @dataclass(slots=True, frozen=True)
@@ -20,7 +21,7 @@ class ManualAnchor:
         return {"line_index": self.line_index, "time_ms": self.time_ms}
 
     @classmethod
-    def from_mapping(cls, value: Mapping[str, Any]) -> "ManualAnchor":
+    def from_mapping(cls, value: Mapping[str, Any]) -> ManualAnchor:
         return cls(line_index=int(value["line_index"]), time_ms=int(value["time_ms"]))
 
 
@@ -49,7 +50,7 @@ class AlignmentOptions:
         return result
 
     @classmethod
-    def from_mapping(cls, value: Mapping[str, Any] | None) -> "AlignmentOptions":
+    def from_mapping(cls, value: Mapping[str, Any] | None) -> AlignmentOptions:
         raw = dict(value or {})
         nested_extras = raw.pop("extras", {})
         extras = dict(nested_extras) if isinstance(nested_extras, Mapping) else {}
@@ -97,7 +98,7 @@ class AlignmentRequest:
         }
 
     @classmethod
-    def from_mapping(cls, value: Mapping[str, Any]) -> "AlignmentRequest":
+    def from_mapping(cls, value: Mapping[str, Any]) -> AlignmentRequest:
         anchors = [
             ManualAnchor.from_mapping(anchor)
             for anchor in value.get("manual_anchors", [])
@@ -131,7 +132,7 @@ class AlignedLine:
         return asdict(self)
 
     @classmethod
-    def from_mapping(cls, value: Mapping[str, Any]) -> "AlignedLine":
+    def from_mapping(cls, value: Mapping[str, Any]) -> AlignedLine:
         confidence = value.get("confidence")
         end = value.get("end")
         return cls(
@@ -169,7 +170,7 @@ class AlignmentResult:
         }
 
     @classmethod
-    def from_mapping(cls, value: Mapping[str, Any]) -> "AlignmentResult":
+    def from_mapping(cls, value: Mapping[str, Any]) -> AlignmentResult:
         return cls(
             lines=[
                 AlignedLine.from_mapping(line)
@@ -228,7 +229,7 @@ class AlignmentResult:
 
 
 def _format_timestamp(seconds: float) -> str:
-    total_centiseconds = max(0, int(round(float(seconds) * 100)))
+    total_centiseconds = max(0, round(float(seconds) * 100))
     minutes, remainder = divmod(total_centiseconds, 6000)
     whole_seconds, centiseconds = divmod(remainder, 100)
     return f"{minutes:02d}:{whole_seconds:02d}.{centiseconds:02d}"

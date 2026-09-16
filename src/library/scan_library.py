@@ -740,8 +740,8 @@ def _cached_normalized_tag_index(audio) -> dict[str, str]:
         return cached
     index = build_normalized_tag_index(audio)
     try:
-        setattr(audio, "_pylrcget_normalized_tag_index", index)
-    except Exception:  # noqa: BLE001
+        audio._pylrcget_normalized_tag_index = index
+    except (AttributeError, TypeError):
         pass
     return index
 
@@ -1139,7 +1139,7 @@ def get_sidecar_scan_state(
             lrc_path = lrc_path or resolved
 
     serialized = "\n".join(sorted(records))
-    digest_input = f"{TRACK_SCAN_STATE_SIGNATURE_VERSION}\n{serialized}".encode("utf-8")
+    digest_input = f"{TRACK_SCAN_STATE_SIGNATURE_VERSION}\n{serialized}".encode()
     digest = hashlib.sha256(digest_input).hexdigest()
     if timing_hook is not None:
         timing_hook("signature_sidecar_stat_s", time.perf_counter() - started)
