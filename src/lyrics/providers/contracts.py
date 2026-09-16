@@ -20,6 +20,7 @@ class TrackLookupContext:
     duration_seconds: float | None
     track_number: int | None
     isrc: str | None
+    instrumental: bool = False
 
 
 @dataclass(slots=True)

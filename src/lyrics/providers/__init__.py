@@ -8,6 +8,15 @@ from .contracts import (
     TrackLookupContext,
 )
 from .lrclib import LrclibProvider
+from .matching import (
+    MatchQuality,
+    TrackMatchMetadata,
+    TrackMatchScore,
+    normalize_isrc,
+    normalize_match_text,
+    provider_result_metadata,
+    score_track_match,
+)
 from .router import (
     ACCEPT_FINAL,
     CONTINUE,
@@ -30,6 +39,13 @@ __all__ = [
     "LyricsProviderResult",
     "LyricsProviderRouter",
     "LyricsResultSelector",
+    "MatchQuality",
     "SelectionDecision",
     "TrackLookupContext",
+    "TrackMatchMetadata",
+    "TrackMatchScore",
+    "normalize_isrc",
+    "normalize_match_text",
+    "provider_result_metadata",
+    "score_track_match",
 ]
