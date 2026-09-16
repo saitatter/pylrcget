@@ -358,8 +358,25 @@ class MpvIpcBackend:
             startupinfo=startupinfo,
         )
 
-        # Connect IPC
-        self._transport.connect(timeout_s=3.0)
+        # Connect IPC. Do not leave an orphaned mpv process if the endpoint
+        # cannot be opened after the process starts.
+        try:
+            self._transport.connect(timeout_s=3.0)
+        except Exception:
+            self._transport.close()
+            proc = self._proc
+            self._proc = None
+            if proc is not None:
+                try:
+                    proc.terminate()
+                    proc.wait(timeout=2.0)
+                except (OSError, ProcessLookupError, subprocess.TimeoutExpired):
+                    try:
+                        proc.kill()
+                        proc.wait(timeout=2.0)
+                    except (OSError, ProcessLookupError, subprocess.TimeoutExpired):
+                        logger.debug("Could not clean up failed mpv process", exc_info=True)
+            raise
 
         # Observe core properties (mpv will emit "property-change" events)
         self.observe_property("time-pos", self._on_time_pos)
@@ -416,18 +433,23 @@ class MpvIpcBackend:
         self._pending[rid] = q
 
         payload = {"command": list(args), "request_id": rid}
-        self._transport.send(payload)
+        try:
+            self._transport.send(payload)
 
-        # Pump messages while waiting
-        deadline = time.time() + timeout_s
-        while time.time() < deadline:
-            self.process_messages(max_messages=50)
-            try:
-                return q.get_nowait()
-            except queue.Empty:
-                time.sleep(0.005)
+            # Pump messages while waiting
+            deadline = time.time() + timeout_s
+            while time.time() < deadline:
+                self.process_messages(max_messages=50)
+                try:
+                    return q.get_nowait()
+                except queue.Empty:
+                    time.sleep(0.005)
 
-        raise TimeoutError(f"mpv command timed out: {args!r}")
+            raise TimeoutError(f"mpv command timed out: {args!r}")
+        finally:
+            # A response may never arrive after a disconnected mpv process.
+            # Do not retain its queue indefinitely.
+            self._pending.pop(rid, None)
 
     def get_property(self, name: str, timeout_s: float = 1.0) -> Any:
         resp = self.command_wait("get_property", name, timeout_s=timeout_s)
