@@ -7,6 +7,7 @@ from .contracts import (
     LyricsProviderResult,
     TrackLookupContext,
 )
+from .execution import ProviderExecutionPolicy, get_provider_execution_policy
 from .lrclib import LrclibProvider
 from .matching import (
     MatchQuality,
@@ -59,6 +60,7 @@ __all__ = [
     "LyricsProviderRouter",
     "LyricsResultSelector",
     "MatchQuality",
+    "ProviderExecutionPolicy",
     "SelectionDecision",
     "TidalAccessContext",
     "TidalCatalogueClient",
@@ -72,6 +74,7 @@ __all__ = [
     "TrackLookupContext",
     "TrackMatchMetadata",
     "TrackMatchScore",
+    "get_provider_execution_policy",
     "local_metadata_fingerprint",
     "normalize_isrc",
     "normalize_match_text",

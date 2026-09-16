@@ -12,7 +12,11 @@ from PySide6.QtCore import QObject, QThread, Signal
 from core.lrclib_client import LrcLibAPI
 from core.utils import prepare_input
 from db.queries import get_remote_track_mappings, get_tracks_for_bulk_download
-from lyrics.providers import LrclibProvider, LyricsProviderRouter
+from lyrics.providers import (
+    LrclibProvider,
+    LyricsProviderRouter,
+    get_provider_execution_policy,
+)
 from lyrics.providers.contracts import LyricsProviderResult, TrackLookupContext
 from lyrics.source_settings import LYRICS_SOURCE_LABELS
 from ui.services.download_modes import normalize_download_mode
@@ -201,7 +205,10 @@ class BulkLyricsDownloadWorker(QThread):
                     self.progress.emit(completed, total, label, msg, self._elapsed())
 
             lookup_groups = self._group_jobs(jobs)
-            worker_count = min(MAX_PARALLEL_DOWNLOAD_WORKERS, max(1, len(lookup_groups)))
+            worker_count = min(
+                get_provider_execution_policy("lrclib").max_concurrency,
+                max(1, len(lookup_groups)),
+            )
             if lookup_groups and not cancelled:
                 self.progress.emit(
                     completed,
