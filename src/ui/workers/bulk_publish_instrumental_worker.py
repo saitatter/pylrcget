@@ -42,6 +42,7 @@ class BulkPublishInstrumentalWorker(QThread):
         ok_count = 0
         fail_count = 0
         total = len(self.track_ids)
+        cancelled = False
 
         try:
             db = sqlite3.connect(self.db_path, timeout=15.0)
@@ -50,6 +51,7 @@ class BulkPublishInstrumentalWorker(QThread):
 
             for idx, track_id in enumerate(self.track_ids, start=1):
                 if self.isInterruptionRequested():
+                    cancelled = True
                     break
 
                 if idx > 1:
@@ -80,9 +82,12 @@ class BulkPublishInstrumentalWorker(QThread):
             if db is not None:
                 db.close()
 
-        stats = {"ok": ok_count, "failed": fail_count, "total": total}
-        summary = f"Published {ok_count} of {total} track(s) as instrumental. {fail_count} failed."
-        self.finished.emit(fail_count == 0, summary, stats)
+        stats = {"ok": ok_count, "failed": fail_count, "total": total, "cancelled": cancelled}
+        if cancelled:
+            summary = f"Instrumental publish cancelled. {ok_count} published, {fail_count} failed."
+        else:
+            summary = f"Published {ok_count} of {total} track(s) as instrumental. {fail_count} failed."
+        self.finished.emit(not cancelled and fail_count == 0, summary, stats)
 
     @staticmethod
     def _publish_with_retry(api, title, artist, album, duration_s):
