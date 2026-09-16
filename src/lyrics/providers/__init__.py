@@ -35,6 +35,7 @@ from .tidal import (
     TidalTrackResolution,
 )
 from .tidal_cache import CachedTidalCatalogueResolver
+from .tidal_transport import TidalLyricsPayload, TidalLyricsTransport
 
 __all__ = [
     "ACCEPT_FINAL",
@@ -54,6 +55,8 @@ __all__ = [
     "TidalCatalogueClient",
     "TidalCatalogueError",
     "TidalCatalogueNotFoundError",
+    "TidalLyricsPayload",
+    "TidalLyricsTransport",
     "TidalTrack",
     "TidalTrackResolution",
     "TrackLookupContext",
