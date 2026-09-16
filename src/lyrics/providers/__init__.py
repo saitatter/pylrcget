@@ -19,6 +19,7 @@ from .matching import (
     provider_result_metadata,
     score_track_match,
 )
+from .result_cache import LookupKey, ProviderLookupResultCache
 from .router import (
     ACCEPT_FINAL,
     CONTINUE,
@@ -53,6 +54,7 @@ __all__ = [
     "DownloadMode",
     "ExternalTidalHelperError",
     "ExternalTidalLyricsTransport",
+    "LookupKey",
     "LrclibProvider",
     "LyricsProvider",
     "LyricsProviderCapabilities",
@@ -61,6 +63,7 @@ __all__ = [
     "LyricsResultSelector",
     "MatchQuality",
     "ProviderExecutionPolicy",
+    "ProviderLookupResultCache",
     "SelectionDecision",
     "TidalAccessContext",
     "TidalCatalogueClient",

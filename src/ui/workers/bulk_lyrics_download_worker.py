@@ -15,6 +15,7 @@ from db.queries import get_remote_track_mappings, get_tracks_for_bulk_download
 from lyrics.providers import (
     LrclibProvider,
     LyricsProviderRouter,
+    ProviderLookupResultCache,
     get_provider_execution_policy,
 )
 from lyrics.providers.contracts import LyricsProviderResult, TrackLookupContext
@@ -61,6 +62,7 @@ class BulkDownloadStats(TypedDict):
     cancelled: bool
     unique_lookup_keys: int
     deduplicated_tracks: int
+    lookup_cache_hits: int
     pending_future_high_water_mark: int
 
 
@@ -124,11 +126,13 @@ class BulkLyricsDownloadWorker(QThread):
         self._started_at = 0.0
         self._thread_local = threading.local()
         self._rate_limit_cooldown = _SharedRateLimitCooldown()
+        self._lookup_result_cache = ProviderLookupResultCache()
 
     def run(self) -> None:
         total = len(self.track_ids)
         self._started_at = time.perf_counter()
         self._rate_limit_cooldown = _SharedRateLimitCooldown()
+        self._lookup_result_cache.clear()
         ok_count = 0
         fail_count = 0
         cancelled = False
@@ -317,6 +321,7 @@ class BulkLyricsDownloadWorker(QThread):
             "cancelled": cancelled,
             "unique_lookup_keys": len(lookup_groups),
             "deduplicated_tracks": max(0, len(jobs) - len(lookup_groups)),
+            "lookup_cache_hits": self._lookup_result_cache.hits,
             "pending_future_high_water_mark": pending_future_high_water_mark,
             "candidates": candidates,
             "requires_review": bool(candidates) and not cancelled,
@@ -345,7 +350,23 @@ class BulkLyricsDownloadWorker(QThread):
             groups[key].append(job)
         return [_DownloadLookupGroup(key=key, jobs=tuple(groups[key])) for key in order]
 
+    @staticmethod
+    def _lookup_key(job: _DownloadJob) -> tuple[str, str, str, str, str, int | None]:
+        return (
+            job.provider_id,
+            prepare_input(job.isrc or ""),
+            prepare_input(job.artist),
+            prepare_input(job.title),
+            prepare_input(job.album),
+            job.duration_s,
+        )
+
     def _fetch_job_match(self, job: _DownloadJob) -> _DownloadFetchResult:
+        lookup_key = self._lookup_key(job)
+        cache_hit, cached_result = self._lookup_result_cache.get(lookup_key)
+        if cache_hit:
+            return _DownloadFetchResult(job=job, match=cached_result)
+
         api = self._api_for_current_thread()
 
         def _notify(status: str) -> None:
@@ -375,6 +396,7 @@ class BulkLyricsDownloadWorker(QThread):
                 instrumental=job.instrumental,
             )
             match = router.lookup(lookup_context, requested_mode=self.download_mode)
+            self._lookup_result_cache.put(lookup_key, match)
             return _DownloadFetchResult(job=job, match=match)
         except LyricsMatchCancelled:
             return _DownloadFetchResult(job=job, cancelled=True)
