@@ -62,6 +62,12 @@ desktop.ini
 .coverage
 .pytest_cache/
 
+# Generated benchmark output
+benchmarks/baseline/*
+!benchmarks/baseline/.gitkeep
+benchmarks/results/*
+!benchmarks/results/.gitkeep
+
 # Node / leftovers (in case)
 node_modules/
 

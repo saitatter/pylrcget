@@ -97,6 +97,13 @@ PyLrcGet goes beyond bulk lyric downloads and turns the app into a full desktop 
 
 ---
 
+## Performance results
+
+The consolidated scanner, LRCLIB, AI synchronization, and TagLib conclusions
+are available in the [benchmark summary](benchmarks/RESULTS_SUMMARY.md).
+
+---
+
 ## ⚙️ Settings
 
 | Category | Options |
