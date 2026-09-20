@@ -508,9 +508,7 @@ class BulkLyricsDownloadWorker(QThread):
             )
             access_token = access.access_token
         elif transport_id == "external_helper":
-            raw_external = self._lyrics_source_settings.get("external")
-            external_settings = raw_external if isinstance(raw_external, dict) else {}
-            command = parse_helper_command(str(external_settings.get("helper_command") or ""))
+            command = parse_helper_command(str(tidal_settings.get("helper_command") or ""))
             if not command:
                 return None
             transport = ExternalTidalLyricsTransport(command)

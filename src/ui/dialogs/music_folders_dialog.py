@@ -1081,9 +1081,7 @@ class MusicFoldersDialog(QDialog):
         self.tidal_transport_combo.setCurrentIndex(max(0, transport_idx))
         self.tidal_client_id_edit.setText(str(tidal.get("client_id") or ""))
         self.tidal_redirect_uri_edit.setText(str(tidal.get("redirect_uri") or TIDAL_DEFAULT_REDIRECT_URI))
-        external = settings.get("external", {})
-        external = external if isinstance(external, dict) else {}
-        self.tidal_helper_edit.setText(str(external.get("helper_command") or ""))
+        self.tidal_helper_edit.setText(str(tidal.get("helper_command") or ""))
         self._update_tidal_auth_status()
         self._update_tidal_transport_fields()
 
@@ -1154,8 +1152,8 @@ class MusicFoldersDialog(QDialog):
                 "transport": str(self.tidal_transport_combo.currentData() or "official"),
                 "client_id": self.tidal_client_id_edit.text().strip(),
                 "redirect_uri": self.tidal_redirect_uri_edit.text().strip() or TIDAL_DEFAULT_REDIRECT_URI,
+                "helper_command": self.tidal_helper_edit.text().strip(),
             },
-            "external": {"helper_command": self.tidal_helper_edit.text().strip()},
         }
 
     def _move_lyrics_source(self, delta: int) -> None:

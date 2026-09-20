@@ -6,11 +6,10 @@ import shlex
 import sys
 from collections.abc import Mapping
 
-LYRICS_SOURCE_IDS: tuple[str, ...] = ("lrclib", "tidal", "external")
+LYRICS_SOURCE_IDS: tuple[str, ...] = ("lrclib", "tidal")
 LYRICS_SOURCE_LABELS: dict[str, str] = {
     "lrclib": "LRCLIB",
     "tidal": "TIDAL",
-    "external": "External Provider",
 }
 _TIDAL_TRANSPORTS = {"official", "external_helper", "experimental_internal"}
 _COUNTRY_CODE_RE = re.compile(r"^[A-Za-z]{2}$")
@@ -20,15 +19,15 @@ TIDAL_DEFAULT_REDIRECT_URI = "http://127.0.0.1:8765/callback"
 def default_lyrics_source_settings() -> dict[str, object]:
     return {
         "priority": list(LYRICS_SOURCE_IDS),
-        "enabled": {"lrclib": True, "tidal": False, "external": False},
+        "enabled": {"lrclib": True, "tidal": False},
         "continue_when_plain_for_synced": True,
         "tidal": {
             "country_code": "Auto",
             "transport": "official",
             "client_id": "",
             "redirect_uri": TIDAL_DEFAULT_REDIRECT_URI,
+            "helper_command": "",
         },
-        "external": {"helper_command": ""},
     }
 
 
@@ -52,7 +51,7 @@ def normalize_lyrics_source_settings(raw: Mapping[str, object] | None) -> dict[s
     if isinstance(raw_priority, list):
         for value in raw_priority:
             provider_id = str(value).strip().casefold()
-            if provider_id and provider_id not in priority:
+            if provider_id in LYRICS_SOURCE_IDS and provider_id not in priority:
                 priority.append(provider_id)
     for provider_id in LYRICS_SOURCE_IDS:
         if provider_id not in priority:
@@ -79,7 +78,9 @@ def normalize_lyrics_source_settings(raw: Mapping[str, object] | None) -> dict[s
 
     raw_external = raw.get("external")
     raw_external = raw_external if isinstance(raw_external, Mapping) else {}
-    helper_command = str(raw_external.get("helper_command") or "").strip()
+    helper_command = str(
+        raw_tidal.get("helper_command") or raw_external.get("helper_command") or ""
+    ).strip()
 
     return {
         "priority": priority,
@@ -93,8 +94,8 @@ def normalize_lyrics_source_settings(raw: Mapping[str, object] | None) -> dict[s
             "transport": transport,
             "client_id": client_id,
             "redirect_uri": redirect_uri,
+            "helper_command": helper_command,
         },
-        "external": {"helper_command": helper_command},
     }
 
 

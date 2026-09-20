@@ -33,7 +33,6 @@ def test_v9_migration_materializes_source_defaults_without_losing_ui_state():
         assert state["lyrics_sources"]["enabled"] == {
             "lrclib": True,
             "tidal": False,
-            "external": False,
         }
         assert int(db.execute("PRAGMA user_version").fetchone()[0]) == CURRENT_DB_VERSION
     finally:

@@ -512,9 +512,7 @@ def _build_single_track_providers(
                         country_code=str(tidal_settings.get("country_code") or "Auto"),
                     )
         elif transport_id == "external_helper":
-            raw_external = settings.get("external")
-            external = raw_external if isinstance(raw_external, dict) else {}
-            command = parse_helper_command(str(external.get("helper_command") or ""))
+            command = parse_helper_command(str(tidal_settings.get("helper_command") or ""))
             if command:
                 transport = ExternalTidalLyricsTransport(command)
         if transport is not None:

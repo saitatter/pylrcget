@@ -333,7 +333,7 @@ class LyricsDownloadControllerTests(unittest.TestCase):
             db = initialize_database(tmp)
             try:
                 settings = default_lyrics_source_settings()
-                settings["enabled"] = {"lrclib": False, "tidal": True, "external": False}
+                settings["enabled"] = {"lrclib": False, "tidal": True}
                 config = get_config(db)
                 db.execute(
                     "UPDATE config_data SET ui_state_json = ? WHERE id = 1",

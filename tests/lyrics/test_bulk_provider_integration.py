@@ -50,8 +50,8 @@ def test_bulk_worker_falls_back_from_lrclib_plain_to_tidal_synced(tmp_path: Path
         audio.write_bytes(b"audio")
         add_tracks(db, [make_fs_track(audio, artist="Artist", album="Album", title="Song")])
         settings = default_lyrics_source_settings()
-        settings["priority"] = ["lrclib", "tidal", "external"]
-        settings["enabled"] = {"lrclib": True, "tidal": True, "external": False}
+        settings["priority"] = ["lrclib", "tidal"]
+        settings["enabled"] = {"lrclib": True, "tidal": True}
         db.execute(
             "UPDATE config_data SET ui_state_json = ?",
             (merge_lyrics_source_settings("", settings),),

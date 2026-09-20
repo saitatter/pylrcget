@@ -154,10 +154,10 @@ class SettingsDialogTests(unittest.TestCase):
             try:
                 dialog = MusicFoldersDialog(app_state)
                 try:
-                    self.assertEqual(dialog.lyrics_source_list.count(), 3)
+                    self.assertEqual(dialog.lyrics_source_list.count(), 2)
                     self.assertEqual(
-                        [dialog.lyrics_source_list.item(i).data(Qt.UserRole) for i in range(3)],
-                        ["lrclib", "tidal", "external"],
+                        [dialog.lyrics_source_list.item(i).data(Qt.UserRole) for i in range(2)],
+                        ["lrclib", "tidal"],
                     )
                     dialog.lyrics_source_list.item(1).setCheckState(Qt.Checked)
                     dialog.lyrics_source_list.setCurrentRow(1)
@@ -173,8 +173,8 @@ class SettingsDialogTests(unittest.TestCase):
                 reloaded = MusicFoldersDialog(app_state)
                 try:
                     self.assertEqual(
-                        [reloaded.lyrics_source_list.item(i).data(Qt.UserRole) for i in range(3)],
-                        ["tidal", "lrclib", "external"],
+                        [reloaded.lyrics_source_list.item(i).data(Qt.UserRole) for i in range(2)],
+                        ["tidal", "lrclib"],
                     )
                     self.assertEqual(reloaded.lyrics_source_list.item(0).checkState(), Qt.Checked)
                     self.assertEqual(reloaded.tidal_country_edit.text(), "RO")
