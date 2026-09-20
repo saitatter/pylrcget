@@ -43,7 +43,11 @@ a = Analysis(
         (str(ROOT / "src" / "ui" / "assets"), "ui/assets"),
         (str(ROOT / "pyproject.toml"), "."),
     ],
-    hiddenimports=[],
+    hiddenimports=[
+        "keyring.backends.Windows",
+        "keyring.backends.SecretService",
+        "keyring.backends.macOS",
+    ],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
