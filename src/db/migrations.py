@@ -152,9 +152,10 @@ def upgrade_database_if_needed(db: sqlite3.Connection, existing_version: int) ->
 
     if current_version < 6:
         logger.info("Upgrade database version %d -> 6...", current_version)
-        # Deliberately leave this table empty. Existing modified_time/file_size
-        # values combine audio and sidecar state, so rebuilding provenance on the
-        # first post-migration scan is safer than guessing source-specific state.
+        # All post-v5 schema work is intentionally released as one migration.
+        # Existing modified_time/file_size values combine audio and sidecar state,
+        # so rebuilding provenance on the first post-migration scan is safer than
+        # guessing source-specific state.
         db.execute(
             """
             CREATE TABLE IF NOT EXISTS track_scan_state (
@@ -175,12 +176,6 @@ def upgrade_database_if_needed(db: sqlite3.Connection, existing_version: int) ->
             """
         )
         db.execute("CREATE INDEX IF NOT EXISTS idx_track_scan_state_signature ON track_scan_state(signature_version)")
-        db.execute("PRAGMA user_version=6")
-        db.commit()
-        current_version = 6
-
-    if current_version < 7:
-        logger.info("Upgrade database version %d -> 7...", current_version)
         track_table = db.execute(
             "SELECT name FROM sqlite_master WHERE type='table' AND name='tracks'"
         ).fetchone()
@@ -190,12 +185,6 @@ def upgrade_database_if_needed(db: sqlite3.Connection, existing_version: int) ->
             }
             if "isrc" not in track_columns:
                 db.execute("ALTER TABLE tracks ADD COLUMN isrc TEXT")
-        db.execute("PRAGMA user_version=7")
-        db.commit()
-        current_version = 7
-
-    if current_version < 8:
-        logger.info("Upgrade database version %d -> 8...", current_version)
         db.execute(
             """
             CREATE TABLE IF NOT EXISTS remote_track_mapping (
@@ -223,15 +212,6 @@ def upgrade_database_if_needed(db: sqlite3.Connection, existing_version: int) ->
                 ON remote_track_mapping(provider, provider_track_id)
             """
         )
-        db.execute("PRAGMA user_version=8")
-        db.commit()
-        current_version = 8
-
-    if current_version < 9:
-        logger.info("Upgrade database version %d -> 9...", current_version)
-        track_table = db.execute(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name='tracks'"
-        ).fetchone()
         if track_table is not None:
             track_columns = {
                 row["name"] for row in db.execute("PRAGMA table_info(tracks)").fetchall()
@@ -240,16 +220,22 @@ def upgrade_database_if_needed(db: sqlite3.Connection, existing_version: int) ->
                 db.execute("ALTER TABLE tracks ADD COLUMN txt_lyrics_source TEXT")
             if "lrc_lyrics_source" not in track_columns:
                 db.execute("ALTER TABLE tracks ADD COLUMN lrc_lyrics_source TEXT")
-        db.execute("PRAGMA user_version=9")
-        db.commit()
-        current_version = 9
-
-    if current_version < 10:
-        logger.info("Upgrade database version %d -> 10...", current_version)
         config_table = db.execute(
             "SELECT name FROM sqlite_master WHERE type='table' AND name='config_data'"
         ).fetchone()
         if config_table is not None:
+            config_columns = {
+                row["name"] for row in db.execute("PRAGMA table_info(config_data)").fetchall()
+            }
+            if "logging_verbosity" not in config_columns:
+                db.execute("ALTER TABLE config_data ADD COLUMN logging_verbosity TEXT DEFAULT 'info'")
+            if "ignore_sort_articles" not in config_columns:
+                db.execute("ALTER TABLE config_data ADD COLUMN ignore_sort_articles BOOLEAN DEFAULT 0")
+            config_columns = {
+                row["name"] for row in db.execute("PRAGMA table_info(config_data)").fetchall()
+            }
+            if "ui_state_json" not in config_columns:
+                db.execute("ALTER TABLE config_data ADD COLUMN ui_state_json TEXT DEFAULT ''")
             rows = db.execute("SELECT id, ui_state_json FROM config_data").fetchall()
             for row in rows:
                 current_state = row["ui_state_json"] or ""
@@ -259,9 +245,9 @@ def upgrade_database_if_needed(db: sqlite3.Connection, existing_version: int) ->
                     "UPDATE config_data SET ui_state_json = ? WHERE id = ?",
                     (migrated_state, int(row["id"])),
                 )
-        db.execute("PRAGMA user_version=10")
+        db.execute("PRAGMA user_version=6")
         db.commit()
-        current_version = 10
+        current_version = 6
 
     if current_version == CURRENT_DB_VERSION:
         return

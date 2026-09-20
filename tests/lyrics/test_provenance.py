@@ -58,7 +58,7 @@ def test_track_lyrics_sources_round_trip_and_manual_update(tmp_path: Path):
         db.close()
 
 
-def test_v8_database_migration_adds_nullable_provenance_columns():
+def test_v5_database_migration_adds_nullable_provenance_columns():
     db = sqlite3.connect(":memory:")
     db.row_factory = sqlite3.Row
     try:
@@ -72,10 +72,10 @@ def test_v8_database_migration_adds_nullable_provenance_columns():
             )
             """
         )
-        db.execute("PRAGMA user_version=8")
+        db.execute("PRAGMA user_version=5")
         db.commit()
 
-        upgrade_database_if_needed(db, 8)
+        upgrade_database_if_needed(db, 5)
 
         columns = {row["name"] for row in db.execute("PRAGMA table_info(tracks)")}
         assert {"txt_lyrics_source", "lrc_lyrics_source"} <= columns

@@ -172,17 +172,17 @@ def test_cached_resolver_does_not_persist_without_local_track_id(tmp_path: Path)
         db.close()
 
 
-def test_v7_database_migration_creates_remote_mapping_table():
+def test_v5_database_migration_creates_remote_mapping_table():
     db = sqlite3.connect(":memory:")
     db.row_factory = sqlite3.Row
     try:
         db.executescript(SCHEMA_V1_SQL)
         db.execute("DROP INDEX IF EXISTS idx_remote_track_mapping_provider_id")
         db.execute("DROP TABLE remote_track_mapping")
-        db.execute("PRAGMA user_version=7")
+        db.execute("PRAGMA user_version=5")
         db.commit()
 
-        upgrade_database_if_needed(db, 7)
+        upgrade_database_if_needed(db, 5)
 
         table = db.execute(
             "SELECT name FROM sqlite_master WHERE type='table' AND name='remote_track_mapping'"

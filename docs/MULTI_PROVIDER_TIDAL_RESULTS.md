@@ -24,7 +24,7 @@ embedding, and editor behavior remain in the existing application layers.
 
 ## Migration summary
 
-The database is currently schema version 10. The migration set preserves
+The next release database schema is version 6. The migration set preserves
 existing tracks and lyrics, adds ISRC storage, remote provider mappings, and
 separate plain/synced lyrics provenance. Existing provenance remains `NULL`
 when it cannot be known historically. The remote mapping is unique per
