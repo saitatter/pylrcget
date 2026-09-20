@@ -228,29 +228,35 @@ class TidalOAuthSession:
         return self._exchange_code(str(code), verifier)
 
     def _exchange_code(self, code: str, verifier: str) -> dict[str, Any]:
-        response = self.http_session.post(
-            TIDAL_TOKEN_URL,
-            data={
-                "grant_type": "authorization_code",
-                "client_id": self.client_id,
-                "code": code,
-                "redirect_uri": self.redirect_uri,
-                "code_verifier": verifier,
-            },
-            timeout=15,
-        )
+        try:
+            response = self.http_session.post(
+                TIDAL_TOKEN_URL,
+                data={
+                    "grant_type": "authorization_code",
+                    "client_id": self.client_id,
+                    "code": code,
+                    "redirect_uri": self.redirect_uri,
+                    "code_verifier": verifier,
+                },
+                timeout=15,
+            )
+        except requests.RequestException as exc:
+            raise TidalAuthenticationError(f"TIDAL token request failed: {exc}") from exc
         return _parse_token_response(response)
 
     def _refresh(self, refresh_token: str) -> dict[str, Any]:
-        response = self.http_session.post(
-            TIDAL_TOKEN_URL,
-            data={
-                "grant_type": "refresh_token",
-                "client_id": self.client_id,
-                "refresh_token": refresh_token,
-            },
-            timeout=15,
-        )
+        try:
+            response = self.http_session.post(
+                TIDAL_TOKEN_URL,
+                data={
+                    "grant_type": "refresh_token",
+                    "client_id": self.client_id,
+                    "refresh_token": refresh_token,
+                },
+                timeout=15,
+            )
+        except requests.RequestException as exc:
+            raise TidalAuthenticationError(f"TIDAL token refresh failed: {exc}") from exc
         token = _parse_token_response(response)
         token.setdefault("refresh_token", refresh_token)
         return token

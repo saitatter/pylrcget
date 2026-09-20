@@ -42,6 +42,17 @@ class ExternalTidalHelperError(RuntimeError):
 class OfficialTidalLyricsError(RuntimeError):
     """Raised when the official TIDAL lyrics relation cannot be read."""
 
+    def __init__(
+        self,
+        message: str,
+        *,
+        status_code: int | None = None,
+        retry_after_s: float | None = None,
+    ) -> None:
+        self.status_code = status_code
+        self.retry_after_s = retry_after_s
+        super().__init__(message)
+
 
 class OfficialTidalLyricsTransport:
     """Read lyrics exposed by the official TIDAL catalogue API.
@@ -107,7 +118,9 @@ class OfficialTidalLyricsTransport:
         if response.status_code >= 400:
             detail = (response.text or "")[:300]
             raise OfficialTidalLyricsError(
-                f"TIDAL lyrics request failed ({response.status_code}): {detail or 'HTTP error'}"
+                f"TIDAL lyrics request failed ({response.status_code}): {detail or 'HTTP error'}",
+                status_code=response.status_code,
+                retry_after_s=retry_after,
             )
         try:
             payload = response.json()

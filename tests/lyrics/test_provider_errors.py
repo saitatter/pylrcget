@@ -10,7 +10,10 @@ from lyrics.providers import (
     classify_provider_error,
 )
 from lyrics.providers.tidal import TidalCatalogueError
-from lyrics.providers.tidal_transport import ExternalTidalHelperError
+from lyrics.providers.tidal_transport import (
+    ExternalTidalHelperError,
+    OfficialTidalLyricsError,
+)
 
 
 @pytest.mark.parametrize(
@@ -23,6 +26,8 @@ from lyrics.providers.tidal_transport import ExternalTidalHelperError
         (TidalCatalogueError(503, "unavailable"), ProviderErrorKind.TEMPORARY),
         (requests.exceptions.Timeout("slow"), ProviderErrorKind.TEMPORARY),
         (ExternalTidalHelperError("invalid protocol"), ProviderErrorKind.FATAL),
+        (OfficialTidalLyricsError("expired", status_code=401), ProviderErrorKind.AUTH_EXPIRED),
+        (OfficialTidalLyricsError("slow", status_code=429), ProviderErrorKind.RATE_LIMITED),
         (ValueError("bad payload"), ProviderErrorKind.INVALID_RESPONSE),
         (RuntimeError("temporary provider error"), ProviderErrorKind.TEMPORARY),
     ],
