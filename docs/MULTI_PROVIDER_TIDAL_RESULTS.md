@@ -9,13 +9,15 @@ provider-specific execution limits. LRCLIB is still the default enabled
 provider and continues to use the existing `LrcLibAPI` and matching/retry
 behavior.
 
-TIDAL is split into two boundaries:
+TIDAL is split into three boundaries:
 
 - `TidalCatalogueClient` resolves official catalogue metadata and track IDs,
   preferring ISRC and falling back to confident metadata matching.
-- `TidalLyricsTransport` retrieves lyrics after resolution. The supported
-  implementation is the versioned external helper protocol; no undocumented
-  internal TIDAL lyrics endpoint is used.
+- `TidalOAuthSession` performs OAuth 2.1 + PKCE and stores refreshable tokens in
+  the OS keyring.
+- `TidalLyricsTransport` retrieves lyrics after resolution. The native
+  implementation requests the official track `lyrics` relationship; the
+  versioned external helper protocol remains optional.
 
 The `TidalProvider` adapter joins those boundaries and returns the same
 provider-neutral result shape as LRCLIB. Persistence, sidecar export,
@@ -103,23 +105,20 @@ default.
 
 ## Known TIDAL API limitation
 
-The official TIDAL Developer API boundary is used for catalogue resolution,
-not for an assumed lyrics endpoint. Native lyrics retrieval therefore remains
-disabled until endpoint availability, third-party use terms, authentication,
-rate limits, and packaging are explicitly verified.
+The public TIDAL API can return an empty lyrics relationship even when the
+consumer-facing TIDAL application displays lyrics. PyLrcGet treats that as a
+clean TIDAL miss and continues to LRCLIB or another configured provider. It
+does not call undocumented internal endpoints.
 
 ## Release recommendation
 
-Keep the multi-provider architecture and external helper transport. Keep the
-native and experimental internal transport choices disabled/off by default.
-TIDAL settings should be used with `External helper` and a user-owned script.
-Do not add a large TIDAL SDK or persist raw credentials in PyLrcGet settings;
-the session abstraction remains available for a future secure OAuth/keyring
-integration.
+Keep the multi-provider architecture and native OAuth/API transport. Keep the
+experimental internal transport disabled. The external helper remains an
+optional fallback. Do not persist raw credentials in PyLrcGet settings; the
+refreshable session uses the operating-system keyring.
 
-Packaging impact: no TIDAL SDK, keyring package, native library, or bundled
-helper was added. The existing application package remains responsible only
-for PyLrcGet; the user controls the optional helper executable/script.
+Packaging impact: the small `keyring` dependency was added for secure token
+storage. No TIDAL SDK, native library, or bundled helper was added.
 
 ## Future-provider notes
 
@@ -131,7 +130,7 @@ directly. Publishing to LRCLIB remains LRCLIB-specific.
 
 ## Verification
 
-The branch was verified with the complete pytest suite: **737 passed, 1
+The branch was verified with the complete pytest suite: **744 passed, 1
 warning, 5 subtests passed**. Ruff also passes. The only known test warning is
 the pre-existing optional TorchCodec/FFmpeg DLL warning from the local AI
 environment.

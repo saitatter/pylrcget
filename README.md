@@ -108,10 +108,10 @@ The multi-provider/TIDAL implementation results are in
 ## Multi-provider lyrics and TIDAL
 
 LRCLIB remains enabled by default. TIDAL can be enabled and ordered in
-Settings → Lyrics → Lyrics Sources. The supported bridge currently uses a
-user-configured external helper; the catalogue resolver prefers ISRC and falls
-back to confident artist/title matching. See the [TIDAL #57 setup guide](docs/MULTI_PROVIDER_TIDAL.md)
-for the JSON helper protocol, security boundaries, and native API limitations.
+Settings → Lyrics → Lyrics Sources with native OAuth/API access; the catalogue
+resolver prefers ISRC and falls back to confident artist/title matching. An
+external helper remains an optional fallback. See the [TIDAL #57 setup guide](docs/MULTI_PROVIDER_TIDAL.md)
+for setup, token storage, and API limitations.
 
 ---
 

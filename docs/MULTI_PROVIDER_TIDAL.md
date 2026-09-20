@@ -7,14 +7,19 @@ source is enabled.
 
 ## TIDAL setup
 
-The supported bridge in this branch is the external helper transport:
+The native transport is the default path and does not require an external
+helper:
 
 1. Open Settings → Lyrics.
-2. Enable TIDAL in Lyrics Sources and move it to the desired priority.
-3. Select `External helper` as the TIDAL lyrics transport.
-4. Set the helper command, for example `python C:\\Tools\\tidal_helper.py`.
-5. Use `Test TIDAL helper` to validate the JSON protocol.
-6. Save the settings, then use Download missing lyrics.
+2. Enter the TIDAL Client ID and redirect URI
+   `http://127.0.0.1:8765/callback`.
+3. Select `Official API`, press `Connect TIDAL`, and finish the browser login.
+4. Enable TIDAL in Lyrics Sources and move it to the desired priority.
+5. Save the settings, then use Download missing lyrics.
+
+OAuth access and refresh tokens are stored in the operating-system keyring;
+they are not written to the PyLrcGet database or UI JSON. The helper transport
+remains available as an optional fallback.
 
 The TIDAL provider resolves local metadata to a catalogue track first. ISRC is
 preferred; artist/title metadata is used when ISRC is unavailable. The
@@ -50,18 +55,20 @@ a bounded timeout, stderr is captured for diagnostics, and cancellation
 terminates the process with a kill fallback. The default request does not
 include a local path, library root, OS username, or lyrics content.
 
-The helper bridge adds no Python package or native library to the application;
-the helper remains user-owned. The branch does not add a TIDAL SDK, keyring
-dependency, or native lyrics backend, so the existing Windows/macOS/Linux
-packaging footprint is unchanged.
+The native path uses the official TIDAL API with a bearer token and requests
+the track's `lyrics` relationship. TIDAL may return an empty relationship for
+tracks whose lyrics are not exposed to third-party applications; that is
+treated as a clean miss and the configured fallback provider can continue.
+
+The optional helper remains user-owned and is launched with `shell=False`.
 
 ## Native API status
 
-The official TIDAL client in this branch is a catalogue resolver only. It does
-not claim that the authorized Developer API exposes a lyrics endpoint. The
-`Official API` and `Experimental internal` transport choices remain disabled
-until endpoint, authentication, policy, and packaging checks pass. The helper
-transport is therefore the practical TIDAL lyrics bridge for this release.
+The official client now includes OAuth 2.1 + PKCE, token refresh, authenticated
+catalogue resolution, and the official track `lyrics` relationship transport.
+The `Experimental internal` transport remains disabled. Empty public lyrics
+responses are not retried through undocumented endpoints; LRCLIB remains the
+safe configured fallback.
 
 ## Matching and provenance
 
