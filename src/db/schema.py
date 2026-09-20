@@ -240,7 +240,7 @@ INSERT INTO config_data (
     0.7,
     '',
     '',
-    '{"lyrics_sources":{"priority":["lrclib","tidal"],"enabled":{"lrclib":true,"tidal":false},"continue_when_plain_for_synced":true,"tidal":{"country_code":"Auto","transport":"official","client_id":"","redirect_uri":"http://127.0.0.1:8765/callback"}}}',
+    '{"lyrics_sources":{"priority":["lrclib","tidal"],"enabled":{"lrclib":true,"tidal":false},"continue_when_plain_for_synced":true,"tidal":{"country_code":"Auto","transport":"official","client_id":"vJElJOz4TVV3SBnC","redirect_uri":"http://127.0.0.1:8765/callback"}}}',
     0
 );
 """

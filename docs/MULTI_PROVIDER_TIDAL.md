@@ -9,7 +9,8 @@ Lyrics Sources. Provider-specific options are available in the Providers tab.
 The Providers tab contains a selector for each configured source:
 
 - LRCLIB: configure the server URL used for downloading and publishing.
-- TIDAL: configure the country, developer Client ID, and OAuth redirect URI.
+- TIDAL: configure the country and OAuth redirect URI. PyLrcGet includes a
+  registered public Client ID; a custom one can be entered if needed.
 
 LRCLIB remains enabled by default. TIDAL is disabled until it is enabled in the
 Lyrics Sources priority list.
@@ -19,7 +20,7 @@ Lyrics Sources priority list.
 The native transport uses the official TIDAL API:
 
 1. Open Settings → Lyrics → Providers and select TIDAL.
-2. Enter the TIDAL Client ID and redirect URI
+2. Leave the preconfigured Client ID in place and verify the redirect URI is
    `http://127.0.0.1:8765/callback`.
 3. Press `Connect TIDAL` and finish the browser login.
 4. Enable TIDAL in Lyrics Sources and move it to the desired priority.

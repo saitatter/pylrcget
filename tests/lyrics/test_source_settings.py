@@ -16,7 +16,7 @@ def test_source_settings_preserve_lrclib_default_and_disable_new_providers():
     assert settings["tidal"] == {
         "country_code": "Auto",
         "transport": "official",
-        "client_id": "",
+        "client_id": "vJElJOz4TVV3SBnC",
         "redirect_uri": "http://127.0.0.1:8765/callback",
     }
 
@@ -39,7 +39,7 @@ def test_source_settings_normalize_priority_country_and_transport():
     assert settings["tidal"] == {
         "country_code": "RO",
         "transport": "official",
-        "client_id": "",
+        "client_id": "vJElJOz4TVV3SBnC",
         "redirect_uri": "http://127.0.0.1:8765/callback",
     }
 

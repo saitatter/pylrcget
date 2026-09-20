@@ -41,6 +41,7 @@ from lyrics.providers import (
 from lyrics.source_settings import (
     LYRICS_SOURCE_IDS,
     LYRICS_SOURCE_LABELS,
+    TIDAL_DEFAULT_CLIENT_ID,
     TIDAL_DEFAULT_REDIRECT_URI,
     load_lyrics_source_settings,
     merge_lyrics_source_settings,
@@ -480,7 +481,7 @@ class MusicFoldersDialog(QDialog):
         self.tidal_country_edit.setPlaceholderText("Auto")
         tidal_layout.addWidget(QLabel("Country"), 0, 0)
         tidal_layout.addWidget(self.tidal_country_edit, 0, 1)
-        self.tidal_client_id_edit = QLineEdit()
+        self.tidal_client_id_edit = QLineEdit(TIDAL_DEFAULT_CLIENT_ID)
         self.tidal_client_id_edit.setPlaceholderText("Client ID from developer.tidal.com")
         self.tidal_client_id_label = QLabel("Client ID")
         tidal_layout.addWidget(self.tidal_client_id_label, 1, 0)
@@ -500,7 +501,8 @@ class MusicFoldersDialog(QDialog):
         auth_buttons.addWidget(self.tidal_auth_status, 1)
         tidal_layout.addWidget(self.tidal_auth_widget, 3, 0, 1, 3)
         self.tidal_hint_label = QLabel(
-            "TIDAL lyrics use the official API. Connect once with a TIDAL developer Client ID."
+            "TIDAL lyrics use the official API. A PyLrcGet Client ID is preconfigured; "
+            "replace it only if you use your own TIDAL developer app."
         )
         self.tidal_hint_label.setWordWrap(True)
         tidal_layout.addWidget(self.tidal_hint_label, 4, 0, 1, 3)
@@ -1070,7 +1072,7 @@ class MusicFoldersDialog(QDialog):
         tidal = settings.get("tidal", {})
         tidal = tidal if isinstance(tidal, dict) else {}
         self.tidal_country_edit.setText(str(tidal.get("country_code") or "Auto"))
-        self.tidal_client_id_edit.setText(str(tidal.get("client_id") or ""))
+        self.tidal_client_id_edit.setText(str(tidal.get("client_id") or TIDAL_DEFAULT_CLIENT_ID))
         self.tidal_redirect_uri_edit.setText(str(tidal.get("redirect_uri") or TIDAL_DEFAULT_REDIRECT_URI))
         self._update_tidal_auth_status()
 

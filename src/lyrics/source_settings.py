@@ -10,6 +10,7 @@ LYRICS_SOURCE_LABELS: dict[str, str] = {
     "tidal": "TIDAL",
 }
 _COUNTRY_CODE_RE = re.compile(r"^[A-Za-z]{2}$")
+TIDAL_DEFAULT_CLIENT_ID = "vJElJOz4TVV3SBnC"
 TIDAL_DEFAULT_REDIRECT_URI = "http://127.0.0.1:8765/callback"
 
 
@@ -21,7 +22,7 @@ def default_lyrics_source_settings() -> dict[str, object]:
         "tidal": {
             "country_code": "Auto",
             "transport": "official",
-            "client_id": "",
+            "client_id": TIDAL_DEFAULT_CLIENT_ID,
             "redirect_uri": TIDAL_DEFAULT_REDIRECT_URI,
         },
     }
@@ -66,7 +67,7 @@ def normalize_lyrics_source_settings(raw: Mapping[str, object] | None) -> dict[s
         country_code = "Auto"
     else:
         country_code = country_code.upper()
-    client_id = str(raw_tidal.get("client_id") or "").strip()
+    client_id = str(raw_tidal.get("client_id") or TIDAL_DEFAULT_CLIENT_ID).strip()
     redirect_uri = str(raw_tidal.get("redirect_uri") or TIDAL_DEFAULT_REDIRECT_URI).strip()
 
     return {
