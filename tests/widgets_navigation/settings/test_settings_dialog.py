@@ -70,7 +70,7 @@ class SettingsDialogTests(unittest.TestCase):
                 dialog = MusicFoldersDialog(app_state)
                 try:
                     labels = [dialog.lyrics_sections_tabs.tabText(index) for index in range(dialog.lyrics_sections_tabs.count())]
-                    self.assertEqual(labels, ["Download", "Files", "Embed", "Editor"])
+                    self.assertEqual(labels, ["Download", "Providers", "Files", "Embed", "Editor"])
                 finally:
                     dialog.deleteLater()
             finally:
@@ -197,6 +197,28 @@ class SettingsDialogTests(unittest.TestCase):
                 try:
                     self.assertEqual(dialog.tidal_test_btn.text(), "Test TIDAL helper")
                     self.assertTrue(dialog.tidal_test_btn.isEnabled())
+                finally:
+                    dialog.deleteLater()
+            finally:
+                app_state.db.close()
+
+    def test_settings_dialog_compacts_provider_setup_by_transport(self):
+        with TemporaryDirectory() as tmp:
+            app_state = simple_app_state(initialize_database(tmp))
+            try:
+                dialog = MusicFoldersDialog(app_state)
+                try:
+                    self.assertLessEqual(dialog.size().height(), 700)
+                    self.assertFalse(dialog.tidal_client_id_edit.isHidden())
+                    self.assertTrue(dialog.tidal_helper_edit.isHidden())
+
+                    dialog.tidal_transport_combo.setCurrentIndex(
+                        dialog.tidal_transport_combo.findData("external_helper")
+                    )
+
+                    self.assertTrue(dialog.tidal_client_id_edit.isHidden())
+                    self.assertFalse(dialog.tidal_helper_edit.isHidden())
+                    self.assertFalse(dialog.tidal_test_btn.isHidden())
                 finally:
                     dialog.deleteLater()
             finally:
