@@ -27,8 +27,20 @@ from db.database import (
 )
 from db.models import Config, Track
 from lyrics.provenance import normalize_lyrics_source
+from lyrics.providers import (
+    CachedTidalCatalogueResolver,
+    ExternalTidalLyricsTransport,
+    LrclibProvider,
+    LyricsProvider,
+    LyricsProviderRouter,
+    OfficialTidalLyricsTransport,
+    TidalAuthenticationError,
+    TidalCatalogueClient,
+    TidalOAuthSession,
+    TidalProvider,
+)
 from lyrics.providers.contracts import LyricsProviderResult, TrackLookupContext
-from lyrics.source_settings import load_lyrics_source_settings
+from lyrics.source_settings import load_lyrics_source_settings, parse_helper_command
 from ui.services.download_modes import normalize_download_mode
 from ui.services.lyrics_match_retry import (
     build_retry_search_queries,
@@ -405,14 +417,6 @@ def download_track_lyrics(
         if not is_valid_lrclib_duration(duration_s):
             return False, invalid_lrclib_duration_message(duration_s), track_id, title_for_ui
 
-        from lyrics.providers import LrclibProvider, LyricsProviderRouter
-
-        provider = LrclibProvider(
-            lrclib_instance,
-            api=api or LrcLibAPI(lrclib_instance),
-            notify=notify,
-        )
-        router = LyricsProviderRouter((provider,))
         lookup_context = TrackLookupContext(
             track_id=track_id,
             file_path=track.file_path,
@@ -425,7 +429,18 @@ def download_track_lyrics(
             isrc=track.isrc,
             instrumental=track.instrumental,
         )
-        source_settings = load_lyrics_source_settings(getattr(config, "ui_state_json", ""))
+        effective_config = config or get_config(db)
+        source_settings = load_lyrics_source_settings(getattr(effective_config, "ui_state_json", ""))
+        providers = _build_single_track_providers(
+            db,
+            lrclib_instance,
+            source_settings,
+            api=api,
+            notify=notify,
+        )
+        if not providers:
+            return False, "No lyrics providers are configured.", track_id, title_for_ui
+        router = LyricsProviderRouter(tuple(providers))
         match = router.lookup(
             lookup_context,
             requested_mode=mode,
@@ -434,7 +449,12 @@ def download_track_lyrics(
             ),
         )
         if match is None:
-            return False, "No lyrics found on LRCLIB for this track.", track_id, title_for_ui
+            no_match_message = (
+                "No lyrics found on LRCLIB for this track."
+                if len(providers) == 1 and providers[0].provider_id == "lrclib"
+                else "No lyrics found on configured providers for this track."
+            )
+            return False, no_match_message, track_id, title_for_ui
         ok, msg, _track = apply_lyrics_match_to_track(
             db,
             track_id=track_id,
@@ -449,3 +469,59 @@ def download_track_lyrics(
     finally:
         if owns_db and db is not None:
             db.close()
+
+
+def _build_single_track_providers(
+    db: sqlite3.Connection,
+    lrclib_instance: str,
+    settings: dict[str, object],
+    *,
+    api: LrcLibAPI | None,
+    notify: ProgressCallback,
+) -> list[LyricsProvider]:
+    raw_enabled = settings.get("enabled")
+    enabled = raw_enabled if isinstance(raw_enabled, dict) else {}
+    raw_priority = settings.get("priority")
+    priority = raw_priority if isinstance(raw_priority, list) else ["lrclib"]
+    providers: dict[str, LyricsProvider] = {}
+    if bool(enabled.get("lrclib", True)):
+        providers["lrclib"] = LrclibProvider(
+            lrclib_instance,
+            api=api or LrcLibAPI(lrclib_instance),
+            notify=notify,
+        )
+
+    raw_tidal = settings.get("tidal")
+    tidal_settings = raw_tidal if isinstance(raw_tidal, dict) else {}
+    if bool(enabled.get("tidal", False)):
+        transport_id = str(tidal_settings.get("transport") or "official").casefold()
+        transport = None
+        access_token: str | None = None
+        if transport_id == "official":
+            client_id = str(tidal_settings.get("client_id") or "").strip()
+            redirect_uri = str(tidal_settings.get("redirect_uri") or "").strip()
+            if client_id and redirect_uri:
+                try:
+                    access = TidalOAuthSession(client_id, redirect_uri).get_access_context()
+                except TidalAuthenticationError:
+                    access = None
+                if access is not None:
+                    access_token = access.access_token
+                    transport = OfficialTidalLyricsTransport(
+                        access_token,
+                        country_code=str(tidal_settings.get("country_code") or "Auto"),
+                    )
+        elif transport_id == "external_helper":
+            raw_external = settings.get("external")
+            external = raw_external if isinstance(raw_external, dict) else {}
+            command = parse_helper_command(str(external.get("helper_command") or ""))
+            if command:
+                transport = ExternalTidalLyricsTransport(command)
+        if transport is not None:
+            client = TidalCatalogueClient(
+                access_token=access_token,
+                country_code=str(tidal_settings.get("country_code") or "Auto"),
+            )
+            providers["tidal"] = TidalProvider(CachedTidalCatalogueResolver(client, db), transport)
+
+    return [providers[provider_id] for provider_id in priority if provider_id in providers]

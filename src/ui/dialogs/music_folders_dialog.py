@@ -5,7 +5,7 @@ import os
 import re
 from dataclasses import replace
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QThread, Signal
 from PySide6.QtGui import QFont, QKeySequence
 from PySide6.QtWidgets import (
     QCheckBox,
@@ -36,11 +36,14 @@ from library.scan_library import preview_audio_path_exclusions
 from lyrics.providers import (
     ExternalTidalHelperError,
     ExternalTidalLyricsTransport,
+    TidalAuthenticationError,
+    TidalOAuthSession,
     TrackLookupContext,
 )
 from lyrics.source_settings import (
     LYRICS_SOURCE_IDS,
     LYRICS_SOURCE_LABELS,
+    TIDAL_DEFAULT_REDIRECT_URI,
     load_lyrics_source_settings,
     merge_lyrics_source_settings,
     parse_helper_command,
@@ -62,6 +65,23 @@ from ui.services.logging_preferences import LOG_VERBOSITY_CHOICES
 from ui.theme_tokens import get_available_themes
 
 
+class _TidalLoginWorker(QThread):
+    finishedLogin = Signal(bool, str)
+
+    def __init__(self, client_id: str, redirect_uri: str, parent=None) -> None:
+        super().__init__(parent)
+        self.client_id = client_id
+        self.redirect_uri = redirect_uri
+
+    def run(self) -> None:
+        try:
+            TidalOAuthSession(self.client_id, self.redirect_uri).connect()
+        except (TidalAuthenticationError, OSError, ValueError) as exc:
+            self.finishedLogin.emit(False, str(exc))
+            return
+        self.finishedLogin.emit(True, "TIDAL connected securely.")
+
+
 class MusicFoldersDialog(QDialog):
     def __init__(self, app_state, parent=None):
         super().__init__(parent)
@@ -70,6 +90,7 @@ class MusicFoldersDialog(QDialog):
         self.app_state = app_state
         self._last_browse_dir = os.path.expanduser("~")
         self.directories_changed = False
+        self._tidal_login_worker: _TidalLoginWorker | None = None
 
         layout = QVBoxLayout(self)
         self.tabs = QTabWidget()
@@ -464,19 +485,35 @@ class MusicFoldersDialog(QDialog):
         self.tidal_transport_combo.addItem("Experimental internal", "experimental_internal")
         tidal_layout.addWidget(QLabel("Lyrics transport"), 1, 0)
         tidal_layout.addWidget(self.tidal_transport_combo, 1, 1)
+        self.tidal_client_id_edit = QLineEdit()
+        self.tidal_client_id_edit.setPlaceholderText("Client ID from developer.tidal.com")
+        tidal_layout.addWidget(QLabel("Client ID"), 2, 0)
+        tidal_layout.addWidget(self.tidal_client_id_edit, 2, 1, 1, 2)
+        self.tidal_redirect_uri_edit = QLineEdit(TIDAL_DEFAULT_REDIRECT_URI)
+        self.tidal_redirect_uri_edit.setPlaceholderText(TIDAL_DEFAULT_REDIRECT_URI)
+        tidal_layout.addWidget(QLabel("Redirect URI"), 3, 0)
+        tidal_layout.addWidget(self.tidal_redirect_uri_edit, 3, 1, 1, 2)
+        self.tidal_connect_btn = QPushButton("Connect TIDAL")
+        self.tidal_disconnect_btn = QPushButton("Disconnect")
+        self.tidal_auth_status = QLabel("Not connected")
+        auth_buttons = QHBoxLayout()
+        auth_buttons.addWidget(self.tidal_connect_btn)
+        auth_buttons.addWidget(self.tidal_disconnect_btn)
+        auth_buttons.addWidget(self.tidal_auth_status, 1)
+        tidal_layout.addLayout(auth_buttons, 4, 0, 1, 3)
         self.tidal_helper_edit = QLineEdit()
         self.tidal_helper_edit.setPlaceholderText("Optional helper executable or script command")
         self.tidal_helper_browse_btn = QPushButton("Browse")
-        tidal_layout.addWidget(QLabel("Helper command"), 2, 0)
-        tidal_layout.addWidget(self.tidal_helper_edit, 2, 1)
-        tidal_layout.addWidget(self.tidal_helper_browse_btn, 2, 2)
+        tidal_layout.addWidget(QLabel("Optional helper command"), 5, 0)
+        tidal_layout.addWidget(self.tidal_helper_edit, 5, 1)
+        tidal_layout.addWidget(self.tidal_helper_browse_btn, 5, 2)
         self.tidal_test_btn = QPushButton("Test TIDAL helper")
-        tidal_layout.addWidget(self.tidal_test_btn, 3, 0, 1, 3)
+        tidal_layout.addWidget(self.tidal_test_btn, 6, 0, 1, 3)
         tidal_hint = QLabel(
-            "TIDAL catalogue access and lyrics transport are separate. Official lyrics remain disabled until supported by the API."
+            "Official API is the native transport. Configure a TIDAL developer Client ID and connect once; the helper is optional fallback."
         )
         tidal_hint.setWordWrap(True)
-        tidal_layout.addWidget(tidal_hint, 4, 0, 1, 3)
+        tidal_layout.addWidget(tidal_hint, 7, 0, 1, 3)
         lyrics_download_layout.addWidget(tidal_box)
 
         lyrics_download_layout.addStretch(1)
@@ -530,6 +567,8 @@ class MusicFoldersDialog(QDialog):
         self.shortcuts_reset_btn.clicked.connect(self._reset_hotkeys_to_defaults)
         self.lyrics_source_up_btn.clicked.connect(lambda: self._move_lyrics_source(-1))
         self.lyrics_source_down_btn.clicked.connect(lambda: self._move_lyrics_source(1))
+        self.tidal_connect_btn.clicked.connect(self._connect_tidal)
+        self.tidal_disconnect_btn.clicked.connect(self._disconnect_tidal)
         self.tidal_helper_browse_btn.clicked.connect(self._browse_tidal_helper)
         self.tidal_test_btn.clicked.connect(self._test_tidal_helper)
 
@@ -1028,11 +1067,28 @@ class MusicFoldersDialog(QDialog):
         tidal = settings.get("tidal", {})
         tidal = tidal if isinstance(tidal, dict) else {}
         self.tidal_country_edit.setText(str(tidal.get("country_code") or "Auto"))
-        transport_idx = self.tidal_transport_combo.findData(str(tidal.get("transport") or "external_helper"))
+        transport_idx = self.tidal_transport_combo.findData(str(tidal.get("transport") or "official"))
         self.tidal_transport_combo.setCurrentIndex(max(0, transport_idx))
+        self.tidal_client_id_edit.setText(str(tidal.get("client_id") or ""))
+        self.tidal_redirect_uri_edit.setText(str(tidal.get("redirect_uri") or TIDAL_DEFAULT_REDIRECT_URI))
         external = settings.get("external", {})
         external = external if isinstance(external, dict) else {}
         self.tidal_helper_edit.setText(str(external.get("helper_command") or ""))
+        self._update_tidal_auth_status()
+
+    def _update_tidal_auth_status(self) -> None:
+        client_id = self.tidal_client_id_edit.text().strip()
+        if not client_id:
+            self.tidal_auth_status.setText("Client ID required")
+            return
+        try:
+            connected = TidalOAuthSession(
+                client_id,
+                self.tidal_redirect_uri_edit.text().strip() or TIDAL_DEFAULT_REDIRECT_URI,
+            ).is_connected()
+        except (TidalAuthenticationError, OSError, ValueError):
+            connected = False
+        self.tidal_auth_status.setText("Connected" if connected else "Not connected")
 
     def _current_lyrics_source_settings(self) -> dict[str, object]:
         priority: list[str] = []
@@ -1050,7 +1106,9 @@ class MusicFoldersDialog(QDialog):
             "continue_when_plain_for_synced": self.lyrics_source_continue_plain_chk.isChecked(),
             "tidal": {
                 "country_code": self.tidal_country_edit.text().strip() or "Auto",
-                "transport": str(self.tidal_transport_combo.currentData() or "external_helper"),
+                "transport": str(self.tidal_transport_combo.currentData() or "official"),
+                "client_id": self.tidal_client_id_edit.text().strip(),
+                "redirect_uri": self.tidal_redirect_uri_edit.text().strip() or TIDAL_DEFAULT_REDIRECT_URI,
             },
             "external": {"helper_command": self.tidal_helper_edit.text().strip()},
         }
@@ -1068,6 +1126,47 @@ class MusicFoldersDialog(QDialog):
         selected = self._pick_file("Select TIDAL helper", self.tidal_helper_edit.text().strip())
         if selected:
             self.tidal_helper_edit.setText(selected)
+
+    def _connect_tidal(self) -> None:
+        if self._tidal_login_worker is not None and self._tidal_login_worker.isRunning():
+            return
+        client_id = self.tidal_client_id_edit.text().strip()
+        redirect_uri = self.tidal_redirect_uri_edit.text().strip() or TIDAL_DEFAULT_REDIRECT_URI
+        if not client_id:
+            QMessageBox.warning(self, "TIDAL", "Enter a TIDAL developer Client ID first.")
+            return
+        self.tidal_connect_btn.setEnabled(False)
+        self.tidal_auth_status.setText("Waiting for TIDAL login...")
+        worker = _TidalLoginWorker(client_id, redirect_uri, self)
+        worker.finishedLogin.connect(self._on_tidal_login_finished)
+        worker.finished.connect(worker.deleteLater)
+        self._tidal_login_worker = worker
+        worker.start()
+
+    def _on_tidal_login_finished(self, success: bool, message: str) -> None:
+        self.tidal_connect_btn.setEnabled(True)
+        self.tidal_auth_status.setText("Connected" if success else "Not connected")
+        if success:
+            QMessageBox.information(self, "TIDAL", message)
+        else:
+            QMessageBox.warning(self, "TIDAL", f"Connection failed: {message}")
+        self._tidal_login_worker = None
+
+    def _disconnect_tidal(self) -> None:
+        client_id = self.tidal_client_id_edit.text().strip()
+        if not client_id:
+            self.tidal_auth_status.setText("Not connected")
+            return
+        try:
+            TidalOAuthSession(
+                client_id,
+                self.tidal_redirect_uri_edit.text().strip() or TIDAL_DEFAULT_REDIRECT_URI,
+            ).disconnect()
+        except TidalAuthenticationError as exc:
+            QMessageBox.warning(self, "TIDAL", str(exc))
+            return
+        self.tidal_auth_status.setText("Not connected")
+        QMessageBox.information(self, "TIDAL", "TIDAL credentials removed from the system keyring.")
 
     def _test_tidal_helper(self) -> None:
         command = parse_helper_command(self.tidal_helper_edit.text())

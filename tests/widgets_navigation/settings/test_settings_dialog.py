@@ -163,6 +163,8 @@ class SettingsDialogTests(unittest.TestCase):
                     dialog.lyrics_source_list.setCurrentRow(1)
                     dialog._move_lyrics_source(-1)
                     dialog.tidal_country_edit.setText("ro")
+                    dialog.tidal_client_id_edit.setText("test-client-id")
+                    dialog.tidal_redirect_uri_edit.setText("http://127.0.0.1:8765/callback")
                     dialog.tidal_helper_edit.setText("C:/Tools/tidal_helper.py")
                     dialog.save()
                 finally:
@@ -176,6 +178,11 @@ class SettingsDialogTests(unittest.TestCase):
                     )
                     self.assertEqual(reloaded.lyrics_source_list.item(0).checkState(), Qt.Checked)
                     self.assertEqual(reloaded.tidal_country_edit.text(), "RO")
+                    self.assertEqual(reloaded.tidal_client_id_edit.text(), "test-client-id")
+                    self.assertEqual(
+                        reloaded.tidal_redirect_uri_edit.text(),
+                        "http://127.0.0.1:8765/callback",
+                    )
                     self.assertEqual(reloaded.tidal_helper_edit.text(), "C:/Tools/tidal_helper.py")
                 finally:
                     reloaded.deleteLater()
