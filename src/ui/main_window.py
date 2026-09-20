@@ -1001,7 +1001,7 @@ class MainWindow(QMainWindow):
                 event.ignore()
                 return
         try:
-            from ui.workers.ai_sync_service import shutdown_all_ai_runtimes
+            from ui.workers.ai.ai_sync_service import shutdown_all_ai_runtimes
 
             shutdown_all_ai_runtimes()
         except (ImportError, OSError, RuntimeError):
@@ -1491,8 +1491,8 @@ class MainWindow(QMainWindow):
         lyrics_actions.on_discard_draft_requested(self)
 
     def _on_auto_sync_requested(self) -> None:
-        from ui.workers.ai_runtime import nvidia_gpu_available
-        from ui.workers.ai_sync_worker import (
+        from ui.workers.ai.ai_runtime import nvidia_gpu_available
+        from ui.workers.ai.ai_sync_worker import (
             AiSyncWorker,
             _check_ai_sync_available,
             get_missing_ai_dependencies,

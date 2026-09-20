@@ -21,15 +21,17 @@ for path in (REPO_ROOT, SRC_ROOT):
     if str(path) not in sys.path:
         sys.path.insert(0, str(path))
 
-from ui.workers.ai_sync_contracts import AlignmentOptions, AlignmentRequest  # noqa: E402
-from ui.workers.ai_sync_stable_ts import StableTsResearchBackend  # noqa: E402
-
-from tools.ai_sync_bench.corpus import BenchmarkCase, load_corpus  # noqa: E402
-from tools.ai_sync_bench.metrics import (  # noqa: E402
+from tools.ai_sync_bench.corpus import BenchmarkCase, load_corpus
+from tools.ai_sync_bench.metrics import (
     aggregate_samples,
     alignment_quality,
     render_report_markdown,
 )
+from ui.workers.ai.ai_sync_contracts import (
+    AlignmentOptions,
+    AlignmentRequest,
+)
+from ui.workers.ai.ai_sync_stable_ts import StableTsResearchBackend
 
 
 def _git_sha() -> str:
@@ -48,10 +50,10 @@ def _local_segments(path: Path | None, case_id: str) -> list[dict[str, Any]]:
         raise ValueError("--segments is required for stable-ts local mode")
     payload = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(payload, dict):
-        raise ValueError("stable-ts segments must be an object keyed by case id")
+        raise TypeError("stable-ts segments must be an object keyed by case id")
     segments = payload.get(case_id)
     if not isinstance(segments, list):
-        raise ValueError(f"No stable-ts segments found for case {case_id!r}")
+        raise TypeError(f"No stable-ts segments found for case {case_id!r}")
     return [dict(segment) for segment in segments if isinstance(segment, dict)]
 
 

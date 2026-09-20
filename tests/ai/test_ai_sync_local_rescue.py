@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from tests import test_support as _test_support  # noqa: F401
-from ui.workers.ai_sync_local_rescue import (
+from ui.workers.ai.ai_sync_local_rescue import (
     RescueWindow,
     build_rescue_windows,
     replace_segments_in_windows,

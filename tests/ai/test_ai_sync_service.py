@@ -4,7 +4,7 @@ import sys
 from pathlib import Path
 
 from tests import test_support as _test_support  # noqa: F401
-from ui.workers.ai_sync_service import (
+from ui.workers.ai.ai_sync_service import (
     AI_SYNC_PROTOCOL_VERSION,
     PersistentAIRuntime,
     build_runtime_environment,

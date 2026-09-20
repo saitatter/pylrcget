@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from tests import test_support as _test_support  # noqa: F401
-from ui.workers.ai_sync_policy import (
+from ui.workers.ai.ai_sync_policy import (
     LYRICS_ALIGNER_MANIFEST,
     MMS_RESEARCH_MANIFEST,
     BackendLicenseManifest,

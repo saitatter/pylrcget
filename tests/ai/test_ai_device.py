@@ -4,7 +4,7 @@ import sys
 from types import SimpleNamespace
 
 from tests import test_support as _test_support  # noqa: F401
-from ui.workers.ai_runtime import available_torch_devices, resolve_torch_device
+from ui.workers.ai.ai_runtime import available_torch_devices, resolve_torch_device
 
 
 def _fake_torch(*, cuda: bool, mps: bool):

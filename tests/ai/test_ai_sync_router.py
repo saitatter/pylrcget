@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 from tests import test_support as _test_support  # noqa: F401
-from ui.workers.ai_sync_router import LanguageAwareBackendRouter, build_default_router
+from ui.workers.ai.ai_sync_router import (
+    LanguageAwareBackendRouter,
+    build_default_router,
+)
 
 
 def test_default_router_selects_english_backend_when_available() -> None:

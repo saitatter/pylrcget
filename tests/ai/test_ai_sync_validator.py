@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 from tests import test_support as _test_support  # noqa: F401
-from ui.workers.ai_sync_contracts import AlignedLine, AlignmentResult, ManualAnchor
-from ui.workers.ai_sync_validator import validate_alignment
+from ui.workers.ai.ai_sync_contracts import AlignedLine, AlignmentResult, ManualAnchor
+from ui.workers.ai.ai_sync_validator import validate_alignment
 
 
 def _result(lines, confidence=0.9):

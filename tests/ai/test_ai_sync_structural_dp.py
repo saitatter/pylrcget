@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 from tests import test_support as _test_support  # noqa: F401
-from ui.workers.ai_sync_contracts import ManualAnchor
-from ui.workers.ai_sync_structural_dp import LineCandidate, select_structural_candidates
+from ui.workers.ai.ai_sync_contracts import ManualAnchor
+from ui.workers.ai.ai_sync_structural_dp import (
+    LineCandidate,
+    select_structural_candidates,
+)
 
 
 def _candidate(line, start, score, *, flags=None):

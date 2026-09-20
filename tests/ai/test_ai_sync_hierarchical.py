@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from tests import test_support as _test_support  # noqa: F401
-from ui.workers.ai_sync_hierarchical import AcousticRegion, build_candidate_regions
+from ui.workers.ai.ai_sync_hierarchical import AcousticRegion, build_candidate_regions
 
 
 def test_hierarchical_regions_always_keep_a_fallback_window() -> None:

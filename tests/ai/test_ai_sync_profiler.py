@@ -5,7 +5,7 @@ import pytest
 from tests import test_support as _test_support  # noqa: F401
 from tools.ai_sync_bench.corpus import build_corpus, load_corpus
 from tools.ai_sync_bench.metrics import alignment_quality, percentile, summarize
-from ui.workers.ai_sync_profiler import StageProfiler
+from ui.workers.ai.ai_sync_profiler import StageProfiler
 
 
 def test_stage_profiler_accumulates_stage_and_counter_data() -> None:

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from tests import test_support as _test_support  # noqa: F401
-from ui.workers import ai_sync_runtime
+from ui.workers.ai import ai_sync_runtime
 
 
 def test_whisperx_cache_is_lru_bounded(monkeypatch) -> None:

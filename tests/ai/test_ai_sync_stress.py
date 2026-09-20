@@ -5,11 +5,14 @@ from itertools import pairwise
 import pytest
 
 from tests import test_support as _test_support  # noqa: F401
-from ui.workers.ai_sync_contracts import AlignedLine, AlignmentResult
-from ui.workers.ai_sync_hierarchical import AcousticRegion, build_candidate_regions
-from ui.workers.ai_sync_language import detect_text_language
-from ui.workers.ai_sync_structural_dp import LineCandidate, select_structural_candidates
-from ui.workers.ai_sync_validator import validate_alignment
+from ui.workers.ai.ai_sync_contracts import AlignedLine, AlignmentResult
+from ui.workers.ai.ai_sync_hierarchical import AcousticRegion, build_candidate_regions
+from ui.workers.ai.ai_sync_language import detect_text_language
+from ui.workers.ai.ai_sync_structural_dp import (
+    LineCandidate,
+    select_structural_candidates,
+)
+from ui.workers.ai.ai_sync_validator import validate_alignment
 
 
 @pytest.mark.parametrize(

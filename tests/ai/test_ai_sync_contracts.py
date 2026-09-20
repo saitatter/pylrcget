@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 
 from tests import test_support as _test_support  # noqa: F401
-from ui.workers.ai_sync_contracts import (
+from ui.workers.ai.ai_sync_contracts import (
     AlignedLine,
     AlignmentOptions,
     AlignmentRequest,

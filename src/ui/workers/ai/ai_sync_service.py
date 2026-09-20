@@ -151,7 +151,7 @@ class PersistentAIRuntime:
                 [
                     str(self.python_path),
                     "-m",
-                    "ui.workers.ai_sync_external_entry",
+                    "ui.workers.ai.ai_sync_external_entry",
                     "--serve",
                 ],
                 cwd=str(self.source_root.parent),

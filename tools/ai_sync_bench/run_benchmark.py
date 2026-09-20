@@ -24,14 +24,22 @@ if str(REPO_ROOT) not in sys.path:
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
-from ui.workers.ai_sync_profiler import StageProfiler  # noqa: E402
+from ui.workers.ai.ai_sync_profiler import StageProfiler
 
 if __package__:
-    from .corpus import BenchmarkCase, build_corpus, load_corpus  # noqa: E402
-    from .metrics import aggregate_samples, alignment_quality, render_report_markdown  # noqa: E402
+    from .corpus import BenchmarkCase, build_corpus, load_corpus
+    from .metrics import (
+        aggregate_samples,
+        alignment_quality,
+        render_report_markdown,
+    )
 else:  # Direct ``python tools/ai_sync_bench/run_benchmark.py`` invocation.
-    from tools.ai_sync_bench.corpus import BenchmarkCase, build_corpus, load_corpus  # noqa: E402
-    from tools.ai_sync_bench.metrics import (  # noqa: E402
+    from tools.ai_sync_bench.corpus import (
+        BenchmarkCase,
+        build_corpus,
+        load_corpus,
+    )
+    from tools.ai_sync_bench.metrics import (
         aggregate_samples,
         alignment_quality,
         render_report_markdown,
@@ -109,7 +117,7 @@ class _CurrentWorkerContext:
         self.completed_result = (bool(ok), str(message), str(output))
 
     def _resolve_device(self) -> str:
-        from ui.workers.ai_runtime import resolve_torch_device
+        from ui.workers.ai.ai_runtime import resolve_torch_device
 
         return resolve_torch_device(self._device)
 
@@ -146,7 +154,7 @@ class CurrentPipelineBackend:
         self.device = device
 
     def align(self, case: BenchmarkCase) -> tuple[list[float | None], dict[str, Any]]:
-        from ui.workers.ai_sync_pipeline import run_ai_sync_pipeline
+        from ui.workers.ai.ai_sync_pipeline import run_ai_sync_pipeline
 
         profiler = StageProfiler(metadata={"backend": self.name, "case_id": case.case_id})
         with profiler.stage("process_startup"):

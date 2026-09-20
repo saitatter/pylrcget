@@ -59,8 +59,8 @@ class MainWindowInstrumentalTests(unittest.TestCase):
         window.app_state = SimpleNamespace()
 
         with (
-            patch("ui.workers.ai_sync_worker._check_ai_sync_available", return_value=(False, "Missing deps")),
-            patch("ui.workers.ai_sync_worker.get_missing_ai_dependencies", return_value=["torch", "torchaudio"]),
+            patch("ui.workers.ai.ai_sync_worker._check_ai_sync_available", return_value=(False, "Missing deps")),
+            patch("ui.workers.ai.ai_sync_worker.get_missing_ai_dependencies", return_value=["torch", "torchaudio"]),
             patch("ui.main_window.AIDependenciesDialog") as dialog_cls,
             patch("ui.main_window.notify_user") as notify_mock,
         ):

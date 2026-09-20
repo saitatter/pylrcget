@@ -12,8 +12,8 @@ if not (3, 10) <= tuple(sys.version_info[:2]) <= (3, 13):
     )
 
 AI_RUNTIME_DATAS = [
-    (str(path), "ai_runtime_src/ui/workers")
-    for path in (ROOT / "src" / "ui" / "workers").glob("*.py")
+    (str(path), "ai_runtime_src/ui/workers/ai")
+    for path in (ROOT / "src" / "ui" / "workers" / "ai").glob("*.py")
 ]
 
 AI_EXCLUDES = [

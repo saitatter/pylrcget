@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from tests import test_support as _test_support  # noqa: F401
-from ui.workers.ai_sync_pipeline import (
+from ui.workers.ai.ai_sync_pipeline import (
     _legacy_full_retries_enabled,
     _relaxed_vad_retry_configs,
 )

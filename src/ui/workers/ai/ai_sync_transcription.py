@@ -17,7 +17,7 @@ def _compat_segment_alignment_quality(
 ) -> float:
     import sys
 
-    worker = sys.modules.get("ui.workers.ai_sync_worker")
+    worker = sys.modules.get("ui.workers.ai.ai_sync_worker")
     if worker is not None:
         candidate = getattr(worker, "_segment_alignment_quality", None)
         if candidate is not None and candidate is not _segment_alignment_quality:

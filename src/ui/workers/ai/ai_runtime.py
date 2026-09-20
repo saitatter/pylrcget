@@ -203,11 +203,11 @@ def resolve_ai_runtime_source() -> Path | None:
             executable_dir / "_internal" / "ai_runtime_src",
         ]
     else:
-        candidates = [Path(__file__).resolve().parents[2]]
+        candidates = [Path(__file__).resolve().parents[3]]
     for candidate in candidates:
         if (
-            (candidate / "ui" / "workers" / "ai_sync_external_entry.py").is_file()
-            and (candidate / "ui" / "workers" / "ai_sync_pipeline.py").is_file()
+            (candidate / "ui" / "workers" / "ai" / "ai_sync_external_entry.py").is_file()
+            and (candidate / "ui" / "workers" / "ai" / "ai_sync_pipeline.py").is_file()
         ):
             return candidate
     return None

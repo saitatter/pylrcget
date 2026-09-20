@@ -16,8 +16,8 @@ from PySide6.QtWidgets import (
 )
 
 from ui.spacing import SPACE_2, SPACE_3, SPACE_4, set_layout_spacing
-from ui.workers.ai_runtime import resolve_ai_install_command
-from ui.workers.ai_sync_worker import get_missing_ai_dependencies
+from ui.workers.ai.ai_runtime import resolve_ai_install_command
+from ui.workers.ai.ai_sync_worker import get_missing_ai_dependencies
 
 logger = logging.getLogger(__name__)
 

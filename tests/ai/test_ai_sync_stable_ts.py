@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 from tests import test_support as _test_support  # noqa: F401
-from ui.workers.ai_sync_contracts import AlignmentOptions, AlignmentRequest
-from ui.workers.ai_sync_stable_ts import StableTsResearchBackend
+from ui.workers.ai.ai_sync_contracts import AlignmentOptions, AlignmentRequest
+from ui.workers.ai.ai_sync_stable_ts import StableTsResearchBackend
 
 
 def _request(**extras) -> AlignmentRequest:

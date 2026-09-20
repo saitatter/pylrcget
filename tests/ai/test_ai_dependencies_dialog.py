@@ -11,7 +11,7 @@ def test_resolve_ai_install_command_for_source_runtime(monkeypatch):
     monkeypatch.setattr(sys, "executable", sys.executable)
     monkeypatch.setattr(sys, "version_info", (3, 13, 0))
     monkeypatch.setattr(sys, "frozen", False, raising=False)
-    monkeypatch.setattr("ui.workers.ai_runtime._is_supported_python", lambda path: True)
+    monkeypatch.setattr("ui.workers.ai.ai_runtime._is_supported_python", lambda path: True)
 
     cmd, error = resolve_ai_install_command(["torch", "openai-whisper"])
 
@@ -25,7 +25,7 @@ def test_resolve_ai_install_command_for_source_runtime(monkeypatch):
 def test_resolve_ai_install_command_for_packaged_exe(monkeypatch):
     monkeypatch.setattr(sys, "executable", r"C:\dist\pylrcget-portable-noai.exe")
     monkeypatch.setattr(sys, "frozen", True, raising=False)
-    monkeypatch.setattr("ui.workers.ai_runtime.shutil.which", lambda name: None)
+    monkeypatch.setattr("ui.workers.ai.ai_runtime.shutil.which", lambda name: None)
 
     cmd, error = resolve_ai_install_command(["torch"])
 
@@ -50,12 +50,12 @@ def test_resolve_ai_runtime_python_rejects_python_314(tmp_path, monkeypatch):
     runtime_python.touch()
     monkeypatch.setenv("PYLRCGET_AI_RUNTIME_PYTHON", str(runtime_python))
     monkeypatch.setattr(
-        "ui.workers.ai_runtime.subprocess.run",
+        "ui.workers.ai.ai_runtime.subprocess.run",
         lambda *args, **kwargs: type(
             "Result", (), {"returncode": 0, "stdout": "3.14"}
         )(),
     )
 
-    from ui.workers.ai_runtime import resolve_ai_runtime_python
+    from ui.workers.ai.ai_runtime import resolve_ai_runtime_python
 
     assert resolve_ai_runtime_python() is None

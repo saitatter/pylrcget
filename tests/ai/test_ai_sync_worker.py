@@ -4,9 +4,9 @@ from __future__ import annotations
 import builtins
 
 from tests import test_support as _test_support  # noqa: F401
-from ui.workers import ai_sync_runtime, ai_sync_worker
-from ui.workers.ai_sync_demucs import AlignmentCandidate, candidate_quality
-from ui.workers.ai_sync_worker import (
+from ui.workers.ai import ai_sync_runtime, ai_sync_worker
+from ui.workers.ai.ai_sync_demucs import AlignmentCandidate, candidate_quality
+from ui.workers.ai.ai_sync_worker import (
     _align_lyrics_to_segments,
     _align_lyrics_to_segments_viterbi,
     _align_segments_per_chunks,

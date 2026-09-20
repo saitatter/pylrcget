@@ -291,7 +291,7 @@ class AiSyncWorker(QThread):
                 [
                     str(python_path),
                     "-m",
-                    "ui.workers.ai_sync_external_entry",
+                    "ui.workers.ai.ai_sync_external_entry",
                 ],
                 cwd=str(source_root.parent),
                 env=environment,

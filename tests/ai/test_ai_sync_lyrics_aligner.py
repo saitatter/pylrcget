@@ -6,8 +6,8 @@ import numpy as np
 import torch
 
 from tests import test_support as _test_support  # noqa: F401
-from ui.workers.ai_sync_contracts import AlignmentOptions, AlignmentRequest
-from ui.workers.ai_sync_lyrics_aligner import (
+from ui.workers.ai.ai_sync_contracts import AlignmentOptions, AlignmentRequest
+from ui.workers.ai.ai_sync_lyrics_aligner import (
     EnglishLyricsAlignerBackend,
     _build_lrc_from_predictions,
     _result_lines,

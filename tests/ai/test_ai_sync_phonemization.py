@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from tests import test_support as _test_support  # noqa: F401
-from ui.workers.ai_sync_phonemization import EnglishG2PPhonemizer
+from ui.workers.ai.ai_sync_phonemization import EnglishG2PPhonemizer
 
 
 def test_english_g2p_phonemizer_caches_normalized_words() -> None:

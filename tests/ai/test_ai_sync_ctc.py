@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 from tests import test_support as _test_support  # noqa: F401
-from ui.workers.ai_sync_contracts import (
+from ui.workers.ai.ai_sync_contracts import (
     AlignedLine,
     AlignmentOptions,
     AlignmentRequest,
     AlignmentResult,
 )
-from ui.workers.ai_sync_ctc import CtcModelRegistry, CtcModelSpec, GenericCtcBackend
+from ui.workers.ai.ai_sync_ctc import CtcModelRegistry, CtcModelSpec, GenericCtcBackend
 
 
 def _request() -> AlignmentRequest:

@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from tests import test_support as _test_support  # noqa: F401
-from ui.workers import ai_sync_pipeline
-from ui.workers.ai_sync_demucs import AlignmentCandidate
-from ui.workers.ai_sync_language import LanguageDetection, detect_text_language
+from ui.workers.ai import ai_sync_pipeline
+from ui.workers.ai.ai_sync_demucs import AlignmentCandidate
+from ui.workers.ai.ai_sync_language import LanguageDetection, detect_text_language
 
 
 def test_text_detector_identifies_ordinary_english_lyrics() -> None:
