@@ -105,6 +105,8 @@ class LyricsProviderRouter:
                 if health_state is not None:
                     health_state.record_failure(provider_id, error)
                 if index == len(self.providers) - 1:
+                    if fallback is not None:
+                        return fallback
                     raise
                 continue
             finally:

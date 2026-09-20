@@ -136,6 +136,17 @@ def test_router_continues_after_provider_error_when_another_provider_is_availabl
     assert result.provider == "fallback"
 
 
+def test_router_keeps_plain_fallback_when_last_provider_errors():
+    first = _FakeProvider(_result("first", plain="plain"))
+    second = _FakeProvider(error=RuntimeError("temporary provider error"))
+
+    result = LyricsProviderRouter((first, second)).lookup(_context(), requested_mode="prefer_synced")
+
+    assert result is not None
+    assert result.provider == "first"
+    assert result.plain_lyrics == "plain"
+
+
 def test_router_preserves_single_provider_errors_for_lrclib_compatibility():
     provider = _FakeProvider(error=RuntimeError("network unavailable"))
 
