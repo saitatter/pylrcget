@@ -20,10 +20,13 @@ from lyrics.providers import (
     LrclibProvider,
     LyricsProvider,
     LyricsProviderRouter,
+    OfficialTidalLyricsTransport,
     ProviderExecutionCoordinator,
     ProviderHealthState,
     ProviderLookupResultCache,
+    TidalAuthenticationError,
     TidalCatalogueClient,
+    TidalOAuthSession,
     TidalProvider,
     build_lookup_diagnostics,
     get_provider_execution_policy,
@@ -486,21 +489,43 @@ class BulkLyricsDownloadWorker(QThread):
             return cached
         raw_tidal = self._lyrics_source_settings.get("tidal")
         tidal_settings = raw_tidal if isinstance(raw_tidal, dict) else {}
-        if str(tidal_settings.get("transport") or "external_helper") != "external_helper":
-            return None
-        raw_external = self._lyrics_source_settings.get("external")
-        external_settings = raw_external if isinstance(raw_external, dict) else {}
-        command = parse_helper_command(str(external_settings.get("helper_command") or ""))
-        if not command:
+        transport_id = str(tidal_settings.get("transport") or "official").casefold()
+        transport = None
+        if transport_id == "official":
+            client_id = str(tidal_settings.get("client_id") or "").strip()
+            redirect_uri = str(tidal_settings.get("redirect_uri") or "").strip()
+            if not client_id or not redirect_uri:
+                return None
+            try:
+                session = TidalOAuthSession(client_id, redirect_uri)
+                access = session.get_access_context()
+            except TidalAuthenticationError:
+                return None
+            transport = OfficialTidalLyricsTransport(
+                access.access_token,
+                country_code=str(tidal_settings.get("country_code") or "Auto"),
+                on_rate_limit=lambda delay_s: self._execution_coordinator.record_rate_limit("tidal", delay_s),
+            )
+            access_token = access.access_token
+        elif transport_id == "external_helper":
+            raw_external = self._lyrics_source_settings.get("external")
+            external_settings = raw_external if isinstance(raw_external, dict) else {}
+            command = parse_helper_command(str(external_settings.get("helper_command") or ""))
+            if not command:
+                return None
+            transport = ExternalTidalLyricsTransport(command)
+            access_token = None
+        else:
             return None
         mapping_db = sqlite3.connect(self.db_path, timeout=15.0)
         mapping_db.row_factory = sqlite3.Row
         client = TidalCatalogueClient(
+            access_token=access_token,
             country_code=str(tidal_settings.get("country_code") or "Auto"),
             on_rate_limit=lambda delay_s: self._execution_coordinator.record_rate_limit("tidal", delay_s),
         )
         resolver = CachedTidalCatalogueResolver(client, mapping_db)
-        transport = ExternalTidalLyricsTransport(command)
+        assert transport is not None
         provider = TidalProvider(resolver, transport)
         self._thread_local.tidal_provider = provider
         self._thread_local.tidal_mapping_db = mapping_db
