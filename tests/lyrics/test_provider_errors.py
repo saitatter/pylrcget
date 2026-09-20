@@ -11,7 +11,6 @@ from lyrics.providers import (
 )
 from lyrics.providers.tidal import TidalCatalogueError
 from lyrics.providers.tidal_transport import (
-    ExternalTidalHelperError,
     OfficialTidalLyricsError,
 )
 
@@ -25,7 +24,6 @@ from lyrics.providers.tidal_transport import (
         (TidalCatalogueError(403, "forbidden"), ProviderErrorKind.AUTH_REQUIRED),
         (TidalCatalogueError(503, "unavailable"), ProviderErrorKind.TEMPORARY),
         (requests.exceptions.Timeout("slow"), ProviderErrorKind.TEMPORARY),
-        (ExternalTidalHelperError("invalid protocol"), ProviderErrorKind.FATAL),
         (OfficialTidalLyricsError("expired", status_code=401), ProviderErrorKind.AUTH_EXPIRED),
         (OfficialTidalLyricsError("slow", status_code=429), ProviderErrorKind.RATE_LIMITED),
         (ValueError("bad payload"), ProviderErrorKind.INVALID_RESPONSE),

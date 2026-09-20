@@ -165,7 +165,6 @@ class SettingsDialogTests(unittest.TestCase):
                     dialog.tidal_country_edit.setText("ro")
                     dialog.tidal_client_id_edit.setText("test-client-id")
                     dialog.tidal_redirect_uri_edit.setText("http://127.0.0.1:8765/callback")
-                    dialog.tidal_helper_edit.setText("C:/Tools/tidal_helper.py")
                     dialog.save()
                 finally:
                     dialog.deleteLater()
@@ -183,42 +182,26 @@ class SettingsDialogTests(unittest.TestCase):
                         reloaded.tidal_redirect_uri_edit.text(),
                         "http://127.0.0.1:8765/callback",
                     )
-                    self.assertEqual(reloaded.tidal_helper_edit.text(), "C:/Tools/tidal_helper.py")
                 finally:
                     reloaded.deleteLater()
             finally:
                 app_state.db.close()
 
-    def test_settings_dialog_exposes_tidal_helper_test_action(self):
-        with TemporaryDirectory() as tmp:
-            app_state = simple_app_state(initialize_database(tmp))
-            try:
-                dialog = MusicFoldersDialog(app_state)
-                try:
-                    self.assertEqual(dialog.tidal_test_btn.text(), "Test TIDAL helper")
-                    self.assertTrue(dialog.tidal_test_btn.isEnabled())
-                finally:
-                    dialog.deleteLater()
-            finally:
-                app_state.db.close()
-
-    def test_settings_dialog_compacts_provider_setup_by_transport(self):
+    def test_settings_dialog_uses_provider_settings_selector(self):
         with TemporaryDirectory() as tmp:
             app_state = simple_app_state(initialize_database(tmp))
             try:
                 dialog = MusicFoldersDialog(app_state)
                 try:
                     self.assertLessEqual(dialog.size().height(), 700)
-                    self.assertFalse(dialog.tidal_client_id_edit.isHidden())
-                    self.assertTrue(dialog.tidal_helper_edit.isHidden())
-
-                    dialog.tidal_transport_combo.setCurrentIndex(
-                        dialog.tidal_transport_combo.findData("external_helper")
+                    self.assertEqual(
+                        [dialog.provider_settings_combo.itemData(i) for i in range(2)],
+                        ["lrclib", "tidal"],
                     )
-
-                    self.assertTrue(dialog.tidal_client_id_edit.isHidden())
-                    self.assertFalse(dialog.tidal_helper_edit.isHidden())
-                    self.assertFalse(dialog.tidal_test_btn.isHidden())
+                    self.assertEqual(dialog.provider_settings_stack.currentIndex(), 0)
+                    dialog.provider_settings_combo.setCurrentIndex(1)
+                    self.assertEqual(dialog.provider_settings_stack.currentIndex(), 1)
+                    self.assertFalse(dialog.tidal_client_id_edit.isHidden())
                 finally:
                     dialog.deleteLater()
             finally:

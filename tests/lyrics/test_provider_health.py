@@ -10,7 +10,7 @@ from lyrics.providers import (
     is_fatal_provider_error,
 )
 from lyrics.providers.tidal import TidalCatalogueError
-from lyrics.providers.tidal_transport import ExternalTidalHelperError
+from lyrics.providers.tidal_transport import OfficialTidalLyricsError
 
 
 def _context() -> TrackLookupContext:
@@ -28,8 +28,8 @@ def _context() -> TrackLookupContext:
 
 
 class _FakeProvider:
-    provider_id = "external"
-    display_name = "External"
+    provider_id = "tidal"
+    display_name = "TIDAL"
 
     def __init__(self, error: Exception | None = None):
         self.error = error
@@ -45,32 +45,19 @@ class _FakeProvider:
             raise self.error
 
 
-def test_health_state_disables_fatal_helper_and_auth_failures_only():
-    state = ProviderHealthState()
-
-    assert is_fatal_provider_error(ExternalTidalHelperError("bad helper")) is True
+def test_health_state_disables_fatal_auth_failures_only():
     assert is_fatal_provider_error(TidalCatalogueError(401, "expired")) is True
+    assert is_fatal_provider_error(OfficialTidalLyricsError("expired", status_code=401)) is True
     assert is_fatal_provider_error(TidalCatalogueError(429, "slow down")) is False
     assert is_fatal_provider_error(RuntimeError("temporary")) is False
 
-    assert state.record_failure("external", ExternalTidalHelperError("bad helper")) is True
-    assert state.is_available("external") is False
-    assert state.snapshot() == {
-        "external": {
-            "available": False,
-            "fatal_error": "bad helper",
-            "failures": 1,
-            "skipped": 1,
-        }
-    }
-
 
 def test_router_skips_provider_after_fatal_batch_failure():
-    provider = _FakeProvider(ExternalTidalHelperError("helper missing"))
+    provider = _FakeProvider(OfficialTidalLyricsError("credentials missing", status_code=401))
     health = ProviderHealthState()
     router = LyricsProviderRouter((provider,))
 
-    with pytest.raises(ExternalTidalHelperError):
+    with pytest.raises(OfficialTidalLyricsError):
         router.lookup(_context(), requested_mode="prefer_synced", health_state=health)
     assert router.lookup(_context(), requested_mode="prefer_synced", health_state=health) is None
     assert provider.calls == 1

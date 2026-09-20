@@ -16,7 +16,6 @@ from core.utils import prepare_input
 from db.queries import get_remote_track_mappings, get_tracks_for_bulk_download
 from lyrics.providers import (
     CachedTidalCatalogueResolver,
-    ExternalTidalLyricsTransport,
     LrclibProvider,
     LyricsProvider,
     LyricsProviderRouter,
@@ -38,7 +37,6 @@ from lyrics.source_settings import (
     LYRICS_SOURCE_LABELS,
     default_lyrics_source_settings,
     load_lyrics_source_settings,
-    parse_helper_command,
 )
 from ui.services.download_modes import normalize_download_mode
 from ui.services.lyrics_download_service import (
@@ -507,12 +505,6 @@ class BulkLyricsDownloadWorker(QThread):
                 on_rate_limit=lambda delay_s: self._execution_coordinator.record_rate_limit("tidal", delay_s),
             )
             access_token = access.access_token
-        elif transport_id == "external_helper":
-            command = parse_helper_command(str(tidal_settings.get("helper_command") or ""))
-            if not command:
-                return None
-            transport = ExternalTidalLyricsTransport(command)
-            access_token = None
         else:
             return None
         mapping_db = sqlite3.connect(self.db_path, timeout=15.0)

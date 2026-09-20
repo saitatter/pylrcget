@@ -59,8 +59,6 @@ from .tidal_auth import (
 from .tidal_cache import CachedTidalCatalogueResolver
 from .tidal_provider import TidalCatalogueResolver, TidalProvider
 from .tidal_transport import (
-    ExternalTidalHelperError,
-    ExternalTidalLyricsTransport,
     OfficialTidalLyricsError,
     OfficialTidalLyricsTransport,
     TidalLyricsPayload,
@@ -74,8 +72,6 @@ __all__ = [
     "REJECT",
     "CachedTidalCatalogueResolver",
     "DownloadMode",
-    "ExternalTidalHelperError",
-    "ExternalTidalLyricsTransport",
     "KeyringTidalTokenStore",
     "LookupKey",
     "LrclibProvider",

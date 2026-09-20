@@ -24,6 +24,7 @@ from PySide6.QtWidgets import (
     QPushButton,
     QScrollArea,
     QSpinBox,
+    QStackedWidget,
     QTabWidget,
     QTextEdit,
     QVBoxLayout,
@@ -34,11 +35,8 @@ from core.lyrics_sidecar import DEFAULT_LYRICS_FILE_PATTERN
 from db.database import get_config, get_directories, set_config, set_directories
 from library.scan_library import preview_audio_path_exclusions
 from lyrics.providers import (
-    ExternalTidalHelperError,
-    ExternalTidalLyricsTransport,
     TidalAuthenticationError,
     TidalOAuthSession,
-    TrackLookupContext,
 )
 from lyrics.source_settings import (
     LYRICS_SOURCE_IDS,
@@ -46,7 +44,6 @@ from lyrics.source_settings import (
     TIDAL_DEFAULT_REDIRECT_URI,
     load_lyrics_source_settings,
     merge_lyrics_source_settings,
-    parse_helper_command,
 )
 from ui.ai_sync_settings import (
     AI_SYNC_DEVICE_OPTIONS,
@@ -452,7 +449,6 @@ class MusicFoldersDialog(QDialog):
         )
         lrclib_hint.setWordWrap(True)
         lrclib_layout.addWidget(lrclib_hint, 1, 0, 1, 3)
-        lyrics_download_layout.addWidget(lrclib_box)
 
         sources_box = QGroupBox("Lyrics Sources")
         sources_layout = QGridLayout(sources_box)
@@ -476,28 +472,24 @@ class MusicFoldersDialog(QDialog):
         sources_layout.addWidget(sources_hint, 4, 0, 1, 3)
         lyrics_download_layout.addWidget(sources_box)
 
+        self.lrclib_box = lrclib_box
+
         tidal_box = QGroupBox("TIDAL")
         tidal_layout = QGridLayout(tidal_box)
         self.tidal_country_edit = QLineEdit()
         self.tidal_country_edit.setPlaceholderText("Auto")
         tidal_layout.addWidget(QLabel("Country"), 0, 0)
         tidal_layout.addWidget(self.tidal_country_edit, 0, 1)
-        self.tidal_transport_combo = QComboBox()
-        self.tidal_transport_combo.addItem("Official API", "official")
-        self.tidal_transport_combo.addItem("External helper", "external_helper")
-        self.tidal_transport_combo.addItem("Experimental internal", "experimental_internal")
-        tidal_layout.addWidget(QLabel("Lyrics transport"), 1, 0)
-        tidal_layout.addWidget(self.tidal_transport_combo, 1, 1)
         self.tidal_client_id_edit = QLineEdit()
         self.tidal_client_id_edit.setPlaceholderText("Client ID from developer.tidal.com")
         self.tidal_client_id_label = QLabel("Client ID")
-        tidal_layout.addWidget(self.tidal_client_id_label, 2, 0)
-        tidal_layout.addWidget(self.tidal_client_id_edit, 2, 1, 1, 2)
+        tidal_layout.addWidget(self.tidal_client_id_label, 1, 0)
+        tidal_layout.addWidget(self.tidal_client_id_edit, 1, 1, 1, 2)
         self.tidal_redirect_uri_edit = QLineEdit(TIDAL_DEFAULT_REDIRECT_URI)
         self.tidal_redirect_uri_edit.setPlaceholderText(TIDAL_DEFAULT_REDIRECT_URI)
         self.tidal_redirect_uri_label = QLabel("Redirect URI")
-        tidal_layout.addWidget(self.tidal_redirect_uri_label, 3, 0)
-        tidal_layout.addWidget(self.tidal_redirect_uri_edit, 3, 1, 1, 2)
+        tidal_layout.addWidget(self.tidal_redirect_uri_label, 2, 0)
+        tidal_layout.addWidget(self.tidal_redirect_uri_edit, 2, 1, 1, 2)
         self.tidal_connect_btn = QPushButton("Connect TIDAL")
         self.tidal_disconnect_btn = QPushButton("Disconnect")
         self.tidal_auth_status = QLabel("Not connected")
@@ -506,22 +498,25 @@ class MusicFoldersDialog(QDialog):
         auth_buttons.addWidget(self.tidal_connect_btn)
         auth_buttons.addWidget(self.tidal_disconnect_btn)
         auth_buttons.addWidget(self.tidal_auth_status, 1)
-        tidal_layout.addWidget(self.tidal_auth_widget, 4, 0, 1, 3)
-        self.tidal_helper_edit = QLineEdit()
-        self.tidal_helper_edit.setPlaceholderText("Optional helper executable or script command")
-        self.tidal_helper_browse_btn = QPushButton("Browse")
-        self.tidal_helper_label = QLabel("Helper command")
-        tidal_layout.addWidget(self.tidal_helper_label, 5, 0)
-        tidal_layout.addWidget(self.tidal_helper_edit, 5, 1)
-        tidal_layout.addWidget(self.tidal_helper_browse_btn, 5, 2)
-        self.tidal_test_btn = QPushButton("Test TIDAL helper")
-        tidal_layout.addWidget(self.tidal_test_btn, 6, 0, 1, 3)
+        tidal_layout.addWidget(self.tidal_auth_widget, 3, 0, 1, 3)
         self.tidal_hint_label = QLabel(
-            "Official API uses the native transport. The helper is only used when External helper is selected."
+            "TIDAL lyrics use the official API. Connect once with a TIDAL developer Client ID."
         )
         self.tidal_hint_label.setWordWrap(True)
-        tidal_layout.addWidget(self.tidal_hint_label, 7, 0, 1, 3)
-        lyrics_providers_layout.addWidget(tidal_box)
+        tidal_layout.addWidget(self.tidal_hint_label, 4, 0, 1, 3)
+        self.tidal_box = tidal_box
+
+        provider_selector_row = QHBoxLayout()
+        provider_selector_row.addWidget(QLabel("Provider settings"))
+        self.provider_settings_combo = QComboBox()
+        for provider_id in LYRICS_SOURCE_IDS:
+            self.provider_settings_combo.addItem(LYRICS_SOURCE_LABELS[provider_id], provider_id)
+        provider_selector_row.addWidget(self.provider_settings_combo, 1)
+        lyrics_providers_layout.addLayout(provider_selector_row)
+        self.provider_settings_stack = QStackedWidget()
+        self.provider_settings_stack.addWidget(self.lrclib_box)
+        self.provider_settings_stack.addWidget(self.tidal_box)
+        lyrics_providers_layout.addWidget(self.provider_settings_stack, 1)
         lyrics_providers_layout.addStretch(1)
 
         lyrics_download_layout.addStretch(1)
@@ -567,7 +562,7 @@ class MusicFoldersDialog(QDialog):
         self.output_dir_edit.textChanged.connect(self._update_pattern_preview)
         self.sidecar_format_combo.currentIndexChanged.connect(self._update_pattern_preview)
         self.download_mode_combo.currentIndexChanged.connect(self._update_download_mode_hint)
-        self.tidal_transport_combo.currentIndexChanged.connect(self._update_tidal_transport_fields)
+        self.provider_settings_combo.currentIndexChanged.connect(self.provider_settings_stack.setCurrentIndex)
         self.add_excluded_path_btn.clicked.connect(self._add_excluded_path)
         self.add_excluded_file_btn.clicked.connect(self._add_excluded_file)
         self.remove_excluded_path_btn.clicked.connect(self._remove_selected_excluded_path_lines)
@@ -579,8 +574,6 @@ class MusicFoldersDialog(QDialog):
         self.lyrics_source_down_btn.clicked.connect(lambda: self._move_lyrics_source(1))
         self.tidal_connect_btn.clicked.connect(self._connect_tidal)
         self.tidal_disconnect_btn.clicked.connect(self._disconnect_tidal)
-        self.tidal_helper_browse_btn.clicked.connect(self._browse_tidal_helper)
-        self.tidal_test_btn.clicked.connect(self._test_tidal_helper)
 
     def _load(self):
         directories = get_directories(self.app_state.db)
@@ -1077,47 +1070,9 @@ class MusicFoldersDialog(QDialog):
         tidal = settings.get("tidal", {})
         tidal = tidal if isinstance(tidal, dict) else {}
         self.tidal_country_edit.setText(str(tidal.get("country_code") or "Auto"))
-        transport_idx = self.tidal_transport_combo.findData(str(tidal.get("transport") or "official"))
-        self.tidal_transport_combo.setCurrentIndex(max(0, transport_idx))
         self.tidal_client_id_edit.setText(str(tidal.get("client_id") or ""))
         self.tidal_redirect_uri_edit.setText(str(tidal.get("redirect_uri") or TIDAL_DEFAULT_REDIRECT_URI))
-        self.tidal_helper_edit.setText(str(tidal.get("helper_command") or ""))
         self._update_tidal_auth_status()
-        self._update_tidal_transport_fields()
-
-    def _update_tidal_transport_fields(self) -> None:
-        transport = str(self.tidal_transport_combo.currentData() or "official")
-        is_official = transport == "official"
-        is_helper = transport == "external_helper"
-
-        for widget in (
-            self.tidal_client_id_label,
-            self.tidal_client_id_edit,
-            self.tidal_redirect_uri_label,
-            self.tidal_redirect_uri_edit,
-            self.tidal_auth_widget,
-        ):
-            widget.setVisible(is_official)
-        for widget in (
-            self.tidal_helper_label,
-            self.tidal_helper_edit,
-            self.tidal_helper_browse_btn,
-            self.tidal_test_btn,
-        ):
-            widget.setVisible(is_helper)
-
-        if is_official:
-            self.tidal_hint_label.setText(
-                "Official API uses the native transport. Connect once with a TIDAL developer Client ID."
-            )
-        elif is_helper:
-            self.tidal_hint_label.setText(
-                "The external helper must implement the configured TIDAL lyrics transport protocol."
-            )
-        else:
-            self.tidal_hint_label.setText(
-                "Experimental internal transport is not available in the current build."
-            )
 
     def _update_tidal_auth_status(self) -> None:
         client_id = self.tidal_client_id_edit.text().strip()
@@ -1149,10 +1104,9 @@ class MusicFoldersDialog(QDialog):
             "continue_when_plain_for_synced": self.lyrics_source_continue_plain_chk.isChecked(),
             "tidal": {
                 "country_code": self.tidal_country_edit.text().strip() or "Auto",
-                "transport": str(self.tidal_transport_combo.currentData() or "official"),
+                "transport": "official",
                 "client_id": self.tidal_client_id_edit.text().strip(),
                 "redirect_uri": self.tidal_redirect_uri_edit.text().strip() or TIDAL_DEFAULT_REDIRECT_URI,
-                "helper_command": self.tidal_helper_edit.text().strip(),
             },
         }
 
@@ -1164,11 +1118,6 @@ class MusicFoldersDialog(QDialog):
         item = self.lyrics_source_list.takeItem(row)
         self.lyrics_source_list.insertItem(target, item)
         self.lyrics_source_list.setCurrentRow(target)
-
-    def _browse_tidal_helper(self) -> None:
-        selected = self._pick_file("Select TIDAL helper", self.tidal_helper_edit.text().strip())
-        if selected:
-            self.tidal_helper_edit.setText(selected)
 
     def _connect_tidal(self) -> None:
         if self._tidal_login_worker is not None and self._tidal_login_worker.isRunning():
@@ -1210,35 +1159,3 @@ class MusicFoldersDialog(QDialog):
             return
         self.tidal_auth_status.setText("Not connected")
         QMessageBox.information(self, "TIDAL", "TIDAL credentials removed from the system keyring.")
-
-    def _test_tidal_helper(self) -> None:
-        command = parse_helper_command(self.tidal_helper_edit.text())
-        if not command:
-            QMessageBox.warning(self, "TIDAL helper", "Set a helper executable or command first.")
-            return
-        transport = ExternalTidalLyricsTransport(command, timeout_s=10.0)
-        test_track = TrackLookupContext(
-            track_id=None,
-            file_path="settings-test",
-            title="PyLrcGet helper test",
-            artists=("PyLrcGet",),
-            album=None,
-            album_artist=None,
-            duration_seconds=None,
-            track_number=None,
-            isrc=None,
-        )
-        try:
-            payload = transport.get_lyrics(
-                "settings-test",
-                track=test_track,
-                requested_mode="prefer_synced",
-            )
-        except (ExternalTidalHelperError, OSError, ValueError) as exc:
-            QMessageBox.warning(self, "TIDAL helper", f"Helper test failed: {exc}")
-            return
-        if payload is None:
-            QMessageBox.information(self, "TIDAL helper", "Helper protocol is valid; it returned no lyrics for the test track.")
-            return
-        result_type = "synced" if payload.synced_lyrics else "plain"
-        QMessageBox.information(self, "TIDAL helper", f"Helper protocol is valid and returned {result_type} lyrics.")

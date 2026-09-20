@@ -7,7 +7,7 @@ import requests
 from core.lrclib_client import LrcLibError
 
 from .tidal import TidalCatalogueError
-from .tidal_transport import ExternalTidalHelperError, OfficialTidalLyricsError
+from .tidal_transport import OfficialTidalLyricsError
 
 
 class ProviderErrorKind(str, Enum):
@@ -47,8 +47,6 @@ def classify_provider_error(error: Exception) -> ProviderErrorKind:
         return error.kind
     if error.__class__.__name__ == "LyricsMatchCancelled":
         return ProviderErrorKind.CANCELLED
-    if isinstance(error, ExternalTidalHelperError):
-        return ProviderErrorKind.FATAL
     if isinstance(error, OfficialTidalLyricsError):
         if error.status_code is not None:
             return _classify_http_status(error.status_code)

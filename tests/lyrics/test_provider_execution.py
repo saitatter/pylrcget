@@ -15,7 +15,6 @@ from lyrics.providers import (
 def test_provider_policies_are_conservative_and_lrclib_keeps_current_limit():
     assert get_provider_execution_policy("lrclib").max_concurrency == 4
     assert get_provider_execution_policy("tidal").max_concurrency == 2
-    assert get_provider_execution_policy("external").max_concurrency == 1
 
 
 def test_unknown_provider_defaults_to_single_worker():

@@ -15,9 +15,8 @@ TIDAL is split into three boundaries:
   preferring ISRC and falling back to confident metadata matching.
 - `TidalOAuthSession` performs OAuth 2.1 + PKCE and stores refreshable tokens in
   the OS keyring.
-- `TidalLyricsTransport` retrieves lyrics after resolution. The native
-  implementation requests the official track `lyrics` relationship; the
-  versioned external helper protocol remains optional.
+- `TidalLyricsTransport` retrieves lyrics after resolution. The implementation
+  requests the official track `lyrics` relationship.
 
 The `TidalProvider` adapter joins those boundaries and returns the same
 provider-neutral result shape as LRCLIB. Persistence, sidecar export,
@@ -50,7 +49,7 @@ Deterministic fixtures cover:
 
 The router accepts a synced result immediately, keeps a plain result as a
 fallback for synced-preferred mode, and preserves the existing Synced only and
-Plain only semantics. Fatal helper/auth/configuration failures can disable a
+Plain only semantics. Fatal authentication/configuration failures can disable a
 provider for the current batch; 429, timeout, and 5xx conditions remain
 transient and are not cached as permanent failures.
 
@@ -63,9 +62,7 @@ Catalogue and provider tests verify that:
 - nested artist/album relationships are normalized;
 - low-confidence candidates are rejected;
 - the resolved remote ID is passed to the lyrics transport;
-- plain and synced helper payloads become provider-neutral results;
-- helper cancellation, timeout, non-zero exit, invalid JSON, and output-size
-  limits are handled safely.
+- plain and synced official payloads become provider-neutral results.
 
 No live TIDAL or LRCLIB test is run by the suite, so public services are not
 stress-tested and no credentials are required for CI.
@@ -112,13 +109,12 @@ does not call undocumented internal endpoints.
 
 ## Release recommendation
 
-Keep the multi-provider architecture and native OAuth/API transport. Keep the
-experimental internal transport disabled. The external helper remains an
-optional fallback. Do not persist raw credentials in PyLrcGet settings; the
+Keep the multi-provider architecture and native OAuth/API transport. Do not
+persist raw credentials in PyLrcGet settings; the
 refreshable session uses the operating-system keyring.
 
 Packaging impact: the small `keyring` dependency was added for secure token
-storage. No TIDAL SDK, native library, or bundled helper was added.
+storage. No TIDAL SDK or native library was added.
 
 ## Future-provider notes
 

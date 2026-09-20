@@ -22,7 +22,6 @@ class ProviderExecutionPolicy:
 _DEFAULT_POLICIES: dict[str, ProviderExecutionPolicy] = {
     "lrclib": ProviderExecutionPolicy(max_concurrency=4),
     "tidal": ProviderExecutionPolicy(max_concurrency=2, min_request_interval=0.1),
-    "external": ProviderExecutionPolicy(max_concurrency=1),
 }
 
 

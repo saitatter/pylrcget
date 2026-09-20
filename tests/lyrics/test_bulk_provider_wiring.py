@@ -13,8 +13,7 @@ def test_bulk_worker_builds_router_in_configured_provider_priority():
         "enabled": {"lrclib": True, "tidal": True},
         "tidal": {
             "country_code": "RO",
-            "transport": "external_helper",
-            "helper_command": "python helper.py",
+            "transport": "official",
         },
     }
     tidal = Mock()
@@ -46,8 +45,7 @@ def test_bulk_worker_never_constructs_disabled_lrclib_provider():
         "enabled": {"lrclib": False, "tidal": True},
         "tidal": {
             "country_code": "RO",
-            "transport": "external_helper",
-            "helper_command": "python helper.py",
+            "transport": "official",
         },
     }
     tidal = Mock()

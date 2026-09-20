@@ -29,7 +29,6 @@ from db.models import Config, Track
 from lyrics.provenance import normalize_lyrics_source
 from lyrics.providers import (
     CachedTidalCatalogueResolver,
-    ExternalTidalLyricsTransport,
     LrclibProvider,
     LyricsProvider,
     LyricsProviderRouter,
@@ -40,7 +39,7 @@ from lyrics.providers import (
     TidalProvider,
 )
 from lyrics.providers.contracts import LyricsProviderResult, TrackLookupContext
-from lyrics.source_settings import load_lyrics_source_settings, parse_helper_command
+from lyrics.source_settings import load_lyrics_source_settings
 from ui.services.download_modes import normalize_download_mode
 from ui.services.lyrics_match_retry import (
     build_retry_search_queries,
@@ -511,10 +510,6 @@ def _build_single_track_providers(
                         access_token,
                         country_code=str(tidal_settings.get("country_code") or "Auto"),
                     )
-        elif transport_id == "external_helper":
-            command = parse_helper_command(str(tidal_settings.get("helper_command") or ""))
-            if command:
-                transport = ExternalTidalLyricsTransport(command)
         if transport is not None:
             client = TidalCatalogueClient(
                 access_token=access_token,

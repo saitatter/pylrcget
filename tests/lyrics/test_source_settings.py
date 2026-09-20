@@ -1,12 +1,10 @@
 from __future__ import annotations
 
 import json
-import sys
 
 from lyrics.source_settings import (
     load_lyrics_source_settings,
     merge_lyrics_source_settings,
-    parse_helper_command,
 )
 
 
@@ -20,7 +18,6 @@ def test_source_settings_preserve_lrclib_default_and_disable_new_providers():
         "transport": "official",
         "client_id": "",
         "redirect_uri": "http://127.0.0.1:8765/callback",
-        "helper_command": "",
     }
 
 
@@ -44,7 +41,6 @@ def test_source_settings_normalize_priority_country_and_transport():
         "transport": "official",
         "client_id": "",
         "redirect_uri": "http://127.0.0.1:8765/callback",
-        "helper_command": "",
     }
 
 
@@ -59,7 +55,7 @@ def test_source_settings_merge_preserves_unrelated_ui_state():
     assert state["lyrics_sources"]["enabled"]["tidal"] is True
 
 
-def test_source_settings_migrate_legacy_external_helper_into_tidal_settings():
+def test_source_settings_drop_removed_external_helper_configuration():
     settings = load_lyrics_source_settings(
         json.dumps(
             {
@@ -67,6 +63,7 @@ def test_source_settings_migrate_legacy_external_helper_into_tidal_settings():
                     "priority": ["external", "lrclib"],
                     "enabled": {"external": True, "lrclib": True},
                     "external": {"helper_command": "python tidal_helper.py"},
+                    "tidal": {"transport": "external_helper", "helper_command": "python tidal_helper.py"},
                 }
             }
         )
@@ -74,19 +71,6 @@ def test_source_settings_migrate_legacy_external_helper_into_tidal_settings():
 
     assert settings["priority"] == ["lrclib", "tidal"]
     assert settings["enabled"] == {"lrclib": True, "tidal": False}
-    assert settings["tidal"]["helper_command"] == "python tidal_helper.py"
+    assert settings["tidal"]["transport"] == "official"
+    assert "helper_command" not in settings["tidal"]
     assert "external" not in settings
-
-
-def test_parse_helper_command_preserves_windows_argv_without_shell_expansion():
-    assert parse_helper_command('python "C:\\Program Files\\helper.py" --mode tidal') == (
-        "python",
-        "C:\\Program Files\\helper.py",
-        "--mode",
-        "tidal",
-    )
-    assert parse_helper_command('python "unterminated') == ()
-    assert parse_helper_command("C:\\Tools\\tidal_helper.py") == (
-        sys.executable,
-        "C:\\Tools\\tidal_helper.py",
-    )

@@ -12,7 +12,7 @@ class _FakeTidalTransport:
         return TidalLyricsPayload(
             plain_lyrics="plain",
             synced_lyrics="[00:01.00]synced",
-            source="external",
+            source="official",
         )
 
 
@@ -24,7 +24,7 @@ def test_tidal_transport_contract_keeps_payload_provider_neutral():
     assert payload is not None
     assert payload.plain_lyrics == "plain"
     assert payload.synced_lyrics == "[00:01.00]synced"
-    assert payload.source == "external"
+    assert payload.source == "official"
 
 
 def test_tidal_transport_receives_cancellation_event():

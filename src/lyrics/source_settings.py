@@ -2,8 +2,6 @@ from __future__ import annotations
 
 import json
 import re
-import shlex
-import sys
 from collections.abc import Mapping
 
 LYRICS_SOURCE_IDS: tuple[str, ...] = ("lrclib", "tidal")
@@ -11,7 +9,6 @@ LYRICS_SOURCE_LABELS: dict[str, str] = {
     "lrclib": "LRCLIB",
     "tidal": "TIDAL",
 }
-_TIDAL_TRANSPORTS = {"official", "external_helper", "experimental_internal"}
 _COUNTRY_CODE_RE = re.compile(r"^[A-Za-z]{2}$")
 TIDAL_DEFAULT_REDIRECT_URI = "http://127.0.0.1:8765/callback"
 
@@ -26,7 +23,6 @@ def default_lyrics_source_settings() -> dict[str, object]:
             "transport": "official",
             "client_id": "",
             "redirect_uri": TIDAL_DEFAULT_REDIRECT_URI,
-            "helper_command": "",
         },
     }
 
@@ -70,17 +66,8 @@ def normalize_lyrics_source_settings(raw: Mapping[str, object] | None) -> dict[s
         country_code = "Auto"
     else:
         country_code = country_code.upper()
-    transport = str(raw_tidal.get("transport") or "official").strip().casefold()
-    if transport not in _TIDAL_TRANSPORTS:
-        transport = "official"
     client_id = str(raw_tidal.get("client_id") or "").strip()
     redirect_uri = str(raw_tidal.get("redirect_uri") or TIDAL_DEFAULT_REDIRECT_URI).strip()
-
-    raw_external = raw.get("external")
-    raw_external = raw_external if isinstance(raw_external, Mapping) else {}
-    helper_command = str(
-        raw_tidal.get("helper_command") or raw_external.get("helper_command") or ""
-    ).strip()
 
     return {
         "priority": priority,
@@ -91,10 +78,9 @@ def normalize_lyrics_source_settings(raw: Mapping[str, object] | None) -> dict[s
         ),
         "tidal": {
             "country_code": country_code,
-            "transport": transport,
+            "transport": "official",
             "client_id": client_id,
             "redirect_uri": redirect_uri,
-            "helper_command": helper_command,
         },
     }
 
@@ -112,27 +98,6 @@ def merge_lyrics_source_settings(
     normalized = normalize_lyrics_source_settings(settings)
     state["lyrics_sources"] = normalized
     return json.dumps(state, ensure_ascii=True, separators=(",", ":"))
-
-
-def parse_helper_command(value: str | None) -> tuple[str, ...]:
-    """Parse a configured helper command into argv without invoking a shell."""
-
-    command = str(value or "").strip()
-    if not command:
-        return ()
-    try:
-        parts = shlex.split(command, posix=False)
-    except ValueError:
-        return ()
-    normalized: list[str] = []
-    for part in parts:
-        if len(part) >= 2 and part[0] == part[-1] and part[0] in {'"', "'"}:
-            part = part[1:-1]
-        if part:
-            normalized.append(part)
-    if normalized and normalized[0].casefold().endswith(".py"):
-        return (sys.executable, *normalized)
-    return tuple(normalized)
 
 
 def _coerce_bool(value: object, default: bool) -> bool:
