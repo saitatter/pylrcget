@@ -444,6 +444,9 @@ class BulkLyricsDownloadWorker(QThread):
                 requested_mode=self.download_mode,
                 health_state=self._provider_health,
                 execution_coordinator=self._execution_coordinator,
+                continue_when_plain_for_synced=bool(
+                    self._lyrics_source_settings.get("continue_when_plain_for_synced", True)
+                ),
             )
             self._lookup_result_cache.put(lookup_key, match)
             return _DownloadFetchResult(job=job, match=match)

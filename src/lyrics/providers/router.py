@@ -34,6 +34,8 @@ class LyricsResultSelector:
         self,
         candidate: LyricsProviderResult,
         requested_mode: DownloadMode,
+        *,
+        continue_when_plain_for_synced: bool = True,
     ) -> SelectionDecision:
         has_plain = bool((candidate.plain_lyrics or "").strip())
         has_synced = bool((candidate.synced_lyrics or "").strip())
@@ -49,6 +51,8 @@ class LyricsResultSelector:
             return SelectionDecision(ACCEPT_FINAL, candidate)
 
         if has_synced:
+            return SelectionDecision(ACCEPT_FINAL, candidate)
+        if not continue_when_plain_for_synced:
             return SelectionDecision(ACCEPT_FINAL, candidate)
         return SelectionDecision(KEEP_AS_FALLBACK, candidate)
 
@@ -67,6 +71,7 @@ class LyricsProviderRouter:
         cancel_event: threading.Event | None = None,
         health_state: ProviderHealthState | None = None,
         execution_coordinator: ProviderExecutionCoordinator | None = None,
+        continue_when_plain_for_synced: bool = True,
     ) -> LyricsProviderResult | None:
         selector = LyricsResultSelector()
         fallback: LyricsProviderResult | None = None
@@ -108,7 +113,11 @@ class LyricsProviderRouter:
             if candidate is None:
                 continue
 
-            decision = selector.consider(candidate, requested_mode)
+            decision = selector.consider(
+                candidate,
+                requested_mode,
+                continue_when_plain_for_synced=continue_when_plain_for_synced,
+            )
             if decision.action == ACCEPT_FINAL:
                 return decision.candidate
             if decision.action == KEEP_AS_FALLBACK and fallback is None:

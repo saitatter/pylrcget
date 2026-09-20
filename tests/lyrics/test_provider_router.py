@@ -81,6 +81,19 @@ def test_selector_keeps_current_download_mode_semantics(mode, result, action):
     assert decision.candidate is result
 
 
+def test_selector_can_stop_after_plain_result_when_fallback_is_disabled():
+    result = _result("fake", plain="plain")
+
+    decision = LyricsResultSelector().consider(
+        result,
+        "prefer_synced",
+        continue_when_plain_for_synced=False,
+    )
+
+    assert decision.action == ACCEPT_FINAL
+    assert decision.candidate is result
+
+
 def test_router_prefers_later_synced_result_over_earlier_plain_fallback():
     first = _FakeProvider(_result("first", plain="plain"))
     second = _FakeProvider(_result("second", synced="[00:01.00]synced"))

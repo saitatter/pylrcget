@@ -28,6 +28,7 @@ from db.database import (
 from db.models import Config, Track
 from lyrics.provenance import normalize_lyrics_source
 from lyrics.providers.contracts import LyricsProviderResult, TrackLookupContext
+from lyrics.source_settings import load_lyrics_source_settings
 from ui.services.download_modes import normalize_download_mode
 from ui.services.lyrics_match_retry import (
     build_retry_search_queries,
@@ -424,7 +425,14 @@ def download_track_lyrics(
             isrc=track.isrc,
             instrumental=track.instrumental,
         )
-        match = router.lookup(lookup_context, requested_mode=mode)
+        source_settings = load_lyrics_source_settings(getattr(config, "ui_state_json", ""))
+        match = router.lookup(
+            lookup_context,
+            requested_mode=mode,
+            continue_when_plain_for_synced=bool(
+                source_settings.get("continue_when_plain_for_synced", True)
+            ),
+        )
         if match is None:
             return False, "No lyrics found on LRCLIB for this track.", track_id, title_for_ui
         ok, msg, _track = apply_lyrics_match_to_track(
