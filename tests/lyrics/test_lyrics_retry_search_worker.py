@@ -29,6 +29,25 @@ class LyricsRetrySearchWorkerTests(unittest.TestCase):
     def setUpClass(cls):
         cls._app = qt_app()
 
+    def test_disabled_lrclib_provider_never_opens_database_or_searches(self):
+        worker = LyricsRetrySearchWorker(
+            "library.sqlite",
+            [12],
+            "https://lrclib.net/api",
+            lrclib_enabled=False,
+        )
+        emitted: list[tuple[list, str]] = []
+        worker.finishedSearch.connect(lambda candidates, error: emitted.append((candidates, error)))
+
+        with patch("ui.workers.lyrics_retry_search_worker.sqlite3.connect") as connect_mock, patch(
+            "ui.workers.lyrics_retry_search_worker.LrcLibAPI"
+        ) as api_cls:
+            worker.run()
+
+        self.assertEqual(emitted, [([], "LRCLIB provider is disabled in the provider matrix.")])
+        connect_mock.assert_not_called()
+        api_cls.assert_not_called()
+
     def test_continues_after_one_relaxed_query_fails(self):
         track = SimpleNamespace(
             id=12,

@@ -40,12 +40,14 @@ class LyricsRetrySearchWorker(QThread):
         track_ids: list[int],
         lrclib_instance: str,
         *,
+        lrclib_enabled: bool = True,
         parent: QObject | None = None,
     ) -> None:
         super().__init__(parent)
         self.db_path = db_path
         self.track_ids = [int(track_id) for track_id in track_ids]
         self.lrclib_instance = lrclib_instance
+        self.lrclib_enabled = bool(lrclib_enabled)
         self._thread_local = threading.local()
 
     def run(self) -> None:
@@ -55,6 +57,9 @@ class LyricsRetrySearchWorker(QThread):
         completed = 0
         db = None
         try:
+            if not self.lrclib_enabled:
+                self.finishedSearch.emit([], "LRCLIB provider is disabled in the provider matrix.")
+                return
             db = sqlite3.connect(self.db_path, timeout=15.0)
             db.row_factory = sqlite3.Row
 

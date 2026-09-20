@@ -16,6 +16,7 @@ from db.queries import (
     get_track_ids_for_download_mode,
     record_download_history_batch,
 )
+from lyrics.source_settings import load_lyrics_source_settings
 from ui.dialogs.batch_lyrics_match_dialog import BatchLyricsMatchDialog
 from ui.services.download_modes import download_mode_label, no_missing_tracks_message
 from ui.services.feedback import notify_user
@@ -226,7 +227,11 @@ class LyricsDownloadController(QObject):
         review_candidates = [candidate for candidate in candidates if int(candidate.score) < 100]
         show_retry_failed = getattr(self._overlay, "show_retry_failed", None)
         if callable(show_retry_failed):
-            retry_count = 0 if stats_dict.get("cancelled") else len(self._failed_download_track_ids)
+            retry_count = (
+                0
+                if stats_dict.get("cancelled") or not self._lrclib_enabled()
+                else len(self._failed_download_track_ids)
+            )
             show_retry_failed(retry_count)
         if stats_dict.get("cancelled"):
             notify_user(
@@ -290,6 +295,12 @@ class LyricsDownloadController(QObject):
             return
         if self._retry_search_worker is not None and self._retry_search_worker.isRunning():
             return
+        lrclib_enabled = self._lrclib_enabled()
+        if not lrclib_enabled:
+            msg = "Retry search is unavailable because LRCLIB is disabled in the provider matrix."
+            self._overlay.finish_batch(msg)
+            notify_user(self._app_state, msg, "info", show_status=self._show_status, status_timeout_ms=4000)
+            return
         config = get_config(self._app_state.db)
         lrclib_instance = self._normalize_lrclib_base(config.lrclib_instance or "https://lrclib.net")
 
@@ -299,11 +310,19 @@ class LyricsDownloadController(QObject):
             self._app_state.db_path,
             failed_ids,
             lrclib_instance,
+            lrclib_enabled=lrclib_enabled,
             parent=self,
         )
         self._retry_search_worker.progress.connect(self._on_retry_search_progress)
         self._retry_search_worker.finishedSearch.connect(self._on_retry_search_finished)
         self._retry_search_worker.start()
+
+    def _lrclib_enabled(self) -> bool:
+        row = self._app_state.db.execute("SELECT ui_state_json FROM config_data LIMIT 1").fetchone()
+        ui_state_json = row["ui_state_json"] if row is not None else ""
+        settings = load_lyrics_source_settings(ui_state_json)
+        enabled = settings.get("enabled")
+        return bool(enabled.get("lrclib", False)) if isinstance(enabled, dict) else False
 
     def _on_retry_search_progress(self, current: int, total: int, track_label: str, status: str) -> None:
         self._overlay.update_progress(current, total, track_label, status)

@@ -18,6 +18,10 @@ from db.queries import (
     set_config,
     update_track_plain_lyrics,
 )
+from lyrics.source_settings import (
+    default_lyrics_source_settings,
+    merge_lyrics_source_settings,
+)
 from tests import test_support as _test_support  # noqa: F401
 from tests.test_support import make_fs_track, qt_app, touch_text
 from ui.controllers.lyrics_download_controller import LyricsDownloadController
@@ -321,6 +325,44 @@ class LyricsDownloadControllerTests(unittest.TestCase):
                 self.assertEqual(overlay.retry_failed_counts[-1], 1)
                 self.assertEqual(download_states[41], "error")
                 self.assertIn(("Finished lyrics download. Success: 1, Failed: 1.", "warning"), notifications)
+            finally:
+                db.close()
+
+    def test_failed_batch_hides_relaxed_retry_when_lrclib_is_disabled(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db = initialize_database(tmp)
+            try:
+                settings = default_lyrics_source_settings()
+                settings["enabled"] = {"lrclib": False, "tidal": True, "external": False}
+                config = get_config(db)
+                db.execute(
+                    "UPDATE config_data SET ui_state_json = ? WHERE id = 1",
+                    (merge_lyrics_source_settings(config.ui_state_json, settings),),
+                )
+                db.commit()
+                app_state = SimpleNamespace(db=db, db_path=str(Path(tmp) / "pylrcget.db.sqlite3"))
+                overlay = _FakeOverlay()
+                controller, _, notifications, _, _ = self._make_controller(app_state, overlay)
+
+                with (
+                    patch("ui.controllers.lyrics_download_controller.BulkLyricsDownloadWorker", _FakeWorker),
+                    patch("ui.controllers.lyrics_download_controller.QTimer.singleShot"),
+                ):
+                    controller.start_downloads([43], mode_override="prefer_synced")
+                    worker = _FakeWorker.instances[0]
+                    worker.itemFinished.emit(43, False, "Artist - Missing", "No lyrics found on configured providers.")
+                    worker.finishedBatch.emit(
+                        True,
+                        "Finished lyrics download. Success: 0, Failed: 1.",
+                        {"ok": 0, "failed": 1, "cancelled": False},
+                    )
+
+                self.assertEqual(overlay.retry_failed_counts[-1], 0)
+                self.assertFalse(any("Retry search" in message for message, _level in notifications))
+                with patch("ui.controllers.lyrics_download_controller.LyricsRetrySearchWorker") as retry_worker:
+                    controller._failed_download_track_ids = [43]
+                    controller._retry_failed_downloads_with_search()
+                    retry_worker.assert_not_called()
             finally:
                 db.close()
 

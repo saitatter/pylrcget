@@ -37,6 +37,23 @@ def test_bulk_worker_skips_tidal_when_transport_is_not_implemented():
     assert [provider.provider_id for provider in providers] == ["lrclib"]
 
 
+def test_bulk_worker_never_constructs_disabled_lrclib_provider():
+    worker = BulkLyricsDownloadWorker("unused.sqlite", [], "https://lrclib.net/api")
+    worker._lyrics_source_settings = {
+        "priority": ["lrclib", "tidal"],
+        "enabled": {"lrclib": False, "tidal": True, "external": False},
+        "tidal": {"country_code": "RO", "transport": "external_helper"},
+        "external": {"helper_command": "python helper.py"},
+    }
+    tidal = Mock()
+    tidal.provider_id = "tidal"
+    worker._tidal_provider_for_current_thread = Mock(return_value=tidal)
+
+    providers = worker._providers_for_current_thread(Mock(), lambda _message: None)
+
+    assert [provider.provider_id for provider in providers] == ["tidal"]
+
+
 def test_bulk_worker_builds_native_tidal_provider_without_helper(tmp_path, monkeypatch):
     worker = BulkLyricsDownloadWorker(str(tmp_path / "tidal.sqlite"), [], "https://lrclib.net/api")
     worker._lyrics_source_settings = {
