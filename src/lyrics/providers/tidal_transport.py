@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 import threading
 import time
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Protocol
+
+import requests
 
 from .contracts import DownloadMode, TrackLookupContext
 
@@ -34,6 +37,85 @@ class TidalLyricsTransport(Protocol):
 
 class ExternalTidalHelperError(RuntimeError):
     """Raised when an external TIDAL lyrics helper cannot be used safely."""
+
+
+class OfficialTidalLyricsError(RuntimeError):
+    """Raised when the official TIDAL lyrics relation cannot be read."""
+
+
+class OfficialTidalLyricsTransport:
+    """Read lyrics exposed by the official TIDAL catalogue API.
+
+    TIDAL exposes lyrics as an optional relationship on the track resource.
+    The public API may return an empty relationship for a track; that is a
+    clean miss and lets the provider router continue to the next source.
+    """
+
+    provider_id = "tidal"
+    base_url = "https://openapi.tidal.com/v2"
+
+    def __init__(
+        self,
+        access_token: str,
+        *,
+        country_code: str | None = None,
+        session: requests.Session | None = None,
+        timeout_s: float = 10.0,
+        on_rate_limit: Callable[[float], None] | None = None,
+    ) -> None:
+        self.access_token = str(access_token).strip()
+        if not self.access_token:
+            raise ValueError("TIDAL access token is required")
+        self.country_code = country_code
+        self.session = session or requests.Session()
+        self.timeout_s = max(0.1, float(timeout_s))
+        self.on_rate_limit = on_rate_limit
+
+    def get_lyrics(
+        self,
+        tidal_track_id: str,
+        *,
+        cancel_event: threading.Event | None = None,
+        track: TrackLookupContext | None = None,
+        requested_mode: DownloadMode = "prefer_synced",
+    ) -> TidalLyricsPayload | None:
+        del track, requested_mode
+        if cancel_event is not None and cancel_event.is_set():
+            return None
+        params: dict[str, object] = {"include": "lyrics"}
+        country = (self.country_code or "").strip()
+        if country and country.casefold() != "auto":
+            params["countryCode"] = country.upper()
+        try:
+            response = self.session.get(
+                f"{self.base_url}/tracks/{tidal_track_id}",
+                params=params,
+                headers={
+                    "Accept": "application/vnd.api+json",
+                    "Authorization": f"Bearer {self.access_token}",
+                },
+                timeout=self.timeout_s,
+            )
+        except requests.RequestException as exc:
+            raise OfficialTidalLyricsError(f"TIDAL lyrics request failed: {exc}") from exc
+        if response.status_code == 404:
+            return None
+        if response.status_code == 429:
+            retry_after = _retry_after_seconds(response)
+            if retry_after is not None and self.on_rate_limit is not None:
+                self.on_rate_limit(retry_after)
+        if response.status_code >= 400:
+            detail = (response.text or "")[:300]
+            raise OfficialTidalLyricsError(
+                f"TIDAL lyrics request failed ({response.status_code}): {detail or 'HTTP error'}"
+            )
+        try:
+            payload = response.json()
+        except ValueError as exc:
+            raise OfficialTidalLyricsError("TIDAL lyrics response was not valid JSON") from exc
+        if not isinstance(payload, dict):
+            raise OfficialTidalLyricsError("TIDAL lyrics response was not a JSON object")
+        return _parse_official_lyrics_payload(payload)
 
 
 class ExternalTidalLyricsTransport:
@@ -237,3 +319,78 @@ def _optional_text(value: object) -> str | None:
     if not isinstance(value, str):
         raise ExternalTidalHelperError("TIDAL lyrics helper lyrics fields must be strings or null")
     return value.strip() or None
+
+
+def _parse_official_lyrics_payload(payload: dict[str, object]) -> TidalLyricsPayload | None:
+    """Accept the JSON:API relationship shape and tolerate future field names."""
+
+    objects: list[dict[str, object]] = []
+    data = payload.get("data")
+    if isinstance(data, dict):
+        objects.append(data)
+        relationships = data.get("relationships")
+        if isinstance(relationships, dict):
+            lyrics_relationship = relationships.get("lyrics")
+            if isinstance(lyrics_relationship, dict):
+                relation_data = lyrics_relationship.get("data")
+                if isinstance(relation_data, dict):
+                    objects.append(relation_data)
+                elif isinstance(relation_data, list):
+                    objects.extend(item for item in relation_data if isinstance(item, dict))
+    included = payload.get("included")
+    if isinstance(included, list):
+        objects.extend(item for item in included if isinstance(item, dict))
+
+    plain: str | None = None
+    synced: str | None = None
+    for item in objects:
+        attributes = item.get("attributes")
+        if not isinstance(attributes, dict):
+            attributes = item
+        synced = synced or _first_text(
+            attributes,
+            "lrcText",
+            "lrc_text",
+            "syncedLyrics",
+            "synced_lyrics",
+            "subtitles",
+        )
+        plain = plain or _first_text(
+            attributes,
+            "plainText",
+            "plain_text",
+            "plainLyrics",
+            "plain_lyrics",
+        )
+        if plain is None:
+            generic = _first_text(attributes, "lyrics", "text")
+            if generic:
+                if _looks_synced(generic):
+                    synced = synced or generic
+                else:
+                    plain = generic
+    if not plain and not synced:
+        return None
+    return TidalLyricsPayload(plain_lyrics=plain, synced_lyrics=synced, source="official")
+
+
+def _first_text(attributes: dict[str, object], *keys: str) -> str | None:
+    for key in keys:
+        value = _optional_text(attributes.get(key))
+        if value:
+            return value
+    return None
+
+
+def _looks_synced(value: str) -> bool:
+    return bool(re.search(r"\[\d{1,2}:\d{2}(?:[.:]\d{1,3})?\]", value))
+
+
+def _retry_after_seconds(response: requests.Response) -> float | None:
+    value = response.headers.get("Retry-After")
+    if value is None:
+        return None
+    try:
+        return max(0.0, float(value))
+    except (TypeError, ValueError):
+        return None

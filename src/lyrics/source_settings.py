@@ -14,6 +14,7 @@ LYRICS_SOURCE_LABELS: dict[str, str] = {
 }
 _TIDAL_TRANSPORTS = {"official", "external_helper", "experimental_internal"}
 _COUNTRY_CODE_RE = re.compile(r"^[A-Za-z]{2}$")
+TIDAL_DEFAULT_REDIRECT_URI = "http://127.0.0.1:8765/callback"
 
 
 def default_lyrics_source_settings() -> dict[str, object]:
@@ -21,7 +22,12 @@ def default_lyrics_source_settings() -> dict[str, object]:
         "priority": list(LYRICS_SOURCE_IDS),
         "enabled": {"lrclib": True, "tidal": False, "external": False},
         "continue_when_plain_for_synced": True,
-        "tidal": {"country_code": "Auto", "transport": "external_helper"},
+        "tidal": {
+            "country_code": "Auto",
+            "transport": "official",
+            "client_id": "",
+            "redirect_uri": TIDAL_DEFAULT_REDIRECT_URI,
+        },
         "external": {"helper_command": ""},
     }
 
@@ -65,9 +71,11 @@ def normalize_lyrics_source_settings(raw: Mapping[str, object] | None) -> dict[s
         country_code = "Auto"
     else:
         country_code = country_code.upper()
-    transport = str(raw_tidal.get("transport") or "external_helper").strip().casefold()
+    transport = str(raw_tidal.get("transport") or "official").strip().casefold()
     if transport not in _TIDAL_TRANSPORTS:
-        transport = "external_helper"
+        transport = "official"
+    client_id = str(raw_tidal.get("client_id") or "").strip()
+    redirect_uri = str(raw_tidal.get("redirect_uri") or TIDAL_DEFAULT_REDIRECT_URI).strip()
 
     raw_external = raw.get("external")
     raw_external = raw_external if isinstance(raw_external, Mapping) else {}
@@ -80,7 +88,12 @@ def normalize_lyrics_source_settings(raw: Mapping[str, object] | None) -> dict[s
             raw.get("continue_when_plain_for_synced"),
             bool(defaults["continue_when_plain_for_synced"]),
         ),
-        "tidal": {"country_code": country_code, "transport": transport},
+        "tidal": {
+            "country_code": country_code,
+            "transport": transport,
+            "client_id": client_id,
+            "redirect_uri": redirect_uri,
+        },
         "external": {"helper_command": helper_command},
     }
 

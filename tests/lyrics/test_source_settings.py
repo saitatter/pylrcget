@@ -15,7 +15,12 @@ def test_source_settings_preserve_lrclib_default_and_disable_new_providers():
 
     assert settings["priority"] == ["lrclib", "tidal", "external"]
     assert settings["enabled"] == {"lrclib": True, "tidal": False, "external": False}
-    assert settings["tidal"] == {"country_code": "Auto", "transport": "external_helper"}
+    assert settings["tidal"] == {
+        "country_code": "Auto",
+        "transport": "official",
+        "client_id": "",
+        "redirect_uri": "http://127.0.0.1:8765/callback",
+    }
 
 
 def test_source_settings_normalize_priority_country_and_transport():
@@ -33,7 +38,12 @@ def test_source_settings_normalize_priority_country_and_transport():
 
     assert settings["priority"] == ["tidal", "lrclib", "external"]
     assert settings["enabled"]["tidal"] is True
-    assert settings["tidal"] == {"country_code": "RO", "transport": "external_helper"}
+    assert settings["tidal"] == {
+        "country_code": "RO",
+        "transport": "official",
+        "client_id": "",
+        "redirect_uri": "http://127.0.0.1:8765/callback",
+    }
 
 
 def test_source_settings_merge_preserves_unrelated_ui_state():

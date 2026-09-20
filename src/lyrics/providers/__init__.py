@@ -48,12 +48,21 @@ from .tidal import (
     TidalTrack,
     TidalTrackResolution,
 )
-from .tidal_auth import TidalAccessContext, TidalSessionProvider
+from .tidal_auth import (
+    KeyringTidalTokenStore,
+    TidalAccessContext,
+    TidalAuthenticationError,
+    TidalOAuthSession,
+    TidalSessionProvider,
+    TidalTokenStore,
+)
 from .tidal_cache import CachedTidalCatalogueResolver
 from .tidal_provider import TidalCatalogueResolver, TidalProvider
 from .tidal_transport import (
     ExternalTidalHelperError,
     ExternalTidalLyricsTransport,
+    OfficialTidalLyricsError,
+    OfficialTidalLyricsTransport,
     TidalLyricsPayload,
     TidalLyricsTransport,
 )
@@ -67,6 +76,7 @@ __all__ = [
     "DownloadMode",
     "ExternalTidalHelperError",
     "ExternalTidalLyricsTransport",
+    "KeyringTidalTokenStore",
     "LookupKey",
     "LrclibProvider",
     "LyricsProvider",
@@ -75,6 +85,8 @@ __all__ = [
     "LyricsProviderRouter",
     "LyricsResultSelector",
     "MatchQuality",
+    "OfficialTidalLyricsError",
+    "OfficialTidalLyricsTransport",
     "ProviderError",
     "ProviderErrorKind",
     "ProviderExecutionCoordinator",
@@ -83,14 +95,17 @@ __all__ = [
     "ProviderLookupResultCache",
     "SelectionDecision",
     "TidalAccessContext",
+    "TidalAuthenticationError",
     "TidalCatalogueClient",
     "TidalCatalogueError",
     "TidalCatalogueNotFoundError",
     "TidalCatalogueResolver",
     "TidalLyricsPayload",
     "TidalLyricsTransport",
+    "TidalOAuthSession",
     "TidalProvider",
     "TidalSessionProvider",
+    "TidalTokenStore",
     "TidalTrack",
     "TidalTrackResolution",
     "TrackLookupContext",
