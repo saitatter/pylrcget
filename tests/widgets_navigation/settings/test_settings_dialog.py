@@ -177,7 +177,7 @@ class SettingsDialogTests(unittest.TestCase):
                     )
                     self.assertEqual(reloaded.lyrics_source_list.item(0).checkState(), Qt.Checked)
                     self.assertEqual(reloaded.tidal_country_edit.text(), "RO")
-                    self.assertEqual(reloaded.tidal_client_id_edit.text(), "test-client-id")
+                    self.assertEqual(reloaded.tidal_client_id_edit.text(), "vJElJOz4TVV3SBnC")
                     self.assertEqual(
                         reloaded.tidal_redirect_uri_edit.text(),
                         "http://127.0.0.1:8765/callback",
@@ -202,6 +202,8 @@ class SettingsDialogTests(unittest.TestCase):
                     dialog.provider_settings_combo.setCurrentIndex(1)
                     self.assertEqual(dialog.provider_settings_stack.currentIndex(), 1)
                     self.assertFalse(dialog.tidal_client_id_edit.isHidden())
+                    self.assertTrue(dialog.tidal_client_id_edit.isReadOnly())
+                    self.assertTrue(dialog.tidal_redirect_uri_edit.isReadOnly())
                 finally:
                     dialog.deleteLater()
             finally:

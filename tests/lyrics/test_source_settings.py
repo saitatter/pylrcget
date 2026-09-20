@@ -44,6 +44,24 @@ def test_source_settings_normalize_priority_country_and_transport():
     }
 
 
+def test_source_settings_keep_distributed_tidal_oauth_configuration_immutable():
+    settings = load_lyrics_source_settings(
+        json.dumps(
+            {
+                "lyrics_sources": {
+                    "tidal": {
+                        "client_id": "custom-client",
+                        "redirect_uri": "http://127.0.0.1:9000/callback",
+                    }
+                }
+            }
+        )
+    )
+
+    assert settings["tidal"]["client_id"] == "vJElJOz4TVV3SBnC"
+    assert settings["tidal"]["redirect_uri"] == "http://127.0.0.1:8765/callback"
+
+
 def test_source_settings_merge_preserves_unrelated_ui_state():
     merged = merge_lyrics_source_settings(
         json.dumps({"editor_auto_edit_on_add_line": True}),

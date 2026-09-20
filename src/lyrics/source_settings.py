@@ -67,8 +67,11 @@ def normalize_lyrics_source_settings(raw: Mapping[str, object] | None) -> dict[s
         country_code = "Auto"
     else:
         country_code = country_code.upper()
-    client_id = str(raw_tidal.get("client_id") or TIDAL_DEFAULT_CLIENT_ID).strip()
-    redirect_uri = str(raw_tidal.get("redirect_uri") or TIDAL_DEFAULT_REDIRECT_URI).strip()
+    # The distributed desktop app owns the registered OAuth client and its
+    # loopback callback. Keep these values immutable even when older settings
+    # contain a custom client configuration.
+    client_id = TIDAL_DEFAULT_CLIENT_ID
+    redirect_uri = TIDAL_DEFAULT_REDIRECT_URI
 
     return {
         "priority": priority,
