@@ -131,7 +131,7 @@ directly. Publishing to LRCLIB remains LRCLIB-specific.
 
 ## Verification
 
-The branch was verified with the complete pytest suite: **732 passed, 1
+The branch was verified with the complete pytest suite: **737 passed, 1
 warning, 5 subtests passed**. Ruff also passes. The only known test warning is
 the pre-existing optional TorchCodec/FFmpeg DLL warning from the local AI
 environment.
