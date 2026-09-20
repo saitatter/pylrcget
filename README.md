@@ -32,7 +32,7 @@ PyLrcGet goes beyond bulk lyric downloads and turns the app into a full desktop 
 - AI-powered auto-sync with lyrics-aligner for English and WhisperX fallback (see [AI Auto-Sync](#-ai-auto-sync))
 - Configurable download modes: `Prefer synced`, `Synced only`, `Plain only`
 - Bulk `Download missing lyrics` action based on the active download mode
-- Configurable multi-provider lyrics routing with an external TIDAL helper bridge (see [TIDAL #57](docs/MULTI_PROVIDER_TIDAL.md))
+- Configurable multi-provider lyrics routing with native TIDAL OAuth/API access and an optional helper fallback (see [TIDAL #57](docs/MULTI_PROVIDER_TIDAL.md))
 - Per-selection download overrides from the track context menu
 - Separate output format choices for sidecar files and embedded lyrics
 - Real-time synced lyrics editor with per-line snapping while audio is playing
