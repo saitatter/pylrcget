@@ -268,6 +268,24 @@ class SharedUiComponentTests(unittest.TestCase):
         finally:
             widget.deleteLater()
 
+    def test_player_seek_uses_stable_accessible_time_controls(self):
+        widget = PlayerBar(player=None)
+        try:
+            self.assertEqual(widget.lbl_time.width(), 40)
+            self.assertEqual(widget.lbl_dur.width(), 40)
+            self.assertEqual(widget.lbl_time.alignment(), Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+            self.assertEqual(widget.lbl_dur.alignment(), Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+            self.assertEqual(widget.slider.accessibleName(), "Track position")
+            self.assertEqual(widget.slider.focusPolicy(), Qt.FocusPolicy.StrongFocus)
+            self.assertGreaterEqual(widget.slider.minimumHeight(), 20)
+
+            widget.slider.setObjectName("PlayerSlider")
+            self.assertEqual(widget.slider._track_geometry()[3], 6.0)
+            widget.slider_volume.setObjectName("VolumeSlider")
+            self.assertEqual(widget.slider_volume._track_geometry()[3], 5.0)
+        finally:
+            widget.deleteLater()
+
     def test_track_action_buttons_track_individual_hover(self):
         table = QTableView()
         model = QStandardItemModel(1, 5)

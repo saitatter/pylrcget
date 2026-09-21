@@ -92,34 +92,45 @@ def _artwork_pixmap(title: str, artist: str | None, audio_path: str | None, size
 
 
 class SeekSlider(QSlider):
+    _SEEK_TRACK_HEIGHT = 6.0
+    _VOLUME_TRACK_HEIGHT = 5.0
+    _SEEK_HANDLE_SIZE = 14.0
+    _VOLUME_HANDLE_SIZE = 12.0
+
+    def _track_geometry(self) -> tuple[float, float, float, float]:
+        is_seek_slider = self.objectName() == "PlayerSlider"
+        handle_size = self._SEEK_HANDLE_SIZE if is_seek_slider else self._VOLUME_HANDLE_SIZE
+        groove_height = self._SEEK_TRACK_HEIGHT if is_seek_slider else self._VOLUME_TRACK_HEIGHT
+        track_left = handle_size / 2.0
+        track_width = max(1.0, self.width() - handle_size)
+        track_top = (self.height() - groove_height) / 2.0
+        return track_left, track_width, track_top, groove_height
+
     def paintEvent(self, event):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing, True)
 
-        groove_height = 7.0
-        handle_size = 12.0
+        is_seek_slider = self.objectName() == "PlayerSlider"
+        handle_size = self._SEEK_HANDLE_SIZE if is_seek_slider else self._VOLUME_HANDLE_SIZE
+        track_left, track_width, track_top, groove_height = self._track_geometry()
         radius = groove_height / 2.0
         value_range = max(1, self.maximum() - self.minimum())
         ratio = (self.value() - self.minimum()) / value_range if self.maximum() > self.minimum() else 0.0
 
-        track_left = handle_size / 2.0
-        track_width = max(1.0, self.width() - handle_size)
-        track_top = (self.height() - groove_height) / 2.0
         track_rect = QRectF(track_left, track_top, track_width, groove_height)
 
         fill_width = track_width * max(0.0, min(1.0, ratio))
         fill_rect = QRectF(track_left, track_top, fill_width, groove_height)
 
-        fill_gradient = QLinearGradient(track_rect.left(), track_rect.top(), track_rect.right(), track_rect.top())
-        fill_gradient.setColorAt(0.0, QColor(STYLE_TOKENS["color-slider-fill-start"]))
-        fill_gradient.setColorAt(1.0, QColor(STYLE_TOKENS["color-slider-fill-end"]))
-
         painter.setPen(Qt.PenStyle.NoPen)
-        painter.setBrush(QColor(STYLE_TOKENS["color-bg-pressed"]))
+        painter.setBrush(QColor(STYLE_TOKENS["color-bg-control"]))
         painter.drawRoundedRect(track_rect, radius, radius)
 
         if fill_width > 0:
-            painter.setBrush(fill_gradient)
+            # Keep the seek state visually calm and theme-consistent. The
+            # accent is intentionally solid so the progress/readability does
+            # not depend on the selected theme's decorative gradient.
+            painter.setBrush(QColor(STYLE_TOKENS["color-accent"]))
             painter.drawRoundedRect(fill_rect, radius, radius)
 
         handle_center_x = track_left + fill_width
@@ -129,11 +140,15 @@ class SeekSlider(QSlider):
             handle_size,
             handle_size,
         )
-        handle_color = (
-            QColor(STYLE_TOKENS["color-accent-alt"])
-            if self.underMouse() or self.isSliderDown()
-            else QColor(STYLE_TOKENS["color-accent"])
-        )
+        is_active = self.underMouse() or self.isSliderDown()
+        handle_color = QColor(STYLE_TOKENS["color-accent-alt"] if is_active else STYLE_TOKENS["color-accent"])
+
+        if self.hasFocus():
+            focus_rect = handle_rect.adjusted(-3.0, -3.0, 3.0, 3.0)
+            painter.setBrush(Qt.BrushStyle.NoBrush)
+            painter.setPen(QPen(QColor(STYLE_TOKENS["color-accent-alt"]), 2))
+            painter.drawEllipse(focus_rect)
+
         painter.setBrush(handle_color)
         painter.setPen(QPen(QColor(STYLE_TOKENS["color-slider-handle-border"]), 2))
         painter.drawEllipse(handle_rect)
@@ -141,11 +156,13 @@ class SeekSlider(QSlider):
 
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:
+            track_left, track_width, _track_top, _groove_height = self._track_geometry()
+            position = max(0.0, min(track_width, event.position().x() - track_left))
             value = QStyle.sliderValueFromPosition(
                 self.minimum(),
                 self.maximum(),
-                int(event.position().x()),
-                max(1, self.width()),
+                int(position),
+                max(1, int(track_width)),
             )
             self.setValue(value)
             self.sliderMoved.emit(value)
@@ -287,13 +304,25 @@ class PlayerBar(QWidget):
         self.lbl_time.setObjectName("TimeLabel")
         self.lbl_dur = QLabel("0:00")
         self.lbl_dur.setObjectName("TimeLabel")
+        for label, alignment in (
+            (self.lbl_time, Qt.AlignmentFlag.AlignLeft),
+            (self.lbl_dur, Qt.AlignmentFlag.AlignRight),
+        ):
+            label.setFixedWidth(40)
+            label.setAlignment(alignment | Qt.AlignmentFlag.AlignVCenter)
+            time_font = label.font()
+            time_font.setStyleHint(QFont.StyleHint.Monospace)
+            label.setFont(time_font)
 
         self.slider = SeekSlider(Qt.Orientation.Horizontal)
         self.slider.setObjectName("PlayerSlider")
+        self.slider.setAccessibleName("Track position")
+        self.slider.setToolTip("Track position")
         self.slider.setRange(0, 0)
         self.slider.setSingleStep(1000)
         self.slider.setPageStep(5000)
-        self.slider.setMinimumHeight(16)
+        self.slider.setMinimumHeight(20)
+        self.slider.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
 
         progress_row.addWidget(self.lbl_time)
         progress_row.addWidget(self.slider, 1)
@@ -372,7 +401,8 @@ class PlayerBar(QWidget):
         self.slider_volume.setRange(0, 100)
         self.slider_volume.setSingleStep(5)
         self.slider_volume.setPageStep(10)
-        self.slider_volume.setMinimumHeight(16)
+        self.slider_volume.setMinimumHeight(20)
+        self.slider_volume.setAccessibleName("Volume")
         self.slider_volume.setFixedWidth(114)
 
         self.lbl_volume_value = QLabel("70%")
