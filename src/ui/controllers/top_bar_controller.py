@@ -3,7 +3,7 @@ from __future__ import annotations
 from itertools import pairwise
 from typing import ClassVar
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QEvent, Qt
 from PySide6.QtWidgets import (
     QBoxLayout,
     QCheckBox,
@@ -338,7 +338,35 @@ class TopBarController(QWidget):
             self.chk_none,
             self.chk_unsaved,
         )
+        self._tab_cycle_widgets = (self.search_box, *filter_controls)
+        for control in self._tab_cycle_widgets:
+            control.installEventFilter(self)
         window.setTabOrder(self.search_box, filter_controls[0])
         for current, following in pairwise(filter_controls):
             window.setTabOrder(current, following)
         window.setTabOrder(filter_controls[-1], self.search_box)
+
+    def eventFilter(self, watched, event) -> bool:
+        if event.type() == QEvent.Type.KeyPress and event.key() in (
+            Qt.Key.Key_Tab,
+            Qt.Key.Key_Backtab,
+        ):
+            modifiers = event.modifiers()
+            if not modifiers & (
+                Qt.KeyboardModifier.ControlModifier
+                | Qt.KeyboardModifier.AltModifier
+                | Qt.KeyboardModifier.MetaModifier
+            ):
+                cycle = getattr(self, "_tab_cycle_widgets", ())
+                if watched in cycle:
+                    current_index = cycle.index(watched)
+                    backwards = event.key() == Qt.Key.Key_Backtab or bool(
+                        modifiers & Qt.KeyboardModifier.ShiftModifier
+                    )
+                    step = -1 if backwards else 1
+                    cycle[(current_index + step) % len(cycle)].setFocus(
+                        Qt.FocusReason.TabFocusReason
+                    )
+                    event.accept()
+                    return True
+        return super().eventFilter(watched, event)

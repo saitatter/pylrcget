@@ -151,6 +151,42 @@ class SharedUiComponentTests(unittest.TestCase):
             tabs.deleteLater()
             widget.deleteLater()
 
+    def test_top_bar_intercepts_tab_before_it_reaches_library_widgets(self):
+        def noop(*args, **kwargs):
+            return None
+
+        widget = TopBarController(
+            on_refresh=noop,
+            on_download_missing=noop,
+            on_export_library=noop,
+            on_open_settings=noop,
+            on_open_about=noop,
+            on_toggle_logs=noop,
+            on_toggle_hotkey_hints=noop,
+            on_schedule_search=noop,
+            on_filter_changed=noop,
+        )
+        window = SimpleNamespace(setTabOrder=MagicMock())
+        tabs = QWidget()
+        event = QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_Tab, Qt.KeyboardModifier.NoModifier)
+        try:
+            widget.bind_tab_order(window, tabs)
+            widget.show()
+            self.app.processEvents()
+            widget.search_box.setFocus()
+            self.app.processEvents()
+
+            self.assertTrue(widget.eventFilter(widget.search_box, event))
+            self.assertTrue(widget.chk_synced.hasFocus())
+
+            event = QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_Backtab, Qt.KeyboardModifier.ShiftModifier)
+            self.assertTrue(widget.eventFilter(widget.chk_synced, event))
+            self.assertTrue(widget.search_box.hasFocus())
+        finally:
+            widget.hide()
+            tabs.deleteLater()
+            widget.deleteLater()
+
     def test_icon_sizes_follow_shared_ui_scale(self):
         def noop(*args, **kwargs):
             return None
