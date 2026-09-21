@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from itertools import pairwise
 from typing import ClassVar
 
 from PySide6.QtCore import Qt
@@ -91,7 +92,6 @@ class TopBarController(QWidget):
         self.chk_synced.setObjectName("TopBarFilterCheck")
         self.chk_synced.setChecked(True)
         self.chk_synced.setAccessibleName("Filter synced lyrics")
-        self.chk_synced.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.chk_synced.setMinimumHeight(28)
         self.chk_synced.toggled.connect(on_filter_changed)
         filters_row.addWidget(self.chk_synced)
@@ -100,7 +100,6 @@ class TopBarController(QWidget):
         self.chk_plain.setObjectName("TopBarFilterCheck")
         self.chk_plain.setChecked(True)
         self.chk_plain.setAccessibleName("Filter plain lyrics")
-        self.chk_plain.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.chk_plain.setMinimumHeight(28)
         self.chk_plain.toggled.connect(on_filter_changed)
         filters_row.addWidget(self.chk_plain)
@@ -109,7 +108,6 @@ class TopBarController(QWidget):
         self.chk_instr.setObjectName("TopBarFilterCheck")
         self.chk_instr.setChecked(False)
         self.chk_instr.setAccessibleName("Filter instrumental tracks")
-        self.chk_instr.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.chk_instr.setMinimumHeight(28)
         self.chk_instr.toggled.connect(on_filter_changed)
         filters_row.addWidget(self.chk_instr)
@@ -118,7 +116,6 @@ class TopBarController(QWidget):
         self.chk_none.setObjectName("TopBarFilterCheck")
         self.chk_none.setChecked(True)
         self.chk_none.setAccessibleName("Filter tracks without lyrics")
-        self.chk_none.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.chk_none.setMinimumHeight(28)
         self.chk_none.toggled.connect(on_filter_changed)
         filters_row.addWidget(self.chk_none)
@@ -127,7 +124,6 @@ class TopBarController(QWidget):
         self.chk_unsaved.setObjectName("TopBarFilterCheck")
         self.chk_unsaved.setChecked(False)
         self.chk_unsaved.setAccessibleName("Filter tracks with unsaved draft")
-        self.chk_unsaved.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.chk_unsaved.setMinimumHeight(28)
         self.chk_unsaved.toggled.connect(on_filter_changed)
         filters_row.addWidget(self.chk_unsaved)
@@ -335,7 +331,17 @@ class TopBarController(QWidget):
         self.updateGeometry()
 
     def bind_tab_order(self, window, tabs_widget) -> None:
-        window.setTabOrder(self.search_box, self.btn_refresh)
+        filter_controls = (
+            self.chk_synced,
+            self.chk_plain,
+            self.chk_instr,
+            self.chk_none,
+            self.chk_unsaved,
+        )
+        window.setTabOrder(self.search_box, filter_controls[0])
+        for current, following in pairwise(filter_controls):
+            window.setTabOrder(current, following)
+        window.setTabOrder(filter_controls[-1], self.btn_refresh)
         window.setTabOrder(self.btn_refresh, self.btn_config)
         window.setTabOrder(self.btn_config, self.btn_about)
         window.setTabOrder(self.btn_about, tabs_widget)

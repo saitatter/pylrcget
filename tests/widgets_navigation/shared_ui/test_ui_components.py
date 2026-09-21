@@ -84,6 +84,43 @@ class SharedUiComponentTests(unittest.TestCase):
         finally:
             widget.deleteLater()
 
+    def test_top_bar_filters_are_keyboard_focusable(self):
+        def noop(*args, **kwargs):
+            return None
+
+        widget = TopBarController(
+            on_refresh=noop,
+            on_download_missing=noop,
+            on_export_library=noop,
+            on_open_settings=noop,
+            on_open_about=noop,
+            on_toggle_logs=noop,
+            on_toggle_hotkey_hints=noop,
+            on_schedule_search=noop,
+            on_filter_changed=noop,
+        )
+        try:
+            filters = (
+                widget.chk_synced,
+                widget.chk_plain,
+                widget.chk_instr,
+                widget.chk_none,
+                widget.chk_unsaved,
+            )
+            self.assertTrue(all(control.focusPolicy() != Qt.FocusPolicy.NoFocus for control in filters))
+            self.assertEqual(
+                [control.accessibleName() for control in filters],
+                [
+                    "Filter synced lyrics",
+                    "Filter plain lyrics",
+                    "Filter instrumental tracks",
+                    "Filter tracks without lyrics",
+                    "Filter tracks with unsaved draft",
+                ],
+            )
+        finally:
+            widget.deleteLater()
+
     def test_icon_sizes_follow_shared_ui_scale(self):
         def noop(*args, **kwargs):
             return None
