@@ -79,6 +79,11 @@ def embed_lyrics_for_track(track: Track, output_format: str = "both") -> None:
     embed_lyrics_in_file(path, plain, synced)
 
 
+def clear_embedded_lyrics_for_track(track: Track) -> None:
+    """Remove only lyrics fields managed by PyLrcGet from the audio file."""
+    embed_lyrics_in_file(track.file_path, None, None)
+
+
 def _select_lyrics_for_output(
     plain: str | None,
     synced: str | None,

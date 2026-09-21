@@ -45,6 +45,55 @@ def export_lyrics_sidecars(track: Track, config: Config) -> list[str]:
     return written_paths
 
 
+def existing_lyrics_sidecar_paths(track: Track, config: Config) -> tuple[str, ...]:
+    """Return existing sidecar files matching the configured PyLrcGet patterns.
+
+    This intentionally only returns ``.txt``/``.lrc`` files whose names match
+    one of the same candidates used by the scanner or the output writer.  It
+    does not recursively search a library directory and it does not delete
+    arbitrary text files.
+    """
+    candidate_names = _candidate_sidecar_names(track, config)
+    directories: list[Path] = [Path(track.file_path).parent]
+
+    lookup_subdir = _normalized_lookup_subdir(getattr(config, "lyrics_lookup_subdir", ""))
+    if lookup_subdir:
+        directories.append(Path(track.file_path).parent / lookup_subdir)
+
+    output_dir = (getattr(config, "lyrics_output_dir", "") or "").strip()
+    if output_dir:
+        directories.append(Path(output_dir))
+
+    names = {f"{name}{suffix}".casefold() for name in candidate_names for suffix in (".txt", ".lrc")}
+    found: dict[str, str] = {}
+    for directory in directories:
+        try:
+            entries = os.scandir(directory)
+        except OSError:
+            continue
+        with entries:
+            for entry in entries:
+                if entry.name.casefold() not in names:
+                    continue
+                try:
+                    if not entry.is_file(follow_symlinks=False):
+                        continue
+                except OSError:
+                    continue
+                normalized = os.path.normcase(os.path.abspath(entry.path))
+                found.setdefault(normalized, entry.path)
+    return tuple(found.values())
+
+
+def delete_lyrics_sidecars(track: Track, config: Config) -> tuple[str, ...]:
+    """Delete only detected sidecars matching the configured lyric patterns."""
+    deleted: list[str] = []
+    for path in existing_lyrics_sidecar_paths(track, config):
+        Path(path).unlink()
+        deleted.append(path)
+    return tuple(deleted)
+
+
 def _select_lyrics_for_output(plain: str, synced: str, output_format: str) -> tuple[str, str]:
     mode = (output_format or "both").strip()
     if mode == "synced_only":
@@ -73,6 +122,50 @@ def _resolve_output_base(track: Track, config: Config) -> Path:
         return result
 
     return Path(track.file_path).with_suffix("")
+
+
+def _candidate_sidecar_names(track: Track, config: Config) -> tuple[str, ...]:
+    names = [_default_output_name(track)]
+    title = _safe_component(track.title)
+    artist = _safe_component(track.artist_name)
+    album_artist = _safe_component(track.album_artist_name or "")
+    track_number = _safe_component(str(track.track_number) if track.track_number is not None else "")
+
+    if title:
+        names.append(title)
+    if artist and title:
+        names.append(f"{artist} - {title}")
+    if album_artist and album_artist != artist and title:
+        names.append(f"{album_artist} - {title}")
+    if track_number and title:
+        names.extend((f"{track_number}. {title}", f"{track_number} - {title}"))
+        if track.track_number is not None:
+            padded = f"{track.track_number:02d}"
+            names.extend((f"{padded}. {title}", f"{padded} - {title}"))
+
+    pattern = (getattr(config, "lyrics_file_pattern", "") or "").strip()
+    if pattern:
+        names.append(_render_pattern(pattern, track))
+
+    unique: list[str] = []
+    seen: set[str] = set()
+    for name in names:
+        safe = _safe_component(name)
+        key = os.path.normcase(safe)
+        if safe and key not in seen:
+            seen.add(key)
+            unique.append(safe)
+    return tuple(unique)
+
+
+def _normalized_lookup_subdir(value: str | None) -> str:
+    raw = (value or "").strip().replace("\\", "/").strip("/")
+    if not raw:
+        return ""
+    parts = [part for part in raw.split("/") if part and part != "."]
+    if not parts or any(part == ".." for part in parts):
+        return ""
+    return str(Path(*parts))
 
 
 def _render_pattern(pattern: str, track: Track) -> str:

@@ -525,18 +525,37 @@ def update_track_plain_lyrics(
 
 
 def update_track_null_lyrics(db: sqlite3.Connection, track_id: int) -> None:
-    db.execute(
-        """
-        UPDATE tracks
-        SET txt_lyrics = NULL, lrc_lyrics = NULL,
-            txt_lyrics_source = NULL, lrc_lyrics_source = NULL,
-            dirty_lrc_lyrics = NULL, dirty_txt_lyrics = NULL,
-            dirty_lyrics_present = 0, instrumental = 0
-        WHERE id = ?
-        """,
-        (int(track_id),),
-    )
-    db.commit()
+    clear_tracks_lyrics(db, [int(track_id)])
+
+
+def clear_tracks_lyrics(
+    db: sqlite3.Connection,
+    track_ids: list[int] | tuple[int, ...],
+    *,
+    commit: bool = True,
+) -> int:
+    """Clear saved and draft lyrics for multiple tracks in one transaction."""
+    unique_ids = list(dict.fromkeys(int(track_id) for track_id in track_ids))
+    if not unique_ids:
+        return 0
+    try:
+        db.executemany(
+            """
+            UPDATE tracks
+            SET txt_lyrics = NULL, lrc_lyrics = NULL,
+                txt_lyrics_source = NULL, lrc_lyrics_source = NULL,
+                dirty_lrc_lyrics = NULL, dirty_txt_lyrics = NULL,
+                dirty_lyrics_present = 0, instrumental = 0
+            WHERE id = ?
+            """,
+            [(track_id,) for track_id in unique_ids],
+        )
+        if commit:
+            db.commit()
+        return len(unique_ids)
+    except Exception:
+        db.rollback()
+        raise
 
 
 def update_track_dirty_lyrics(db: sqlite3.Connection, track_id: int, synced_lyrics: str, plain_lyrics: str) -> None:
