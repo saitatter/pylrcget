@@ -87,7 +87,7 @@ class TrackTableModel(QAbstractTableModel):
                     LyricsState.NONE: "○ Missing",
                     LyricsState.PLAIN: "● Plain",
                     LyricsState.SYNCED: "● Synced",
-                    LyricsState.INSTRUMENTAL: "● Instrumental",
+                    LyricsState.INSTRUMENTAL: "♦ Instrumental",
                 }.get(row.lyrics_state, row.lyrics_state)
                 return f"{label} *" if row.has_dirty_lyrics else label
             if col == 4:

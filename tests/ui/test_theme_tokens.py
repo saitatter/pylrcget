@@ -147,7 +147,7 @@ def test_light_theme_lyrics_statuses_use_semantic_text_colors() -> None:
         assert model.data(model.index(0, 3), Qt.ForegroundRole).name() == "#067647"
 
         model._rows[0] = replace(row, lyrics_state=LyricsState.INSTRUMENTAL)
-        assert model.data(model.index(0, 3), Qt.DisplayRole) == "● Instrumental"
+        assert model.data(model.index(0, 3), Qt.DisplayRole) == "♦ Instrumental"
         assert model.data(model.index(0, 3), Qt.ForegroundRole).name() == "#175cd3"
     finally:
         set_theme_tokens("DarkTheme")
