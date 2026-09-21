@@ -51,6 +51,21 @@ class MainWindowInstrumentalTests(unittest.TestCase):
         )
         window._publish_instrumental_to_lrclib.assert_called_once_with([1, 2])
 
+    def test_download_refresh_preserves_the_active_lyrics_track_selection(self):
+        window = MainWindow.__new__(MainWindow)
+        window._editing_track_id = 42
+        window.tracks_tab = object()
+        active_track_list = SimpleNamespace(restore_selection=MagicMock())
+        window.track_list = SimpleNamespace(apply_route=MagicMock())
+        window.tabs = SimpleNamespace(currentWidget=lambda: window.tracks_tab)
+        window.navigation = SimpleNamespace(current_route=tracks_all())
+        window._active_track_list_widget = MagicMock(return_value=active_track_list)
+
+        MainWindow._refresh_visible_library_view_after_downloads(window)
+
+        window.track_list.apply_route.assert_called_once_with(window.navigation.current_route)
+        active_track_list.restore_selection.assert_called_once_with({42})
+
     def test_saving_unchanged_settings_does_not_rebuild_library_ui(self):
         window = MainWindow.__new__(MainWindow)
         window.app_state = SimpleNamespace(db=object())

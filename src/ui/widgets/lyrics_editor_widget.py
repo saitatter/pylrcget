@@ -675,8 +675,8 @@ class LyricsEditorWidget(QWidget):
             self.empty_state.configure(
                 icon_name="audio-lines.svg",
                 title="No lyrics yet",
-                body="Download lyrics from LRCLIB or search manually, then edit them here.",
-                action_text="Download from LRCLIB",
+                body="Download lyrics from enabled providers or search manually, then edit them here.",
+                action_text="Download Lyrics",
                 secondary_action_text="Search LRCLIB",
                 tertiary_action_text="Write Lyrics",
                 quaternary_action_text="Auto Sync",

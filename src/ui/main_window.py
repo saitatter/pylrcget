@@ -1470,6 +1470,7 @@ class MainWindow(QMainWindow):
             view.show_none("Select a track to see lyrics")
 
     def _refresh_visible_library_view_after_downloads(self) -> None:
+        editing_track_id = self._editing_track_id
         current = self.tabs.currentWidget()
         if current is self.tracks_tab:
             route = self.navigation.current_route
@@ -1483,6 +1484,11 @@ class MainWindow(QMainWindow):
         elif current is self.album_artists_page:
             route = self.navigation.current_route
             self.album_artists_tab.apply_route(route if route.tab == "album_artists" else LibraryRoute(tab="album_artists", mode="root"))
+
+        if editing_track_id is not None:
+            active_track_list = self._active_track_list_widget()
+            if active_track_list is not None:
+                active_track_list.restore_selection({int(editing_track_id)})
 
     def _active_track_list_widget(self):
         current = self.tabs.currentWidget()
