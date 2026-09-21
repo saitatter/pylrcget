@@ -390,9 +390,11 @@ class PlayerBar(QWidget):
         shell_layout.addWidget(self.left_panel, 0, 0)
         shell_layout.addWidget(self.center_panel, 0, 1)
         shell_layout.addWidget(self.right_panel, 0, 2)
-        shell_layout.setColumnStretch(0, 3)
-        shell_layout.setColumnStretch(1, 5)
-        shell_layout.setColumnStretch(2, 2)
+        # Keep transport centered relative to the player/window, independent
+        # of unequal metadata and extras content widths.
+        shell_layout.setColumnStretch(0, 0)
+        shell_layout.setColumnStretch(1, 1)
+        shell_layout.setColumnStretch(2, 0)
 
         self.slider.sliderPressed.connect(self._on_slider_pressed)
         self.slider.sliderReleased.connect(self._on_slider_released)
@@ -502,12 +504,12 @@ class PlayerBar(QWidget):
         cover_size = round(cover_size * self._ui_scale)
         bar_height = round(bar_height * self._ui_scale)
 
+        side_width = max(left_width, right_width)
+
         self.lbl_cover.setFixedSize(cover_size, cover_size)
         self.lbl_cover.setVisible(self._show_album_art)
-        self.left_panel.setMinimumWidth(left_width)
-        self.left_panel.setMaximumWidth(16777215)
-        self.right_panel.setMinimumWidth(right_width)
-        self.right_panel.setMaximumWidth(16777215)
+        self.left_panel.setFixedWidth(side_width)
+        self.right_panel.setFixedWidth(side_width)
         self.center_panel.setMinimumWidth(center_width)
         self.center_panel.setMaximumWidth(16777215)
         self.setMinimumHeight(bar_height)

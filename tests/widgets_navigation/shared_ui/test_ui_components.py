@@ -248,6 +248,26 @@ class SharedUiComponentTests(unittest.TestCase):
         finally:
             widget.deleteLater()
 
+    def test_player_transport_stays_centered_between_symmetric_side_panels(self):
+        widget = PlayerBar(player=None)
+        try:
+            widget.resize(1200, 120)
+            widget.show()
+            self.app.processEvents()
+
+            shell_center = widget.findChild(QWidget, "PlayerShell").rect().center().x()
+            center_panel = widget.center_panel.geometry()
+            self.assertEqual(widget.left_panel.width(), widget.right_panel.width())
+            self.assertLessEqual(abs(center_panel.center().x() - shell_center), 1)
+
+            widget.lbl_title.setText("A very long title that should not move playback controls")
+            widget.lbl_artist.setText("A very long artist name")
+            widget.lbl_album.setText("A very long album name")
+            self.app.processEvents()
+            self.assertLessEqual(abs(widget.center_panel.geometry().center().x() - shell_center), 1)
+        finally:
+            widget.deleteLater()
+
     def test_track_action_buttons_track_individual_hover(self):
         table = QTableView()
         model = QStandardItemModel(1, 5)

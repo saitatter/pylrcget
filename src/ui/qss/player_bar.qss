@@ -1,16 +1,12 @@
 QWidget#PlayerBar {
-    background-color: {{color-bg-app}};
+    background-color: {{color-bg-panel}};
     border-top: 1px solid {{color-border}};
 }
 
 QWidget#PlayerShell {
-    background: {{color-bg-elevated}};
-    border: 1px solid {{color-border}};
-    border-radius: 999px;
-}
-
-QWidget#PlayerBar[compact="true"] QWidget#PlayerShell {
-    border-radius: 999px;
+    background: {{color-bg-panel}};
+    border: none;
+    border-radius: 0;
 }
 
 QWidget#PlayerBar[compact="true"] QWidget#PlayerExtras {
