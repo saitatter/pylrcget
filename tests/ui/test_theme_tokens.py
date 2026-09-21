@@ -157,3 +157,15 @@ def test_selection_actions_have_explicit_disabled_light_theme_style() -> None:
         assert "color: #475569;" in stylesheet
     finally:
         set_theme_tokens("DarkTheme")
+
+
+def test_light_theme_tooltips_use_light_surface_tokens() -> None:
+    set_theme_tokens("LightTheme")
+    try:
+        stylesheet = load_stylesheet("app.qss")
+        assert "QToolTip {" in stylesheet
+        assert "background-color: #ffffff;" in stylesheet
+        assert "color: #111827;" in stylesheet
+        assert "border: 1px solid #cbd5e1;" in stylesheet
+    finally:
+        set_theme_tokens("DarkTheme")

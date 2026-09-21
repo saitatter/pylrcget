@@ -8,6 +8,14 @@ QLabel {
     background: transparent;
 }
 
+QToolTip {
+    background-color: {{color-bg-elevated}};
+    color: {{color-text}};
+    border: 1px solid {{color-border-strong}};
+    border-radius: {{radius-sm}};
+    padding: 5px 8px;
+}
+
 QMainWindow, QMenuBar, QStatusBar, QSplitter::handle {
     background-color: {{color-bg-app}};
 }
