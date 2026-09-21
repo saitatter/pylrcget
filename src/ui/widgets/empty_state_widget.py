@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtWidgets import QLabel, QPushButton, QVBoxLayout, QWidget
+from PySide6.QtWidgets import QLabel, QPushButton, QSizePolicy, QVBoxLayout, QWidget
 
 from ui.button_roles import set_button_role
 from ui.icon_loader import load_svg_pixmap
@@ -69,6 +69,15 @@ class EmptyStateWidget(QWidget):
         set_button_role(self.quaternary_action, "secondary")
         self.quaternary_action.clicked.connect(self.quaternaryActionTriggered.emit)
         self.quaternary_action.hide()
+
+        for action in (
+            self.action,
+            self.secondary_action,
+            self.tertiary_action,
+            self.quaternary_action,
+        ):
+            action.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+            action.setMaximumHeight(52)
 
         self._btn_row = FlowLayout(spacing=SPACE_2, justify_rows=False, center_rows=True)
         self._btn_row.addWidget(self.action)

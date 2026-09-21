@@ -52,6 +52,10 @@ class LyricsEditorWidgetTests(unittest.TestCase):
             ]
             visible_buttons = [button for button in buttons if button.isVisible()]
             self.assertEqual(len(visible_buttons), 4)
+            self.assertTrue(
+                all(button.sizePolicy().verticalPolicy().name == "Fixed" for button in visible_buttons)
+            )
+            self.assertTrue(all(button.maximumHeight() <= 52 for button in visible_buttons))
 
             y_positions = {button.geometry().y() for button in visible_buttons}
 
