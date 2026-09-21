@@ -25,21 +25,6 @@ class LyricsEditorWidgetTests(unittest.TestCase):
         finally:
             widget.deleteLater()
 
-    def test_lyrics_pane_toggle_stays_in_header(self):
-        widget = LyricsEditorWidget()
-        try:
-            widget.set_pane_collapsed(True)
-            self.assertEqual(widget.btn_toggle_pane.text(), "‹")
-            self.assertIn("Expand", widget.btn_toggle_pane.toolTip())
-            self.assertTrue(widget.stack.isHidden())
-
-            widget.set_pane_collapsed(False)
-            self.assertEqual(widget.btn_toggle_pane.text(), "›")
-            self.assertIn("Collapse", widget.btn_toggle_pane.toolTip())
-            self.assertFalse(widget.stack.isHidden())
-        finally:
-            widget.deleteLater()
-
     def test_empty_lyrics_actions_wrap_in_narrow_layouts(self):
         widget = LyricsEditorWidget()
         try:

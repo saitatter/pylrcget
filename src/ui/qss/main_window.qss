@@ -202,23 +202,28 @@ QSplitter#LibraryLyricsSplitter::handle:hover {
 }
 
 QToolButton#LyricsPaneToggle {
-    min-width: 24px;
-    max-width: 24px;
-    min-height: 24px;
-    max-height: 24px;
+    min-width: 28px;
+    max-width: 28px;
+    min-height: 28px;
+    max-height: 28px;
     padding: 0;
-    border: 1px solid transparent;
+    border: 1px solid {{color-border-strong}};
     border-radius: {{radius-sm}};
-    background: transparent;
-    color: {{color-text-muted}};
+    background: {{color-bg-pressed}};
+    color: {{color-text-strong}};
     font-size: {{font-size-lg}};
     font-weight: 700;
 }
 
 QToolButton#LyricsPaneToggle:hover {
-    background: {{color-bg-control}};
-    border-color: {{color-border}};
+    background: {{color-bg-elevated}};
+    border-color: {{color-accent}};
     color: {{color-accent}};
+}
+
+QToolButton#LyricsPaneToggle:pressed {
+    background: {{color-bg-pressed}};
+    border-color: {{color-accent}};
 }
 
 QToolButton#LibraryNavButton {

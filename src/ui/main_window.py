@@ -100,7 +100,6 @@ from ui.widgets.toast import ToastManager
 from ui.widgets.track_list_widget import TrackListWidget
 
 logger = logging.getLogger(__name__)
-COLLAPSED_LYRICS_PANE_WIDTH = 56
 
 DEFAULT_WINDOW_WIDTH = 1200
 DEFAULT_WINDOW_HEIGHT = 760
@@ -2146,19 +2145,16 @@ class MainWindow(QMainWindow):
         return pairs
 
     def _connect_lyrics_pane_toggles(self) -> None:
-        for splitter, lyrics_view in self._library_lyrics_pairs():
-            lyrics_view.togglePaneRequested.connect(
+        for splitter, _lyrics_view in self._library_lyrics_pairs():
+            splitter.toggleRequested.connect(
                 lambda current=splitter: self._toggle_lyrics_pane(current)
             )
-            lyrics_view.set_pane_collapsed(False)
+            splitter.set_lyrics_collapsed(False)
 
     def _set_lyrics_pane_collapsed(self, collapsed: bool) -> None:
         self._lyrics_pane_collapsed = bool(collapsed)
-        for splitter, lyrics_view in self._library_lyrics_pairs():
-            lyrics_view.setMinimumWidth(
-                COLLAPSED_LYRICS_PANE_WIDTH if self._lyrics_pane_collapsed else LYRICS_PANE_MIN_WIDTH
-            )
-            lyrics_view.set_pane_collapsed(self._lyrics_pane_collapsed)
+        for splitter, _lyrics_view in self._library_lyrics_pairs():
+            splitter.set_lyrics_collapsed(self._lyrics_pane_collapsed)
 
     def _apply_lyrics_pane_collapsed_state(self) -> None:
         if not getattr(self, "_lyrics_pane_collapsed", False):
@@ -2168,8 +2164,7 @@ class MainWindow(QMainWindow):
             total = sum(max(0, int(value)) for value in sizes)
             if total <= 0:
                 total = splitter.width() if splitter.orientation() == Qt.Orientation.Horizontal else splitter.height()
-            collapsed_size = min(COLLAPSED_LYRICS_PANE_WIDTH, max(24, total // 3))
-            splitter.setSizes([max(1, total - collapsed_size), collapsed_size])
+            splitter.setSizes([max(1, total), 0])
 
     def _toggle_lyrics_pane(self, source: QSplitter | None = None) -> None:
         collapsed = not bool(getattr(self, "_lyrics_pane_collapsed", False))
