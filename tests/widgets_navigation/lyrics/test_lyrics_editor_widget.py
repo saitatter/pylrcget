@@ -29,7 +29,7 @@ class LyricsEditorWidgetTests(unittest.TestCase):
             self.assertEqual(widget.empty_state.action.text(), "Download Lyrics")
             self.assertEqual(widget.empty_state.secondary_action.text(), "Search Lyrics")
             self.assertEqual(widget.empty_state.tertiary_action.text(), "Write Lyrics")
-            self.assertEqual(widget.empty_state.quaternary_action.text(), "Auto Sync")
+            self.assertEqual(widget.empty_state.quaternary_action.text(), "✨ Sync with AI")
             self.assertIn("Download lyrics from enabled providers", widget.empty_state.body.text())
         finally:
             widget.deleteLater()
@@ -172,6 +172,8 @@ class LyricsEditorWidgetTests(unittest.TestCase):
             self.assertEqual(emitted, [True])
             self.assertIs(widget.stack.currentWidget(), widget.plain)
             self.assertFalse(widget.btn_auto_sync.isHidden())
+            self.assertEqual(widget.btn_auto_sync.text(), "Sync with AI")
+            self.assertIn("local audio", widget.btn_auto_sync.toolTip())
         finally:
             widget.deleteLater()
 

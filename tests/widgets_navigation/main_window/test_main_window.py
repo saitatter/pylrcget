@@ -785,8 +785,8 @@ class MainWindowInstrumentalTests(unittest.TestCase):
             "__AI_SYNC_PROGRESS__|3|8|Transcribing audio (base pass)…",
         )
 
-        self.assertEqual(statuses[-1], "Transcribing audio (base pass)…")
-        self.assertEqual(updates[-1], (3, 8, "AI Auto-Sync", "Transcribing audio (base pass)…"))
+        self.assertEqual(statuses[-1], "Transcribing audio…")
+        self.assertEqual(updates[-1], (3, 8, "AI Sync", "Transcribing audio…"))
 
     def test_ai_sync_progress_fallback_mapping_without_marker(self):
         updates: list[tuple[int, int, str, str]] = []
@@ -799,8 +799,8 @@ class MainWindowInstrumentalTests(unittest.TestCase):
 
         MainWindow._on_ai_sync_progress(window, "Performing alignment (forced alignment)...")
 
-        self.assertEqual(statuses[-1], "Performing alignment (forced alignment)...")
-        self.assertEqual(updates[-1], (4, 8, "AI Auto-Sync", "Performing alignment (forced alignment)..."))
+        self.assertEqual(statuses[-1], "Aligning lyrics…")
+        self.assertEqual(updates[-1], (4, 8, "AI Sync", "Aligning lyrics…"))
 
     def test_validate_current_selected_track_clears_deleted_track(self):
         with TemporaryDirectory() as tmp:

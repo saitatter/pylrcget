@@ -382,7 +382,7 @@ class MusicFoldersDialog(QDialog):
         embed_layout.addWidget(reaction_hint, 3, 0, 1, 2)
         lyrics_embed_layout.addWidget(embed_box)
 
-        ai_sync_box = QGroupBox("AI Auto-Sync")
+        ai_sync_box = QGroupBox("AI Sync")
         ai_sync_layout = QGridLayout(ai_sync_box)
         self.ai_device_combo = QComboBox()
         for label, value in AI_SYNC_DEVICE_OPTIONS:
@@ -411,8 +411,8 @@ class MusicFoldersDialog(QDialog):
         ai_sync_layout.addWidget(self.ai_fuzzy_threshold_spin, 3, 1)
         ai_sync_layout.addWidget(self.ai_enable_demucs_chk, 4, 0, 1, 2)
         ai_sync_hint = QLabel(
-            "These options control local AI auto-sync only. "
-            "Changes apply to the next Auto Sync run."
+            "These options control local AI synchronization. "
+            "Changes apply to the next AI Sync run."
         )
         ai_sync_hint.setWordWrap(True)
         ai_sync_layout.addWidget(ai_sync_hint, 5, 0, 1, 2)

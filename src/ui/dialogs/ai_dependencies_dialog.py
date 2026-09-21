@@ -65,7 +65,7 @@ class AIDependenciesDialog(QDialog):
         self._install_succeeded = False
         self._install_cmd, self._install_cmd_error = resolve_ai_install_command(self._missing_packages)
 
-        self.setWindowTitle("AI Auto Sync setup")
+        self.setWindowTitle("AI Sync setup")
         self.resize(760, 520)
 
         root = QVBoxLayout(self)
@@ -77,11 +77,11 @@ class AIDependenciesDialog(QDialog):
 
         summary_text = (
             "You can install required packages directly from this dialog. "
-            "After installation, use Retry to continue Auto Sync."
+            "After installation, use Retry AI Sync to continue."
             if self._install_cmd
             else (
                 "Automatic install is unavailable for this runtime. "
-                "Use the instructions below, then reopen Auto Sync."
+                "Use the instructions below, then reopen AI Sync."
             )
         )
         summary = QLabel(summary_text)
@@ -99,7 +99,7 @@ class AIDependenciesDialog(QDialog):
         set_layout_spacing(button_row, spacing=SPACE_2)
         self.btn_install = QPushButton("Install Missing Dependencies")
         self.btn_copy = QPushButton("Copy Install Command")
-        self.btn_retry = QPushButton("Retry Auto Sync")
+        self.btn_retry = QPushButton("Retry AI Sync")
         self.btn_close = QPushButton("Close")
         self.btn_retry.setEnabled(False)
         self.btn_install.setEnabled(bool(self._install_cmd))
@@ -181,7 +181,7 @@ class AIDependenciesDialog(QDialog):
 
         if ok and not get_missing_ai_dependencies():
             self._install_succeeded = True
-            self.details.append("Dependencies are now available. You can retry Auto Sync.")
+            self.details.append("Dependencies are now available. You can retry AI Sync.")
             self.btn_retry.setEnabled(True)
             return
 

@@ -1565,7 +1565,7 @@ class MainWindow(QMainWindow):
         if track_id is None:
             notify_user(
                 self.app_state,
-                "Select a track before auto-syncing.",
+                "Select a track before starting AI Sync.",
                 "warning",
                 show_status=self._show_status_message,
                 status_timeout_ms=3000,
@@ -1641,11 +1641,11 @@ class MainWindow(QMainWindow):
 
         for view in self._all_lyrics_views():
             view.btn_auto_sync.setEnabled(False)
-            view.btn_auto_sync.setText("Syncing...")
+            view.btn_auto_sync.setText("Syncing…")
 
         self.ai_sync_overlay.start_batch("Current track", 8)
-        self.ai_sync_overlay.update_progress(0, 8, "AI Auto-Sync", "Preparing AI sync pipeline…")
-        self._show_status_message("AI sync starting...")
+        self.ai_sync_overlay.update_progress(0, 8, "AI Sync", "Preparing to sync lyrics…")
+        self._show_status_message("Starting AI Sync…")
         sync_track_id = int(track_id)
 
         worker = AiSyncWorker(
@@ -1691,11 +1691,11 @@ class MainWindow(QMainWindow):
 
         for view in self._all_lyrics_views():
             view.btn_auto_sync.setEnabled(True)
-            view.btn_auto_sync.setText("Auto Sync")
+            view.btn_auto_sync.setText("Sync with AI")
 
         overlay = getattr(self, "ai_sync_overlay", None)
         if overlay is not None:
-            overlay.append_result("AI Auto-Sync", msg, ok)
+            overlay.append_result("AI Sync", msg, ok)
             overlay.finish_batch(
                 "AI sync cancelled." if msg == "Cancelled." else msg,
                 cancelled=(msg == "Cancelled."),
@@ -1755,9 +1755,45 @@ class MainWindow(QMainWindow):
         if was_cancelled:
             for view in self._all_lyrics_views():
                 view.btn_auto_sync.setEnabled(True)
-                view.btn_auto_sync.setText("Auto Sync")
+                view.btn_auto_sync.setText("Sync with AI")
 
     # ------------------ helpers ------------------
+    @staticmethod
+    def _humanize_ai_sync_progress(message: str) -> str:
+        """Keep implementation details out of ordinary AI Sync progress UI."""
+        text = str(message or "").strip()
+        if not text:
+            return "Working…"
+
+        lowered = text.casefold()
+        if "loading audio" in lowered:
+            return "Preparing audio…"
+        if "detecting lyrics language" in lowered or "language detection" in lowered:
+            return "Detecting lyrics language…"
+        if "lyrics-aligner failed" in lowered or "fallback" in lowered:
+            return "Trying a compatible alignment method…"
+        if "selecting english lyrics-aligner" in lowered:
+            return "Selecting the best alignment method…"
+        if "loading whisperx" in lowered or "asr model" in lowered:
+            return "Preparing speech recognition…"
+        if "transcrib" in lowered:
+            return "Transcribing audio…"
+        if "performing alignment" in lowered:
+            return "Aligning lyrics…"
+        if "forced alignment" in lowered or "aligning detected words" in lowered:
+            return "Aligning detected words…"
+        if "rescuing uncertain" in lowered or "relaxed vad" in lowered:
+            return "Checking uncertain lyric sections…"
+        if "coverage" in lowered:
+            return "Checking audio coverage…"
+        if "building lrc" in lowered or "building synced" in lowered:
+            return "Building synced lyrics…"
+        if "aligning lyric lines" in lowered:
+            return "Matching lyrics to the audio…"
+        if "finalizing" in lowered:
+            return "Finalizing synced lyrics…"
+        return text
+
     def _on_ai_sync_progress(self, message: str) -> None:
         raw_message = str(message or "").strip()
         display_message = raw_message
@@ -1795,11 +1831,12 @@ class MainWindow(QMainWindow):
             elif "finalizing" in lowered:
                 step = 8
 
+        display_message = self._humanize_ai_sync_progress(display_message)
         self._show_status_message(display_message)
         overlay = getattr(self, "ai_sync_overlay", None)
         if overlay is None:
             return
-        overlay.update_progress(step, total, "AI Auto-Sync", display_message)
+        overlay.update_progress(step, total, "AI Sync", display_message)
 
         # Watchdog: if building LRC (final step) takes too long, show a soft timeout message
         try:
@@ -1819,7 +1856,7 @@ class MainWindow(QMainWindow):
                 def _on_watchdog():
                     ov = getattr(self, "ai_sync_overlay", None)
                     if ov is not None:
-                        ov.update_progress(-1, total, "AI Auto-Sync", "Still processing final alignment — you can cancel")
+                        ov.update_progress(-1, total, "AI Sync", "Still working on the final timing — you can cancel")
                 timer.timeout.connect(_on_watchdog)
                 timer.start()
                 self._ai_sync_watchdog_timer = timer

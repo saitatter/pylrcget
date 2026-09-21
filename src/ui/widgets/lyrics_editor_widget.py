@@ -214,9 +214,9 @@ class LyricsEditorWidget(QWidget):
         self.btn_clear_timestamps.clicked.connect(self._clear_timestamps)
         title_row.addWidget(self.btn_clear_timestamps)
 
-        self.btn_auto_sync = QPushButton("Auto Sync")
+        self.btn_auto_sync = QPushButton("Sync with AI")
         self.btn_auto_sync.setObjectName("LyricsAutoSync")
-        self.btn_auto_sync.setToolTip("Automatically synchronize lyrics using AI (requires torch and openai-whisper; Demucs is optional)")
+        self.btn_auto_sync.setToolTip("Automatically synchronize these lyrics with the local audio using AI.")
         self.btn_auto_sync.hide()
         self.btn_auto_sync.clicked.connect(self.autoSyncRequested.emit)
         title_row.addWidget(self.btn_auto_sync)
@@ -714,7 +714,7 @@ class LyricsEditorWidget(QWidget):
                 action_text="Download Lyrics",
                 secondary_action_text="Search Lyrics",
                 tertiary_action_text="Write Lyrics",
-                quaternary_action_text="Auto Sync",
+                quaternary_action_text="✨ Sync with AI",
             )
             self.stack.setCurrentWidget(self.empty_state)
         self._sync_header_height()
