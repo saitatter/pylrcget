@@ -460,10 +460,10 @@ class LyricsEditorWidgetTests(unittest.TestCase):
             self.assertEqual(widget.validation_badge.text(), "2 issues")
             self.assertIn("Duplicate timestamp", widget.table.item(0, 0).toolTip())
             self.assertIn("Duplicate timestamp", widget.table.item(1, 1).toolTip())
-            self.assertEqual(widget.table.item(0, 0).background().color(), QColor("#2a0a0a"))
-            self.assertEqual(widget.table.item(1, 1).background().color(), QColor("#2a0a0a"))
-            self.assertNotEqual(widget.table.item(0, LINE_NUMBER_COLUMN).background().color(), QColor("#2a0a0a"))
-            self.assertEqual(widget.table.item(0, LINE_NUMBER_COLUMN).foreground().color(), QColor("#fee2e2"))
+            self.assertEqual(widget.table.item(0, 0).background().color(), QColor("#321414"))
+            self.assertEqual(widget.table.item(1, 1).background().color(), QColor("#321414"))
+            self.assertNotEqual(widget.table.item(0, LINE_NUMBER_COLUMN).background().color(), QColor("#321414"))
+            self.assertEqual(widget.table.item(0, LINE_NUMBER_COLUMN).foreground().color(), QColor("#FDA29B"))
         finally:
             widget.deleteLater()
 

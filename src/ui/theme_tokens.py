@@ -41,6 +41,25 @@ def _theme(
     extra: dict[str, str] | None = None,
 ) -> dict[str, str]:
     accent_alt = accent_alt or accent
+    if palette_mode == "light":
+        semantic_colors = {
+            "success": ("#ECFDF3", "#ABEFC6", "#067647"),
+            "warning": ("#FFFAEB", "#FEDF89", "#B54708"),
+            "error": ("#FEF3F2", "#FECDCA", "#B42318"),
+            "info": ("#EFF8FF", "#B2DDFF", "#175CD3"),
+        }
+    else:
+        semantic_colors = {
+            "success": ("#102A20", "#237A50", "#75E0A7"),
+            "warning": ("#2B210C", "#B88214", "#FEC84B"),
+            "error": ("#321414", "#D24A4A", "#FDA29B"),
+            "info": ("#10243B", "#316DA8", "#8CC8FF"),
+        }
+
+    success_bg, success_border, success_text = semantic_colors["success"]
+    warning_bg, warning_border, warning_text = semantic_colors["warning"]
+    error_bg, error_border, error_text = semantic_colors["error"]
+    info_bg, info_border, info_text = semantic_colors["info"]
     theme = {
         "theme-name": name,
         "palette-mode": palette_mode,
@@ -67,20 +86,21 @@ def _theme(
         "color-scrollbar-handle": border,
         "color-scrollbar-hover": accent,
         "color-overlay-scrim": _rgba("#000000", 0.62 if palette_mode == "dark" else 0.28),
-        "color-info-border": accent_alt,
-        "color-info-text": accent_alt,
+        "color-info-bg": info_bg,
+        "color-info-border": info_border,
+        "color-info-text": info_text,
         "color-disabled-text": "#6b7280" if palette_mode == "dark" else "#475569",
         "color-disabled-bg": bg_pressed,
         "color-disabled-border": border_strong,
-        "color-success-bg": "#052e1a",
-        "color-success-border": "#16a34a",
-        "color-success-text": "#dcfce7",
-        "color-error-bg": "#2a0a0a",
-        "color-error-border": "#ef4444",
-        "color-error-text": "#fee2e2",
-        "color-warning-bg": "#2a1a05",
-        "color-warning-border": "#f59e0b",
-        "color-warning-text": "#fde68a",
+        "color-success-bg": success_bg,
+        "color-success-border": success_border,
+        "color-success-text": success_text,
+        "color-error-bg": error_bg,
+        "color-error-border": error_border,
+        "color-error-text": error_text,
+        "color-warning-bg": warning_bg,
+        "color-warning-border": warning_border,
+        "color-warning-text": warning_text,
         "color-table-bg": bg_app,
         "color-table-alt": bg_panel,
         "color-table-grid": bg_app,
