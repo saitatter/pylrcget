@@ -139,9 +139,11 @@ def test_light_theme_lyrics_statuses_use_semantic_text_colors() -> None:
         )
         model = TrackTableModel([row])
 
-        assert model.data(model.index(0, 3), Qt.ForegroundRole).name() == "#b42318"
+        assert model.data(model.index(0, 3), Qt.DisplayRole) == "○ Missing"
+        assert model.data(model.index(0, 3), Qt.ForegroundRole).name() == "#6b7280"
 
         model._rows[0] = replace(row, lyrics_state=LyricsState.SYNCED)
+        assert model.data(model.index(0, 3), Qt.DisplayRole) == "● Synced"
         assert model.data(model.index(0, 3), Qt.ForegroundRole).name() == "#067647"
     finally:
         set_theme_tokens("DarkTheme")

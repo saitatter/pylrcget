@@ -61,7 +61,7 @@ class TrackTableModel(QAbstractTableModel):
                 "Track number",
                 "Artist — Title",
                 "Track duration",
-                "Lyrics status: None / Plain / Synced / Instrumental",
+                "Lyrics status: Missing / Plain / Synced / Instrumental",
                 "Actions",
             ][section]
         if role == Qt.TextAlignmentRole and section in {0, 2, 3, 4}:
@@ -84,10 +84,10 @@ class TrackTableModel(QAbstractTableModel):
                 return fmt_duration(row.duration_s)
             if col == 3:
                 label = {
-                    LyricsState.NONE: "No lyrics",
-                    LyricsState.PLAIN: "Plain",
-                    LyricsState.SYNCED: "Synced",
-                    LyricsState.INSTRUMENTAL: "Instrumental",
+                    LyricsState.NONE: "○ Missing",
+                    LyricsState.PLAIN: "● Plain",
+                    LyricsState.SYNCED: "● Synced",
+                    LyricsState.INSTRUMENTAL: "◆ Instrumental",
                 }.get(row.lyrics_state, row.lyrics_state)
                 return f"{label} *" if row.has_dirty_lyrics else label
             if col == 4:
@@ -96,10 +96,10 @@ class TrackTableModel(QAbstractTableModel):
             if row.has_dirty_lyrics:
                 return QColor(STYLE_TOKENS.get("color-warning-text", "#f59e0b"))
             color_map = {
-                LyricsState.NONE: QColor(STYLE_TOKENS.get("color-error-text", "#ef4444")),
+                LyricsState.NONE: QColor(STYLE_TOKENS.get("color-text-muted", "#94a3b8")),
                 LyricsState.PLAIN: QColor(STYLE_TOKENS.get("color-warning-text", "#f59e0b")),
                 LyricsState.SYNCED: QColor(STYLE_TOKENS.get("color-success-text", "#22c55e")),
-                LyricsState.INSTRUMENTAL: QColor(STYLE_TOKENS.get("color-accent-alt", "#60a5fa")),
+                LyricsState.INSTRUMENTAL: QColor(STYLE_TOKENS.get("color-info-text", "#60a5fa")),
             }
             return color_map.get(row.lyrics_state, QColor(STYLE_TOKENS.get("color-text-muted", "#94a3b8")))
         if role == Qt.FontRole and col == 3:
