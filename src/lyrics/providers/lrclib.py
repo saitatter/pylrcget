@@ -81,6 +81,7 @@ class LrclibProvider:
             match = find_best_lyrics_match(
                 self._api,
                 notify=self._notify,
+                provider_label=self.display_name,
                 track_id=int(track.track_id or 0),
                 track_label=label,
                 title=title,

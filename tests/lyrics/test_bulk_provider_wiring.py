@@ -51,6 +51,16 @@ def test_bulk_worker_never_constructs_disabled_lrclib_provider():
     assert [provider.provider_id for provider in providers] == ["musixmatch"]
 
 
+def test_bulk_worker_progress_uses_enabled_provider_labels():
+    worker = BulkLyricsDownloadWorker("unused.sqlite", [], "https://lrclib.net/api")
+    worker._lyrics_source_settings = {
+        "priority": ["musixmatch", "lrclib"],
+        "enabled": {"lrclib": False, "musixmatch": True},
+    }
+
+    assert worker._provider_search_label() == "Musixmatch"
+
+
 def test_bulk_worker_builds_native_musixmatch_provider_without_helper(tmp_path, monkeypatch):
     worker = BulkLyricsDownloadWorker(str(tmp_path / "musixmatch.sqlite"), [], "https://lrclib.net/api")
     worker._lyrics_source_settings = {

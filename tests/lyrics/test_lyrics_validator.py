@@ -101,3 +101,10 @@ def test_plain_validator_and_autofix_handles_punctuation():
     assert lowercase_problems[0].line == 2
 
     assert autofix_plain_lyrics("First line.\nsecond line,") == "First line\nSecond line"
+
+
+def test_validator_and_autofix_preserve_lines_starting_with_digits():
+    assert validate_plain_lyrics("2pac") == []
+    assert validate_synced_lyrics([(1000, "2pac"), (2000, "")]) == []
+    assert autofix_plain_lyrics("2pac.") == "2pac"
+    assert autofix_synced_lyrics([(1000, "2pac."), (2000, "")]) == [(1000, "2pac")]

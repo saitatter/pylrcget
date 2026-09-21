@@ -141,6 +141,7 @@ def fetch_lyrics_with_retry(
     api: LrcLibAPI,
     *,
     notify: ProgressCallback,
+    provider_label: str = "LRCLIB",
     title: str,
     artist: str,
     album: str | None,
@@ -154,7 +155,7 @@ def fetch_lyrics_with_retry(
         try:
             if before_request is not None and not before_request():
                 raise LyricsMatchCancelled
-            notify(f"Querying LRCLIB... (attempt {attempt}/{_MAX_LRCLIB_RETRIES})")
+            notify(f"Querying {provider_label}... (attempt {attempt}/{_MAX_LRCLIB_RETRIES})")
             return api.get_lyrics(
                 track_name=title,
                 artist_name=artist,
@@ -170,7 +171,10 @@ def fetch_lyrics_with_retry(
             if not _should_retry_lrclib_error(exc) or attempt >= _MAX_LRCLIB_RETRIES:
                 raise
             logger.warning("Retrying LRCLIB request for %s - %s after %s: %s", artist, title, type(exc).__name__, exc)
-            notify(f"LRCLIB request failed ({type(exc).__name__}); retrying in {backoff_s:.1f}s...")
+            notify(
+                f"{provider_label} request failed ({type(exc).__name__}); "
+                f"retrying in {backoff_s:.1f}s..."
+            )
             time.sleep(backoff_s)
             backoff_s *= 2
     if last_error is not None:
@@ -181,6 +185,7 @@ def find_best_lyrics_match(
     api: LrcLibAPI,
     *,
     notify: ProgressCallback,
+    provider_label: str = "LRCLIB",
     track_id: int,
     track_label: str,
     title: str,
@@ -194,6 +199,7 @@ def find_best_lyrics_match(
         lyrics = fetch_lyrics_with_retry(
             api,
             notify=notify,
+            provider_label=provider_label,
             title=title,
             artist=artist,
             album=album or None,
@@ -204,13 +210,13 @@ def find_best_lyrics_match(
         if _strip_empty(getattr(lyrics, "synced_lyrics", None)) or _strip_empty(getattr(lyrics, "plain_lyrics", None)):
             logger.debug("LRCLIB exact match selected for track %s with exact metadata.", track_label)
             return LyricsDownloadMatch(lyrics, 100, "exact metadata")
-        notify("Exact LRCLIB match has no usable lyrics; trying alternatives...")
+        notify(f"Exact {provider_label} match has no usable lyrics; trying alternatives...")
     except LyricsMatchCancelled:
         raise
     except Exception as exc:
         if not _is_lrclib_not_found(exc):
             raise
-        notify("Exact LRCLIB match not found; trying alternatives...")
+        notify(f"Exact {provider_label} match not found; trying alternatives...")
 
     best = None
     early_exit_score = _lrclib_early_exit_score()
@@ -218,7 +224,7 @@ def find_best_lyrics_match(
         try:
             if before_request is not None and not before_request():
                 raise LyricsMatchCancelled
-            notify(f"Searching LRCLIB with {query.label}...")
+            notify(f"Searching {provider_label} with {query.label}...")
             results = api.search_lyrics(
                 query=query.query or None,
                 track_name=query.title or None,

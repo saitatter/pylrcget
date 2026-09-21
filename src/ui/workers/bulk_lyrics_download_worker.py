@@ -232,7 +232,7 @@ class BulkLyricsDownloadWorker(QThread):
                     completed,
                     total,
                     "Lyrics download",
-                    f"Searching LRCLIB ({worker_count} at a time)...",
+                    f"Searching {self._provider_search_label()} ({worker_count} at a time)...",
                     self._elapsed(),
                 )
                 executor = ThreadPoolExecutor(max_workers=worker_count)
@@ -374,6 +374,18 @@ class BulkLyricsDownloadWorker(QThread):
             prepare_input(job.album),
             job.duration_s,
         )
+
+    def _provider_search_label(self) -> str:
+        raw_enabled = self._lyrics_source_settings.get("enabled")
+        enabled = raw_enabled if isinstance(raw_enabled, dict) else {}
+        raw_priority = self._lyrics_source_settings.get("priority")
+        priority = raw_priority if isinstance(raw_priority, list) else []
+        labels = [
+            LYRICS_SOURCE_LABELS.get(str(provider_id).casefold(), str(provider_id).title())
+            for provider_id in priority
+            if bool(enabled.get(str(provider_id).casefold(), False))
+        ]
+        return " + ".join(labels) or "enabled providers"
 
     def _fetch_job_match(self, job: _DownloadJob) -> _DownloadFetchResult:
         lookup_key = self._lookup_key(job)

@@ -10,6 +10,8 @@ def _normalize_autofix_line(text: str) -> str:
         cleaned = cleaned[:-1].rstrip()
     if not cleaned:
         return ""
+    if cleaned[0].isdigit():
+        return cleaned
 
     chars = list(cleaned)
     for index, char in enumerate(chars):
@@ -51,11 +53,12 @@ def _validate_line_text(content: str, line_no: int, is_synced: bool = False) -> 
         )
 
     first_alpha_lower = False
-    for char in content:
-        if char.isalpha():
-            if char.islower():
-                first_alpha_lower = True
-            break
+    if not content[0].isdigit():
+        for char in content:
+            if char.isalpha():
+                if char.islower():
+                    first_alpha_lower = True
+                break
     if first_alpha_lower:
         problems.append(
             LyricsValidationProblem(
