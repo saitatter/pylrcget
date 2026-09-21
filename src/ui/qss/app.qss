@@ -278,6 +278,23 @@ QLabel#SettingsValidationHint[validationState="success"] {
     border-color: {{color-success-border}};
 }
 
+QLabel#AIRuntimeStatusValue {
+    font-weight: 650;
+    color: {{color-text-muted}};
+}
+
+QLabel#AIRuntimeStatusValue[statusTone="success"] {
+    color: {{color-success-text}};
+}
+
+QLabel#AIRuntimeStatusValue[statusTone="warning"] {
+    color: {{color-warning-text}};
+}
+
+QLabel#AIRuntimeStatusValue[statusTone="error"] {
+    color: {{color-error-text}};
+}
+
 QTabWidget#MainTabs::pane {
     border: 1px solid {{color-border-strong}};
     border-radius: {{radius-xl}};

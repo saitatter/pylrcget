@@ -4,9 +4,10 @@ import json
 import os
 import re
 from dataclasses import replace
+from pathlib import Path
 
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QFont, QKeySequence
+from PySide6.QtCore import Qt, QUrl
+from PySide6.QtGui import QDesktopServices, QFont, QKeySequence
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -416,6 +417,39 @@ class MusicFoldersDialog(QDialog):
         )
         ai_sync_hint.setWordWrap(True)
         ai_sync_layout.addWidget(ai_sync_hint, 5, 0, 1, 2)
+
+        ai_runtime_box = QGroupBox("AI Runtime Status")
+        ai_runtime_box.setObjectName("AIRuntimeStatus")
+        ai_runtime_layout = QGridLayout(ai_runtime_box)
+        self.ai_runtime_status_labels: dict[str, QLabel] = {}
+        for row, (key, label) in enumerate(
+            (
+                ("runtime", "Runtime"),
+                ("device", "Device"),
+                ("english", "English aligner"),
+                ("multilingual", "Multilingual backend"),
+                ("fallback", "Fallback"),
+            )
+        ):
+            name_label = QLabel(label)
+            value_label = QLabel("Checking…")
+            value_label.setObjectName("AIRuntimeStatusValue")
+            value_label.setProperty("statusTone", "neutral")
+            value_label.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+            ai_runtime_layout.addWidget(name_label, row, 0)
+            ai_runtime_layout.addWidget(value_label, row, 1)
+            self.ai_runtime_status_labels[key] = value_label
+
+        ai_runtime_buttons = QHBoxLayout()
+        self.ai_runtime_refresh_btn = QPushButton("Refresh status")
+        self.ai_runtime_refresh_btn.setToolTip("Check the installed AI runtime and available backends.")
+        self.ai_runtime_manage_btn = QPushButton("Manage AI runtime")
+        self.ai_runtime_manage_btn.setToolTip("Open the folder containing the isolated AI runtime.")
+        ai_runtime_buttons.addWidget(self.ai_runtime_refresh_btn)
+        ai_runtime_buttons.addWidget(self.ai_runtime_manage_btn)
+        ai_runtime_buttons.addStretch(1)
+        ai_runtime_layout.addLayout(ai_runtime_buttons, 5, 0, 1, 2)
+        ai_sync_layout.addWidget(ai_runtime_box, 6, 0, 1, 2)
         ai_sync_tab_layout.addWidget(ai_sync_box)
         ai_sync_tab_layout.addStretch(1)
 
@@ -547,6 +581,10 @@ class MusicFoldersDialog(QDialog):
         self.lyrics_source_up_btn.clicked.connect(lambda: self._move_lyrics_source(-1))
         self.lyrics_source_down_btn.clicked.connect(lambda: self._move_lyrics_source(1))
         self.musixmatch_mode_combo.currentIndexChanged.connect(self._update_musixmatch_api_key_state)
+        self.ai_runtime_refresh_btn.clicked.connect(self._refresh_ai_runtime_status)
+        self.ai_runtime_manage_btn.clicked.connect(self._open_ai_runtime_folder)
+        self.ai_device_combo.currentIndexChanged.connect(self._refresh_ai_runtime_status)
+        self.ai_enable_demucs_chk.toggled.connect(self._refresh_ai_runtime_status)
 
     def _load(self):
         directories = get_directories(self.app_state.db)
@@ -631,6 +669,114 @@ class MusicFoldersDialog(QDialog):
         self._update_download_mode_hint()
         self._update_pattern_preview()
         self._validate_regex_patterns()
+        self._refresh_ai_runtime_status()
+
+    def _set_ai_runtime_status(self, key: str, text: str, tone: str) -> None:
+        label = self.ai_runtime_status_labels.get(key)
+        if label is None:
+            return
+        label.setText(text)
+        label.setProperty("statusTone", tone)
+        label.style().unpolish(label)
+        label.style().polish(label)
+        label.update()
+
+    def _refresh_ai_runtime_status(self, *_args) -> None:
+        """Show only AI runtime capabilities verified by the current environment."""
+        from ui.workers.ai.ai_runtime import (
+            default_ai_runtime_dir,
+            resolve_ai_runtime_python,
+        )
+        from ui.workers.ai.ai_sync_lyrics_aligner import (
+            is_available as english_aligner_available,
+        )
+        from ui.workers.ai.ai_sync_runtime import (
+            _cuda_runtime_available,
+            get_missing_ai_dependencies,
+        )
+
+        try:
+            runtime_python = resolve_ai_runtime_python()
+            missing = get_missing_ai_dependencies(
+                require_lyrics_aligner=True,
+                require_demucs=True,
+            )
+        except (OSError, RuntimeError, ValueError) as exc:
+            runtime_python = None
+            missing = [f"status check failed: {exc}"]
+
+        core_packages = {"torch", "torchaudio", "soundfile", "whisperx", "torch-cuda"}
+        core_missing = [item for item in missing if item in core_packages]
+        demucs_missing = "demucs" in missing
+        runtime_ready = runtime_python is not None and not core_missing
+
+        if runtime_python is None:
+            self._set_ai_runtime_status("runtime", "Not installed", "warning")
+        elif core_missing:
+            self._set_ai_runtime_status(
+                "runtime",
+                f"Missing: {', '.join(core_missing)}",
+                "error",
+            )
+        elif demucs_missing:
+            self._set_ai_runtime_status("runtime", "Ready · optional Demucs missing", "warning")
+        else:
+            self._set_ai_runtime_status("runtime", "Ready", "success")
+
+        selected_device = str(self.ai_device_combo.currentData() or "auto")
+        cuda_ready = False
+        if runtime_python is not None:
+            try:
+                cuda_ready = bool(_cuda_runtime_available(runtime_python))
+            except (OSError, RuntimeError, ValueError):
+                cuda_ready = False
+        if selected_device == "cuda":
+            device_text = "NVIDIA CUDA" if cuda_ready else "CUDA unavailable"
+            device_tone = "success" if cuda_ready else "warning"
+        elif selected_device == "cpu":
+            device_text = "CPU only"
+            device_tone = "neutral"
+        elif runtime_python is None:
+            device_text = "Auto · runtime unavailable"
+            device_tone = "warning"
+        else:
+            device_text = "Auto → NVIDIA CUDA" if cuda_ready else "Auto → CPU"
+            device_tone = "success" if cuda_ready else "neutral"
+        self._set_ai_runtime_status("device", device_text, device_tone)
+
+        try:
+            english_ready = bool(english_aligner_available())
+        except (OSError, RuntimeError, ValueError):
+            english_ready = False
+        self._set_ai_runtime_status(
+            "english",
+            "Ready" if english_ready else "Not installed",
+            "success" if english_ready else "warning",
+        )
+
+        multilingual_ready = runtime_ready and "whisperx" not in missing
+        self._set_ai_runtime_status(
+            "multilingual",
+            "Ready" if multilingual_ready else "Not ready",
+            "success" if multilingual_ready else "warning",
+        )
+        self._set_ai_runtime_status(
+            "fallback",
+            "WhisperX fallback ready" if multilingual_ready else "Unavailable",
+            "success" if multilingual_ready else "warning",
+        )
+
+        runtime_dir = default_ai_runtime_dir()
+        self.ai_runtime_manage_btn.setToolTip(
+            f"Open the isolated AI runtime folder: {runtime_dir}"
+        )
+
+    def _open_ai_runtime_folder(self) -> None:
+        from ui.workers.ai.ai_runtime import default_ai_runtime_dir
+
+        runtime_dir = Path(default_ai_runtime_dir())
+        runtime_dir.parent.mkdir(parents=True, exist_ok=True)
+        QDesktopServices.openUrl(QUrl.fromLocalFile(str(runtime_dir)))
 
     def add_folder(self):
         path = self._pick_directory("Select Music Folder")

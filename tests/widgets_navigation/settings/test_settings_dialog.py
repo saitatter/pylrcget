@@ -48,6 +48,46 @@ class SettingsDialogTests(unittest.TestCase):
             finally:
                 app_state.db.close()
 
+    def test_settings_dialog_shows_verified_ai_runtime_status(self):
+        with TemporaryDirectory() as tmp:
+            app_state = simple_app_state(initialize_database(tmp))
+            try:
+                with (
+                    patch(
+                        "ui.workers.ai.ai_runtime.resolve_ai_runtime_python",
+                        return_value=Path("C:/ai-runtime/Scripts/python.exe"),
+                    ),
+                    patch(
+                        "ui.workers.ai.ai_runtime.default_ai_runtime_dir",
+                        return_value=Path("C:/ai-runtime"),
+                    ),
+                    patch(
+                        "ui.workers.ai.ai_sync_runtime._cuda_runtime_available",
+                        return_value=True,
+                    ),
+                    patch(
+                        "ui.workers.ai.ai_sync_runtime.get_missing_ai_dependencies",
+                        return_value=["demucs"],
+                    ),
+                    patch(
+                        "ui.workers.ai.ai_sync_lyrics_aligner.is_available",
+                        return_value=True,
+                    ),
+                ):
+                    dialog = MusicFoldersDialog(app_state)
+                    try:
+                        dialog.ai_device_combo.setCurrentIndex(dialog.ai_device_combo.findData("auto"))
+                        self.assertEqual(dialog.ai_runtime_status_labels["runtime"].text(), "Ready · optional Demucs missing")
+                        self.assertEqual(dialog.ai_runtime_status_labels["device"].text(), "Auto → NVIDIA CUDA")
+                        self.assertEqual(dialog.ai_runtime_status_labels["english"].text(), "Ready")
+                        self.assertEqual(dialog.ai_runtime_status_labels["multilingual"].text(), "Ready")
+                        self.assertEqual(dialog.ai_runtime_status_labels["fallback"].text(), "WhisperX fallback ready")
+                        self.assertEqual(dialog.ai_runtime_status_labels["runtime"].property("statusTone"), "warning")
+                    finally:
+                        dialog.deleteLater()
+            finally:
+                app_state.db.close()
+
     def test_settings_dialog_uses_compact_scrollable_shortcuts_tab(self):
         with TemporaryDirectory() as tmp:
             app_state = simple_app_state(initialize_database(tmp))
