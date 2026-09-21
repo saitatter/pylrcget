@@ -133,6 +133,17 @@ class LyricsEditorWidgetTests(unittest.TestCase):
         finally:
             widget.deleteLater()
 
+    def test_unparseable_synced_field_is_shown_as_plain_lyrics(self):
+        widget = LyricsEditorWidget()
+        try:
+            widget.set_track_lyrics("Song", "", "First line\nSecond line", False, track_id=1)
+
+            self.assertIs(widget.stack.currentWidget(), widget.plain)
+            self.assertEqual(widget.plain.toPlainText(), "First line\nSecond line")
+            self.assertFalse(widget.empty_state.isVisible())
+        finally:
+            widget.deleteLater()
+
     def test_lyrics_header_does_not_inflate_minimum_height_hint(self):
         widget = LyricsEditorWidget()
         try:

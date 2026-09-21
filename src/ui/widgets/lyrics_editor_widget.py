@@ -721,6 +721,17 @@ class LyricsEditorWidget(QWidget):
                 self._loading_track = False
                 return
 
+            # Some legacy/provider data was stored in the synced field without
+            # LRC timestamps. Keep that content visible instead of treating the
+            # track as empty; it can be corrected or saved as plain lyrics.
+            if not txt:
+                txt = lrc
+            self._set_plain(txt)
+            self._set_publish_available(False, bool(txt) and not has_dirty_draft)
+            self._sync_header_height()
+            self._loading_track = False
+            return
+
         # else fall back to plain
         if txt:
             self._set_plain(txt)
