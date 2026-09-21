@@ -197,6 +197,25 @@ QLabel#LyricsMessage {
     color: {{color-empty-body}};
 }
 
+QTextEdit#LyricsPlainEditor {
+    background: {{color-bg-panel}};
+    color: {{color-text}};
+    border: 1px solid {{color-border}};
+    border-radius: {{radius-md}};
+    padding: 10px 12px;
+    font-size: {{font-size-md}};
+    selection-background-color: {{color-accent}};
+    selection-color: {{color-bg-app}};
+}
+
+QTextEdit#LyricsPlainEditor:hover {
+    border-color: {{color-border-hover}};
+}
+
+QTextEdit#LyricsPlainEditor:focus {
+    border-color: {{color-accent}};
+}
+
 QLabel#LyricsValidationHint {
     border-radius: {{radius-md}};
     padding: 6px {{space-3}};

@@ -11,6 +11,10 @@ class LyricsEditorWidgetTests(unittest.TestCase):
         widget = LyricsEditorWidget()
         try:
             self.assertFalse(widget.plain.acceptRichText())
+            self.assertEqual(widget.plain.objectName(), "LyricsPlainEditor")
+            self.assertEqual(widget.plain.lineWrapMode(), widget.plain.LineWrapMode.WidgetWidth)
+            self.assertIn("QTextEdit#LyricsPlainEditor", widget.styleSheet())
+            self.assertIn("font-size: 13px", widget.styleSheet())
         finally:
             widget.deleteLater()
 

@@ -386,7 +386,9 @@ class LyricsEditorWidget(QWidget):
 
         # Plain editor (editable if you want)
         self.plain = QTextEdit()
+        self.plain.setObjectName("LyricsPlainEditor")
         self.plain.setAcceptRichText(False)
+        self.plain.setLineWrapMode(QTextEdit.LineWrapMode.WidgetWidth)
         self.plain.setPlaceholderText("Lyrics will appear here")
         self.plain.textChanged.connect(self._on_any_edit)
         self.stack.addWidget(self.plain)
