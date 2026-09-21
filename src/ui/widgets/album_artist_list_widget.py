@@ -366,6 +366,7 @@ class AlbumArtistListWidget(QWidget):
             return
 
         menu = QMenu(self)
+        menu.setObjectName("AlbumArtistContextMenu")
         info = menu.addAction(str(name))
         info.setEnabled(False)
         menu.addSeparator()

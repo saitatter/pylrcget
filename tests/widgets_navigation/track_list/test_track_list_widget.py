@@ -203,10 +203,14 @@ class TrackListWidgetTests(unittest.TestCase):
             widget.deleteLater()
             app_state.db.close()
 
-    def test_context_menu_omits_bulk_actions_duplicated_in_selection_bar(self):
+    def test_context_menu_keeps_row_actions_and_omits_bulk_actions(self):
         app_state = simple_app_state()
         widget = TrackListWidget(app_state)
+        downloaded = []
+        exported = []
         try:
+            widget.downloadLyrics.connect(downloaded.append)
+            widget.exportLyricsFiles.connect(exported.append)
             focused_row = TrackListRow(
                 track_id=1,
                 title="Song",
@@ -226,8 +230,26 @@ class TrackListWidgetTests(unittest.TestCase):
                 focused_row=focused_row,
             )
 
-            self.assertIsNone(actions["download"])
-            self.assertIsNone(actions["export"])
+            self.assertEqual(actions["download"].text(), "Download lyrics")
+            self.assertEqual(actions["export"].text(), "Export lyrics files")
+            widget._handle_track_context_menu_choice(
+                actions["download"],
+                actions,
+                selected_ids=[1],
+                current_track_id=1,
+                focused_artist_id=7,
+                focused_album_id=11,
+            )
+            widget._handle_track_context_menu_choice(
+                actions["export"],
+                actions,
+                selected_ids=[1],
+                current_track_id=1,
+                focused_artist_id=7,
+                focused_album_id=11,
+            )
+            self.assertEqual(downloaded, [1])
+            self.assertEqual(exported, [1])
             self.assertIsNone(actions["refresh_selected"])
             self.assertIsNone(actions["download_selected"])
             self.assertIsNone(actions["download_synced"])

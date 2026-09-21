@@ -371,11 +371,10 @@ class ArtistListWidget(QWidget):
         artist_name = self.model.index(idx.row(), 0).data(Qt.ItemDataRole.DisplayRole) or "N/A"
 
         menu = QMenu(self)
+        menu.setObjectName("ArtistContextMenu")
         info = menu.addAction(str(artist_name))
         info.setEnabled(False)
         menu.addSeparator()
-        browse = menu.addAction("Browse")
-        browse.setEnabled(False)
         act_open = menu.addAction("Open artist")
 
         chosen = menu.exec(self.table.viewport().mapToGlobal(pos))

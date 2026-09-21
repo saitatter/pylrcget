@@ -474,11 +474,10 @@ class AlbumListWidget(QWidget):
         album_name = self.model.index(idx.row(), 0).data(Qt.ItemDataRole.DisplayRole) or "N/A"
 
         menu = QMenu(self)
+        menu.setObjectName("AlbumContextMenu")
         info = menu.addAction(str(album_name))
         info.setEnabled(False)
         menu.addSeparator()
-        browse = menu.addAction("Browse")
-        browse.setEnabled(False)
         act_open = menu.addAction("Open album")
         chosen = menu.exec(self.table.viewport().mapToGlobal(pos))
         if chosen == act_open:

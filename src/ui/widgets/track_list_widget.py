@@ -486,19 +486,21 @@ class TrackListWidget(QWidget):
         actions["open_folder"] = menu.addAction("Open containing folder")
         actions["open_artist"] = menu.addAction("Open artist")
         actions["open_album"] = menu.addAction("Open album")
+        actions["download"] = menu.addAction("Download lyrics")
         actions["open_folder"].setEnabled(has_focused_track)
         actions["open_artist"].setEnabled(focused_artist_id is not None)
         actions["open_album"].setEnabled(focused_album_id is not None)
+        actions["download"].setEnabled(has_focused_track)
 
         menu.addSeparator()
         self._add_context_section(menu, "Lyrics", f"{len(selected_ids)} selected track(s)")
+        actions["export"] = menu.addAction("Export lyrics files")
         actions["cleanup_lyrics"] = menu.addAction("Clean lyrics…")
+        actions["export"].setEnabled(has_focused_track)
         actions["cleanup_lyrics"].setEnabled(bool(selected_ids))
 
         actions.update(
             {
-                "download": None,
-                "export": None,
                 "refresh_selected": None,
                 "download_selected": None,
                 "download_synced": None,
@@ -535,6 +537,12 @@ class TrackListWidget(QWidget):
         elif chosen == actions.get("open_album"):
             if focused_album_id is not None:
                 self._emit_album_navigation(int(focused_album_id))
+        elif chosen == actions.get("download"):
+            if current_track_id is not None:
+                self.downloadLyrics.emit(int(current_track_id))
+        elif chosen == actions.get("export"):
+            if current_track_id is not None:
+                self.exportLyricsFiles.emit(int(current_track_id))
         elif chosen == actions.get("cleanup_lyrics"):
             self.cleanupLyricsRequested.emit(selected_ids)
         elif chosen == actions.get("download_selected"):
