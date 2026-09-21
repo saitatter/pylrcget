@@ -15,7 +15,6 @@ QLabel#LyricsValidationBadge {
 
 QPushButton#LyricsDiscardDraft,
 QPushButton#LyricsShowDiff,
-QPushButton#LyricsSwitchMode,
 QPushButton#LyricsAutoSync {
     min-height: 28px;
     max-height: 28px;
@@ -72,16 +71,37 @@ QPushButton#LyricsShowDiff:hover {
     color: {{color-text}};
 }
 
-QPushButton#LyricsSwitchMode {
-    background: transparent;
-    color: {{color-text-muted}};
+QWidget#LyricsModeSelector {
+    min-height: 28px;
+    max-height: 28px;
+    padding: 1px;
+    background: {{color-bg-control}};
     border: 1px solid {{color-border}};
+    border-radius: {{radius-sm}};
 }
 
-QPushButton#LyricsSwitchMode:hover {
+QPushButton#LyricsModeButton {
+    min-height: 24px;
+    max-height: 24px;
+    min-width: 52px;
+    padding: 0 8px;
+    background: transparent;
+    color: {{color-text-muted}};
+    border: none;
+    border-radius: {{radius-sm}};
+    font-size: {{font-size-xs}};
+    font-weight: 650;
+}
+
+QPushButton#LyricsModeButton:hover {
     background: {{color-bg-elevated}};
-    border-color: {{color-accent}};
     color: {{color-text}};
+}
+
+QPushButton#LyricsModeButton:checked {
+    background: {{color-accent}};
+    border-color: {{color-accent}};
+    color: {{color-bg-app}};
 }
 
 QPushButton#LyricsAutoSync {

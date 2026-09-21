@@ -9,6 +9,7 @@ from PySide6.QtCore import QEvent, Qt, QTimer, Signal
 from PySide6.QtGui import QColor, QKeySequence, QShortcut, QTextCursor
 from PySide6.QtWidgets import (
     QApplication,
+    QButtonGroup,
     QDoubleSpinBox,
     QHBoxLayout,
     QHeaderView,
@@ -180,12 +181,30 @@ class LyricsEditorWidget(QWidget):
         self.btn_show_diff.clicked.connect(self._show_diff)
         title_row.addWidget(self.btn_show_diff)
 
-        self.btn_switch_mode = QPushButton("Switch to Synced")
-        self.btn_switch_mode.setObjectName("LyricsSwitchMode")
-        self.btn_switch_mode.setToolTip("Toggle between synced (timestamped) and plain text editing")
-        self.btn_switch_mode.hide()
-        self.btn_switch_mode.clicked.connect(self._toggle_editor_mode)
-        title_row.addWidget(self.btn_switch_mode)
+        self.mode_selector = QWidget()
+        self.mode_selector.setObjectName("LyricsModeSelector")
+        mode_layout = QHBoxLayout(self.mode_selector)
+        set_layout_spacing(mode_layout, margins=2, spacing=0)
+        self.mode_group = QButtonGroup(self)
+        self.mode_group.setExclusive(True)
+        self.btn_mode_synced = QPushButton("Synced", self.mode_selector)
+        self.btn_mode_synced.setObjectName("LyricsModeButton")
+        self.btn_mode_synced.setCheckable(True)
+        self.btn_mode_synced.setAccessibleName("Synced lyrics mode")
+        self.btn_mode_synced.setToolTip("Edit timestamped synced lyrics")
+        self.btn_mode_plain = QPushButton("Plain", self.mode_selector)
+        self.btn_mode_plain.setObjectName("LyricsModeButton")
+        self.btn_mode_plain.setCheckable(True)
+        self.btn_mode_plain.setAccessibleName("Plain lyrics mode")
+        self.btn_mode_plain.setToolTip("Edit plain text lyrics")
+        self.mode_group.addButton(self.btn_mode_synced)
+        self.mode_group.addButton(self.btn_mode_plain)
+        self.btn_mode_synced.clicked.connect(lambda: self._select_editor_mode("synced"))
+        self.btn_mode_plain.clicked.connect(lambda: self._select_editor_mode("plain"))
+        mode_layout.addWidget(self.btn_mode_synced)
+        mode_layout.addWidget(self.btn_mode_plain)
+        self.mode_selector.hide()
+        title_row.addWidget(self.mode_selector)
 
         self.btn_clear_timestamps = QPushButton("Clear Timestamps")
         self.btn_clear_timestamps.setToolTip("Reset all synced timestamps to 00:00 (undoable)")
@@ -205,8 +224,8 @@ class LyricsEditorWidget(QWidget):
             self.dirty_badge,
             self.btn_discard_draft,
             self.btn_show_diff,
-            self.btn_switch_mode,
             self.btn_auto_sync,
+            self.mode_selector,
         ):
             title_control.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
 
@@ -663,7 +682,7 @@ class LyricsEditorWidget(QWidget):
         self.btn_sync_others.setEnabled(False)
         self.btn_export_files.setEnabled(False)
         self._update_publish_enabled()
-        self.btn_switch_mode.hide()
+        self.mode_selector.hide()
         self.btn_clear_timestamps.hide()
         self.btn_auto_sync.hide()
 
@@ -704,8 +723,7 @@ class LyricsEditorWidget(QWidget):
         self.btn_shift_all_from_first.setEnabled(False)
         self.btn_export_files.setEnabled(True)
         self.btn_sync_others.setEnabled(True)
-        self.btn_switch_mode.setText("Switch to Synced")
-        self.btn_switch_mode.setVisible(True)
+        self._set_editor_mode("plain")
         self.btn_auto_sync.setVisible(True)
         self._validate_current_lyrics()
 
@@ -718,6 +736,23 @@ class LyricsEditorWidget(QWidget):
         """Expose AI sync from the empty state while keeping the regular editor visible."""
         self._start_writing_lyrics()
         self.autoSyncRequested.emit()
+
+    def _select_editor_mode(self, mode: str) -> None:
+        should_toggle = (
+            mode == "synced" and self.stack.currentWidget() is self.plain
+        ) or (
+            mode == "plain" and self.stack.currentWidget() is self.table
+        )
+        if should_toggle:
+            self._toggle_editor_mode()
+        else:
+            self._set_editor_mode(mode)
+
+    def _set_editor_mode(self, mode: str) -> None:
+        synced = mode == "synced"
+        self.btn_mode_synced.setChecked(synced)
+        self.btn_mode_plain.setChecked(not synced)
+        self.mode_selector.setVisible(True)
 
     def _toggle_editor_mode(self):
         """Switch between synced (table) and plain text editing modes."""
@@ -866,8 +901,7 @@ class LyricsEditorWidget(QWidget):
         self.btn_shift_selected.setEnabled(has_selection)
         self.btn_export_files.setEnabled(True)
         self.btn_sync_others.setEnabled(True)
-        self.btn_switch_mode.setText("Switch to Plain")
-        self.btn_switch_mode.setVisible(True)
+        self._set_editor_mode("synced")
         self.btn_clear_timestamps.setVisible(True)
         self.btn_auto_sync.setVisible(True)
         self._validate_current_lyrics()

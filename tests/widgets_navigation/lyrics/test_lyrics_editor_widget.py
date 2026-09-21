@@ -143,6 +143,21 @@ class LyricsEditorWidgetTests(unittest.TestCase):
         finally:
             widget.deleteLater()
 
+    def test_mode_selector_tracks_current_editor_mode(self):
+        widget = LyricsEditorWidget()
+        try:
+            widget._set_plain("First line")
+            self.assertTrue(widget.btn_mode_plain.isChecked())
+            self.assertFalse(widget.btn_mode_synced.isChecked())
+            self.assertFalse(widget.mode_selector.isHidden())
+
+            widget.btn_mode_synced.click()
+            self.assertTrue(widget.btn_mode_synced.isChecked())
+            self.assertFalse(widget.btn_mode_plain.isChecked())
+            self.assertIs(widget.stack.currentWidget(), widget.table)
+        finally:
+            widget.deleteLater()
+
     def test_switching_modes_preserves_synced_timestamps(self):
         widget = LyricsEditorWidget()
         try:
