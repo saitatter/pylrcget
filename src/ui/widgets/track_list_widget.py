@@ -210,6 +210,7 @@ class TrackListWidget(QWidget):
         self.table.setColumnHidden(3, not bool(show))
 
     def apply_current_palette(self) -> None:
+        self._apply_styles()
         self.table.viewport().update()
         self.table.update()
 

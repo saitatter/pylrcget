@@ -179,6 +179,7 @@ class AlbumListWidget(QWidget):
         self.track_list.set_ui_scale(self._ui_scale)
 
     def apply_current_palette(self) -> None:
+        self._apply_styles()
         self.table.viewport().update()
         self.table.update()
         self.track_list.apply_current_palette()

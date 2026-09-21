@@ -1,8 +1,12 @@
 from __future__ import annotations
 
-import pytest
+from types import SimpleNamespace
 
-from ui.theme_tokens import get_theme_tokens
+import pytest
+from PySide6.QtWidgets import QApplication
+
+from ui.theme_tokens import get_theme_tokens, set_theme_tokens
+from ui.widgets.album_list_widget import AlbumListWidget
 
 
 @pytest.mark.parametrize(
@@ -56,3 +60,20 @@ def test_optional_theme_keeps_its_palette_mode_for_semantic_fallbacks() -> None:
 
     assert tokens["palette-mode"] == "dark"
     assert tokens["color-success-bg"] == "#102A20"
+
+
+def test_album_table_reloads_qss_after_palette_change() -> None:
+    app = QApplication.instance() or QApplication([])
+    del app
+    set_theme_tokens("DarkTheme")
+    widget = AlbumListWidget(SimpleNamespace(db=None))
+
+    try:
+        set_theme_tokens("LightTheme")
+        widget.apply_current_palette()
+
+        assert "#fafafa" in widget.styleSheet()
+        assert "#303030" not in widget.styleSheet()
+    finally:
+        widget.deleteLater()
+        set_theme_tokens("DarkTheme")

@@ -171,6 +171,7 @@ class AlbumArtistListWidget(QWidget):
         self.album_browser.set_ui_scale(self._ui_scale)
 
     def apply_current_palette(self) -> None:
+        self._apply_styles()
         self.table.viewport().update()
         self.table.update()
         self.album_browser.apply_current_palette()
