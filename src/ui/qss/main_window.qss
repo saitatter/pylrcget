@@ -257,6 +257,20 @@ QToolButton#SelectionActionMenuButton:hover {
     background: {{color-bg-elevated}};
 }
 
+QPushButton#SelectionActionButton:disabled,
+QToolButton#SelectionActionMenuButton:disabled {
+    background: {{color-disabled-bg}};
+    border-color: {{color-disabled-border}};
+    color: {{color-disabled-text}};
+}
+
+QPushButton#SelectionActionButton:disabled:hover,
+QToolButton#SelectionActionMenuButton:disabled:hover {
+    background: {{color-disabled-bg}};
+    border-color: {{color-disabled-border}};
+    color: {{color-disabled-text}};
+}
+
 QToolButton#SelectionActionMenuButton::menu-indicator {
     image: none;
     width: 0px;

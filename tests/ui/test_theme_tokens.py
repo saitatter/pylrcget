@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from types import SimpleNamespace
 
 import pytest
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QApplication
 
+from core.tracklist_models import DownloadState, LyricsState, TrackListRow
+from ui.models.track_table_model import TrackTableModel
 from ui.style_loader import load_stylesheet
 from ui.theme_tokens import get_theme_tokens, set_theme_tokens
 from ui.widgets.album_list_widget import AlbumListWidget
@@ -114,5 +118,42 @@ def test_checked_checkbox_focus_keeps_light_accent_fill() -> None:
         assert "QCheckBox:hover::indicator" not in stylesheet
         assert "background: #3f51b5;" in stylesheet
         assert "background: #5f5fc4;" in stylesheet
+    finally:
+        set_theme_tokens("DarkTheme")
+
+
+def test_light_theme_lyrics_statuses_use_semantic_text_colors() -> None:
+    set_theme_tokens("LightTheme")
+    try:
+        row = TrackListRow(
+            track_id=1,
+            title="Song",
+            artist="Artist",
+            artist_id=None,
+            album="Album",
+            album_id=None,
+            track_number=1,
+            duration_s=120,
+            lyrics_state=LyricsState.NONE,
+            download_state=DownloadState.IDLE,
+        )
+        model = TrackTableModel([row])
+
+        assert model.data(model.index(0, 3), Qt.ForegroundRole).name() == "#b42318"
+
+        model._rows[0] = replace(row, lyrics_state=LyricsState.SYNCED)
+        assert model.data(model.index(0, 3), Qt.ForegroundRole).name() == "#067647"
+    finally:
+        set_theme_tokens("DarkTheme")
+
+
+def test_selection_actions_have_explicit_disabled_light_theme_style() -> None:
+    set_theme_tokens("LightTheme")
+    try:
+        stylesheet = load_stylesheet("main_window.qss")
+        assert "QPushButton#SelectionActionButton:disabled" in stylesheet
+        assert "QToolButton#SelectionActionMenuButton:disabled" in stylesheet
+        assert "background: #e5e7eb;" in stylesheet
+        assert "color: #475569;" in stylesheet
     finally:
         set_theme_tokens("DarkTheme")

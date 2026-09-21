@@ -94,11 +94,11 @@ class TrackTableModel(QAbstractTableModel):
                 return ""
         if role == Qt.ForegroundRole and col == 3:
             if row.has_dirty_lyrics:
-                return QColor(STYLE_TOKENS.get("color-warning-border", "#f59e0b"))
+                return QColor(STYLE_TOKENS.get("color-warning-text", "#f59e0b"))
             color_map = {
-                LyricsState.NONE: QColor(STYLE_TOKENS.get("color-error-border", "#ef4444")),
-                LyricsState.PLAIN: QColor(STYLE_TOKENS.get("color-warning-border", "#f59e0b")),
-                LyricsState.SYNCED: QColor(STYLE_TOKENS.get("color-success-border", "#22c55e")),
+                LyricsState.NONE: QColor(STYLE_TOKENS.get("color-error-text", "#ef4444")),
+                LyricsState.PLAIN: QColor(STYLE_TOKENS.get("color-warning-text", "#f59e0b")),
+                LyricsState.SYNCED: QColor(STYLE_TOKENS.get("color-success-text", "#22c55e")),
                 LyricsState.INSTRUMENTAL: QColor(STYLE_TOKENS.get("color-accent-alt", "#60a5fa")),
             }
             return color_map.get(row.lyrics_state, QColor(STYLE_TOKENS.get("color-text-muted", "#94a3b8")))
