@@ -5,7 +5,17 @@ from dataclasses import replace
 
 from PySide6.QtCore import QByteArray, QRect, Qt
 from PySide6.QtGui import QKeySequence, QShortcut
-from PySide6.QtWidgets import QApplication, QWidget
+from PySide6.QtWidgets import (
+    QAbstractButton,
+    QAbstractSpinBox,
+    QApplication,
+    QComboBox,
+    QLineEdit,
+    QPlainTextEdit,
+    QSlider,
+    QTextEdit,
+    QWidget,
+)
 
 from db.queries import get_config, set_config
 from ui.app_theme import apply_app_theme
@@ -66,6 +76,35 @@ def apply_global_shortcuts(window, bindings: dict[str, dict[str, object]]) -> No
             effective_hotkey_text(bindings.get(action), HOTKEY_SPECS[action]),
             callback,
         )
+
+    app = QApplication.instance()
+    if app is not None and not hasattr(window, "_play_pause_focus_slot"):
+        slot = lambda _old, _new: update_play_pause_shortcut(window)
+        app.focusChanged.connect(slot)
+        window._play_pause_focus_slot = slot
+    update_play_pause_shortcut(window)
+
+
+def _space_belongs_to_focused_control(focus_widget: QWidget | None) -> bool:
+    return isinstance(
+        focus_widget,
+        (
+            QAbstractButton,
+            QAbstractSpinBox,
+            QComboBox,
+            QLineEdit,
+            QPlainTextEdit,
+            QSlider,
+            QTextEdit,
+        ),
+    )
+
+
+def update_play_pause_shortcut(window) -> None:
+    shortcut = getattr(window, "_global_shortcuts", {}).get("play_pause")
+    if shortcut is None:
+        return
+    shortcut.setEnabled(not _space_belongs_to_focused_control(QApplication.focusWidget()))
 
 
 def replace_global_shortcut(window, action: str, key: str, callback) -> None:

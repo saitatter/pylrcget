@@ -1083,14 +1083,19 @@ class MainWindow(QMainWindow):
 
     def _toggle_play_pause(self) -> None:
         from PySide6.QtWidgets import (
+            QAbstractButton,
             QAbstractSpinBox,
             QComboBox,
             QLineEdit,
             QPlainTextEdit,
+            QSlider,
             QTextEdit,
         )
         focus = QApplication.focusWidget()
-        if isinstance(focus, (QLineEdit, QTextEdit, QPlainTextEdit, QAbstractSpinBox, QComboBox)):
+        if isinstance(
+            focus,
+            (QAbstractButton, QAbstractSpinBox, QComboBox, QLineEdit, QPlainTextEdit, QSlider, QTextEdit),
+        ):
             return
         if self.app_state.player:
             self.app_state.player.toggle_play_pause()

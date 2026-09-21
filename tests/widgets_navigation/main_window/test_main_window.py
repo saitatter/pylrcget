@@ -1,10 +1,11 @@
 from dataclasses import replace
 
-from PySide6.QtWidgets import QDialog, QToolButton
+from PySide6.QtWidgets import QCheckBox, QDialog, QToolButton
 
 from db.models import Config
 from db.queries import get_config, set_config
 from tests.widgets_navigation._shared import *
+from ui.main_window_parts import preferences
 from ui.main_window_parts.preferences import persist_window_state_payload
 
 
@@ -136,6 +137,26 @@ class MainWindowInstrumentalTests(unittest.TestCase):
         dialog_cls.assert_called_once()
         dialog_cls.return_value.exec.assert_called_once()
         notify_mock.assert_not_called()
+
+    def test_space_playback_shortcut_yields_to_focused_checkbox(self):
+        window = MainWindow.__new__(MainWindow)
+        player = SimpleNamespace(toggle_play_pause=MagicMock())
+        window.app_state = SimpleNamespace(player=player)
+        shortcut = MagicMock()
+        window._global_shortcuts = {"play_pause": shortcut}
+        checkbox = QCheckBox("Filter")
+        checkbox.show()
+        checkbox.setFocus()
+        self.app.processEvents()
+
+        try:
+            preferences.update_play_pause_shortcut(window)
+            MainWindow._toggle_play_pause(window)
+
+            shortcut.setEnabled.assert_called_once_with(False)
+            player.toggle_play_pause.assert_not_called()
+        finally:
+            checkbox.deleteLater()
 
     def test_slider_up_down_moves_active_lyrics_selection(self):
         window = MainWindow.__new__(MainWindow)
