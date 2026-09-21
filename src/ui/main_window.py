@@ -178,7 +178,15 @@ class MainWindow(QMainWindow):
         self.central_widget = QWidget()
         self.setCentralWidget(self.central_widget)
         self.layout = QVBoxLayout(self.central_widget)
-        set_layout_spacing(self.layout, margins=SPACE_3, spacing=SPACE_3)
+        set_layout_spacing(self.layout, margins=0, spacing=0)
+        self.content_widget = QWidget()
+        self.content_layout = QVBoxLayout(self.content_widget)
+        set_layout_spacing(
+            self.content_layout,
+            margins=(SPACE_3, SPACE_3, SPACE_3, 0),
+            spacing=SPACE_3,
+        )
+        self.layout.addWidget(self.content_widget, 1)
 
         self.toasts = ToastManager(self.central_widget)
         self.app_state.notification.connect(self._on_notify)
@@ -203,7 +211,7 @@ class MainWindow(QMainWindow):
             on_filter_changed=self._apply_track_filters,
             parent=self,
         )
-        self.layout.addWidget(self.top_bar)
+        self.content_layout.addWidget(self.top_bar)
 
         self.nav_bar = QWidget()
         self.nav_bar.setObjectName("LibraryNavBar")
@@ -217,7 +225,7 @@ class MainWindow(QMainWindow):
         self.breadcrumbs_layout = QHBoxLayout(self.breadcrumbs)
         set_layout_spacing(self.breadcrumbs_layout, margins=0, spacing=SPACE_1)
         nav_layout.addWidget(self.breadcrumbs, 1)
-        self.layout.addWidget(self.nav_bar)
+        self.content_layout.addWidget(self.nav_bar)
 
         # --- Tabs ---
         self.tabs = QTabWidget()
@@ -363,11 +371,10 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(self.mylrclib_tab, "Lyrics Activity")
         self.tabs.setAccessibleName("Library navigation tabs")
 
-        self.layout.addWidget(self.tabs)
+        self.content_layout.addWidget(self.tabs)
 
         # --- PlayerBar ---
         self.player_bar = PlayerBar(self.app_state.player, self)
-        self.layout.addWidget(self.player_bar)
         self.toasts.set_bottom_anchor(self.player_bar)
         self.player_bar.set_prev_next_handlers(self.play_prev, self.play_next)
         self.player_bar.playbackSpeedChanged.connect(self._persist_playback_speed)
@@ -500,14 +507,15 @@ class MainWindow(QMainWindow):
         scan_layout.addWidget(self.progress_bar, 1)
         scan_layout.addWidget(self.btn_cancel_scan)
 
-        self.layout.addWidget(self.scan_row)
+        self.content_layout.addWidget(self.scan_row)
         self.scan_row.setVisible(False)
         self.scan_row.setObjectName("ScanRow")
 
         self.log_panel = LogPanel(self)
         self.log_panel.set_log_file_path(getattr(self.app_state, "log_path", ""))
         self.log_panel.setVisible(False)
-        self.layout.addWidget(self.log_panel)
+        self.content_layout.addWidget(self.log_panel)
+        self.layout.addWidget(self.player_bar)
         self._ui_log_handler.bridge.messageReady.connect(self._on_log_message)
         logging.getLogger().addHandler(self._ui_log_handler)
 
@@ -671,8 +679,9 @@ class MainWindow(QMainWindow):
         def add_menu_button(text: str, tooltip: str, menu_items: list[tuple[str, object]]) -> QToolButton:
             button = QToolButton()
             button.setObjectName("SelectionActionMenuButton")
-            button.setText(f"{text} v")
+            button.setText(text)
             button.setToolTip(tooltip)
+            button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextOnly)
             button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
 
             menu = QMenu(button)
@@ -1129,6 +1138,7 @@ class MainWindow(QMainWindow):
                     "font_size_mode",
                     "show_album_art",
                     "ignore_sort_articles",
+                    "items_per_tab_page",
                 )
             )
             if appearance_changed:
@@ -1422,11 +1432,9 @@ class MainWindow(QMainWindow):
         return library_actions.get_primary_track_download_state(self, track_id)
 
     def _show_status_message(self, message: str, timeout_ms: int | None = None) -> None:
-        message = str(message or "").strip()
-        if not message:
-            self._clear_status_message()
-            return
-        self.toasts.show_status(message, timeout_ms)
+        # Keep this callback for controllers that expose status feedback, but do
+        # not render a persistent message strip above the player bar.
+        return
 
     def _clear_status_message(self) -> None:
         self.toasts.clear_status()

@@ -1,5 +1,6 @@
 from PySide6.QtWidgets import QGridLayout, QGroupBox
 
+from db.database import get_config
 from tests.widgets_navigation._shared import *
 from ui.hotkeys import HOTKEY_SPECS
 
@@ -186,6 +187,24 @@ class SettingsDialogTests(unittest.TestCase):
                     self.assertLessEqual(dialog.excluded_patterns_edit.maximumHeight(), 140)
                     self.assertIn(dialog.scan_source_combo.currentData(), {"both", "embedded_only", "sidecar_only"})
                 finally:
+                    dialog.deleteLater()
+            finally:
+                app_state.db.close()
+
+    def test_settings_dialog_loads_and_saves_items_per_tab_page(self):
+        with TemporaryDirectory() as tmp:
+            app_state = simple_app_state(initialize_database(tmp))
+            try:
+                dialog = MusicFoldersDialog(app_state)
+                dialog.items_per_tab_page_spin.setValue(20)
+                dialog.save()
+
+                reloaded = MusicFoldersDialog(app_state)
+                try:
+                    self.assertEqual(reloaded.items_per_tab_page_spin.value(), 20)
+                    self.assertEqual(get_config(app_state.db).items_per_tab_page, 20)
+                finally:
+                    reloaded.deleteLater()
                     dialog.deleteLater()
             finally:
                 app_state.db.close()

@@ -317,6 +317,13 @@ class MusicFoldersDialog(QDialog):
         self.startup_view_combo.addItem("Artists", "artists")
         self.startup_view_combo.addItem("Album Artists", "album_artists")
         self.startup_view_combo.addItem("Lyrics Activity", "my_lrclib")
+        self.items_per_tab_page_spin = QSpinBox()
+        self.items_per_tab_page_spin.setRange(10, 1000)
+        self.items_per_tab_page_spin.setSingleStep(10)
+        self.items_per_tab_page_spin.setSuffix(" items")
+        self.items_per_tab_page_spin.setToolTip(
+            "Maximum rows loaded per table page. Lower values make indexed paging easier to test."
+        )
         appearance_layout.addWidget(QLabel("Theme"), 0, 0)
         appearance_layout.addWidget(self.theme_combo, 0, 1)
         appearance_layout.addWidget(QLabel("UI scale"), 1, 0)
@@ -327,9 +334,13 @@ class MusicFoldersDialog(QDialog):
         appearance_layout.addWidget(self.album_art_combo, 3, 1)
         appearance_layout.addWidget(QLabel("Startup view"), 4, 0)
         appearance_layout.addWidget(self.startup_view_combo, 4, 1)
-        startup_hint = QLabel("Startup view is applied the next time the app opens.")
+        appearance_layout.addWidget(QLabel("Items per tab page"), 5, 0)
+        appearance_layout.addWidget(self.items_per_tab_page_spin, 5, 1)
+        startup_hint = QLabel(
+            "Startup view is applied the next time the app opens. Lower page sizes help test indexed table pages."
+        )
         startup_hint.setWordWrap(True)
-        appearance_layout.addWidget(startup_hint, 5, 0, 1, 2)
+        appearance_layout.addWidget(startup_hint, 6, 0, 1, 2)
         appearance_layout_root.addWidget(appearance_box)
         appearance_layout_root.addStretch(1)
 
@@ -728,6 +739,7 @@ class MusicFoldersDialog(QDialog):
         self.album_art_combo.setCurrentIndex(max(0, album_art_idx))
         startup_view_idx = self.startup_view_combo.findData(config.startup_view or "remember_last")
         self.startup_view_combo.setCurrentIndex(max(0, startup_view_idx))
+        self.items_per_tab_page_spin.setValue(int(getattr(config, "items_per_tab_page", 200) or 200))
         self.save_sidecars_chk.setChecked(config.save_lyrics_sidecars)
         sidecar_format_idx = self.sidecar_format_combo.findData(getattr(config, "lyrics_sidecar_format", "both") or "both")
         self.sidecar_format_combo.setCurrentIndex(max(0, sidecar_format_idx))
@@ -1240,6 +1252,7 @@ class MusicFoldersDialog(QDialog):
         if not isinstance(ui_state, dict):
             ui_state = {}
         ui_state["editor_auto_edit_on_add_line"] = self.auto_edit_on_add_line_chk.isChecked()
+        ui_state["items_per_tab_page"] = int(self.items_per_tab_page_spin.value())
         ui_state_json = merge_lyrics_source_settings(
             json.dumps(ui_state, ensure_ascii=True, separators=(",", ":")),
             self._current_lyrics_source_settings(),

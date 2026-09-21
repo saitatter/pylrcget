@@ -443,6 +443,11 @@ def apply_appearance_preferences(window, config) -> None:
         window.artists_tab.set_ui_scale(scale)
     if hasattr(window, "album_artists_tab"):
         window.album_artists_tab.set_ui_scale(scale)
+    page_size = max(10, min(1000, int(getattr(config, "items_per_tab_page", 200) or 200)))
+    for widget_name in ("track_list", "albums_tab", "artists_tab", "album_artists_tab"):
+        widget = getattr(window, widget_name, None)
+        if hasattr(widget, "set_page_size"):
+            widget.set_page_size(page_size)
     if hasattr(window, "_all_lyrics_views"):
         for view in window._all_lyrics_views():
             view.set_ui_scale(scale)

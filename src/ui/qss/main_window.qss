@@ -1,5 +1,5 @@
 QWidget#TopBar {
-    background: {{color-bg-panel}};
+    background-color: {{color-bg-panel}};
     border: 1px solid {{color-border-strong}};
     border-radius: {{radius-lg}};
     min-height: 46px;
@@ -50,6 +50,31 @@ QToolButton#TopBarAction {
     min-width: 32px;
     min-height: 32px;
     padding: 4px;
+    background: transparent;
+    color: {{color-text}};
+    border: 1px solid transparent;
+    border-radius: {{radius-sm}};
+}
+
+QWidget#TopBarActionCluster {
+    background: transparent;
+    border: none;
+    border-radius: 0;
+}
+
+QWidget#TopBarActionSeparator {
+    background: {{color-border-strong}};
+    margin: 4px 3px;
+}
+
+QToolButton#TopBarAction:hover {
+    background: {{color-bg-elevated}};
+    border-color: {{color-border-hover}};
+}
+
+QToolButton#TopBarAction:focus {
+    background: {{color-bg-elevated}};
+    border-color: {{color-accent}};
 }
 
 QCheckBox#TopBarFilterCheck {
@@ -96,6 +121,27 @@ QToolButton#TopBarAction:disabled {
     color: {{color-disabled-text}};
     border-color: transparent;
     background: transparent;
+}
+
+QToolButton#TopBarActionOverflow {
+    min-height: 32px;
+    padding: 4px 28px 4px 10px;
+    color: {{color-text}};
+    background: {{color-bg-control}};
+    border: 1px solid {{color-border}};
+    border-radius: {{radius-md}};
+}
+
+QToolButton#TopBarActionOverflow:hover,
+QToolButton#TopBarActionOverflow:focus {
+    background: {{color-bg-elevated}};
+    border-color: {{color-accent}};
+}
+
+QToolButton#TopBarActionOverflow::menu-indicator {
+    subcontrol-origin: padding;
+    subcontrol-position: right center;
+    right: 9px;
 }
 
 QWidget#ScanRow {
@@ -287,14 +333,35 @@ QToolButton#SelectionActionButton {
 
 QToolButton#SelectionActionMenuButton {
     min-height: 28px;
-    padding: 4px 10px;
+    padding: 4px 28px 4px 10px;
     font-size: {{font-size-xs}};
-    font-weight: 700;
+    font-weight: 600;
     background: {{color-bg-control}};
+    color: {{color-text}};
+    border: 1px solid {{color-border}};
+    border-radius: {{radius-md}};
 }
 
 QToolButton#SelectionActionMenuButton:hover {
     background: {{color-bg-elevated}};
+    border-color: {{color-accent}};
+}
+
+QToolButton#SelectionActionMenuButton:pressed,
+QToolButton#SelectionActionMenuButton:checked {
+    background: {{color-bg-pressed}};
+    border-color: {{color-accent}};
+}
+
+QToolButton#SelectionActionMenuButton:focus {
+    background: {{color-bg-elevated}};
+    border-color: {{color-accent}};
+}
+
+QToolButton#SelectionActionMenuButton::menu-indicator {
+    subcontrol-origin: padding;
+    subcontrol-position: right center;
+    right: 9px;
 }
 
 QPushButton#SelectionActionButton:disabled,
@@ -309,11 +376,6 @@ QToolButton#SelectionActionMenuButton:disabled:hover {
     background: {{color-disabled-bg}};
     border-color: {{color-disabled-border}};
     color: {{color-disabled-text}};
-}
-
-QToolButton#SelectionActionMenuButton::menu-indicator {
-    image: none;
-    width: 0px;
 }
 
 QLabel#ScanLabel {

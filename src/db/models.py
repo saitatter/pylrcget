@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import sqlite3
 from dataclasses import dataclass
 
@@ -135,3 +136,17 @@ class Config:
     scan_worker_count: int = 4
     logging_verbosity: str = "info"
     ignore_sort_articles: bool = False
+
+    @property
+    def items_per_tab_page(self) -> int:
+        try:
+            state = json.loads(self.ui_state_json or "{}")
+        except (TypeError, ValueError, json.JSONDecodeError):
+            state = {}
+        if not isinstance(state, dict):
+            state = {}
+        try:
+            value = int(state.get("items_per_tab_page", 200) or 200)
+        except (TypeError, ValueError):
+            value = 200
+        return max(10, min(1000, value))

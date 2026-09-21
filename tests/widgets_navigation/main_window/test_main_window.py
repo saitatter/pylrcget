@@ -290,8 +290,9 @@ class MainWindowInstrumentalTests(unittest.TestCase):
         bar, _label, buttons = MainWindow._create_selection_actions_bar(window)
 
         try:
-            self.assertEqual([button.text() for button in buttons], ["Refresh", "Download v", "Export", "Instrumental v", "Publish v"])
+            self.assertEqual([button.text() for button in buttons], ["Refresh", "Download", "Export", "Instrumental", "Publish"])
             self.assertIsInstance(buttons[1], QToolButton)
+            self.assertEqual(buttons[1].toolButtonStyle(), Qt.ToolButtonStyle.ToolButtonTextOnly)
             self.assertIsNotNone(buttons[1].menu())
             self.assertEqual([action.text() for action in buttons[1].menu().actions()], ["Use current mode", "Synced only", "Plain only"])
         finally:
@@ -729,7 +730,7 @@ class MainWindowInstrumentalTests(unittest.TestCase):
         self.assertEqual(overlay_calls[-1][0:3], (3, 10, "Song.mp3"))
         self.assertIn("30%", overlay_calls[-1][3])
 
-    def test_status_message_uses_toast_area_without_changing_layout(self):
+    def test_status_message_does_not_render_a_bottom_status_toast(self):
         window = MainWindow.__new__(MainWindow)
         window.central_widget = QWidget()
         window.central_widget.resize(480, 320)
@@ -746,20 +747,15 @@ class MainWindowInstrumentalTests(unittest.TestCase):
             self.app.processEvents()
 
             self.assertEqual(window.central_widget.geometry(), before)
-            self.assertIsNotNone(window.toasts._status_toast)
-            toast = window.toasts._status_toast
-            self.assertTrue(toast.isVisible())
-            self.assertEqual(toast.lbl.text(), "Lyrics saved.")
-            self.assertLessEqual(
-                toast.y() + toast.height(),
-                window.player_bar.y(),
-            )
+            self.assertIsNone(window.toasts._status_toast)
 
             window.toasts.show_toast("Saved.", "success", 3000)
             self.app.processEvents()
-            normal_toast = next(t for t in window.toasts._toasts if t is not toast)
-            self.assertLess(normal_toast.y(), toast.y())
-            self.assertLessEqual(normal_toast.y() + normal_toast.height(), toast.y())
+            normal_toast = next(t for t in window.toasts._toasts)
+            self.assertLessEqual(
+                normal_toast.y() + normal_toast.height(),
+                window.player_bar.y(),
+            )
         finally:
             window.central_widget.deleteLater()
 

@@ -159,6 +159,8 @@ def test_selection_actions_have_explicit_disabled_light_theme_style() -> None:
         stylesheet = load_stylesheet("main_window.qss")
         assert "QPushButton#SelectionActionButton:disabled" in stylesheet
         assert "QToolButton#SelectionActionMenuButton:disabled" in stylesheet
+        assert "QToolButton#SelectionActionMenuButton::menu-indicator" in stylesheet
+        assert "border: 1px solid #cbd5e1;" in stylesheet
         assert "background: #e5e7eb;" in stylesheet
         assert "color: #475569;" in stylesheet
     finally:

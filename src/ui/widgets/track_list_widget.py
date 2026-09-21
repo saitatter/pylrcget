@@ -38,8 +38,8 @@ from ui.spacing import set_layout_spacing
 from ui.style_loader import load_stylesheet
 from ui.widgets.alpha_index_widget import AlphaIndexWidget
 from ui.widgets.empty_state_widget import EmptyStateWidget
-from ui.widgets.library_table_utils import should_load_more
 from ui.widgets.sortable_header_view import SortableHeaderView
+from ui.widgets.table_pagination import TablePaginationBar
 from ui.widgets.track_list_rows import build_track_list_rows
 from ui.workers.bulk_lyrics_export_worker import TrackExportScope
 
@@ -93,6 +93,8 @@ class TrackListWidget(QWidget):
         self._sort_order = Qt.SortOrder.AscendingOrder
         self._has_more_rows = False
         self._loading_more = False
+        self._page_index = 0
+        self._explicit_page_request = False
         self._duplicate_ids: set[int] = set()
         self._ui_scale = 1.0
         self._drag_lyrics_path = ""
@@ -194,6 +196,10 @@ class TrackListWidget(QWidget):
         layout.addWidget(self.scope_bar)
         layout.addWidget(self.alpha_index)
         layout.addWidget(self.stack)
+        self.pagination = TablePaginationBar()
+        self.pagination.previousRequested.connect(self._show_previous_page)
+        self.pagination.nextRequested.connect(self._show_next_page)
+        layout.addWidget(self.pagination)
 
         self._empty_action = ""
 
@@ -203,6 +209,17 @@ class TrackListWidget(QWidget):
         self._apply_column_widths()
         if hasattr(self.actions, "set_ui_scale"):
             self.actions.set_ui_scale(self._ui_scale)
+
+    def set_page_size(self, size: int) -> None:
+        self._page_size = max(10, min(1000, int(size)))
+        self.alpha_index.set_page_size(self._page_size)
+        self.alpha_index.reset()
+        self._letter_prefix = None
+        self._alpha_page = 0
+        self._page_index = 0
+        self._loaded_db_rows = 0
+        if self._active:
+            self.refresh()
 
     def set_show_duration_column(self, show: bool) -> None:
         self.table.setColumnHidden(2, not bool(show))
@@ -289,7 +306,39 @@ class TrackListWidget(QWidget):
             self.refresh()
 
     def refresh(self):
+        self._page_index = 0
         self._load_rows(reset=True)
+
+    def _show_previous_page(self) -> None:
+        if self._page_index <= 0 or self._letter_prefix is not None:
+            return
+        self._page_index -= 1
+        self._explicit_page_request = True
+        try:
+            self._load_rows(reset=True)
+        finally:
+            self._explicit_page_request = False
+
+    def _show_next_page(self) -> None:
+        if not self._has_more_rows or self._letter_prefix is not None:
+            return
+        self._page_index += 1
+        self._explicit_page_request = True
+        try:
+            self._load_rows(reset=True)
+        finally:
+            self._explicit_page_request = False
+
+    def _update_pagination(self) -> None:
+        self.pagination.set_page_state(
+            page=self._page_index,
+            has_next=self._has_more_rows,
+            visible=(
+                self._letter_prefix is None
+                and self.model.rowCount() > 0
+                and self.stack.currentWidget() is self.table
+            ),
+        )
 
     def _load_rows(self, *, reset: bool) -> None:
         db = self.app_state.db
@@ -297,6 +346,7 @@ class TrackListWidget(QWidget):
         if not directories:
             self.model.set_rows([])
             self._has_more_rows = False
+            self.pagination.set_page_state(page=0, has_next=False, visible=False)
             self._show_empty_state(
                 icon_name="folder-open.svg",
                 title="No music folders yet",
@@ -341,7 +391,11 @@ class TrackListWidget(QWidget):
                 no_lyrics_tracks=self._filters["none"],
                 unsaved_draft_only=self._filters.get("unsaved", False),
                 limit=self._page_size + 1,
-                offset=0 if reset else self.model.rowCount(),
+                offset=(
+                    self._page_index * self._page_size
+                    if self._explicit_page_request
+                    else (0 if reset else self.model.rowCount())
+                ),
                 artist_id=self._artist_id,
                 album_id=self._album_id,
                 artist_ids=self._artist_ids,
@@ -380,6 +434,8 @@ class TrackListWidget(QWidget):
                 action_text="Clear Filters",
                 action_key="clear-filters",
             )
+
+        self._update_pagination()
 
         if reset and is_root_mode:
             self._refresh_letter_counts()
@@ -495,7 +551,7 @@ class TrackListWidget(QWidget):
         menu.addSeparator()
         self._add_context_section(menu, "Lyrics", f"{len(selected_ids)} selected track(s)")
         actions["export"] = menu.addAction("Export lyrics files")
-        actions["cleanup_lyrics"] = menu.addAction("Clean lyrics…")
+        actions["cleanup_lyrics"] = menu.addAction("Clear lyrics…")
         actions["export"].setEnabled(has_focused_track)
         actions["cleanup_lyrics"].setEnabled(bool(selected_ids))
 
@@ -862,19 +918,6 @@ class TrackListWidget(QWidget):
             self.refresh()
 
     def _maybe_load_more(self, value: int) -> None:
-        if self._letter_prefix is not None:
-            return
-        scroll = self.table.verticalScrollBar()
-        if not should_load_more(
-            has_more_rows=self._has_more_rows,
-            loading_more=self._loading_more,
-            is_browser_visible=True,
-            value=value,
-            maximum=scroll.maximum(),
-        ):
-            return
-        self._loading_more = True
-        try:
-            self._load_rows(reset=False)
-        finally:
-            self._loading_more = False
+        # Indexed paging replaces the old implicit load-more-on-scroll behavior.
+        # Keep the slot connected for compatibility with existing table setup.
+        return

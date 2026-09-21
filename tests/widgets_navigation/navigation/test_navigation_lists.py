@@ -123,3 +123,48 @@ class PaginationWidgetTests(unittest.TestCase):
         finally:
             widget.deleteLater()
             app_state.db.close()
+
+    def test_album_widget_exposes_previous_and_next_indexed_pages(self):
+        app_state = simple_app_state()
+        widget = AlbumListWidget(app_state)
+        widget._page_size = 2
+        calls: list[int] = []
+
+        def fake_get_album_rows(**kwargs):
+            offset = int(kwargs["offset"])
+            calls.append(offset)
+            if offset == 0:
+                return [
+                    {"album_id": 1, "album_name": "Album 1", "artist_name": "Artist", "track_count": 1},
+                    {"album_id": 2, "album_name": "Album 2", "artist_name": "Artist", "track_count": 1},
+                    {"album_id": 3, "album_name": "Album 3", "artist_name": "Artist", "track_count": 1},
+                ]
+            if offset == 2:
+                return [
+                    {"album_id": 3, "album_name": "Album 3", "artist_name": "Artist", "track_count": 1},
+                ]
+            return []
+
+        try:
+            with patch("ui.widgets.album_list_widget.get_directories", return_value=["C:/Music"]), patch(
+                "db.database.get_album_rows", side_effect=fake_get_album_rows
+            ):
+                widget.refresh()
+                self.assertEqual(widget.model.rowCount(), 2)
+                self.assertTrue(widget.pagination.next_button.isEnabled())
+                self.assertFalse(widget.pagination.previous_button.isEnabled())
+
+                widget.pagination.next_button.click()
+                self.assertEqual(widget.model.rowCount(), 1)
+                self.assertEqual(widget._page_index, 1)
+                self.assertFalse(widget.pagination.next_button.isEnabled())
+                self.assertTrue(widget.pagination.previous_button.isEnabled())
+
+                widget.pagination.previous_button.click()
+                self.assertEqual(widget.model.rowCount(), 2)
+                self.assertEqual(widget._page_index, 0)
+
+            self.assertEqual(calls, [0, 2, 0])
+        finally:
+            widget.deleteLater()
+            app_state.db.close()

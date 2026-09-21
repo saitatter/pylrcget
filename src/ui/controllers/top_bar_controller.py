@@ -149,6 +149,23 @@ class TopBarController(QWidget):
         set_layout_spacing(actions_row, margins=0, spacing=SPACE_1)
         self._action_icons: dict[QToolButton, str] = {}
 
+        self.library_actions_group = QWidget()
+        self.library_actions_group.setObjectName("TopBarActionCluster")
+        self.library_actions_group.setAccessibleName("Library actions")
+        library_actions_layout = QHBoxLayout(self.library_actions_group)
+        set_layout_spacing(library_actions_layout, margins=(2, 2, 2, 2), spacing=0)
+
+        self.app_actions_group = QWidget()
+        self.app_actions_group.setObjectName("TopBarActionCluster")
+        self.app_actions_group.setAccessibleName("Application actions")
+        app_actions_layout = QHBoxLayout(self.app_actions_group)
+        set_layout_spacing(app_actions_layout, margins=(2, 2, 2, 2), spacing=0)
+
+        self.actions_separator = QWidget()
+        self.actions_separator.setObjectName("TopBarActionSeparator")
+        self.actions_separator.setFixedWidth(1)
+        self.actions_separator.setFixedHeight(24)
+
         self.btn_refresh = self._make_action_button(
             "refresh-cw.svg",
             "Refresh library",
@@ -192,10 +209,10 @@ class TopBarController(QWidget):
 
         self.btn_hotkeys = QToolButton()
         self.btn_hotkeys.setObjectName("TopBarAction")
-        self.btn_hotkeys.setText("Keys")
-        self.btn_hotkeys.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextOnly)
-        self.btn_hotkeys.setToolTip("Show keyboard shortcut hints")
-        self.btn_hotkeys.setAccessibleName("Show keyboard shortcut hints")
+        self._set_action_icon(self.btn_hotkeys, "keyboard.svg")
+        self.btn_hotkeys.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonIconOnly)
+        self.btn_hotkeys.setToolTip("Show keyboard shortcuts")
+        self.btn_hotkeys.setAccessibleName("Show keyboard shortcuts")
         self.btn_hotkeys.setCheckable(True)
         self.btn_hotkeys.clicked.connect(on_toggle_hotkey_hints)
 
@@ -206,13 +223,16 @@ class TopBarController(QWidget):
         self.btn_bg_activity.setAccessibleName("Show background operation progress")
         self.btn_bg_activity.hide()
 
-        actions_row.addWidget(self.btn_refresh)
-        actions_row.addWidget(self.btn_download_missing)
-        actions_row.addWidget(self.btn_export_library)
-        actions_row.addWidget(self.btn_config)
-        actions_row.addWidget(self.btn_about)
-        actions_row.addWidget(self.btn_logs)
-        actions_row.addWidget(self.btn_hotkeys)
+        for button in (self.btn_refresh, self.btn_download_missing, self.btn_export_library):
+            library_actions_layout.addWidget(button)
+        for button in (self.btn_config, self.btn_about, self.btn_logs, self.btn_hotkeys):
+            app_actions_layout.addWidget(button)
+
+        # Keep the action cluster at the far right of the available top-bar space.
+        actions_row.addStretch(1)
+        actions_row.addWidget(self.library_actions_group)
+        actions_row.addWidget(self.actions_separator)
+        actions_row.addWidget(self.app_actions_group)
         actions_row.addWidget(self.btn_bg_activity)
 
         self.btn_actions_overflow = QToolButton()
@@ -225,7 +245,6 @@ class TopBarController(QWidget):
         self._overflow_action_bindings: list[tuple[object, QToolButton]] = []
         self._configure_actions_overflow()
         actions_row.addWidget(self.btn_actions_overflow)
-        actions_row.addStretch(1)
         actions_layout.addLayout(actions_row)
         root.addWidget(self.actions_group, stretch=1)
 
@@ -239,6 +258,7 @@ class TopBarController(QWidget):
             self.btn_hotkeys,
         )
         self.btn_actions_overflow.hide()
+        self._action_clusters = (self.library_actions_group, self.app_actions_group)
 
     def _make_action_button(self, icon_name: str, tooltip: str, accessible_name: str, callback) -> QToolButton:
         button = QToolButton()
@@ -372,6 +392,9 @@ class TopBarController(QWidget):
         self.root_layout.setStretch(2, 0 if compact_actions else 1)
         for button in self._regular_action_buttons:
             button.setVisible(not compact_actions)
+        for cluster in self._action_clusters:
+            cluster.setVisible(not compact_actions)
+        self.actions_separator.setVisible(not compact_actions)
         self.btn_actions_overflow.setVisible(compact_actions)
         self.updateGeometry()
 

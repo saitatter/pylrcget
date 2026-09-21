@@ -34,9 +34,9 @@ from ui.widgets.library_table_utils import (
     display_artist_name,
     find_display_row,
     normalize_id_bucket,
-    should_load_more,
 )
 from ui.widgets.sortable_header_view import SortableHeaderView
+from ui.widgets.table_pagination import TablePaginationBar
 from ui.widgets.track_list_widget import TrackListWidget
 
 
@@ -78,6 +78,8 @@ class AlbumListWidget(QWidget):
         self._has_more_rows = False
         self._loading_more = False
         self._loaded_db_rows = 0
+        self._page_index = 0
+        self._explicit_page_request = False
         self._unknown_album_ids: list[int] = []
         self._unknown_track_count = 0
         self._unknown_artist_names: set[str] = set()
@@ -109,6 +111,10 @@ class AlbumListWidget(QWidget):
 
         self.stack = QStackedWidget()
         root.addWidget(self.stack)
+        self.pagination = TablePaginationBar()
+        self.pagination.previousRequested.connect(self._show_previous_page)
+        self.pagination.nextRequested.connect(self._show_next_page)
+        root.addWidget(self.pagination)
 
         self.browser_page = QWidget()
         browser_layout = QVBoxLayout(self.browser_page)
@@ -167,6 +173,7 @@ class AlbumListWidget(QWidget):
         self.track_list.clearFiltersRequested.connect(self.clearFiltersRequested.emit)
         self.track_list.configureFoldersRequested.connect(self.configureFoldersRequested.emit)
         self.stack.addWidget(self.track_list)
+        self.stack.currentChanged.connect(lambda _index: self._update_pagination())
 
         self.table.doubleClicked.connect(self._on_double_click)
         self.table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
@@ -179,6 +186,21 @@ class AlbumListWidget(QWidget):
         self._ui_scale = max(0.85, min(1.5, float(scale or 1.0)))
         self.table.verticalHeader().setDefaultSectionSize(round(30 * self._ui_scale))
         self.track_list.set_ui_scale(self._ui_scale)
+
+    def set_page_size(self, size: int) -> None:
+        self._page_size = max(10, min(1000, int(size)))
+        self.alpha_index.set_page_size(self._page_size)
+        self.alpha_index.reset()
+        self._letter_prefix = None
+        self._alpha_page = 0
+        self._page_index = 0
+        self._loaded_db_rows = 0
+        self.track_list.set_page_size(self._page_size)
+        if self._active:
+            if self.stack.currentWidget() is self.browser_page:
+                self.refresh()
+            else:
+                self.track_list.refresh()
 
     def apply_current_palette(self) -> None:
         self._apply_styles()
@@ -265,7 +287,39 @@ class AlbumListWidget(QWidget):
         return self.track_list.get_download_state(track_id)
 
     def refresh(self):
+        self._page_index = 0
         self._load_rows(reset=True)
+
+    def _show_previous_page(self) -> None:
+        if self._page_index <= 0 or self._letter_prefix is not None:
+            return
+        self._page_index -= 1
+        self._explicit_page_request = True
+        try:
+            self._load_rows(reset=True)
+        finally:
+            self._explicit_page_request = False
+
+    def _show_next_page(self) -> None:
+        if not self._has_more_rows or self._letter_prefix is not None:
+            return
+        self._page_index += 1
+        self._explicit_page_request = True
+        try:
+            self._load_rows(reset=True)
+        finally:
+            self._explicit_page_request = False
+
+    def _update_pagination(self) -> None:
+        self.pagination.set_page_state(
+            page=self._page_index,
+            has_next=self._has_more_rows,
+            visible=(
+                self._letter_prefix is None
+                and self.model.rowCount() > 0
+                and self.stack.currentWidget() is self.browser_page
+            ),
+        )
 
     def _load_rows(self, *, reset: bool) -> None:
         from db.database import get_album_rows, get_album_rows_by_album_artist
@@ -274,6 +328,7 @@ class AlbumListWidget(QWidget):
         if not directories:
             self.model.setRowCount(0)
             self._has_more_rows = False
+            self.pagination.set_page_state(page=0, has_next=False, visible=False)
             self._show_empty_state(
                 icon_name="folder-open.svg",
                 title="No music folders yet",
@@ -292,7 +347,11 @@ class AlbumListWidget(QWidget):
                 album_artist_name=self._album_artist_name,
                 search_query=self._search,
                 limit=self._page_size + 1,
-                offset=0 if reset else self._loaded_db_rows,
+                offset=(
+                    self._page_index * self._page_size
+                    if self._explicit_page_request
+                    else (0 if reset else self._loaded_db_rows)
+                ),
                 sort_column=self._sort_column,
                 sort_order=sort_order,
             )
@@ -320,7 +379,11 @@ class AlbumListWidget(QWidget):
                 artist_id=self._artist_id,
                 artist_ids=self._artist_ids,
                 limit=self._page_size + 1,
-                offset=0 if reset else self._loaded_db_rows,
+                offset=(
+                    self._page_index * self._page_size
+                    if self._explicit_page_request
+                    else (0 if reset else self._loaded_db_rows)
+                ),
                 sort_column=self._sort_column,
                 sort_order=sort_order,
             )
@@ -394,6 +457,7 @@ class AlbumListWidget(QWidget):
                 action_text="Refresh Library",
                 action_key="refresh-library",
             )
+        self._update_pagination()
 
         if reset and is_root_mode:
             self._refresh_letter_counts()
@@ -587,16 +651,5 @@ class AlbumListWidget(QWidget):
             self.refresh()
 
     def _maybe_load_more(self, value: int) -> None:
-        if self._letter_prefix is not None:
-            return
-        scroll = self.table.verticalScrollBar()
-        if not should_load_more(
-            has_more_rows=self._has_more_rows,
-            loading_more=self._loading_more,
-            is_browser_visible=self.stack.currentWidget() is self.browser_page and not self.table.isHidden(),
-            value=value,
-            maximum=scroll.maximum(),
-        ):
-            return
-        self._loading_more = True
-        self._load_rows(reset=False)
+        # Indexed paging replaces the old implicit load-more-on-scroll behavior.
+        return
