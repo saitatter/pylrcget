@@ -137,27 +137,29 @@ def update_responsive_layout(window) -> None:
         if width < RESPONSIVE_LAYOUT_BREAKPOINT:
             if window.content_splitter.orientation() != Qt.Orientation.Vertical:
                 window.content_splitter.setOrientation(Qt.Orientation.Vertical)
-                window.content_splitter.setSizes([int(window.height() * 0.54), int(window.height() * 0.46)])
+                window.content_splitter.setSizes([int(window.height() * 0.60), int(window.height() * 0.40)])
         else:
             if window.content_splitter.orientation() != Qt.Orientation.Horizontal:
                 window.content_splitter.setOrientation(Qt.Orientation.Horizontal)
-                window.content_splitter.setSizes([int(width * 0.58), int(width * 0.42)])
+                window.content_splitter.setSizes([int(width * 0.60), int(width * 0.40)])
 
-    for splitter_name in ("albums_splitter", "artists_splitter"):
+    for splitter_name in ("albums_splitter", "artists_splitter", "album_artists_splitter"):
         splitter = getattr(window, splitter_name, None)
         if splitter is None:
             continue
         if width < RESPONSIVE_LAYOUT_BREAKPOINT:
             if splitter.orientation() != Qt.Orientation.Vertical:
                 splitter.setOrientation(Qt.Orientation.Vertical)
-                splitter.setSizes([int(window.height() * 0.54), int(window.height() * 0.46)])
+                splitter.setSizes([int(window.height() * 0.60), int(window.height() * 0.40)])
         else:
             if splitter.orientation() != Qt.Orientation.Horizontal:
                 splitter.setOrientation(Qt.Orientation.Horizontal)
-                splitter.setSizes([int(width * 0.58), int(width * 0.42)])
+                splitter.setSizes([int(width * 0.60), int(width * 0.40)])
 
     if hasattr(window, "player_bar"):
         window.player_bar.set_compact_mode(width < RESPONSIVE_LAYOUT_BREAKPOINT)
+    if getattr(window, "_lyrics_pane_collapsed", False) and hasattr(window, "_apply_lyrics_pane_collapsed_state"):
+        window._apply_lyrics_pane_collapsed_state()
 
 
 def save_window_state(window) -> None:

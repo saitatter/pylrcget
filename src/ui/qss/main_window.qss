@@ -193,6 +193,34 @@ QWidget#LibraryNavBar {
     min-height: 36px;
 }
 
+QSplitter#LibraryLyricsSplitter::handle {
+    background: transparent;
+}
+
+QSplitter#LibraryLyricsSplitter::handle:hover {
+    background: {{color-bg-control}};
+}
+
+QToolButton#LyricsPaneToggle {
+    min-width: 24px;
+    max-width: 24px;
+    min-height: 24px;
+    max-height: 24px;
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: {{radius-sm}};
+    background: transparent;
+    color: {{color-text-muted}};
+    font-size: {{font-size-lg}};
+    font-weight: 700;
+}
+
+QToolButton#LyricsPaneToggle:hover {
+    background: {{color-bg-control}};
+    border-color: {{color-border}};
+    color: {{color-accent}};
+}
+
 QToolButton#LibraryNavButton {
     min-width: 32px;
     min-height: 32px;

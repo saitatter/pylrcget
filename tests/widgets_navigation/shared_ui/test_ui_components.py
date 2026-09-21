@@ -85,6 +85,25 @@ class SharedUiComponentTests(unittest.TestCase):
         self.assertIn("border: none;", stylesheet)
         self.assertIn("LibraryBreadcrumbButton", stylesheet)
 
+    def test_lyrics_splitter_toggle_is_reversible(self):
+        splitter = LyricsPaneSplitter()
+        splitter.addWidget(QWidget())
+        splitter.addWidget(QWidget())
+        try:
+            splitter.set_lyrics_collapsed(False)
+            button = splitter.handle(1).toggle_button
+            self.assertIn("Collapse", button.toolTip())
+
+            splitter.set_lyrics_collapsed(True)
+            self.assertEqual(button.text(), "‹")
+            self.assertIn("Expand", button.toolTip())
+
+            splitter.set_lyrics_collapsed(False)
+            self.assertEqual(button.text(), "›")
+            self.assertIn("Collapse", button.toolTip())
+        finally:
+            splitter.deleteLater()
+
     def test_player_hotkey_badges_use_shared_badge_style(self):
         stylesheet = Path("src/ui/qss/player_bar.qss").read_text(encoding="utf-8")
         self.assertIn("QLabel#HotkeyHintBadge", stylesheet)

@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
     QTableWidget,
     QTableWidgetItem,
     QTextEdit,
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
@@ -112,6 +113,7 @@ class LyricsEditorWidget(QWidget):
     downloadRequested = Signal()
     searchRequested = Signal()
     exportFilesRequested = Signal()
+    togglePaneRequested = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -200,6 +202,15 @@ class LyricsEditorWidget(QWidget):
         self.btn_auto_sync.clicked.connect(self.autoSyncRequested.emit)
         title_row.addWidget(self.btn_auto_sync)
 
+        self.btn_toggle_pane = QToolButton()
+        self.btn_toggle_pane.setObjectName("LyricsPaneToggle")
+        self.btn_toggle_pane.setText("›")
+        self.btn_toggle_pane.setAutoRaise(True)
+        self.btn_toggle_pane.setToolTip("Collapse lyrics panel")
+        self.btn_toggle_pane.setAccessibleName("Toggle lyrics panel")
+        self.btn_toggle_pane.clicked.connect(self.togglePaneRequested.emit)
+        title_row.addWidget(self.btn_toggle_pane)
+
         for title_control in (
             self.validation_badge,
             self.dirty_badge,
@@ -207,6 +218,7 @@ class LyricsEditorWidget(QWidget):
             self.btn_show_diff,
             self.btn_switch_mode,
             self.btn_auto_sync,
+            self.btn_toggle_pane,
         ):
             title_control.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
 
@@ -539,6 +551,11 @@ class LyricsEditorWidget(QWidget):
             return
         self.header_widget.setFixedHeight(required_height)
         self.header_widget.updateGeometry()
+
+    def set_pane_collapsed(self, collapsed: bool) -> None:
+        collapsed = bool(collapsed)
+        self.btn_toggle_pane.setText("‹" if collapsed else "›")
+        self.btn_toggle_pane.setToolTip("Expand lyrics panel" if collapsed else "Collapse lyrics panel")
 
     def show_none(self, message: str):
         self._reset_state()

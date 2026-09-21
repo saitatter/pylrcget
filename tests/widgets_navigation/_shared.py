@@ -72,6 +72,7 @@ from ui.widgets.lyrics_editor_widget import (
     TIMESTAMP_MS_ROLE,
     LyricsEditorWidget,
 )
+from ui.widgets.lyrics_pane_splitter import LyricsPaneSplitter
 from ui.widgets.toast import ToastManager
 
 __all__ = [name for name in globals() if not name.startswith("__")]

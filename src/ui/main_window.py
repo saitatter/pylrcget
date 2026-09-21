@@ -94,6 +94,7 @@ from ui.widgets.library_navigation_tab_bar import LibraryNavigationTabBar
 from ui.widgets.log_panel import LogPanel, QtLogHandler
 from ui.widgets.lrclib_browser_widget import LrclibBrowserWidget
 from ui.widgets.lyrics_editor_widget import LyricsEditorWidget
+from ui.widgets.lyrics_pane_splitter import LyricsPaneSplitter
 from ui.widgets.my_lrclib_widget import MyLrclibWidget
 from ui.widgets.toast import ToastManager
 from ui.widgets.track_list_widget import TrackListWidget
@@ -228,7 +229,7 @@ class MainWindow(QMainWindow):
         tracks_layout = QVBoxLayout(self.tracks_tab)
         set_layout_spacing(tracks_layout, margins=0, spacing=SPACE_2)
 
-        splitter = QSplitter(Qt.Orientation.Horizontal)
+        splitter = LyricsPaneSplitter(Qt.Orientation.Horizontal)
         self.content_splitter = splitter
 
         self.track_pane = QWidget()
@@ -253,7 +254,7 @@ class MainWindow(QMainWindow):
         splitter.setStretchFactor(0, 3)
         splitter.setStretchFactor(1, 2)
         splitter.setCollapsible(0, False)
-        splitter.setCollapsible(1, False)
+        splitter.setCollapsible(1, True)
         self.track_pane.setMinimumWidth(LIBRARY_PANE_MIN_WIDTH)
         self.lyrics_view.setMinimumWidth(LYRICS_PANE_MIN_WIDTH)
 
@@ -268,7 +269,7 @@ class MainWindow(QMainWindow):
             self.albums_selection_actions_label,
             self.albums_selection_action_buttons,
         ) = self._create_selection_actions_bar()
-        self.albums_splitter = QSplitter(Qt.Orientation.Horizontal)
+        self.albums_splitter = LyricsPaneSplitter(Qt.Orientation.Horizontal)
         self.albums_splitter.addWidget(self.albums_tab)
         self.albums_lyrics_view = LyricsEditorWidget()
         self.albums_lyrics_view.show_none("Select a track to see lyrics")
@@ -277,7 +278,7 @@ class MainWindow(QMainWindow):
         self.albums_splitter.setStretchFactor(0, 3)
         self.albums_splitter.setStretchFactor(1, 2)
         self.albums_splitter.setCollapsible(0, False)
-        self.albums_splitter.setCollapsible(1, False)
+        self.albums_splitter.setCollapsible(1, True)
         self.albums_tab.setMinimumWidth(LIBRARY_PANE_MIN_WIDTH)
         self.albums_lyrics_view.setMinimumWidth(LYRICS_PANE_MIN_WIDTH)
         albums_layout.addWidget(self.albums_splitter)
@@ -291,7 +292,7 @@ class MainWindow(QMainWindow):
             self.artists_selection_actions_label,
             self.artists_selection_action_buttons,
         ) = self._create_selection_actions_bar()
-        self.artists_splitter = QSplitter(Qt.Orientation.Horizontal)
+        self.artists_splitter = LyricsPaneSplitter(Qt.Orientation.Horizontal)
         self.artists_splitter.addWidget(self.artists_tab)
         self.artists_lyrics_view = LyricsEditorWidget()
         self.artists_lyrics_view.show_none("Select a track to see lyrics")
@@ -300,7 +301,7 @@ class MainWindow(QMainWindow):
         self.artists_splitter.setStretchFactor(0, 3)
         self.artists_splitter.setStretchFactor(1, 2)
         self.artists_splitter.setCollapsible(0, False)
-        self.artists_splitter.setCollapsible(1, False)
+        self.artists_splitter.setCollapsible(1, True)
         self.artists_tab.setMinimumWidth(LIBRARY_PANE_MIN_WIDTH)
         self.artists_lyrics_view.setMinimumWidth(LYRICS_PANE_MIN_WIDTH)
         artists_layout.addWidget(self.artists_splitter)
@@ -315,7 +316,7 @@ class MainWindow(QMainWindow):
             self.album_artists_selection_actions_label,
             self.album_artists_selection_action_buttons,
         ) = self._create_selection_actions_bar()
-        self.album_artists_splitter = QSplitter(Qt.Orientation.Horizontal)
+        self.album_artists_splitter = LyricsPaneSplitter(Qt.Orientation.Horizontal)
         self.album_artists_splitter.addWidget(self.album_artists_tab)
         self.album_artists_lyrics_view = LyricsEditorWidget()
         self.album_artists_lyrics_view.show_none("Select a track to see lyrics")
@@ -324,7 +325,7 @@ class MainWindow(QMainWindow):
         self.album_artists_splitter.setStretchFactor(0, 3)
         self.album_artists_splitter.setStretchFactor(1, 2)
         self.album_artists_splitter.setCollapsible(0, False)
-        self.album_artists_splitter.setCollapsible(1, False)
+        self.album_artists_splitter.setCollapsible(1, True)
         self.album_artists_tab.setMinimumWidth(LIBRARY_PANE_MIN_WIDTH)
         self.album_artists_lyrics_view.setMinimumWidth(LYRICS_PANE_MIN_WIDTH)
         album_artists_layout.addWidget(self.album_artists_splitter)
@@ -338,7 +339,10 @@ class MainWindow(QMainWindow):
             self.nav_layout.addWidget(selection_bar)
 
         self._syncing_library_splitters = False
+        self._lyrics_pane_collapsed = False
+        self._lyrics_splitter_restore_sizes: list[int] | None = None
         self._connect_library_splitter_sync()
+        self._connect_lyrics_pane_toggles()
 
         self.mylrclib_tab = MyLrclibWidget(self.app_state)
 
@@ -2128,6 +2132,62 @@ class MainWindow(QMainWindow):
                 lambda _pos, _index, current=splitter: self._sync_library_splitters_from(current)
             )
 
+    def _library_lyrics_pairs(self) -> list[tuple[LyricsPaneSplitter, LyricsEditorWidget]]:
+        pairs: list[tuple[LyricsPaneSplitter, LyricsEditorWidget]] = []
+        for splitter_name, lyrics_name in (
+            ("content_splitter", "lyrics_view"),
+            ("albums_splitter", "albums_lyrics_view"),
+            ("artists_splitter", "artists_lyrics_view"),
+            ("album_artists_splitter", "album_artists_lyrics_view"),
+        ):
+            if hasattr(self, splitter_name) and hasattr(self, lyrics_name):
+                pairs.append((getattr(self, splitter_name), getattr(self, lyrics_name)))
+        return pairs
+
+    def _connect_lyrics_pane_toggles(self) -> None:
+        for splitter, lyrics_view in self._library_lyrics_pairs():
+            splitter.toggleRequested.connect(
+                lambda current=splitter: self._toggle_lyrics_pane(current)
+            )
+            lyrics_view.togglePaneRequested.connect(
+                lambda current=splitter: self._toggle_lyrics_pane(current)
+            )
+            splitter.set_lyrics_collapsed(False)
+            lyrics_view.set_pane_collapsed(False)
+
+    def _set_lyrics_pane_collapsed(self, collapsed: bool) -> None:
+        self._lyrics_pane_collapsed = bool(collapsed)
+        for splitter, lyrics_view in self._library_lyrics_pairs():
+            splitter.set_lyrics_collapsed(self._lyrics_pane_collapsed)
+            lyrics_view.set_pane_collapsed(self._lyrics_pane_collapsed)
+
+    def _apply_lyrics_pane_collapsed_state(self) -> None:
+        if not getattr(self, "_lyrics_pane_collapsed", False):
+            return
+        for splitter, _lyrics_view in self._library_lyrics_pairs():
+            sizes = splitter.sizes()
+            total = sum(max(0, int(value)) for value in sizes)
+            if total <= 0:
+                total = splitter.width() if splitter.orientation() == Qt.Orientation.Horizontal else splitter.height()
+            splitter.setSizes([max(1, total), 0])
+
+    def _toggle_lyrics_pane(self, source: QSplitter | None = None) -> None:
+        collapsed = not bool(getattr(self, "_lyrics_pane_collapsed", False))
+        if collapsed:
+            source = source if source in self._all_library_splitters() else self.content_splitter
+            sizes = [int(value) for value in source.sizes()]
+            if len(sizes) == 2 and all(value > 0 for value in sizes):
+                self._lyrics_splitter_restore_sizes = sizes
+            self._set_lyrics_pane_collapsed(True)
+            self._apply_lyrics_pane_collapsed_state()
+            return
+
+        source = source if source in self._all_library_splitters() else self.content_splitter
+        restore_sizes = self._lyrics_splitter_restore_sizes or [60, 40]
+        self._set_lyrics_pane_collapsed(False)
+        self._apply_library_splitter_state(source.orientation(), restore_sizes)
+        self._lyrics_splitter_restore_sizes = None
+
     @staticmethod
     def _splitter_orientation_name(orientation: Qt.Orientation) -> str:
         return "vertical" if orientation == Qt.Orientation.Vertical else "horizontal"
@@ -2152,6 +2212,7 @@ class MainWindow(QMainWindow):
         return {
             "orientation": self._splitter_orientation_name(self.content_splitter.orientation()),
             "sizes": sizes,
+            "lyrics_collapsed": bool(getattr(self, "_lyrics_pane_collapsed", False)),
         }
 
     def _apply_library_splitter_state(self, orientation: Qt.Orientation, sizes: list[int]) -> None:
@@ -2173,6 +2234,7 @@ class MainWindow(QMainWindow):
         shared = state.get("library_splitter") if isinstance(state.get("library_splitter"), dict) else None
         sizes: list[int] | None = None
         orientation = Qt.Orientation.Horizontal
+        lyrics_collapsed = bool(shared.get("lyrics_collapsed")) if shared is not None else False
         if shared is not None:
             raw_sizes = shared.get("sizes")
             if isinstance(raw_sizes, list):
@@ -2189,6 +2251,7 @@ class MainWindow(QMainWindow):
                 ("tracks_splitter", self.content_splitter),
                 ("albums_splitter", self.albums_splitter),
                 ("artists_splitter", self.artists_splitter),
+                ("album_artists_splitter", self.album_artists_splitter),
             ]:
                 raw_sizes = state.get(key)
                 if not isinstance(raw_sizes, list):
@@ -2204,6 +2267,8 @@ class MainWindow(QMainWindow):
 
         if sizes is not None:
             self._apply_library_splitter_state(orientation, sizes)
+        self._set_lyrics_pane_collapsed(lyrics_collapsed)
+        self._apply_lyrics_pane_collapsed_state()
 
     def _sync_library_splitters_from(self, source: QSplitter) -> None:
         if self._syncing_library_splitters:
