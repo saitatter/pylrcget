@@ -1,6 +1,11 @@
 from __future__ import annotations
 
-from lyrics.providers.tidal_transport import OfficialTidalLyricsTransport
+import pytest
+
+from lyrics.providers.tidal_transport import (
+    OfficialTidalLyricsError,
+    OfficialTidalLyricsTransport,
+)
 
 
 class _Response:
@@ -22,6 +27,16 @@ class _Session:
     def get(self, url, **kwargs):
         self.calls.append((url, kwargs))
         return self.response
+
+
+class _SequenceSession:
+    def __init__(self, responses):
+        self.responses = iter(responses)
+        self.calls = []
+
+    def get(self, url, **kwargs):
+        self.calls.append((url, kwargs))
+        return next(self.responses)
 
 
 def test_official_transport_reads_json_api_lyrics_relationship():
@@ -68,3 +83,41 @@ def test_official_transport_treats_empty_public_relationship_as_clean_miss():
     session = _Session(_Response({"data": {"type": "tracks", "id": "42"}, "included": []}))
 
     assert OfficialTidalLyricsTransport("token", session=session).get_lyrics("42") is None
+
+
+def test_official_transport_probes_auto_country_fallbacks_until_lyrics_are_found():
+    session = _SequenceSession(
+        [
+            _Response({"data": {"type": "tracks", "id": "42"}, "included": []}, status_code=404),
+            _Response({"data": {"type": "tracks", "id": "42"}, "included": []}, status_code=404),
+            _Response(
+                {
+                    "included": [
+                        {
+                            "type": "lyrics",
+                            "id": "lyrics-42",
+                            "attributes": {"lrcText": "[00:01.00]Found"},
+                        }
+                    ]
+                }
+            ),
+        ]
+    )
+
+    result = OfficialTidalLyricsTransport("token", country_code="Auto", session=session).get_lyrics("42")
+
+    assert result is not None
+    assert result.synced_lyrics == "[00:01.00]Found"
+    assert result.country_code == "US"
+    assert [call[1]["params"].get("countryCode") for call in session.calls] == [None, "RO", "US"]
+
+
+def test_official_transport_does_not_probe_other_countries_after_auth_error():
+    session = _SequenceSession([_Response({"error": "forbidden"}, status_code=403)])
+
+    with pytest.raises(OfficialTidalLyricsError) as error:
+        OfficialTidalLyricsTransport("token", country_code="Auto", session=session).get_lyrics("42")
+
+    assert error.value.status_code == 403
+
+    assert len(session.calls) == 1

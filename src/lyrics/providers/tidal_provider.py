@@ -85,6 +85,7 @@ class TidalProvider:
             {
                 "catalogue_diagnostics": dict(resolution.score.diagnostics),
                 "transport_source": payload.source,
+                "transport_country_code": payload.country_code,
             }
         )
         return LyricsProviderResult(

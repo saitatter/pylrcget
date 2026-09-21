@@ -65,7 +65,9 @@ class _Transport:
 
 def test_tidal_provider_resolves_catalogue_then_fetches_transport_payload():
     resolver = _Resolver(_resolution())
-    transport = _Transport(TidalLyricsPayload("plain", "[00:01.00]synced", "official"))
+    transport = _Transport(
+        TidalLyricsPayload("plain", "[00:01.00]synced", "official", "US")
+    )
 
     result = TidalProvider(resolver, transport).lookup(_context(), requested_mode="prefer_synced")
 
@@ -75,6 +77,7 @@ def test_tidal_provider_resolves_catalogue_then_fetches_transport_payload():
     assert result.remote_artist == "Artist"
     assert result.synced_lyrics == "[00:01.00]synced"
     assert result.diagnostics["transport_source"] == "official"
+    assert result.diagnostics["transport_country_code"] == "US"
     assert result.diagnostics["selected_remote_id"] == "123"
     assert resolver.calls and transport.calls[0][0] == "123"
     assert transport.calls[0][2] == _context()
