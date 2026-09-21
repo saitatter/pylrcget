@@ -148,6 +148,18 @@ QCheckBox::indicator:checked:focus:hover {
     image: url("{{asset-url}}/assets/icons/check.svg");
 }
 
+QCheckBox:hover::indicator,
+QCheckBox:unchecked:hover::indicator {
+    background: {{color-bg-elevated}};
+    border-color: {{color-accent}};
+}
+
+QCheckBox:checked:hover::indicator {
+    background: {{color-accent-alt}};
+    border-color: {{color-accent-alt}};
+    image: url("{{asset-url}}/assets/icons/check.svg");
+}
+
 QCheckBox:disabled {
     color: {{color-disabled-text}};
 }
