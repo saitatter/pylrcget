@@ -15,6 +15,7 @@ QLabel#LyricsValidationBadge {
 
 QPushButton#LyricsDiscardDraft,
 QPushButton#LyricsShowDiff,
+QPushButton#LyricsClearTimestamps,
 QPushButton#LyricsAutoSync {
     min-height: 28px;
     max-height: 28px;
@@ -104,40 +105,46 @@ QPushButton#LyricsModeButton:checked {
     color: {{color-bg-app}};
 }
 
+QPushButton#LyricsClearTimestamps,
 QPushButton#LyricsAutoSync {
     background: transparent;
     color: {{color-accent}};
     border: 1px solid {{color-accent}};
 }
 
+QPushButton#LyricsClearTimestamps:hover,
 QPushButton#LyricsAutoSync:hover {
     background: {{color-accent}};
     color: {{color-bg-app}};
 }
 
+QPushButton#LyricsClearTimestamps:disabled,
 QPushButton#LyricsAutoSync:disabled {
     color: {{color-disabled-text}};
     border-color: {{color-disabled-border}};
 }
 
-QToolButton#LyricsMoreActions {
-    min-height: 28px;
-    max-height: 28px;
+QPushButton#LyricsMoreActions {
+    min-height: {{control-height-normal}};
+    max-height: {{control-height-normal}};
     min-width: 64px;
-    padding: 0 10px;
+    padding: {{space-2}} {{space-3}};
     background: {{color-bg-control}};
-    color: {{color-text-muted}};
+    color: {{color-text}};
     border: 1px solid {{color-border}};
-    border-radius: {{radius-sm}};
-    font-size: {{font-size-xs}};
-    font-weight: 650;
+    border-radius: {{radius-md}};
+    font-size: {{font-size-sm}};
+    font-weight: 600;
 }
 
-QToolButton#LyricsMoreActions:hover,
-QToolButton#LyricsMoreActions:open {
+QPushButton#LyricsMoreActions:hover {
     background: {{color-bg-elevated}};
     border-color: {{color-accent}};
     color: {{color-text}};
+}
+
+QPushButton#LyricsMoreActions:pressed {
+    background: {{color-bg-pressed}};
 }
 
 QPushButton#LyricsAutofix {

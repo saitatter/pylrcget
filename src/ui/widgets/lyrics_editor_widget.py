@@ -21,7 +21,6 @@ from PySide6.QtWidgets import (
     QTableWidget,
     QTableWidgetItem,
     QTextEdit,
-    QToolButton,
     QVBoxLayout,
     QWidget,
 )
@@ -208,6 +207,7 @@ class LyricsEditorWidget(QWidget):
         title_row.addWidget(self.mode_selector)
 
         self.btn_clear_timestamps = QPushButton("Clear Timestamps")
+        self.btn_clear_timestamps.setObjectName("LyricsClearTimestamps")
         self.btn_clear_timestamps.setToolTip("Reset all synced timestamps to 00:00 (undoable)")
         self.btn_clear_timestamps.hide()
         self.btn_clear_timestamps.clicked.connect(self._clear_timestamps)
@@ -225,6 +225,7 @@ class LyricsEditorWidget(QWidget):
             self.dirty_badge,
             self.btn_discard_draft,
             self.btn_show_diff,
+            self.btn_clear_timestamps,
             self.btn_auto_sync,
             self.mode_selector,
         ):
@@ -312,11 +313,9 @@ class LyricsEditorWidget(QWidget):
         self.btn_publish_synced.clicked.connect(lambda: self.publishSyncedRequested.emit())
         self.btn_publish_plain.clicked.connect(lambda: self.publishPlainRequested.emit())
 
-        self.btn_more_actions = QToolButton()
+        self.btn_more_actions = QPushButton("More")
         self.btn_more_actions.setObjectName("LyricsMoreActions")
-        self.btn_more_actions.setText("More")
         self.btn_more_actions.setToolTip("More lyrics editing actions")
-        self.btn_more_actions.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
         self.more_actions_menu = QMenu(self)
         self.btn_more_actions.setMenu(self.more_actions_menu)
         self._more_action_bindings = []

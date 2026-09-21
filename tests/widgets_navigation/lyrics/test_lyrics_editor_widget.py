@@ -168,6 +168,7 @@ class LyricsEditorWidgetTests(unittest.TestCase):
             )
             self.assertFalse(widget.btn_shift_all_from_first.isVisible())
             self.assertFalse(widget.btn_more_actions.isHidden())
+            self.assertEqual(widget.btn_clear_timestamps.objectName(), "LyricsClearTimestamps")
             self.assertTrue(widget.btn_more_actions.toolTip())
         finally:
             widget.deleteLater()
