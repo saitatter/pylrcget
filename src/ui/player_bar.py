@@ -102,6 +102,16 @@ class SeekSlider(QSlider):
     _SEEK_HANDLE_SIZE = 14.0
     _VOLUME_HANDLE_SIZE = 12.0
     _HANDLE_BORDER_WIDTH = 2.0
+    _FOCUS_RING_INSET = 2.0
+
+    @classmethod
+    def _focus_ring_geometry(cls, handle_rect: QRectF) -> QRectF:
+        return handle_rect.adjusted(
+            cls._FOCUS_RING_INSET,
+            cls._FOCUS_RING_INSET,
+            -cls._FOCUS_RING_INSET,
+            -cls._FOCUS_RING_INSET,
+        )
 
     def _track_geometry(self) -> tuple[float, float, float, float]:
         is_seek_slider = self.objectName() == "PlayerSlider"
@@ -151,7 +161,7 @@ class SeekSlider(QSlider):
         handle_color = QColor(STYLE_TOKENS["color-accent-alt"] if is_active else STYLE_TOKENS["color-accent"])
 
         if self.hasFocus():
-            focus_rect = handle_rect.adjusted(-3.0, -3.0, 3.0, 3.0)
+            focus_rect = self._focus_ring_geometry(handle_rect)
             painter.setBrush(Qt.BrushStyle.NoBrush)
             painter.setPen(QPen(QColor(STYLE_TOKENS["color-accent-alt"]), 2))
             painter.drawEllipse(focus_rect)

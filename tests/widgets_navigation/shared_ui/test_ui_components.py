@@ -1,3 +1,5 @@
+from PySide6.QtCore import QRectF
+
 from tests.widgets_navigation._shared import *
 from ui.button_roles import set_button_role
 from ui.icon_loader import (
@@ -349,6 +351,17 @@ class SharedUiComponentTests(unittest.TestCase):
                     track_left + track_width + handle_radius,
                     slider.width() - edge_clearance,
                 )
+
+                for center_x in (track_left, track_left + track_width):
+                    handle_rect = QRectF(
+                        center_x - handle_radius,
+                        (slider.height() - handle_size) / 2.0,
+                        handle_size,
+                        handle_size,
+                    )
+                    focus_rect = slider._focus_ring_geometry(handle_rect)
+                    self.assertGreaterEqual(focus_rect.left(), 0.0)
+                    self.assertLessEqual(focus_rect.right(), slider.width())
         finally:
             widget.deleteLater()
 
