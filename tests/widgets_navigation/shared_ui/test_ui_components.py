@@ -1,4 +1,5 @@
 from PySide6.QtCore import QRectF
+from PySide6.QtWidgets import QBoxLayout
 
 from tests.widgets_navigation._shared import *
 from ui.button_roles import set_button_role
@@ -81,6 +82,33 @@ class SharedUiComponentTests(unittest.TestCase):
             self.assertIn("padding: 4px 8px;", stylesheet)
             self.assertIn("min-width: 32px;", stylesheet)
             self.assertNotIn("min-height: 72px;", stylesheet)
+        finally:
+            widget.deleteLater()
+
+    def test_top_bar_uses_overflow_for_global_actions_in_compact_layout(self):
+        def noop(*args, **kwargs):
+            return None
+
+        widget = TopBarController(
+            on_refresh=noop,
+            on_download_missing=noop,
+            on_export_library=noop,
+            on_open_settings=noop,
+            on_open_about=noop,
+            on_toggle_logs=noop,
+            on_toggle_hotkey_hints=noop,
+            on_schedule_search=noop,
+            on_filter_changed=noop,
+        )
+        try:
+            widget.update_responsive_layout(1000)
+            self.assertFalse(widget.btn_actions_overflow.isHidden())
+            self.assertTrue(all(button.isHidden() for button in widget._regular_action_buttons))
+            self.assertEqual(widget.root_layout.direction(), QBoxLayout.Direction.LeftToRight)
+
+            widget.update_responsive_layout(1400)
+            self.assertTrue(widget.btn_actions_overflow.isHidden())
+            self.assertTrue(all(not button.isHidden() for button in widget._regular_action_buttons))
         finally:
             widget.deleteLater()
 

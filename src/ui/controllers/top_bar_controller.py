@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QMenu,
     QSizePolicy,
     QToolButton,
     QVBoxLayout,
@@ -213,9 +214,31 @@ class TopBarController(QWidget):
         actions_row.addWidget(self.btn_logs)
         actions_row.addWidget(self.btn_hotkeys)
         actions_row.addWidget(self.btn_bg_activity)
+
+        self.btn_actions_overflow = QToolButton()
+        self.btn_actions_overflow.setObjectName("TopBarActionOverflow")
+        self.btn_actions_overflow.setText("More")
+        self.btn_actions_overflow.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextOnly)
+        self.btn_actions_overflow.setToolTip("More library actions")
+        self.btn_actions_overflow.setAccessibleName("More library actions")
+        self.btn_actions_overflow.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        self._overflow_action_bindings: list[tuple[object, QToolButton]] = []
+        self._configure_actions_overflow()
+        actions_row.addWidget(self.btn_actions_overflow)
         actions_row.addStretch(1)
         actions_layout.addLayout(actions_row)
         root.addWidget(self.actions_group, stretch=1)
+
+        self._regular_action_buttons = (
+            self.btn_refresh,
+            self.btn_download_missing,
+            self.btn_export_library,
+            self.btn_config,
+            self.btn_about,
+            self.btn_logs,
+            self.btn_hotkeys,
+        )
+        self.btn_actions_overflow.hide()
 
     def _make_action_button(self, icon_name: str, tooltip: str, accessible_name: str, callback) -> QToolButton:
         button = QToolButton()
@@ -229,6 +252,30 @@ class TopBarController(QWidget):
     def _set_action_icon(self, button: QToolButton, icon_name: str) -> None:
         self._action_icons[button] = icon_name
         button.setIcon(load_svg_icon(icon_name, ICON_SIZE_NORMAL))
+
+    def _configure_actions_overflow(self) -> None:
+        menu = QMenu(self.btn_actions_overflow)
+        self.btn_actions_overflow.setMenu(menu)
+        for button in (
+            self.btn_refresh,
+            self.btn_download_missing,
+            self.btn_export_library,
+            self.btn_config,
+            self.btn_about,
+            self.btn_logs,
+            self.btn_hotkeys,
+        ):
+            action = menu.addAction(button.toolTip() or button.accessibleName())
+            action.setCheckable(button.isCheckable())
+            action.triggered.connect(lambda _checked=False, target=button: target.click())
+            self._overflow_action_bindings.append((action, button))
+        menu.aboutToShow.connect(self._sync_actions_overflow)
+
+    def _sync_actions_overflow(self) -> None:
+        for action, button in self._overflow_action_bindings:
+            action.setEnabled(button.isEnabled())
+            if action.isCheckable():
+                action.setChecked(button.isChecked())
 
     def refresh_theme_icons(self) -> None:
         for button, icon_name in self._action_icons.items():
@@ -318,16 +365,14 @@ class TopBarController(QWidget):
         self.actions_label.setText(default_label)
 
     def update_responsive_layout(self, width: int) -> None:
-        if width < 1120:
-            self.root_layout.setDirection(QBoxLayout.TopToBottom)
-            self.root_layout.setStretch(0, 0)
-            self.root_layout.setStretch(1, 0)
-            self.root_layout.setStretch(2, 0)
-        else:
-            self.root_layout.setDirection(QBoxLayout.LeftToRight)
-            self.root_layout.setStretch(0, 3)
-            self.root_layout.setStretch(1, 2)
-            self.root_layout.setStretch(2, 1)
+        compact_actions = width < 1120
+        self.root_layout.setDirection(QBoxLayout.LeftToRight)
+        self.root_layout.setStretch(0, 3)
+        self.root_layout.setStretch(1, 2)
+        self.root_layout.setStretch(2, 0 if compact_actions else 1)
+        for button in self._regular_action_buttons:
+            button.setVisible(not compact_actions)
+        self.btn_actions_overflow.setVisible(compact_actions)
         self.updateGeometry()
 
     def bind_tab_order(self, window, _tabs_widget) -> None:
