@@ -146,18 +146,17 @@ class ActionsDelegate(QStyledItemDelegate):
         border_color = _theme_color("color-accent" if hovered else "color-border", "#334155")
         has_fill = True
         if selected:
-            bg_color = _theme_color("color-accent", "#38bdf8")
-            bg_color.setAlpha(110 if hovered else 80)
-            border_color = _theme_color("color-accent", "#38bdf8")
-            border_color.setAlpha(210 if hovered else 130)
+            # Keep row selection visible in the cell, but do not turn the
+            # per-track actions into blue primary buttons.
+            bg_color = _theme_color("color-bg-elevated" if hovered else "color-bg-control", "#172033")
+            border_color = _theme_color("color-border-hover" if hovered else "color-border", "#334155")
             has_fill = hovered
         if not enabled:
             bg_color = _theme_color("color-bg-pressed", "#262626")
             border_color = _theme_color("color-disabled-border", "#4b5563")
             if selected:
-                bg_color = _theme_color("color-accent", "#38bdf8")
-                bg_color.setAlpha(24)
-                border_color.setAlpha(80)
+                bg_color = _theme_color("color-bg-pressed", "#262626")
+                border_color = _theme_color("color-disabled-border", "#4b5563")
                 has_fill = True
 
         painter.setBrush(bg_color if has_fill else Qt.BrushStyle.NoBrush)

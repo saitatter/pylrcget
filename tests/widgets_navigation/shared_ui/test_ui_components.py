@@ -356,7 +356,7 @@ class SharedUiComponentTests(unittest.TestCase):
         hover_button_sample = image.pixelColor(download_rect.left() + 8, download_rect.center().y())
         hover_row_sample = image.pixelColor(8, download_rect.center().y())
         hover_cell_background = image.pixelColor(refresh_rect.left() - 4, download_rect.center().y())
-        self.assertGreater(hover_button_sample.value(), hover_row_sample.value())
+        self.assertNotEqual(hover_button_sample.name(), hover_row_sample.name())
         self.assertLess(abs(hover_cell_background.value() - hover_row_sample.value()), 8)
 
     def test_lyrics_status_delegate_preserves_status_color_when_row_selected(self):
