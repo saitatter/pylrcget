@@ -160,6 +160,29 @@ class LyricsEditorWidgetTests(unittest.TestCase):
             widget.hide()
             widget.deleteLater()
 
+    def test_synced_lyrics_header_receives_needed_height_after_controls_show(self):
+        widget = LyricsEditorWidget()
+        try:
+            widget.resize(720, 640)
+            widget.show()
+            self.app.processEvents()
+
+            lrc = "\n".join(f"[{index:02d}:00.00] line {index}" for index in range(1, 12))
+            widget.set_track_lyrics("Song", "", lrc, False, track_id=1)
+            self.app.processEvents()
+
+            header_layout = widget.header_widget.layout()
+            required_height = header_layout.totalHeightForWidth(widget.header_widget.width())
+            self.assertTrue(widget.btn_auto_sync.isVisible())
+            self.assertGreaterEqual(widget.header_widget.height(), required_height)
+            self.assertGreaterEqual(
+                widget.stack.geometry().top(),
+                widget.header_widget.geometry().bottom() + widget.layout().spacing(),
+            )
+        finally:
+            widget.hide()
+            widget.deleteLater()
+
     def test_empty_lyrics_auto_sync_action_opens_editor_and_emits_request(self):
         widget = LyricsEditorWidget()
         emitted: list[bool] = []

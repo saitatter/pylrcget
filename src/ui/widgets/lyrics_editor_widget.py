@@ -717,6 +717,7 @@ class LyricsEditorWidget(QWidget):
                     self.plain.blockSignals(True)
                     self.plain.setPlainText("\n".join([t.rstrip() for _, t in pairs]).rstrip())
                     self.plain.blockSignals(False)
+                self._sync_header_height()
                 self._loading_track = False
                 return
 
