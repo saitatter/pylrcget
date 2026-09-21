@@ -49,7 +49,7 @@ class TopBarController(QWidget):
 
         root = QHBoxLayout(self)
         self.root_layout = root
-        set_layout_spacing(root, margins=SPACE_1, spacing=SPACE_2)
+        set_layout_spacing(root, margins=(SPACE_1, 2, SPACE_1, 2), spacing=SPACE_2)
 
         self.search_group = QWidget()
         self.search_group.setObjectName("TopBarGroup")

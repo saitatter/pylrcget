@@ -38,6 +38,8 @@ QLineEdit#TopBarSearch {
     background: transparent;
     border-color: {{color-border}};
     min-width: 260px;
+    min-height: 28px;
+    padding: 4px 8px;
 }
 
 QLineEdit#TopBarSearch:focus {
@@ -45,8 +47,9 @@ QLineEdit#TopBarSearch:focus {
 }
 
 QToolButton#TopBarAction {
-    min-width: 36px;
-    min-height: 36px;
+    min-width: 32px;
+    min-height: 32px;
+    padding: 4px;
 }
 
 QCheckBox#TopBarFilterCheck {

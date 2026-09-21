@@ -56,6 +56,9 @@ class SharedUiComponentTests(unittest.TestCase):
             self.assertIn("QWidget#TopBar {", stylesheet)
             self.assertIn("max-height: 52px;", stylesheet)
             self.assertIn("QCheckBox#TopBarFilterCheck", stylesheet)
+            self.assertIn("min-height: 28px;", stylesheet)
+            self.assertIn("padding: 4px 8px;", stylesheet)
+            self.assertIn("min-width: 32px;", stylesheet)
             self.assertNotIn("min-height: 72px;", stylesheet)
         finally:
             widget.deleteLater()
