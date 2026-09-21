@@ -159,6 +159,9 @@ class MyLrclibWidget(QWidget):
         table.setAlternatingRowColors(True)
         table.setEditTriggers(QTableView.EditTrigger.NoEditTriggers)
         table.setSortingEnabled(True)
+        # QTableView re-enables the platform-native arrow when sorting is
+        # enabled; keep only the themed indicator painted by SortableHeaderView.
+        header.setSortIndicatorShown(False)
         table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         table.customContextMenuRequested.connect(
             lambda pos, t=table, m=model: self._on_context_menu(t, m, pos)
