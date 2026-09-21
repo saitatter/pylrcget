@@ -1,48 +1,67 @@
 # PyLrcGet
 
-PyLrcGet is a native PySide6 desktop app for browsing a local music library,
-finding and editing synced/plain lyrics, playing tracks, exporting sidecars,
-embedding lyrics, and publishing to LRCLIB.
+> 🎵 A native desktop lyrics manager and player for local music libraries.
+
+Browse, edit, sync, download, export, embed, and publish synced or plain lyrics
+without leaving your desktop workflow.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![GitHub Release](https://img.shields.io/github/v/release/saitatter/pylrcget)](https://github.com/saitatter/pylrcget/releases)
+[![Issues](https://img.shields.io/github/issues/saitatter/pylrcget)](https://github.com/saitatter/pylrcget/issues)
 [![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![PySide6](https://img.shields.io/badge/PySide6-Qt-41CD52?logo=qt&logoColor=white)](https://doc.qt.io/qtforpython/)
+[![SQLite](https://img.shields.io/badge/SQLite-003B57?logo=sqlite&logoColor=white)](https://www.sqlite.org/)
+[![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)](#)
 
-## What it does
+## ✨ What it does
 
-- Scans folders recursively into SQLite, with incremental refresh and exclusion rules.
-- Browses Tracks, Albums, Artists, Album Artists, Lyrics Browser, and Lyrics Activity.
-- Downloads lyrics through an ordered provider matrix.
-- Supports LRCLIB by default and optional Musixmatch website/API transports.
-- Edits synced or plain lyrics, tracks unsaved drafts, and highlights lyrics during playback.
-- Exports `.lrc`/`.txt` sidecars and optionally embeds lyrics into supported formats.
-- Provides local AI Auto Sync with CUDA when available and CPU fallback.
-- Includes playback controls, custom speed, volume, themes, keyboard shortcuts, and logs.
+- 🎧 Scans local folders recursively into SQLite with incremental refresh and exclusions.
+- 📚 Browses Tracks, Albums, Artists, Album Artists, Lyrics Browser, and Lyrics Activity.
+- 📝 Edits synced (`.lrc`) and plain lyrics, with unsaved drafts and playback highlighting.
+- 🌐 Downloads through an ordered provider matrix; LRCLIB is enabled by default.
+- 💾 Exports `.lrc` / `.txt` sidecars and embeds lyrics into supported formats.
+- 🤖 Provides local AI Auto Sync with CUDA when available and CPU fallback.
+- 🎨 Includes playback controls, themes, keyboard shortcuts, logs, and responsive layouts.
 
 Provider settings are opt-in: a disabled provider is never used as an automatic
 fallback. See [Musixmatch provider notes](docs/MULTI_PROVIDER_MUSIXMATCH.md).
 
-## Screenshots
+## 📸 Screenshots
 
-Add final captures under `docs/screenshots/` when the visual set is ready.
-These are the most useful views for the project page:
+Add final captures under `docs/screenshots/`. The following views are the most
+useful for the project page and release notes:
 
-| File | Capture |
-|---|---|
-| `tracks-light.png` | Tracks + lyrics panel in the Light theme, with a selected track. |
-| `tracks-dark.png` | The same view in the Dark theme, showing the normal browsing hierarchy. |
-| `lyrics-editor.png` | Synced lyrics editor with timestamps, toolbar, and playback controls. |
-| `empty-lyrics.png` | Missing-lyrics state with provider actions visible. |
-| `settings-providers.png` | Provider matrix and per-provider settings. |
-| `responsive-narrow.png` | Narrow window showing the compact command bar and usable lyrics pane. |
+| File | What to capture | Why it is useful |
+|---|---|---|
+| `tracks-light.png` | Light theme, selected track, library table, and lyrics panel. | Main product view and light-theme readability. |
+| `tracks-dark.png` | The same view in the Dark theme. | Theme support and normal navigation hierarchy. |
+| `lyrics-editor.png` | Synced editor with timestamps, toolbar, and player bar. | Core editing workflow. |
+| `empty-lyrics.png` | Missing-lyrics state with provider actions visible. | First-run/download experience. |
+| `settings-providers.png` | Provider matrix with LRCLIB/Musixmatch settings. | Provider configuration and disabled-provider behavior. |
+| `settings-appearance.png` | Appearance settings with theme and page-size controls. | Customization and indexed table pagination. |
+| `responsive-narrow.png` | Narrow window with compact actions and lyrics pane. | Responsive layout and overflow actions. |
+| `clear-lyrics.png` | Clear Lyrics dialog with grouped TXT/LRC options. | Safe cleanup and embedded-lyrics controls. |
 
-When added, place the corresponding Markdown image links here, for example:
+When the captures are ready, add the image links below this table. Keep the
+images inside the repository so the README also renders offline:
 
 ```markdown
 ![Tracks in the Light theme](docs/screenshots/tracks-light.png)
+![Lyrics editor](docs/screenshots/lyrics-editor.png)
 ```
 
-## Quick start
+<!-- Screenshot slots:
+![Tracks in the Light theme](docs/screenshots/tracks-light.png)
+![Tracks in the Dark theme](docs/screenshots/tracks-dark.png)
+![Lyrics editor](docs/screenshots/lyrics-editor.png)
+![Missing lyrics](docs/screenshots/empty-lyrics.png)
+![Provider settings](docs/screenshots/settings-providers.png)
+![Appearance settings](docs/screenshots/settings-appearance.png)
+![Responsive layout](docs/screenshots/responsive-narrow.png)
+![Clear Lyrics dialog](docs/screenshots/clear-lyrics.png)
+-->
+
+## 🚀 Quick start
 
 ```powershell
 py -3.13 -m venv .venv
@@ -55,7 +74,7 @@ The core application supports Python 3.10+. Python 3.13 is recommended for
 the optional AI runtime. The app does not modify a music folder during normal
 scanning; exports and embedding are explicit user actions.
 
-## Optional AI Auto Sync
+## 🤖 Optional AI Auto Sync
 
 ```powershell
 python -m pip install -e ".[ai]"
@@ -75,7 +94,7 @@ $env:PYLRCGET_AI_BOOTSTRAP_PYTHON = "C:\Path\to\python.exe"
 Optional Demucs is used only as a candidate vocal-stem path and is not
 required for the base AI workflow.
 
-## Lyrics providers
+## 🌐 Lyrics providers
 
 | Provider | Default | Notes |
 |---|:---:|---|
@@ -87,7 +106,7 @@ matching uses artist, title, album, duration, and version metadata. Full
 transport limitations are documented in
 [docs/MULTI_PROVIDER_MUSIXMATCH.md](docs/MULTI_PROVIDER_MUSIXMATCH.md).
 
-## Supported audio formats
+## 🎼 Supported audio formats
 
 | Format | Scan | Lyrics read/write | Sidecar export |
 |---|:---:|:---:|:---:|
@@ -100,7 +119,7 @@ transport limitations are documented in
 Playback depends on the active backend and installed codecs. Metadata support
 can be broader than playback support for a specific format.
 
-## Important settings
+## ⚙️ Important settings
 
 | Area | Examples |
 |---|---|
@@ -113,7 +132,7 @@ can be broader than playback support for a specific format.
 Download modes are `Prefer synced`, `Synced only`, and `Plain only`. Export
 and embedding format choices are configured independently from download mode.
 
-## Performance and design notes
+## ⚡ Performance and design notes
 
 The scanner separates audio and sidecar state, reuses stored metadata for
 unchanged audio, and avoids unnecessary Mutagen and sidecar reads. LRCLIB
@@ -125,7 +144,7 @@ results, known trade-offs, and the TagLib decision. The benchmark harnesses
 are documented in [tools/perf/README.md](tools/perf/README.md) and
 [tools/ai_sync_bench/README.md](tools/ai_sync_bench/README.md).
 
-## Development
+## 🛠️ Development
 
 Run the test suite and static checks from the repository root:
 
@@ -146,7 +165,7 @@ Performance fixtures and benchmark output are generated under `benchmarks/`;
 do not point a mutating benchmark at a real music folder. Read-only source
 measurements must use the harness `--read-only-source` option.
 
-## Building
+## 📦 Building locally
 
 ```powershell
 python -m pip install -r requirements.txt pyinstaller
@@ -159,7 +178,7 @@ For the portable single-file build:
 pyinstaller --noconfirm pylrcget-portable.spec
 ```
 
-## Releases and troubleshooting
+## 🧭 Releases and troubleshooting
 
 Releases use Conventional Commits and semantic-release. See
 [CHANGELOG.md](CHANGELOG.md) for published changes.
