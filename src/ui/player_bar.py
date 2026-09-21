@@ -101,13 +101,15 @@ class SeekSlider(QSlider):
     _VOLUME_TRACK_HEIGHT = 5.0
     _SEEK_HANDLE_SIZE = 14.0
     _VOLUME_HANDLE_SIZE = 12.0
+    _HANDLE_BORDER_WIDTH = 2.0
 
     def _track_geometry(self) -> tuple[float, float, float, float]:
         is_seek_slider = self.objectName() == "PlayerSlider"
         handle_size = self._SEEK_HANDLE_SIZE if is_seek_slider else self._VOLUME_HANDLE_SIZE
         groove_height = self._SEEK_TRACK_HEIGHT if is_seek_slider else self._VOLUME_TRACK_HEIGHT
-        track_left = handle_size / 2.0
-        track_width = max(1.0, self.width() - handle_size)
+        edge_inset = handle_size / 2.0 + self._HANDLE_BORDER_WIDTH / 2.0
+        track_left = edge_inset
+        track_width = max(1.0, self.width() - 2.0 * edge_inset)
         track_top = (self.height() - groove_height) / 2.0
         return track_left, track_width, track_top, groove_height
 

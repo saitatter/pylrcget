@@ -330,6 +330,28 @@ class SharedUiComponentTests(unittest.TestCase):
         finally:
             widget.deleteLater()
 
+    def test_player_slider_handles_keep_border_clearance_at_both_edges(self):
+        widget = PlayerBar(player=None)
+        try:
+            for slider in (widget.slider, widget.slider_volume):
+                handle_size = (
+                    slider._SEEK_HANDLE_SIZE
+                    if slider.objectName() == "PlayerSlider"
+                    else slider._VOLUME_HANDLE_SIZE
+                )
+                slider.resize(100, 24)
+                track_left, track_width, _track_top, _track_height = slider._track_geometry()
+                edge_clearance = slider._HANDLE_BORDER_WIDTH / 2.0
+                handle_radius = handle_size / 2.0
+
+                self.assertGreaterEqual(track_left - handle_radius, edge_clearance)
+                self.assertLessEqual(
+                    track_left + track_width + handle_radius,
+                    slider.width() - edge_clearance,
+                )
+        finally:
+            widget.deleteLater()
+
     def test_track_action_buttons_track_individual_hover(self):
         table = QTableView()
         model = QStandardItemModel(1, 5)
