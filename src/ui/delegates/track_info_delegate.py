@@ -93,7 +93,7 @@ class TrackInfoDelegate(QStyledItemDelegate):
 
     def sizeHint(self, option, index) -> QSize:
         size = super().sizeHint(option, index)
-        return QSize(size.width(), max(size.height(), 36))
+        return QSize(size.width(), max(size.height(), 44))
 
     def editorEvent(self, event, model, option, index) -> bool:
         del model
