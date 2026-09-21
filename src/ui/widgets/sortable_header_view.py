@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from PySide6.QtCore import QPoint, QRect, Qt
-from PySide6.QtGui import QColor, QPainter
+from PySide6.QtGui import QColor, QPainter, QPolygon
 from PySide6.QtWidgets import QHeaderView, QMenu
 
 from ui.theme_tokens import STYLE_TOKENS
@@ -23,7 +23,9 @@ class SortableHeaderView(QHeaderView):
         self._non_sortable_columns = set(non_sortable_columns or set())
 
         self.setSectionsClickable(True)
-        self.setSortIndicatorShown(True)
+        # The indicator is painted below so the platform-native arrow cannot
+        # overlap the themed one.
+        self.setSortIndicatorShown(False)
         self.setHighlightSections(False)
         self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.customContextMenuRequested.connect(self._open_context_menu)
@@ -37,14 +39,27 @@ class SortableHeaderView(QHeaderView):
         if logical_index in self._non_sortable_columns:
             return
 
-        arrow = "\u25B2" if self.sortIndicatorOrder() == Qt.SortOrder.AscendingOrder else "\u25BC"
-        arrow_rect = rect.adjusted(0, 0, -8, 0)
         accent = QColor(STYLE_TOKENS.get("color-accent", "#38bdf8"))
+        center_x = rect.right() - 14
+        center_y = rect.center().y()
+        if self.sortIndicatorOrder() == Qt.SortOrder.AscendingOrder:
+            points = [
+                QPoint(center_x, center_y - 4),
+                QPoint(center_x - 4, center_y + 3),
+                QPoint(center_x + 4, center_y + 3),
+            ]
+        else:
+            points = [
+                QPoint(center_x - 4, center_y - 3),
+                QPoint(center_x + 4, center_y - 3),
+                QPoint(center_x, center_y + 4),
+            ]
 
         painter.save()
-        painter.setRenderHint(QPainter.RenderHint.TextAntialiasing, True)
-        painter.setPen(accent)
-        painter.drawText(arrow_rect, Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter, arrow)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(accent)
+        painter.drawPolygon(QPolygon(points))
 
         underline_y = rect.bottom() - 1
         painter.fillRect(QRect(rect.left() + 6, underline_y, max(0, rect.width() - 12), 2), accent)
