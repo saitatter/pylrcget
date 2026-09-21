@@ -188,9 +188,9 @@ QPushButton#DownloadOverlayStop {
 }
 
 QWidget#LibraryNavBar {
-    background: {{color-bg-panel}};
-    border: 1px solid {{color-border-strong}};
-    border-radius: {{radius-lg}};
+    background: transparent;
+    border: none;
+    min-height: 36px;
 }
 
 QToolButton#LibraryNavButton {
@@ -222,9 +222,9 @@ QLabel#LibraryBreadcrumbSeparator {
 }
 
 QWidget#SelectionActionsBar {
-    background: {{color-bg-panel}};
-    border: 1px solid {{color-border-strong}};
-    border-radius: {{radius-lg}};
+    background: transparent;
+    border: none;
+    border-radius: 0;
 }
 
 QLabel#SelectionActionsLabel {

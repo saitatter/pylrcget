@@ -205,6 +205,7 @@ class MainWindow(QMainWindow):
         self.nav_bar = QWidget()
         self.nav_bar.setObjectName("LibraryNavBar")
         nav_layout = QHBoxLayout(self.nav_bar)
+        self.nav_layout = nav_layout
         set_layout_spacing(nav_layout, margins=(SPACE_2, 0, SPACE_2, 0), spacing=SPACE_2)
         self.breadcrumbs = QWidget()
         self.breadcrumbs.setObjectName("LibraryBreadcrumbs")
@@ -240,7 +241,6 @@ class MainWindow(QMainWindow):
         ) = self._create_selection_actions_bar()
 
         self.track_list = TrackListWidget(self.app_state, show_bulk_context_actions=False)
-        track_pane_layout.addWidget(self.selection_actions_bar)
         track_pane_layout.addWidget(self.track_list, 1)
         splitter.addWidget(self.track_pane)
 
@@ -268,7 +268,6 @@ class MainWindow(QMainWindow):
             self.albums_selection_actions_label,
             self.albums_selection_action_buttons,
         ) = self._create_selection_actions_bar()
-        albums_layout.addWidget(self.albums_selection_actions_bar)
         self.albums_splitter = QSplitter(Qt.Orientation.Horizontal)
         self.albums_splitter.addWidget(self.albums_tab)
         self.albums_lyrics_view = LyricsEditorWidget()
@@ -292,7 +291,6 @@ class MainWindow(QMainWindow):
             self.artists_selection_actions_label,
             self.artists_selection_action_buttons,
         ) = self._create_selection_actions_bar()
-        artists_layout.addWidget(self.artists_selection_actions_bar)
         self.artists_splitter = QSplitter(Qt.Orientation.Horizontal)
         self.artists_splitter.addWidget(self.artists_tab)
         self.artists_lyrics_view = LyricsEditorWidget()
@@ -317,7 +315,6 @@ class MainWindow(QMainWindow):
             self.album_artists_selection_actions_label,
             self.album_artists_selection_action_buttons,
         ) = self._create_selection_actions_bar()
-        album_artists_layout.addWidget(self.album_artists_selection_actions_bar)
         self.album_artists_splitter = QSplitter(Qt.Orientation.Horizontal)
         self.album_artists_splitter.addWidget(self.album_artists_tab)
         self.album_artists_lyrics_view = LyricsEditorWidget()
@@ -331,6 +328,14 @@ class MainWindow(QMainWindow):
         self.album_artists_tab.setMinimumWidth(LIBRARY_PANE_MIN_WIDTH)
         self.album_artists_lyrics_view.setMinimumWidth(LYRICS_PANE_MIN_WIDTH)
         album_artists_layout.addWidget(self.album_artists_splitter)
+
+        for selection_bar in (
+            self.selection_actions_bar,
+            self.albums_selection_actions_bar,
+            self.artists_selection_actions_bar,
+            self.album_artists_selection_actions_bar,
+        ):
+            self.nav_layout.addWidget(selection_bar)
 
         self._syncing_library_splitters = False
         self._connect_library_splitter_sync()
@@ -704,7 +709,7 @@ class MainWindow(QMainWindow):
         return bar, label, buttons
 
     def _selection_bar_targets(self):
-        return [
+        targets = [
             (self.selection_actions_bar, self.selection_actions_label, self.selection_action_buttons, self.track_list),
             (
                 self.albums_selection_actions_bar,
@@ -719,6 +724,16 @@ class MainWindow(QMainWindow):
                 self.artists_tab.album_browser.track_list,
             ),
         ]
+        if hasattr(self, "album_artists_selection_actions_bar"):
+            targets.append(
+                (
+                    self.album_artists_selection_actions_bar,
+                    self.album_artists_selection_actions_label,
+                    self.album_artists_selection_action_buttons,
+                    self.album_artists_tab.album_browser.track_list,
+                )
+            )
+        return targets
 
     def _selected_track_ids_for_toolbar(self) -> list[int]:
         track_list = self._active_track_list_widget() if hasattr(self, "track_list") else None
@@ -769,9 +784,11 @@ class MainWindow(QMainWindow):
         has_selection = count > 0
         label = f"Selected tracks: {count}" if has_selection else "Selected tracks: none"
         active_track_list = self._active_track_list_widget()
+        if hasattr(self, "breadcrumbs"):
+            self.breadcrumbs.setVisible(not has_selection)
         for bar, bar_label, buttons, track_list in self._selection_bar_targets():
             is_active = track_list is active_track_list
-            bar.setVisible(is_active)
+            bar.setVisible(is_active and has_selection)
             if not is_active:
                 continue
             bar_label.setText(label)

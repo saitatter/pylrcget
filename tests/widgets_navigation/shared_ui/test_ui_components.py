@@ -77,6 +77,14 @@ class SharedUiComponentTests(unittest.TestCase):
         finally:
             tab_bar.deleteLater()
 
+    def test_context_row_uses_flat_breadcrumb_and_selection_surfaces(self):
+        stylesheet = Path("src/ui/qss/main_window.qss").read_text(encoding="utf-8")
+        self.assertIn("QWidget#LibraryNavBar {", stylesheet)
+        self.assertIn("QWidget#SelectionActionsBar {", stylesheet)
+        self.assertIn("background: transparent;", stylesheet)
+        self.assertIn("border: none;", stylesheet)
+        self.assertIn("LibraryBreadcrumbButton", stylesheet)
+
     def test_player_hotkey_badges_use_shared_badge_style(self):
         stylesheet = Path("src/ui/qss/player_bar.qss").read_text(encoding="utf-8")
         self.assertIn("QLabel#HotkeyHintBadge", stylesheet)
