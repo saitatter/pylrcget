@@ -398,6 +398,35 @@ class LyricsEditorWidget(QWidget):
 
         self.stack.addWidget(self.table)
 
+        self._pane_collapsed = False
+        self._pane_visibility_snapshot: dict[QWidget, bool] | None = None
+        self._pane_collapsible_widgets = (
+            self.title,
+            self.validation_badge,
+            self.dirty_badge,
+            self.btn_discard_draft,
+            self.btn_show_diff,
+            self.btn_switch_mode,
+            self.btn_clear_timestamps,
+            self.btn_auto_sync,
+            self.btn_snap,
+            self.btn_shift_minus,
+            self.btn_shift_plus,
+            self.shift_spin,
+            self.btn_shift_selected,
+            self.btn_shift_all_from_first,
+            self.btn_add,
+            self.btn_del,
+            self.btn_autofix,
+            self.btn_save,
+            self.btn_sync_others,
+            self.btn_export_files,
+            self.btn_publish_synced,
+            self.btn_publish_plain,
+            self.validation_hint,
+            self.stack,
+        )
+
         # Undo/redo shortcuts for the synced table
         self._shortcut_undo = QShortcut(QKeySequence.StandardKey.Undo, self)
         self._shortcut_undo.activated.connect(self._undo)
@@ -554,8 +583,25 @@ class LyricsEditorWidget(QWidget):
 
     def set_pane_collapsed(self, collapsed: bool) -> None:
         collapsed = bool(collapsed)
+        if collapsed and not self._pane_collapsed:
+            self._pane_visibility_snapshot = {
+                widget: not widget.isHidden()
+                for widget in self._pane_collapsible_widgets
+            }
+            for widget in self._pane_collapsible_widgets:
+                widget.hide()
+        elif not collapsed and self._pane_collapsed:
+            snapshot = self._pane_visibility_snapshot or {}
+            for widget in self._pane_collapsible_widgets:
+                widget.setVisible(bool(snapshot.get(widget, False)))
+            self._pane_visibility_snapshot = None
+        self._pane_collapsed = collapsed
         self.btn_toggle_pane.setText("‹" if collapsed else "›")
         self.btn_toggle_pane.setToolTip("Expand lyrics panel" if collapsed else "Collapse lyrics panel")
+        self._sync_header_height()
+
+    def _set_pane_control_visible(self, widget: QWidget, visible: bool) -> None:
+        widget.setVisible(False if self._pane_collapsed else bool(visible))
 
     def show_none(self, message: str):
         self._reset_state()
@@ -687,9 +733,9 @@ class LyricsEditorWidget(QWidget):
     def _set_dirty_badge(self, visible: bool) -> None:
         self._has_dirty_draft = bool(visible)
         self.dirty_badge.setText("Unsaved draft" if visible else "")
-        self.dirty_badge.setVisible(bool(visible))
-        self.btn_discard_draft.setVisible(bool(visible))
-        self.btn_show_diff.setVisible(bool(visible))
+        self._set_pane_control_visible(self.dirty_badge, visible)
+        self._set_pane_control_visible(self.btn_discard_draft, visible)
+        self._set_pane_control_visible(self.btn_show_diff, visible)
         self._sync_header_height()
         self._update_publish_enabled()
 
@@ -722,8 +768,8 @@ class LyricsEditorWidget(QWidget):
         self.btn_export_files.setEnabled(True)
         self.btn_sync_others.setEnabled(True)
         self.btn_switch_mode.setText("Switch to Synced")
-        self.btn_switch_mode.setVisible(True)
-        self.btn_auto_sync.setVisible(True)
+        self._set_pane_control_visible(self.btn_switch_mode, True)
+        self._set_pane_control_visible(self.btn_auto_sync, True)
         self._validate_current_lyrics()
 
     def _start_writing_lyrics(self):
@@ -884,9 +930,9 @@ class LyricsEditorWidget(QWidget):
         self.btn_export_files.setEnabled(True)
         self.btn_sync_others.setEnabled(True)
         self.btn_switch_mode.setText("Switch to Plain")
-        self.btn_switch_mode.setVisible(True)
-        self.btn_clear_timestamps.setVisible(True)
-        self.btn_auto_sync.setVisible(True)
+        self._set_pane_control_visible(self.btn_switch_mode, True)
+        self._set_pane_control_visible(self.btn_clear_timestamps, True)
+        self._set_pane_control_visible(self.btn_auto_sync, True)
         self._validate_current_lyrics()
 
     def _rebuild_times_cache(self):
@@ -1032,7 +1078,7 @@ class LyricsEditorWidget(QWidget):
         self.validation_hint.style().unpolish(self.validation_hint)
         self.validation_hint.style().polish(self.validation_hint)
         self.validation_hint.update()
-        self.validation_hint.setVisible(bool(message))
+        self._set_pane_control_visible(self.validation_hint, bool(message))
 
     def _set_validation_badge(self, text: str, *, state: str = "") -> None:
         self.validation_badge.setText(text)
@@ -1040,7 +1086,7 @@ class LyricsEditorWidget(QWidget):
         self.validation_badge.style().unpolish(self.validation_badge)
         self.validation_badge.style().polish(self.validation_badge)
         self.validation_badge.update()
-        self.validation_badge.setVisible(bool(text))
+        self._set_pane_control_visible(self.validation_badge, bool(text))
 
     def _validate_current_lyrics(self, *, show_success: bool = False) -> bool:
         if self.stack.currentWidget() is self.table:
@@ -1054,7 +1100,7 @@ class LyricsEditorWidget(QWidget):
         self._lint_rows = {problem.line - 1 for problem in problems if problem.line > 0}
         self._row_validation_messages = self._validation_messages_by_row(problems)
         can_autofix = any(problem.fixable for problem in problems)
-        self.btn_autofix.setVisible(bool(problems))
+        self._set_pane_control_visible(self.btn_autofix, bool(problems))
         self.btn_autofix.setEnabled(can_autofix)
 
         if problems:

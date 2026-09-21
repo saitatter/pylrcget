@@ -85,22 +85,13 @@ class SharedUiComponentTests(unittest.TestCase):
         self.assertIn("border: none;", stylesheet)
         self.assertIn("LibraryBreadcrumbButton", stylesheet)
 
-    def test_lyrics_splitter_toggle_is_reversible(self):
+    def test_lyrics_splitter_keeps_resize_handle_free_of_toggle_controls(self):
         splitter = LyricsPaneSplitter()
         splitter.addWidget(QWidget())
         splitter.addWidget(QWidget())
         try:
-            splitter.set_lyrics_collapsed(False)
-            button = splitter.handle(1).toggle_button
-            self.assertIn("Collapse", button.toolTip())
-
-            splitter.set_lyrics_collapsed(True)
-            self.assertEqual(button.text(), "‹")
-            self.assertIn("Expand", button.toolTip())
-
-            splitter.set_lyrics_collapsed(False)
-            self.assertEqual(button.text(), "›")
-            self.assertIn("Collapse", button.toolTip())
+            self.assertEqual(splitter.handleWidth(), 24)
+            self.assertFalse(hasattr(splitter.handle(1), "toggle_button"))
         finally:
             splitter.deleteLater()
 
