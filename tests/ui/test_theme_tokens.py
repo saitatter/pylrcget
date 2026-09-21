@@ -5,6 +5,7 @@ from types import SimpleNamespace
 import pytest
 from PySide6.QtWidgets import QApplication
 
+from ui.style_loader import load_stylesheet
 from ui.theme_tokens import get_theme_tokens, set_theme_tokens
 from ui.widgets.album_list_widget import AlbumListWidget
 
@@ -76,4 +77,15 @@ def test_album_table_reloads_qss_after_palette_change() -> None:
         assert "#303030" not in widget.styleSheet()
     finally:
         widget.deleteLater()
+        set_theme_tokens("DarkTheme")
+
+
+def test_checked_checkbox_focus_keeps_light_accent_fill() -> None:
+    set_theme_tokens("LightTheme")
+    try:
+        stylesheet = load_stylesheet("app.qss")
+
+        assert "QCheckBox::indicator:checked:focus" in stylesheet
+        assert "background: #3f51b5;" in stylesheet
+    finally:
         set_theme_tokens("DarkTheme")

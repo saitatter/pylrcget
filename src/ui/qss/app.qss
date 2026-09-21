@@ -135,6 +135,12 @@ QCheckBox::indicator:focus {
     background: {{color-bg-elevated}};
 }
 
+QCheckBox::indicator:checked:focus {
+    background: {{color-accent}};
+    border-color: {{color-accent}};
+    image: url("{{asset-url}}/assets/icons/check.svg");
+}
+
 QCheckBox:disabled {
     color: {{color-disabled-text}};
 }
