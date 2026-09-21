@@ -29,6 +29,7 @@ from db.database import get_config
 from lyrics.provider_search import search_configured_providers
 from lyrics.providers.contracts import LyricsSearchContext, LyricsSearchResult
 from lyrics.source_settings import LYRICS_SOURCE_LABELS, load_lyrics_source_settings
+from ui.button_roles import set_button_role
 from ui.dialogs.form_layout import configure_form_layout
 from ui.dialogs.publish_lyrics_dialog import PublishProgress, PublishWorker
 from ui.spacing import SPACE_2, SPACE_3, SPACE_4, set_layout_spacing
@@ -176,6 +177,8 @@ class _BrowserPublishDialog(QDialog):
 
         self.btn_primary = QPushButton("Publish")
         self.btn_secondary = QPushButton("Cancel")
+        set_button_role(self.btn_primary, "primary")
+        set_button_role(self.btn_secondary, "secondary")
         self.btn_primary.clicked.connect(self._on_primary)
         self.btn_secondary.clicked.connect(self._on_secondary)
         footer.addWidget(self.btn_primary)
@@ -327,6 +330,7 @@ class LrclibBrowserWidget(QWidget):
         search_layout.addWidget(self.album_edit, 1)
 
         self.search_btn = QPushButton("Search")
+        set_button_role(self.search_btn, "primary")
         search_layout.addWidget(self.search_btn)
         root.addLayout(search_layout)
 
@@ -382,6 +386,9 @@ class LrclibBrowserWidget(QWidget):
         self.copy_synced_btn = QPushButton("Copy Synced")
         self.copy_plain_btn = QPushButton("Copy Plain")
         self.publish_btn = QPushButton("Publish to LRCLIB")
+        set_button_role(self.copy_synced_btn, "secondary")
+        set_button_role(self.copy_plain_btn, "secondary")
+        set_button_role(self.publish_btn, "primary")
         self.copy_synced_btn.setEnabled(False)
         self.copy_plain_btn.setEnabled(False)
 

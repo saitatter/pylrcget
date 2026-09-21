@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (
 )
 
 from db.models import Config, Track
+from ui.button_roles import set_button_role
 from ui.services.lyrics_cleanup_service import (
     LyricsCleanupOptions,
     preview_lyrics_cleanup,
@@ -77,7 +78,10 @@ class LyricsCleanupDialog(QDialog):
             QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel,
             parent=self,
         )
-        self.buttons.button(QDialogButtonBox.StandardButton.Ok).setText("Clean Lyrics")
+        clean_button = self.buttons.button(QDialogButtonBox.StandardButton.Ok)
+        clean_button.setText("Clean Lyrics")
+        set_button_role(clean_button, "danger")
+        set_button_role(self.buttons.button(QDialogButtonBox.StandardButton.Cancel), "secondary")
         self.buttons.accepted.connect(self.accept)
         self.buttons.rejected.connect(self.reject)
         layout.addWidget(self.buttons)
@@ -113,4 +117,3 @@ class LyricsCleanupDialog(QDialog):
             warnings.append("Audio files will be modified; non-lyrics metadata is preserved.")
         self.warning.setText(" ".join(warnings))
         self.warning.setVisible(bool(warnings))
-

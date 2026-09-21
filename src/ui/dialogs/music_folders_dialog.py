@@ -48,6 +48,7 @@ from ui.ai_sync_settings import (
     load_ai_sync_settings,
     merge_ai_sync_settings,
 )
+from ui.button_roles import set_button_role
 from ui.dialogs.form_layout import configure_form_grid
 from ui.hotkeys import (
     HOTKEY_SPECS,
@@ -221,6 +222,8 @@ class MusicFoldersDialog(QDialog):
         btn_layout = QHBoxLayout()
         self.add_btn = QPushButton("Add Folder")
         self.remove_btn = QPushButton("Remove Selected")
+        set_button_role(self.add_btn, "secondary")
+        set_button_role(self.remove_btn, "danger")
         btn_layout.addWidget(self.add_btn)
         btn_layout.addWidget(self.remove_btn)
         folders_layout.addLayout(btn_layout)
@@ -241,6 +244,9 @@ class MusicFoldersDialog(QDialog):
         self.add_excluded_file_btn = QPushButton("Add Excluded File")
         self.remove_excluded_path_btn = QPushButton("Remove Selected Lines")
         self.test_exclusions_btn = QPushButton("Test Exclusions")
+        for button in (self.add_excluded_path_btn, self.add_excluded_file_btn, self.test_exclusions_btn):
+            set_button_role(button, "secondary")
+        set_button_role(self.remove_excluded_path_btn, "danger")
         self.excluded_patterns_edit = QTextEdit()
         self.excluded_patterns_edit.setPlaceholderText(
             "One regex per line.\n"
@@ -334,6 +340,7 @@ class MusicFoldersDialog(QDialog):
         self._build_shortcut_controls(shortcuts_layout, group="lyrics")
 
         self.shortcuts_reset_btn = QPushButton("Reset All Defaults")
+        set_button_role(self.shortcuts_reset_btn, "secondary")
         self.shortcuts_reset_btn.setMaximumWidth(180)
         shortcuts_layout_root.addWidget(global_shortcuts_box)
         shortcuts_layout_root.addWidget(shortcuts_box)
@@ -379,6 +386,8 @@ class MusicFoldersDialog(QDialog):
         self.output_dir_edit.setPlaceholderText("Leave empty to save next to the audio file")
         self.browse_output_btn = QPushButton("Browse")
         self.clear_output_btn = QPushButton("Use Track Folder")
+        set_button_role(self.browse_output_btn, "secondary")
+        set_button_role(self.clear_output_btn, "ghost")
 
         lyrics_layout.addWidget(QLabel("Download directory"), 2, 0)
         lyrics_layout.addWidget(self.output_dir_edit, 2, 1)
@@ -543,6 +552,8 @@ class MusicFoldersDialog(QDialog):
         self.ai_runtime_refresh_btn.setToolTip("Check the installed AI runtime and available backends.")
         self.ai_runtime_manage_btn = QPushButton("Manage AI runtime")
         self.ai_runtime_manage_btn.setToolTip("Open the folder containing the isolated AI runtime.")
+        set_button_role(self.ai_runtime_refresh_btn, "secondary")
+        set_button_role(self.ai_runtime_manage_btn, "secondary")
         ai_runtime_buttons.addWidget(self.ai_runtime_refresh_btn)
         ai_runtime_buttons.addWidget(self.ai_runtime_manage_btn)
         ai_runtime_buttons.addStretch(1)
@@ -558,6 +569,7 @@ class MusicFoldersDialog(QDialog):
         lrclib_layout.addWidget(QLabel("Server URL"), 0, 0)
         lrclib_layout.addWidget(self.lrclib_instance_edit, 0, 1)
         self.lrclib_reset_btn = QPushButton("Reset to Default")
+        set_button_role(self.lrclib_reset_btn, "secondary")
         lrclib_layout.addWidget(self.lrclib_reset_btn, 0, 2)
         lrclib_hint = QLabel(
             "The LRCLIB server used for downloading and publishing lyrics. "
@@ -575,6 +587,8 @@ class MusicFoldersDialog(QDialog):
         source_buttons = QHBoxLayout()
         self.lyrics_source_up_btn = QPushButton("Move Up")
         self.lyrics_source_down_btn = QPushButton("Move Down")
+        set_button_role(self.lyrics_source_up_btn, "ghost")
+        set_button_role(self.lyrics_source_down_btn, "ghost")
         source_buttons.addWidget(self.lyrics_source_up_btn)
         source_buttons.addWidget(self.lyrics_source_down_btn)
         source_buttons.addStretch(1)
@@ -654,6 +668,7 @@ class MusicFoldersDialog(QDialog):
         self.tabs.addTab(shortcuts_tab, "Shortcuts")
 
         self.save_btn = QPushButton("Save")
+        set_button_role(self.save_btn, "primary")
         self.save_btn.setDefault(True)
         save_actions = QHBoxLayout()
         save_actions.addStretch(1)

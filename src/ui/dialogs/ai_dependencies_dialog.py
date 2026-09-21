@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
+from ui.button_roles import set_button_role
 from ui.spacing import SPACE_2, SPACE_3, SPACE_4, set_layout_spacing
 from ui.workers.ai.ai_runtime import resolve_ai_install_command
 from ui.workers.ai.ai_sync_worker import get_missing_ai_dependencies
@@ -101,6 +102,10 @@ class AIDependenciesDialog(QDialog):
         self.btn_copy = QPushButton("Copy Install Command")
         self.btn_retry = QPushButton("Retry AI Sync")
         self.btn_close = QPushButton("Close")
+        set_button_role(self.btn_install, "primary")
+        set_button_role(self.btn_copy, "ghost")
+        set_button_role(self.btn_retry, "primary")
+        set_button_role(self.btn_close, "secondary")
         self.btn_retry.setEnabled(False)
         self.btn_install.setEnabled(bool(self._install_cmd))
         self.btn_copy.setEnabled(bool(self._install_cmd))

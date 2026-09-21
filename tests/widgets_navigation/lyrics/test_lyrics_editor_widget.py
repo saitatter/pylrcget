@@ -857,3 +857,14 @@ class LyricsEditorWidgetTests(unittest.TestCase):
             self.assertGreaterEqual(dialog._pub_artist.minimumHeight(), 32)
         finally:
             dialog.deleteLater()
+
+    def test_lyrics_editor_uses_semantic_roles_for_primary_and_destructive_actions(self):
+        widget = LyricsEditorWidget()
+        try:
+            self.assertEqual(widget.btn_save.property("buttonRole"), "primary")
+            self.assertEqual(widget.btn_auto_sync.property("buttonRole"), "primary")
+            self.assertEqual(widget.btn_del.property("buttonRole"), "danger")
+            self.assertEqual(widget.btn_clear_lyrics.property("buttonRole"), "danger")
+            self.assertEqual(widget.btn_mode_synced.property("buttonRole"), "segmented")
+        finally:
+            widget.deleteLater()

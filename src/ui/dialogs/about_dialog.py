@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ui.button_roles import set_button_role
 from ui.services.update_service import (
     UpdateInfo,
     choose_update_download_path,
@@ -92,6 +93,11 @@ class AboutDialog(QDialog):
         self.btn_download = QPushButton("Download update")
         self.btn_install = QPushButton("Install update")
         self.btn_close = QPushButton("Close")
+        set_button_role(self.btn_check, "primary")
+        set_button_role(self.btn_release, "secondary")
+        set_button_role(self.btn_download, "secondary")
+        set_button_role(self.btn_install, "primary")
+        set_button_role(self.btn_close, "secondary")
         self.btn_check.clicked.connect(self.check_for_updates)
         self.btn_release.clicked.connect(self._open_release_page)
         self.btn_download.clicked.connect(lambda: self._download_update(install=False))

@@ -26,6 +26,7 @@ from core.lrclib_client import (
     RateLimitError,
     ServerError,
 )
+from ui.button_roles import set_button_role
 from ui.spacing import SPACE_2, SPACE_3, SPACE_4, set_layout_spacing
 
 logger = logging.getLogger(__name__)
@@ -282,6 +283,8 @@ class PublishLyricsDialog(QDialog):
 
         self.btn_primary = QPushButton()
         self.btn_secondary = QPushButton("Cancel")
+        set_button_role(self.btn_primary, "primary")
+        set_button_role(self.btn_secondary, "secondary")
 
         self.btn_primary.clicked.connect(self._on_primary)
         self.btn_secondary.clicked.connect(self._on_secondary)

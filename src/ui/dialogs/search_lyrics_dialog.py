@@ -22,6 +22,7 @@ from db.database import get_config, get_recent_search_queries, record_search_his
 from lyrics.provider_search import search_configured_providers
 from lyrics.providers.contracts import LyricsSearchContext, LyricsSearchResult
 from lyrics.source_settings import LYRICS_SOURCE_LABELS, load_lyrics_source_settings
+from ui.button_roles import set_button_role
 
 logger = logging.getLogger(__name__)
 
@@ -126,6 +127,7 @@ class SearchLyricsDialog(QDialog):
         fields_row.addWidget(self.album_edit, 1)
 
         self.search_btn = QPushButton("Search")
+        set_button_role(self.search_btn, "primary")
         fields_row.addWidget(self.search_btn)
         layout.addLayout(fields_row)
 
@@ -134,6 +136,8 @@ class SearchLyricsDialog(QDialog):
         self.artist_title_btn = QPushButton("Artist + title only")
         self.clear_album_btn = QPushButton("Clear album")
         self.free_text_btn = QPushButton("Use free-text query")
+        for button in (self.artist_title_btn, self.clear_album_btn, self.free_text_btn):
+            set_button_role(button, "ghost")
         refine_row.addWidget(self.artist_title_btn)
         refine_row.addWidget(self.clear_album_btn)
         refine_row.addWidget(self.free_text_btn)
@@ -169,8 +173,10 @@ class SearchLyricsDialog(QDialog):
         btn_row = QHBoxLayout()
         btn_row.addStretch(1)
         self.use_btn = QPushButton("Use Selected Lyrics")
+        set_button_role(self.use_btn, "primary")
         self.use_btn.setEnabled(False)
         self.cancel_btn = QPushButton("Cancel")
+        set_button_role(self.cancel_btn, "secondary")
         btn_row.addWidget(self.use_btn)
         btn_row.addWidget(self.cancel_btn)
         layout.addLayout(btn_row)

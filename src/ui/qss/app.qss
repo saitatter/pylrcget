@@ -91,6 +91,110 @@ QPushButton:pressed {
     background-color: {{color-bg-pressed}};
 }
 
+/* Semantic button roles. Component QSS may refine these for compact controls. */
+QPushButton[buttonRole="primary"] {
+    background-color: {{color-accent}};
+    color: {{color-bg-app}};
+    border-color: {{color-accent}};
+    font-weight: 650;
+}
+
+QPushButton[buttonRole="primary"]:hover {
+    background-color: {{color-accent-alt}};
+    border-color: {{color-accent-alt}};
+}
+
+QPushButton[buttonRole="secondary"] {
+    background-color: {{color-bg-control}};
+    color: {{color-text}};
+    border-color: {{color-border}};
+}
+
+QPushButton[buttonRole="secondary"]:hover {
+    background-color: {{color-bg-elevated}};
+    border-color: {{color-accent}};
+}
+
+QPushButton[buttonRole="ghost"] {
+    background-color: transparent;
+    color: {{color-text}};
+    border-color: transparent;
+}
+
+QPushButton[buttonRole="ghost"]:hover {
+    background-color: {{color-bg-control}};
+    border-color: {{color-border}};
+}
+
+QPushButton[buttonRole="danger"] {
+    background-color: {{color-error-bg}};
+    color: {{color-error-text}};
+    border-color: {{color-error-border}};
+}
+
+QPushButton[buttonRole="danger"]:hover {
+    background-color: {{color-error-border}};
+    border-color: {{color-error-text}};
+    color: {{color-bg-app}};
+}
+
+QPushButton[buttonRole="segmented"] {
+    background-color: transparent;
+    color: {{color-text-muted}};
+    border-color: transparent;
+}
+
+QPushButton[buttonRole="segmented"]:checked,
+QPushButton[buttonRole="segmented"]:checked:hover {
+    background-color: {{color-accent}};
+    color: {{color-bg-app}};
+    border-color: {{color-accent}};
+}
+
+QPushButton[buttonRole="segmented"]:hover {
+    background-color: {{color-bg-elevated}};
+    color: {{color-text}};
+}
+
+QPushButton[buttonRole="chip"] {
+    min-height: 28px;
+    max-height: 28px;
+    padding: 2px 8px;
+    background-color: {{color-bg-control}};
+    color: {{color-text}};
+    border-color: {{color-border}};
+    border-radius: {{radius-pill}};
+}
+
+QPushButton[buttonRole="chip"]:checked,
+QPushButton[buttonRole="chip"]:checked:hover {
+    background-color: {{color-accent}};
+    color: {{color-bg-app}};
+    border-color: {{color-accent}};
+}
+
+QPushButton[buttonRole="chip"]:hover {
+    background-color: {{color-bg-elevated}};
+    border-color: {{color-accent}};
+}
+
+QToolButton[buttonRole="icon"] {
+    min-width: 28px;
+    max-width: 28px;
+    min-height: 28px;
+    max-height: 28px;
+    padding: 4px;
+    background-color: transparent;
+    border-color: transparent;
+}
+
+QToolButton[buttonRole="icon"]:hover,
+QToolButton[buttonRole="icon"]:checked {
+    background-color: {{color-bg-control}};
+    border-color: {{color-accent}};
+    color: {{color-accent}};
+}
+
 QPushButton:disabled, QLineEdit:disabled, QTextEdit:disabled, QComboBox:disabled {
     color: {{color-disabled-text}};
     border-color: {{color-disabled-border}};

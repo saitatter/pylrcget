@@ -131,6 +131,8 @@ class SettingsDialogTests(unittest.TestCase):
                     )
                     self.assertGreaterEqual(dialog.theme_combo.minimumHeight(), 32)
                     self.assertTrue(dialog.save_btn.isDefault())
+                    self.assertEqual(dialog.save_btn.property("buttonRole"), "primary")
+                    self.assertEqual(dialog.remove_btn.property("buttonRole"), "danger")
                 finally:
                     dialog.deleteLater()
             finally:

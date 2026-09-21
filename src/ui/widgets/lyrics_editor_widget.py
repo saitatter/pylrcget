@@ -42,6 +42,7 @@ from core.utils import (
     parse_ts_str as _parse_ts_str,
 )
 from db.queries import get_config
+from ui.button_roles import set_button_role
 from ui.hotkeys import HOTKEY_SPECS, effective_hotkey_text, lyrics_hotkey_defaults
 from ui.spacing import SPACE_2, SPACE_3, set_layout_spacing
 from ui.style_loader import load_stylesheet
@@ -170,6 +171,7 @@ class LyricsEditorWidget(QWidget):
 
         self.btn_discard_draft = QPushButton("Discard")
         self.btn_discard_draft.setObjectName("LyricsDiscardDraft")
+        set_button_role(self.btn_discard_draft, "danger")
         self.btn_discard_draft.setToolTip("Discard draft and revert to saved lyrics")
         self.btn_discard_draft.hide()
         self.btn_discard_draft.clicked.connect(self.discardDraftRequested.emit)
@@ -177,6 +179,7 @@ class LyricsEditorWidget(QWidget):
 
         self.btn_show_diff = QPushButton("Diff")
         self.btn_show_diff.setObjectName("LyricsShowDiff")
+        set_button_role(self.btn_show_diff, "secondary")
         self.btn_show_diff.setToolTip("Show differences between saved and draft lyrics")
         self.btn_show_diff.hide()
         self.btn_show_diff.clicked.connect(self._show_diff)
@@ -190,11 +193,13 @@ class LyricsEditorWidget(QWidget):
         self.mode_group.setExclusive(True)
         self.btn_mode_synced = QPushButton("Synced", self.mode_selector)
         self.btn_mode_synced.setObjectName("LyricsModeButton")
+        set_button_role(self.btn_mode_synced, "segmented")
         self.btn_mode_synced.setCheckable(True)
         self.btn_mode_synced.setAccessibleName("Synced lyrics mode")
         self.btn_mode_synced.setToolTip("Edit timestamped synced lyrics")
         self.btn_mode_plain = QPushButton("Plain", self.mode_selector)
         self.btn_mode_plain.setObjectName("LyricsModeButton")
+        set_button_role(self.btn_mode_plain, "segmented")
         self.btn_mode_plain.setCheckable(True)
         self.btn_mode_plain.setAccessibleName("Plain lyrics mode")
         self.btn_mode_plain.setToolTip("Edit plain text lyrics")
@@ -209,6 +214,7 @@ class LyricsEditorWidget(QWidget):
 
         self.btn_clear_timestamps = QPushButton("Clear Timestamps")
         self.btn_clear_timestamps.setObjectName("LyricsClearTimestamps")
+        set_button_role(self.btn_clear_timestamps, "secondary")
         self.btn_clear_timestamps.setToolTip("Reset all synced timestamps to 00:00 (undoable)")
         self.btn_clear_timestamps.hide()
         self.btn_clear_timestamps.clicked.connect(self._clear_timestamps)
@@ -216,6 +222,7 @@ class LyricsEditorWidget(QWidget):
 
         self.btn_auto_sync = QPushButton("Sync with AI")
         self.btn_auto_sync.setObjectName("LyricsAutoSync")
+        set_button_role(self.btn_auto_sync, "primary")
         self.btn_auto_sync.setToolTip("Automatically synchronize these lyrics with the local audio using AI.")
         self.btn_auto_sync.hide()
         self.btn_auto_sync.clicked.connect(self.autoSyncRequested.emit)
@@ -239,9 +246,12 @@ class LyricsEditorWidget(QWidget):
         self._lyrics_hotkeys = lyrics_hotkey_defaults()
 
         self.btn_snap = QPushButton("Snap")
+        set_button_role(self.btn_snap, "secondary")
         self.btn_shift_minus = QPushButton("-0.1s")
+        set_button_role(self.btn_shift_minus, "ghost")
         self.btn_shift_minus.setToolTip("Shift selected lines 100ms earlier (Left)")
         self.btn_shift_plus = QPushButton("+0.1s")
+        set_button_role(self.btn_shift_plus, "ghost")
         self.btn_shift_plus.setToolTip("Shift selected lines 100ms later (Right)")
         self.shift_spin = QDoubleSpinBox()
         self.shift_spin.setRange(-30.0, 30.0)
@@ -254,20 +264,28 @@ class LyricsEditorWidget(QWidget):
         self.shift_spin.setButtonSymbols(QDoubleSpinBox.ButtonSymbols.NoButtons)
         self.shift_spin.setMinimumWidth(SHIFT_SPIN_MIN_WIDTH)
         self.btn_shift_selected = QPushButton("Shift Selected")
+        set_button_role(self.btn_shift_selected, "secondary")
         self.btn_shift_all_from_first = QPushButton("Shift All from First")
+        set_button_role(self.btn_shift_all_from_first, "secondary")
         self.btn_add = QPushButton("+ Line")
+        set_button_role(self.btn_add, "secondary")
         self.btn_add.setToolTip("Insert a new line after the current selection (Ctrl+N or Insert)")
         self.btn_del = QPushButton("Delete")
+        set_button_role(self.btn_del, "danger")
         self.btn_del.setToolTip("Delete the selected line (Delete)")
         self.btn_autofix = QPushButton("Autofix")
         self.btn_autofix.setObjectName("LyricsAutofix")
+        set_button_role(self.btn_autofix, "secondary")
         self.btn_autofix.setToolTip("Automatically fix safe lyrics validation issues")
         self.btn_autofix.hide()
         self.btn_save = QPushButton("Save")
+        set_button_role(self.btn_save, "primary")
         self.btn_save.setToolTip("Save lyrics to the library (Ctrl+S)")
         self.btn_sync_others = QPushButton("Sync to Others")
+        set_button_role(self.btn_sync_others, "secondary")
         self.btn_sync_others.setToolTip("Copy the current lyrics to similar tracks")
         self.btn_export_files = QPushButton("Export Files")
+        set_button_role(self.btn_export_files, "secondary")
         self.btn_export_files.setToolTip("Export .lrc and .txt sidecar files next to the audio file")
 
         self.btn_snap.setEnabled(False)
@@ -306,8 +324,10 @@ class LyricsEditorWidget(QWidget):
         toolbar.addWidget(self.btn_save)
 
         self.btn_publish_synced = QPushButton("Publish Synced")
+        set_button_role(self.btn_publish_synced, "secondary")
         self.btn_publish_synced.setToolTip("Publish synced (LRC) lyrics to LRCLIB")
         self.btn_publish_plain = QPushButton("Publish Plain")
+        set_button_role(self.btn_publish_plain, "secondary")
         self.btn_publish_plain.setToolTip("Publish plain text lyrics to LRCLIB")
         self.btn_publish_synced.setEnabled(False)
         self.btn_publish_plain.setEnabled(False)
@@ -316,12 +336,14 @@ class LyricsEditorWidget(QWidget):
 
         self.btn_clear_lyrics = QPushButton("Clear Lyrics")
         self.btn_clear_lyrics.setObjectName("LyricsClearLyrics")
+        set_button_role(self.btn_clear_lyrics, "danger")
         self.btn_clear_lyrics.setToolTip("Clean saved lyrics, sidecar files, or embedded lyrics")
         self.btn_clear_lyrics.setEnabled(False)
         self.btn_clear_lyrics.clicked.connect(self.clearLyricsRequested.emit)
 
         self.btn_more_actions = QPushButton("More")
         self.btn_more_actions.setObjectName("LyricsMoreActions")
+        set_button_role(self.btn_more_actions, "ghost")
         self.btn_more_actions.setToolTip("More lyrics editing actions")
         self.more_actions_menu = QMenu(self)
         self.btn_more_actions.setMenu(self.more_actions_menu)

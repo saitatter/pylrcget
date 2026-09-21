@@ -3,6 +3,7 @@ from __future__ import annotations
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QDialog, QHBoxLayout, QLabel, QPushButton, QVBoxLayout
 
+from ui.button_roles import set_button_role
 from ui.spacing import SPACE_2, SPACE_3, SPACE_4, set_layout_spacing
 
 
@@ -43,6 +44,8 @@ class FirstRunDialog(QDialog):
 
         self.btn_later = QPushButton("Set Up Later")
         self.btn_start = QPushButton("Choose Music Folders")
+        set_button_role(self.btn_later, "secondary")
+        set_button_role(self.btn_start, "primary")
         self.btn_start.setDefault(True)
 
         self.btn_later.clicked.connect(self.reject)

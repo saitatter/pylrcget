@@ -3,6 +3,7 @@ from __future__ import annotations
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import QLabel, QPushButton, QVBoxLayout, QWidget
 
+from ui.button_roles import set_button_role
 from ui.icon_loader import load_svg_pixmap
 from ui.spacing import SPACE_2, SPACE_3, SPACE_4, set_layout_spacing
 from ui.style_loader import load_stylesheet
@@ -47,21 +48,25 @@ class EmptyStateWidget(QWidget):
 
         self.action = QPushButton()
         self.action.setObjectName("EmptyStateAction")
+        set_button_role(self.action, "primary")
         self.action.clicked.connect(self.actionTriggered.emit)
         self.action.hide()
 
         self.secondary_action = QPushButton()
         self.secondary_action.setObjectName("EmptyStateSecondaryAction")
+        set_button_role(self.secondary_action, "secondary")
         self.secondary_action.clicked.connect(self.secondaryActionTriggered.emit)
         self.secondary_action.hide()
 
         self.tertiary_action = QPushButton()
         self.tertiary_action.setObjectName("EmptyStateTertiaryAction")
+        set_button_role(self.tertiary_action, "secondary")
         self.tertiary_action.clicked.connect(self.tertiaryActionTriggered.emit)
         self.tertiary_action.hide()
 
         self.quaternary_action = QPushButton()
         self.quaternary_action.setObjectName("EmptyStateQuaternaryAction")
+        set_button_role(self.quaternary_action, "secondary")
         self.quaternary_action.clicked.connect(self.quaternaryActionTriggered.emit)
         self.quaternary_action.hide()
 

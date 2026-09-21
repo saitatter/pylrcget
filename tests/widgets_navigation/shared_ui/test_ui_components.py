@@ -1,4 +1,5 @@
 from tests.widgets_navigation._shared import *
+from ui.button_roles import set_button_role
 
 
 @unittest.skipUnless(HAS_QT, "PySide6 is required for widget tests")
@@ -29,6 +30,19 @@ class SharedUiComponentTests(unittest.TestCase):
             self.assertEqual(widget.btn_export_library.text(), "")
         finally:
             widget.deleteLater()
+
+    def test_button_roles_are_semantic_and_theme_styles_are_declared(self):
+        button = QPushButton("Save")
+        try:
+            set_button_role(button, "primary")
+            self.assertEqual(button.property("buttonRole"), "primary")
+
+            stylesheet = Path("src/ui/qss/app.qss").read_text(encoding="utf-8")
+            for role in ("primary", "secondary", "ghost", "danger", "segmented", "chip"):
+                self.assertIn(f'QPushButton[buttonRole="{role}"]', stylesheet)
+            self.assertIn('QToolButton[buttonRole="icon"]', stylesheet)
+        finally:
+            button.deleteLater()
 
     def test_top_bar_uses_flat_command_bar_layout(self):
         def noop(*args, **kwargs):
