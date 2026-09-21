@@ -64,6 +64,45 @@ class LyricsEditorWidgetTests(unittest.TestCase):
             widget.hide()
             widget.deleteLater()
 
+    def test_empty_state_reflows_after_becoming_visible_in_a_tab(self):
+        from PySide6.QtWidgets import QStackedWidget
+
+        host = QStackedWidget()
+        placeholder = QWidget()
+        widget = LyricsEditorWidget()
+        host.addWidget(placeholder)
+        host.addWidget(widget)
+        host.resize(520, 520)
+        host.show()
+        try:
+            widget.set_track_lyrics("Song", "", "", False, track_id=1)
+            host.setCurrentWidget(widget)
+            self.app.processEvents()
+
+            widget.refresh_layout()
+            self.app.processEvents()
+
+            visible_buttons = [
+                button
+                for button in (
+                    widget.empty_state.action,
+                    widget.empty_state.secondary_action,
+                    widget.empty_state.tertiary_action,
+                    widget.empty_state.quaternary_action,
+                )
+                if button.isVisible()
+            ]
+            self.assertTrue(visible_buttons)
+            self.assertTrue(
+                all(button.geometry().height() <= button.maximumHeight() for button in visible_buttons)
+            )
+            self.assertTrue(
+                all(button.geometry().right() <= widget.empty_state.width() for button in visible_buttons)
+            )
+        finally:
+            host.hide()
+            host.deleteLater()
+
     def test_no_selection_hides_editor_toolbar_in_narrow_layouts(self):
         widget = LyricsEditorWidget()
         try:

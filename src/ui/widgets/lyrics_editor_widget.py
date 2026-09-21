@@ -525,10 +525,13 @@ class LyricsEditorWidget(QWidget):
 
     def refresh_layout(self) -> None:
         self._sync_header_height()
-        layout = self.layout()
-        if layout is not None:
+        for widget in (self, self.header_widget, self.stack, self.empty_state):
+            layout = widget.layout()
+            if layout is None:
+                continue
             layout.invalidate()
             layout.activate()
+        self.empty_state.updateGeometry()
         self.updateGeometry()
         self.update()
 

@@ -72,7 +72,10 @@ class FlowLayout(QLayout):
             widget = item.widget()
             if widget is not None and not widget.isVisible():
                 continue
-            item_size = item.sizeHint()
+            item_size = item.sizeHint().expandedTo(item.minimumSize())
+            maximum_size = widget.maximumSize() if widget is not None else item.maximumSize()
+            item_size.setWidth(min(item_size.width(), maximum_size.width()))
+            item_size.setHeight(min(item_size.height(), maximum_size.height()))
             next_width = row_width + (spacing if row else 0) + item_size.width()
             if row and next_width > effective.width():
                 rows.append((row, row_width, row_height))
@@ -99,7 +102,11 @@ class FlowLayout(QLayout):
                 item_width = item_size.width() + extra_each + (1 if index < extra_remainder else 0)
                 item_height = item_size.height()
                 if not test_only:
-                    item.setGeometry(QRect(x, y, item_width, item_height))
+                    geometry = QRect(x, y, item_width, item_height)
+                    if item.widget() is not None:
+                        item.widget().setGeometry(geometry)
+                    else:
+                        item.setGeometry(geometry)
                 x += item_width + spacing
             y += row_height + spacing
 
