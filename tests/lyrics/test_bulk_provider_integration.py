@@ -14,9 +14,9 @@ from tests.test_support import make_fs_track
 from ui.workers.bulk_lyrics_download_worker import BulkLyricsDownloadWorker
 
 
-class _FakeTidalProvider:
-    provider_id = "tidal"
-    display_name = "TIDAL"
+class _FakeMusixmatchProvider:
+    provider_id = "musixmatch"
+    display_name = "Musixmatch"
 
     def __init__(self) -> None:
         self.calls = 0
@@ -28,10 +28,10 @@ class _FakeTidalProvider:
         del requested_mode, cancel_event
         self.calls += 1
         return LyricsProviderResult(
-            provider="tidal",
-            provider_track_id="tidal-123",
-            plain_lyrics="tidal plain",
-            synced_lyrics="[00:01.00]tidal synced",
+            provider="musixmatch",
+            provider_track_id="musixmatch-123",
+            plain_lyrics="musixmatch plain",
+            synced_lyrics="[00:01.00]musixmatch synced",
             instrumental=False,
             match_score=100.0,
             match_method="exact isrc",
@@ -43,15 +43,15 @@ class _FakeTidalProvider:
         )
 
 
-def test_bulk_worker_falls_back_from_lrclib_plain_to_tidal_synced(tmp_path: Path):
+def test_bulk_worker_falls_back_from_lrclib_plain_to_musixmatch_synced(tmp_path: Path):
     db = initialize_database(str(tmp_path))
     try:
         audio = tmp_path / "song.mp3"
         audio.write_bytes(b"audio")
         add_tracks(db, [make_fs_track(audio, artist="Artist", album="Album", title="Song")])
         settings = default_lyrics_source_settings()
-        settings["priority"] = ["lrclib", "tidal"]
-        settings["enabled"] = {"lrclib": True, "tidal": True}
+        settings["priority"] = ["lrclib", "musixmatch"]
+        settings["enabled"] = {"lrclib": True, "musixmatch": True}
         db.execute(
             "UPDATE config_data SET ui_state_json = ?",
             (merge_lyrics_source_settings("", settings),),
@@ -66,7 +66,7 @@ def test_bulk_worker_falls_back_from_lrclib_plain_to_tidal_synced(tmp_path: Path
         [track_id],
         "https://lrclib.test/api",
     )
-    tidal = _FakeTidalProvider()
+    musixmatch = _FakeMusixmatchProvider()
     finished: list[dict] = []
     worker.finishedBatch.connect(lambda _ok, _message, stats: finished.append(stats))
     worker.itemFinished.connect(lambda _track_id, _ok, _label, _message: None)
@@ -81,12 +81,12 @@ def test_bulk_worker_falls_back_from_lrclib_plain_to_tidal_synced(tmp_path: Path
     )
     with patch("ui.workers.bulk_lyrics_download_worker.LrcLibAPI") as api_cls:
         api_cls.return_value.get_lyrics.return_value = fake_lrclib
-        worker._tidal_provider_for_current_thread = Mock(return_value=tidal)
+        worker._musixmatch_provider_for_current_thread = Mock(return_value=musixmatch)
         worker.run()
 
     assert api_cls.return_value.get_lyrics.call_count == 1
-    assert tidal.calls == 1
+    assert musixmatch.calls == 1
     assert len(finished) == 1
     assert finished[0]["ok"] == 1
     assert finished[0]["candidates"]
-    assert finished[0]["candidates"][0].provider == "tidal"
+    assert finished[0]["candidates"][0].provider == "musixmatch"

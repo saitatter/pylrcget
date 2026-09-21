@@ -25,13 +25,13 @@ class BatchLyricsMatchDialogTests(unittest.TestCase):
             kind="Synced",
             plain_lyrics="plain",
             synced_lyrics="[00:01.00]synced",
-            provider="tidal",
+            provider="musixmatch",
         )
         dialog = BatchLyricsMatchDialog([candidate])
         try:
             headers = [dialog.table.horizontalHeaderItem(index).text() for index in range(dialog.table.columnCount())]
             assert headers[-2:] == ["Source", "Found by"]
-            assert dialog.table.item(0, 6).text() == "TIDAL"
+            assert dialog.table.item(0, 6).text() == "Musixmatch"
             assert dialog.table.item(0, 7).text() == "artist + title"
         finally:
             dialog.deleteLater()

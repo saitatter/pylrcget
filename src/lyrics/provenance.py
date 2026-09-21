@@ -2,10 +2,20 @@ from __future__ import annotations
 
 from typing import Literal
 
-LyricsSource = Literal["lrclib", "tidal", "external", "embedded", "sidecar", "manual", "ai", "unknown"]
+LyricsSource = Literal[
+    "lrclib",
+    "musixmatch",
+    "tidal",
+    "external",
+    "embedded",
+    "sidecar",
+    "manual",
+    "ai",
+    "unknown",
+]
 
 KNOWN_LYRICS_SOURCES = frozenset(
-    {"lrclib", "tidal", "external", "embedded", "sidecar", "manual", "ai", "unknown"}
+    {"lrclib", "musixmatch", "tidal", "external", "embedded", "sidecar", "manual", "ai", "unknown"}
 )
 
 

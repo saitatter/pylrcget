@@ -1,29 +1,24 @@
 from __future__ import annotations
 
 import json
-import re
 from collections.abc import Mapping
 
-LYRICS_SOURCE_IDS: tuple[str, ...] = ("lrclib", "tidal")
+LYRICS_SOURCE_IDS: tuple[str, ...] = ("lrclib", "musixmatch")
 LYRICS_SOURCE_LABELS: dict[str, str] = {
     "lrclib": "LRCLIB",
-    "tidal": "TIDAL",
+    "musixmatch": "Musixmatch",
 }
-_COUNTRY_CODE_RE = re.compile(r"^[A-Za-z]{2}$")
-TIDAL_DEFAULT_CLIENT_ID = "vJElJOz4TVV3SBnC"
-TIDAL_DEFAULT_REDIRECT_URI = "http://127.0.0.1:8765/callback"
+MUSIXMATCH_DEFAULT_MODE = "website"
 
 
 def default_lyrics_source_settings() -> dict[str, object]:
     return {
         "priority": list(LYRICS_SOURCE_IDS),
-        "enabled": {"lrclib": True, "tidal": False},
+        "enabled": {"lrclib": True, "musixmatch": False},
         "continue_when_plain_for_synced": True,
-        "tidal": {
-            "country_code": "Auto",
-            "transport": "official",
-            "client_id": TIDAL_DEFAULT_CLIENT_ID,
-            "redirect_uri": TIDAL_DEFAULT_REDIRECT_URI,
+        "musixmatch": {
+            "mode": MUSIXMATCH_DEFAULT_MODE,
+            "api_key": "",
         },
     }
 
@@ -60,18 +55,14 @@ def normalize_lyrics_source_settings(raw: Mapping[str, object] | None) -> dict[s
         provider_id: _coerce_bool(raw_enabled.get(provider_id), bool(defaults["enabled"][provider_id]))
         for provider_id in LYRICS_SOURCE_IDS
     }
-    raw_tidal = raw.get("tidal")
-    raw_tidal = raw_tidal if isinstance(raw_tidal, Mapping) else {}
-    country_code = str(raw_tidal.get("country_code") or "Auto").strip()
-    if country_code.casefold() == "auto" or not _COUNTRY_CODE_RE.fullmatch(country_code):
-        country_code = "Auto"
-    else:
-        country_code = country_code.upper()
-    # The distributed desktop app owns the registered OAuth client and its
-    # loopback callback. Keep these values immutable even when older settings
-    # contain a custom client configuration.
-    client_id = TIDAL_DEFAULT_CLIENT_ID
-    redirect_uri = TIDAL_DEFAULT_REDIRECT_URI
+    raw_musixmatch = raw.get("musixmatch")
+    raw_musixmatch = raw_musixmatch if isinstance(raw_musixmatch, Mapping) else {}
+    mode = str(raw_musixmatch.get("mode") or MUSIXMATCH_DEFAULT_MODE).strip().casefold()
+    if mode == "desktop":
+        mode = MUSIXMATCH_DEFAULT_MODE
+    if mode not in {"website", "official"}:
+        mode = MUSIXMATCH_DEFAULT_MODE
+    api_key = str(raw_musixmatch.get("api_key") or "").strip()
 
     return {
         "priority": priority,
@@ -80,11 +71,9 @@ def normalize_lyrics_source_settings(raw: Mapping[str, object] | None) -> dict[s
             raw.get("continue_when_plain_for_synced"),
             bool(defaults["continue_when_plain_for_synced"]),
         ),
-        "tidal": {
-            "country_code": country_code,
-            "transport": "official",
-            "client_id": client_id,
-            "redirect_uri": redirect_uri,
+        "musixmatch": {
+            "mode": mode,
+            "api_key": api_key,
         },
     }
 

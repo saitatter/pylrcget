@@ -14,7 +14,7 @@ from lyrics.providers import (
 
 def test_provider_policies_are_conservative_and_lrclib_keeps_current_limit():
     assert get_provider_execution_policy("lrclib").max_concurrency == 4
-    assert get_provider_execution_policy("tidal").max_concurrency == 2
+    assert get_provider_execution_policy("musixmatch").max_concurrency == 2
 
 
 def test_unknown_provider_defaults_to_single_worker():
@@ -38,7 +38,7 @@ def test_execution_coordinator_allows_and_releases_provider_slot():
 def test_execution_coordinator_records_provider_specific_rate_limit():
     coordinator = ProviderExecutionCoordinator()
 
-    coordinator.record_rate_limit("tidal", 0.0)
+    coordinator.record_rate_limit("musixmatch", 0.0)
     assert coordinator.acquire("lrclib", lambda: False) is True
     coordinator.release("lrclib")
 

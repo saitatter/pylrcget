@@ -106,7 +106,7 @@ class _FixtureProvider:
                 plain=f"plain {track.title}" if result_type == "plain" else None,
                 method=method,
             )
-        elif self.provider_id == "tidal":
+        elif self.provider_id == "musixmatch":
             result_type = "synced"
             result = _result(self.provider_id, track, synced=f"[00:01.00]{track.title}", plain=None, method=method)
         else:
@@ -202,7 +202,7 @@ def run_benchmark(track_count: int, duplicate_every: int, workers: int) -> dict[
     for context in contexts:
         groups.setdefault(_lookup_key(context), []).append(context)
 
-    stats_by_provider = {provider_id: _ProviderStats() for provider_id in ("lrclib", "tidal")}
+    stats_by_provider = {provider_id: _ProviderStats() for provider_id in ("lrclib", "musixmatch")}
     providers = tuple(_FixtureProvider(provider_id, stats_by_provider[provider_id]) for provider_id in stats_by_provider)
     router = LyricsProviderRouter(providers)
     health = ProviderHealthState()

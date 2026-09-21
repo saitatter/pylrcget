@@ -157,14 +157,15 @@ class SettingsDialogTests(unittest.TestCase):
                     self.assertEqual(dialog.lyrics_source_list.count(), 2)
                     self.assertEqual(
                         [dialog.lyrics_source_list.item(i).data(Qt.UserRole) for i in range(2)],
-                        ["lrclib", "tidal"],
+                        ["lrclib", "musixmatch"],
                     )
                     dialog.lyrics_source_list.item(1).setCheckState(Qt.Checked)
                     dialog.lyrics_source_list.setCurrentRow(1)
                     dialog._move_lyrics_source(-1)
-                    dialog.tidal_country_edit.setText("ro")
-                    dialog.tidal_client_id_edit.setText("test-client-id")
-                    dialog.tidal_redirect_uri_edit.setText("http://127.0.0.1:8765/callback")
+                    dialog.musixmatch_mode_combo.setCurrentIndex(
+                        dialog.musixmatch_mode_combo.findData("official")
+                    )
+                    dialog.musixmatch_api_key_edit.setText("test-api-key")
                     dialog.save()
                 finally:
                     dialog.deleteLater()
@@ -173,15 +174,11 @@ class SettingsDialogTests(unittest.TestCase):
                 try:
                     self.assertEqual(
                         [reloaded.lyrics_source_list.item(i).data(Qt.UserRole) for i in range(2)],
-                        ["tidal", "lrclib"],
+                        ["musixmatch", "lrclib"],
                     )
                     self.assertEqual(reloaded.lyrics_source_list.item(0).checkState(), Qt.Checked)
-                    self.assertEqual(reloaded.tidal_country_edit.text(), "RO")
-                    self.assertEqual(reloaded.tidal_client_id_edit.text(), "vJElJOz4TVV3SBnC")
-                    self.assertEqual(
-                        reloaded.tidal_redirect_uri_edit.text(),
-                        "http://127.0.0.1:8765/callback",
-                    )
+                    self.assertEqual(reloaded.musixmatch_mode_combo.currentData(), "official")
+                    self.assertEqual(reloaded.musixmatch_api_key_edit.text(), "test-api-key")
                 finally:
                     reloaded.deleteLater()
             finally:
@@ -196,14 +193,13 @@ class SettingsDialogTests(unittest.TestCase):
                     self.assertLessEqual(dialog.size().height(), 700)
                     self.assertEqual(
                         [dialog.provider_settings_combo.itemData(i) for i in range(2)],
-                        ["lrclib", "tidal"],
+                        ["lrclib", "musixmatch"],
                     )
                     self.assertEqual(dialog.provider_settings_stack.currentIndex(), 0)
                     dialog.provider_settings_combo.setCurrentIndex(1)
                     self.assertEqual(dialog.provider_settings_stack.currentIndex(), 1)
-                    self.assertFalse(dialog.tidal_client_id_edit.isHidden())
-                    self.assertTrue(dialog.tidal_client_id_edit.isReadOnly())
-                    self.assertTrue(dialog.tidal_redirect_uri_edit.isReadOnly())
+                    self.assertFalse(dialog.musixmatch_api_key_edit.isHidden())
+                    self.assertFalse(dialog.musixmatch_api_key_edit.isReadOnly())
                 finally:
                     dialog.deleteLater()
             finally:

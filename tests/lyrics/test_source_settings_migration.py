@@ -32,7 +32,7 @@ def test_v5_migration_materializes_source_defaults_without_losing_ui_state():
         assert state["editor_auto_edit_on_add_line"] is True
         assert state["lyrics_sources"]["enabled"] == {
             "lrclib": True,
-            "tidal": False,
+            "musixmatch": False,
         }
         assert int(db.execute("PRAGMA user_version").fetchone()[0]) == CURRENT_DB_VERSION
     finally:

@@ -5,12 +5,11 @@ import pytest
 from lyrics.providers import (
     LyricsProviderCapabilities,
     LyricsProviderRouter,
+    MusixmatchError,
     ProviderHealthState,
     TrackLookupContext,
     is_fatal_provider_error,
 )
-from lyrics.providers.tidal import TidalCatalogueError
-from lyrics.providers.tidal_transport import OfficialTidalLyricsError
 
 
 def _context() -> TrackLookupContext:
@@ -28,8 +27,8 @@ def _context() -> TrackLookupContext:
 
 
 class _FakeProvider:
-    provider_id = "tidal"
-    display_name = "TIDAL"
+    provider_id = "musixmatch"
+    display_name = "Musixmatch"
 
     def __init__(self, error: Exception | None = None):
         self.error = error
@@ -46,18 +45,18 @@ class _FakeProvider:
 
 
 def test_health_state_disables_fatal_auth_failures_only():
-    assert is_fatal_provider_error(TidalCatalogueError(401, "expired")) is True
-    assert is_fatal_provider_error(OfficialTidalLyricsError("expired", status_code=401)) is True
-    assert is_fatal_provider_error(TidalCatalogueError(429, "slow down")) is False
+    assert is_fatal_provider_error(MusixmatchError("expired", status_code=401)) is True
+    assert is_fatal_provider_error(MusixmatchError("expired", status_code=403)) is True
+    assert is_fatal_provider_error(MusixmatchError("slow down", status_code=429)) is False
     assert is_fatal_provider_error(RuntimeError("temporary")) is False
 
 
 def test_router_skips_provider_after_fatal_batch_failure():
-    provider = _FakeProvider(OfficialTidalLyricsError("credentials missing", status_code=401))
+    provider = _FakeProvider(MusixmatchError("credentials missing", status_code=401))
     health = ProviderHealthState()
     router = LyricsProviderRouter((provider,))
 
-    with pytest.raises(OfficialTidalLyricsError):
+    with pytest.raises(MusixmatchError):
         router.lookup(_context(), requested_mode="prefer_synced", health_state=health)
     assert router.lookup(_context(), requested_mode="prefer_synced", health_state=health) is None
     assert provider.calls == 1

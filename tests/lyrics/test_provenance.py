@@ -50,9 +50,9 @@ def test_track_lyrics_sources_round_trip_and_manual_update(tmp_path: Path):
         assert track.txt_lyrics_source == "sidecar"
         assert track.lrc_lyrics_source == "embedded"
 
-        update_track_plain_lyrics(db, track_id, "downloaded plain", source="tidal")
+        update_track_plain_lyrics(db, track_id, "downloaded plain", source="musixmatch")
         updated = get_track_by_id(db, track_id)
-        assert updated.txt_lyrics_source == "tidal"
+        assert updated.txt_lyrics_source == "musixmatch"
         assert updated.lrc_lyrics_source is None
     finally:
         db.close()

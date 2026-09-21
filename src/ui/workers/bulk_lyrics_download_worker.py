@@ -13,20 +13,18 @@ from PySide6.QtCore import QObject, QThread, Signal
 
 from core.lrclib_client import LrcLibAPI
 from core.utils import prepare_input
-from db.queries import get_remote_track_mappings, get_tracks_for_bulk_download
+from db.queries import get_tracks_for_bulk_download
 from lyrics.providers import (
-    CachedTidalCatalogueResolver,
     LrclibProvider,
     LyricsProvider,
     LyricsProviderRouter,
-    OfficialTidalLyricsTransport,
+    MusixmatchClient,
+    MusixmatchProvider,
+    ProviderError,
+    ProviderErrorKind,
     ProviderExecutionCoordinator,
     ProviderHealthState,
     ProviderLookupResultCache,
-    TidalAuthenticationError,
-    TidalCatalogueClient,
-    TidalOAuthSession,
-    TidalProvider,
     build_lookup_diagnostics,
     get_provider_execution_policy,
     log_lookup_diagnostics,
@@ -100,8 +98,6 @@ class _DownloadJob:
     duration_s: int | None
     has_plain_lyrics: bool
     has_synced_lyrics: bool
-    cached_tidal_track_id: str | None
-    cached_tidal_metadata_fingerprint: str | None
     provider_id: str = "lrclib"
 
 
@@ -174,7 +170,6 @@ class BulkLyricsDownloadWorker(QThread):
             self._lyrics_source_settings = load_lyrics_source_settings(ui_state_json)
 
             tracks_by_id = get_tracks_for_bulk_download(db, self.track_ids)
-            remote_mappings = get_remote_track_mappings(db, self.track_ids, "tidal")
             for track_id in self.track_ids:
                 if self.isInterruptionRequested():
                     cancelled = True
@@ -216,16 +211,6 @@ class BulkLyricsDownloadWorker(QThread):
                             duration_s=duration_s,
                             has_plain_lyrics=bool(track.txt_lyrics),
                             has_synced_lyrics=bool(track.lrc_lyrics and not track.instrumental),
-                            cached_tidal_track_id=(
-                                str(remote_mappings[int(track_id)]["provider_track_id"])
-                                if int(track_id) in remote_mappings
-                                else None
-                            ),
-                            cached_tidal_metadata_fingerprint=(
-                                str(remote_mappings[int(track_id)]["local_metadata_fingerprint"])
-                                if int(track_id) in remote_mappings
-                                else None
-                            ),
                             provider_id="router",
                         )
                     )
@@ -303,7 +288,7 @@ class BulkLyricsDownloadWorker(QThread):
                                     continue
                                 if result.match is None:
                                     fail_count += 1
-                                    msg = "No lyrics found on LRCLIB for this track."
+                                    msg = "No lyrics found on the enabled lyrics providers for this track."
                                     self.itemFinished.emit(job.track_id, False, job.label, msg)
                                     self.progress.emit(completed, total, job.label, msg, self._elapsed())
                                     continue
@@ -319,7 +304,7 @@ class BulkLyricsDownloadWorker(QThread):
                                     msg = f"Candidate found · {provider_label}. Match: {candidate.score}%."
                                 else:
                                     fail_count += 1
-                                    msg = "No usable lyrics found on LRCLIB for this track."
+                                    msg = "No usable lyrics found on the enabled lyrics providers for this track."
                                 self.itemFinished.emit(job.track_id, candidate is not None, job.label, msg)
                                 self.progress.emit(completed, total, job.label, msg, self._elapsed())
 
@@ -453,6 +438,10 @@ class BulkLyricsDownloadWorker(QThread):
             return _DownloadFetchResult(job=job, match=match)
         except LyricsMatchCancelled:
             return _DownloadFetchResult(job=job, cancelled=True)
+        except ProviderError as exc:
+            if exc.kind is ProviderErrorKind.CANCELLED:
+                return _DownloadFetchResult(job=job, cancelled=True)
+            return _DownloadFetchResult(job=job, error=str(exc))
         except Exception as exc:  # noqa: BLE001
             return _DownloadFetchResult(job=job, error=str(exc))
 
@@ -475,50 +464,27 @@ class BulkLyricsDownloadWorker(QThread):
                 before_request=self._before_lrclib_request,
                 on_rate_limit=self._record_lrclib_rate_limit,
             )
-        if bool(enabled.get("tidal", False)):
-            tidal_provider = self._tidal_provider_for_current_thread()
-            if tidal_provider is not None:
-                providers["tidal"] = tidal_provider
+        if bool(enabled.get("musixmatch", False)):
+            musixmatch_provider = self._musixmatch_provider_for_current_thread()
+            if musixmatch_provider is not None:
+                providers["musixmatch"] = musixmatch_provider
         return tuple(providers[provider_id] for provider_id in priority if provider_id in providers)
 
-    def _tidal_provider_for_current_thread(self) -> TidalProvider | None:
-        cached = getattr(self._thread_local, "tidal_provider", None)
+    def _musixmatch_provider_for_current_thread(self) -> MusixmatchProvider | None:
+        cached = getattr(self._thread_local, "musixmatch_provider", None)
         if cached is not None:
             return cached
-        raw_tidal = self._lyrics_source_settings.get("tidal")
-        tidal_settings = raw_tidal if isinstance(raw_tidal, dict) else {}
-        transport_id = str(tidal_settings.get("transport") or "official").casefold()
-        transport = None
-        if transport_id == "official":
-            client_id = str(tidal_settings.get("client_id") or "").strip()
-            redirect_uri = str(tidal_settings.get("redirect_uri") or "").strip()
-            if not client_id or not redirect_uri:
-                return None
-            try:
-                session = TidalOAuthSession(client_id, redirect_uri)
-                access = session.get_access_context()
-            except TidalAuthenticationError:
-                return None
-            transport = OfficialTidalLyricsTransport(
-                access.access_token,
-                country_code=str(tidal_settings.get("country_code") or "Auto"),
-                on_rate_limit=lambda delay_s: self._execution_coordinator.record_rate_limit("tidal", delay_s),
+        raw_musixmatch = self._lyrics_source_settings.get("musixmatch")
+        musixmatch_settings = raw_musixmatch if isinstance(raw_musixmatch, dict) else {}
+        try:
+            client = MusixmatchClient(
+                mode=str(musixmatch_settings.get("mode") or "desktop"),
+                api_key=str(musixmatch_settings.get("api_key") or ""),
             )
-            access_token = access.access_token
-        else:
+        except (ValueError, RuntimeError):
             return None
-        mapping_db = sqlite3.connect(self.db_path, timeout=15.0)
-        mapping_db.row_factory = sqlite3.Row
-        client = TidalCatalogueClient(
-            access_token=access_token,
-            country_code=str(tidal_settings.get("country_code") or "Auto"),
-            on_rate_limit=lambda delay_s: self._execution_coordinator.record_rate_limit("tidal", delay_s),
-        )
-        resolver = CachedTidalCatalogueResolver(client, mapping_db)
-        assert transport is not None
-        provider = TidalProvider(resolver, transport)
-        self._thread_local.tidal_provider = provider
-        self._thread_local.tidal_mapping_db = mapping_db
+        provider = MusixmatchProvider(client)
+        self._thread_local.musixmatch_provider = provider
         return provider
 
     def _before_lrclib_request(self) -> bool:

@@ -43,7 +43,7 @@ def test_provider_result_keeps_lyrics_provenance_and_isolates_diagnostics():
         remote_isrc="US-AAA-00-00001",
     )
     second = LyricsProviderResult(
-        provider="tidal",
+        provider="musixmatch",
         provider_track_id=None,
         plain_lyrics=None,
         synced_lyrics=None,

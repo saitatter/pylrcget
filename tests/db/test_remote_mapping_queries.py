@@ -25,8 +25,8 @@ def test_bulk_remote_mapping_query_returns_all_requested_rows(tmp_path: Path):
             upsert_remote_track_mapping(
                 db,
                 track_id=track_id,
-                provider="tidal",
-                provider_track_id=f"tidal-{track_id}",
+                provider="musixmatch",
+                provider_track_id=f"musixmatch-{track_id}",
                 match_method="metadata",
                 match_score=90,
                 remote_isrc=None,
@@ -40,10 +40,10 @@ def test_bulk_remote_mapping_query_returns_all_requested_rows(tmp_path: Path):
 
         statements: list[str] = []
         db.set_trace_callback(statements.append)
-        mappings = get_remote_track_mappings(db, track_ids, "tidal")
+        mappings = get_remote_track_mappings(db, track_ids, "musixmatch")
 
         assert list(mappings) == track_ids
-        assert mappings[track_ids[1]]["provider_track_id"] == "tidal-2"
+        assert mappings[track_ids[1]]["provider_track_id"] == "musixmatch-2"
         assert sum("FROM remote_track_mapping" in statement for statement in statements) == 1
     finally:
         db.close()

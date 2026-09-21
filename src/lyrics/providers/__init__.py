@@ -31,6 +31,16 @@ from .matching import (
     provider_result_metadata,
     score_track_match,
 )
+from .musixmatch import (
+    MUSIXMATCH_DESKTOP_BASE_URL,
+    MUSIXMATCH_OFFICIAL_BASE_URL,
+    MUSIXMATCH_WEBSITE_BASE_URL,
+    MusixmatchClient,
+    MusixmatchError,
+    MusixmatchLyrics,
+    MusixmatchProvider,
+    MusixmatchTrack,
+)
 from .result_cache import LookupKey, ProviderLookupResultCache
 from .router import (
     ACCEPT_FINAL,
@@ -41,38 +51,16 @@ from .router import (
     LyricsResultSelector,
     SelectionDecision,
 )
-from .tidal import (
-    TidalCatalogueClient,
-    TidalCatalogueError,
-    TidalCatalogueNotFoundError,
-    TidalTrack,
-    TidalTrackResolution,
-)
-from .tidal_auth import (
-    KeyringTidalTokenStore,
-    TidalAccessContext,
-    TidalAuthenticationError,
-    TidalOAuthSession,
-    TidalSessionProvider,
-    TidalTokenStore,
-)
-from .tidal_cache import CachedTidalCatalogueResolver
-from .tidal_provider import TidalCatalogueResolver, TidalProvider
-from .tidal_transport import (
-    OfficialTidalLyricsError,
-    OfficialTidalLyricsTransport,
-    TidalLyricsPayload,
-    TidalLyricsTransport,
-)
 
 __all__ = [
     "ACCEPT_FINAL",
     "CONTINUE",
     "KEEP_AS_FALLBACK",
+    "MUSIXMATCH_DESKTOP_BASE_URL",
+    "MUSIXMATCH_OFFICIAL_BASE_URL",
+    "MUSIXMATCH_WEBSITE_BASE_URL",
     "REJECT",
-    "CachedTidalCatalogueResolver",
     "DownloadMode",
-    "KeyringTidalTokenStore",
     "LookupKey",
     "LrclibProvider",
     "LyricsProvider",
@@ -81,8 +69,11 @@ __all__ = [
     "LyricsProviderRouter",
     "LyricsResultSelector",
     "MatchQuality",
-    "OfficialTidalLyricsError",
-    "OfficialTidalLyricsTransport",
+    "MusixmatchClient",
+    "MusixmatchError",
+    "MusixmatchLyrics",
+    "MusixmatchProvider",
+    "MusixmatchTrack",
     "ProviderError",
     "ProviderErrorKind",
     "ProviderExecutionCoordinator",
@@ -90,20 +81,6 @@ __all__ = [
     "ProviderHealthState",
     "ProviderLookupResultCache",
     "SelectionDecision",
-    "TidalAccessContext",
-    "TidalAuthenticationError",
-    "TidalCatalogueClient",
-    "TidalCatalogueError",
-    "TidalCatalogueNotFoundError",
-    "TidalCatalogueResolver",
-    "TidalLyricsPayload",
-    "TidalLyricsTransport",
-    "TidalOAuthSession",
-    "TidalProvider",
-    "TidalSessionProvider",
-    "TidalTokenStore",
-    "TidalTrack",
-    "TidalTrackResolution",
     "TrackLookupContext",
     "TrackMatchMetadata",
     "TrackMatchScore",

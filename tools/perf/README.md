@@ -27,7 +27,7 @@ can be made duplicate-heavy with `--duplicate-every`.
 
 `benchmark_multi_provider.py` is also fixture-backed. It exercises the
 provider router, provider health state, bounded futures, and duplicate
-collapse without contacting LRCLIB, TIDAL, or an external helper.
+collapse without contacting LRCLIB, Musixmatch, or an external helper.
 
 Supported scan scenarios are:
 

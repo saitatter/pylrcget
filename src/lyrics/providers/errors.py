@@ -6,9 +6,6 @@ import requests
 
 from core.lrclib_client import LrcLibError
 
-from .tidal import TidalCatalogueError
-from .tidal_transport import OfficialTidalLyricsError
-
 
 class ProviderErrorKind(str, Enum):
     NOT_FOUND = "not_found"
@@ -47,12 +44,6 @@ def classify_provider_error(error: Exception) -> ProviderErrorKind:
         return error.kind
     if error.__class__.__name__ == "LyricsMatchCancelled":
         return ProviderErrorKind.CANCELLED
-    if isinstance(error, OfficialTidalLyricsError):
-        if error.status_code is not None:
-            return _classify_http_status(error.status_code)
-        return ProviderErrorKind.TEMPORARY
-    if isinstance(error, TidalCatalogueError):
-        return _classify_http_status(error.status_code)
     if isinstance(error, LrcLibError):
         return _classify_http_status(error.status_code)
     if isinstance(error, (requests.exceptions.Timeout, requests.exceptions.ConnectionError)):

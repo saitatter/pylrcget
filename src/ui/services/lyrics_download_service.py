@@ -28,18 +28,14 @@ from db.database import (
 from db.models import Config, Track
 from lyrics.provenance import normalize_lyrics_source
 from lyrics.providers import (
-    CachedTidalCatalogueResolver,
     LrclibProvider,
     LyricsProvider,
     LyricsProviderRouter,
-    OfficialTidalLyricsTransport,
-    TidalAuthenticationError,
-    TidalCatalogueClient,
-    TidalOAuthSession,
-    TidalProvider,
+    MusixmatchClient,
+    MusixmatchProvider,
 )
 from lyrics.providers.contracts import LyricsProviderResult, TrackLookupContext
-from lyrics.source_settings import load_lyrics_source_settings
+from lyrics.source_settings import LYRICS_SOURCE_LABELS, load_lyrics_source_settings
 from ui.services.download_modes import normalize_download_mode
 from ui.services.lyrics_match_retry import (
     build_retry_search_queries,
@@ -332,6 +328,7 @@ def apply_lyrics_match_to_track(
     else:
         lyrics = match
         score = int(match.match_score)
+    provider_id = match.provider if isinstance(match, LyricsProviderResult) else "lrclib"
     source = normalize_lyrics_source(match.provider) if isinstance(match, LyricsProviderResult) else "lrclib"
     synced = _strip_empty(getattr(lyrics, "synced_lyrics", None))
     plain = _strip_empty(getattr(lyrics, "plain_lyrics", None))
@@ -352,7 +349,8 @@ def apply_lyrics_match_to_track(
                 track = get_track_by_id(db, track_id)
                 sync_track_outputs(db, track, notify, config=config)
                 return True, f"Downloaded plain lyrics.{score_note}", track
-        return False, f"No plain lyrics found on LRCLIB for this track.{score_note}", None
+        provider_label = LYRICS_SOURCE_LABELS.get(str(provider_id).casefold(), str(provider_id).title())
+        return False, f"No plain lyrics found on {provider_label} for this track.{score_note}", None
 
     if synced:
         notify("Saving synced lyrics...")
@@ -370,14 +368,18 @@ def apply_lyrics_match_to_track(
 
     if plain:
         if mode == "synced_only":
-            return False, f"Only plain lyrics were found; synced-only mode is enabled.{score_note}", None
+            provider_label = LYRICS_SOURCE_LABELS.get(str(provider_id).casefold(), str(provider_id).title())
+            return False, (
+                f"Only plain lyrics were found on {provider_label}; synced-only mode is enabled.{score_note}"
+            ), None
         notify("Saving plain lyrics...")
         update_track_plain_lyrics(db, track_id, plain, source=source)
         track = get_track_by_id(db, track_id)
         sync_track_outputs(db, track, notify, config=config)
         return True, f"Downloaded plain lyrics.{score_note}", track
 
-    return False, f"No lyrics found on LRCLIB for this track.{score_note}", None
+    provider_label = LYRICS_SOURCE_LABELS.get(str(provider_id).casefold(), str(provider_id).title())
+    return False, f"No lyrics found on {provider_label} for this track.{score_note}", None
 
 
 def download_track_lyrics(
@@ -490,31 +492,15 @@ def _build_single_track_providers(
             notify=notify,
         )
 
-    raw_tidal = settings.get("tidal")
-    tidal_settings = raw_tidal if isinstance(raw_tidal, dict) else {}
-    if bool(enabled.get("tidal", False)):
-        transport_id = str(tidal_settings.get("transport") or "official").casefold()
-        transport = None
-        access_token: str | None = None
-        if transport_id == "official":
-            client_id = str(tidal_settings.get("client_id") or "").strip()
-            redirect_uri = str(tidal_settings.get("redirect_uri") or "").strip()
-            if client_id and redirect_uri:
-                try:
-                    access = TidalOAuthSession(client_id, redirect_uri).get_access_context()
-                except TidalAuthenticationError:
-                    access = None
-                if access is not None:
-                    access_token = access.access_token
-                    transport = OfficialTidalLyricsTransport(
-                        access_token,
-                        country_code=str(tidal_settings.get("country_code") or "Auto"),
-                    )
-        if transport is not None:
-            client = TidalCatalogueClient(
-                access_token=access_token,
-                country_code=str(tidal_settings.get("country_code") or "Auto"),
-            )
-            providers["tidal"] = TidalProvider(CachedTidalCatalogueResolver(client, db), transport)
+    raw_musixmatch = settings.get("musixmatch")
+    musixmatch_settings = raw_musixmatch if isinstance(raw_musixmatch, dict) else {}
+    if bool(enabled.get("musixmatch", False)):
+        providers["musixmatch"] = MusixmatchProvider(
+            MusixmatchClient(
+                mode=str(musixmatch_settings.get("mode") or "desktop"),
+                api_key=str(musixmatch_settings.get("api_key") or ""),
+            ),
+            notify=notify,
+        )
 
     return [providers[provider_id] for provider_id in priority if provider_id in providers]
