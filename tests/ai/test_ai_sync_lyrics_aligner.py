@@ -2,8 +2,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import numpy as np
-import torch
+import pytest
+
+np = pytest.importorskip("numpy")
+torch = pytest.importorskip("torch")
 
 from tests import test_support as _test_support  # noqa: F401
 from ui.workers.ai.ai_sync_contracts import AlignmentOptions, AlignmentRequest
