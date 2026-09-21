@@ -26,3 +26,30 @@ QPushButton#EmptyStateQuaternaryAction {
     min-width: 140px;
     min-height: 40px;
 }
+
+QPushButton#EmptyStateAction {
+    background: {{color-accent}};
+    color: {{color-bg-app}};
+    border: 1px solid {{color-accent}};
+    font-weight: 650;
+}
+
+QPushButton#EmptyStateAction:hover {
+    background: {{color-border-hover}};
+    border-color: {{color-border-hover}};
+}
+
+QPushButton#EmptyStateSecondaryAction,
+QPushButton#EmptyStateTertiaryAction,
+QPushButton#EmptyStateQuaternaryAction {
+    background: {{color-bg-control}};
+    color: {{color-text}};
+    border: 1px solid {{color-border}};
+}
+
+QPushButton#EmptyStateSecondaryAction:hover,
+QPushButton#EmptyStateTertiaryAction:hover,
+QPushButton#EmptyStateQuaternaryAction:hover {
+    background: {{color-bg-elevated}};
+    border-color: {{color-accent}};
+}

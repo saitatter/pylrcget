@@ -674,9 +674,9 @@ class LyricsEditorWidget(QWidget):
             self._set_publish_available(False, False)
             self.empty_state.configure(
                 icon_name="audio-lines.svg",
-                title="No lyrics available yet",
-                body="Download lyrics from LRCLIB, write them manually, or start an AI auto-sync draft from the local audio file.",
-                action_text="Download Lyrics",
+                title="No lyrics yet",
+                body="Download lyrics from LRCLIB or search manually, then edit them here.",
+                action_text="Download from LRCLIB",
                 secondary_action_text="Search LRCLIB",
                 tertiary_action_text="Write Lyrics",
                 quaternary_action_text="Auto Sync",

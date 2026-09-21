@@ -25,7 +25,12 @@ class LyricsEditorWidgetTests(unittest.TestCase):
 
             self.assertIs(widget.stack.currentWidget(), widget.empty_state)
             self.assertFalse(widget.empty_state.quaternary_action.isHidden())
+            self.assertEqual(widget.empty_state.title.text(), "No lyrics yet")
+            self.assertEqual(widget.empty_state.action.text(), "Download from LRCLIB")
+            self.assertEqual(widget.empty_state.secondary_action.text(), "Search LRCLIB")
+            self.assertEqual(widget.empty_state.tertiary_action.text(), "Write Lyrics")
             self.assertEqual(widget.empty_state.quaternary_action.text(), "Auto Sync")
+            self.assertIn("Download lyrics from LRCLIB", widget.empty_state.body.text())
         finally:
             widget.deleteLater()
 
