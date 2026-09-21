@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
     QTableWidget,
     QTableWidgetItem,
     QTextEdit,
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
@@ -297,13 +298,10 @@ class LyricsEditorWidget(QWidget):
         toolbar.addWidget(self.btn_shift_plus)
         toolbar.addWidget(self.shift_spin)
         toolbar.addWidget(self.btn_shift_selected)
-        toolbar.addWidget(self.btn_shift_all_from_first)
         toolbar.addWidget(self.btn_add)
         toolbar.addWidget(self.btn_del)
         toolbar.addWidget(self.btn_autofix)
         toolbar.addWidget(self.btn_save)
-        toolbar.addWidget(self.btn_sync_others)
-        toolbar.addWidget(self.btn_export_files)
 
         self.btn_publish_synced = QPushButton("Publish Synced")
         self.btn_publish_synced.setToolTip("Publish synced (LRC) lyrics to LRCLIB")
@@ -313,6 +311,40 @@ class LyricsEditorWidget(QWidget):
         self.btn_publish_plain.setEnabled(False)
         self.btn_publish_synced.clicked.connect(lambda: self.publishSyncedRequested.emit())
         self.btn_publish_plain.clicked.connect(lambda: self.publishPlainRequested.emit())
+
+        self.btn_more_actions = QToolButton()
+        self.btn_more_actions.setObjectName("LyricsMoreActions")
+        self.btn_more_actions.setText("More")
+        self.btn_more_actions.setToolTip("More lyrics editing actions")
+        self.btn_more_actions.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        self.more_actions_menu = QMenu(self)
+        self.btn_more_actions.setMenu(self.more_actions_menu)
+        self._more_action_bindings = []
+        for button in (
+            self.btn_shift_all_from_first,
+            self.btn_sync_others,
+            self.btn_export_files,
+            self.btn_publish_synced,
+            self.btn_publish_plain,
+        ):
+            action = self.more_actions_menu.addAction(button.text())
+            action.triggered.connect(button.click)
+            self._more_action_bindings.append((action, button))
+        bound_actions = {action for action, _button in self._more_action_bindings}
+        for action in tuple(self.more_actions_menu.actions()):
+            if action not in bound_actions:
+                self.more_actions_menu.removeAction(action)
+        self.more_actions_menu.aboutToShow.connect(self._sync_more_actions)
+        for button in (
+            self.btn_shift_all_from_first,
+            self.btn_sync_others,
+            self.btn_export_files,
+            self.btn_publish_synced,
+            self.btn_publish_plain,
+        ):
+            button.hide()
+
+        toolbar.addWidget(self.btn_more_actions)
 
         for button in (
             self.btn_snap,
@@ -329,11 +361,9 @@ class LyricsEditorWidget(QWidget):
             self.btn_export_files,
             self.btn_publish_synced,
             self.btn_publish_plain,
+            self.btn_more_actions,
         ):
             button.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
-
-        toolbar.addWidget(self.btn_publish_synced)
-        toolbar.addWidget(self.btn_publish_plain)
 
         header.addLayout(toolbar)
 
@@ -558,6 +588,11 @@ class LyricsEditorWidget(QWidget):
             return
         self.header_widget.setFixedHeight(required_height)
         self.header_widget.updateGeometry()
+
+    def _sync_more_actions(self) -> None:
+        for action, button in self._more_action_bindings:
+            action.setText(button.text() or self._default_button_text.get(button, "More"))
+            action.setEnabled(button.isEnabled())
 
     def show_none(self, message: str):
         self._reset_state()

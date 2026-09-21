@@ -158,6 +158,20 @@ class LyricsEditorWidgetTests(unittest.TestCase):
         finally:
             widget.deleteLater()
 
+    def test_secondary_lyrics_actions_are_available_from_more_menu(self):
+        widget = LyricsEditorWidget()
+        try:
+            action_texts = [action.text() for action in widget.more_actions_menu.actions()]
+            self.assertEqual(
+                action_texts,
+                ["Shift All from First", "Sync to Others", "Export Files", "Publish Synced", "Publish Plain"],
+            )
+            self.assertFalse(widget.btn_shift_all_from_first.isVisible())
+            self.assertFalse(widget.btn_more_actions.isHidden())
+            self.assertTrue(widget.btn_more_actions.toolTip())
+        finally:
+            widget.deleteLater()
+
     def test_switching_modes_preserves_synced_timestamps(self):
         widget = LyricsEditorWidget()
         try:

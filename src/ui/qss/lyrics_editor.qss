@@ -120,6 +120,26 @@ QPushButton#LyricsAutoSync:disabled {
     border-color: {{color-disabled-border}};
 }
 
+QToolButton#LyricsMoreActions {
+    min-height: 28px;
+    max-height: 28px;
+    min-width: 64px;
+    padding: 0 10px;
+    background: {{color-bg-control}};
+    color: {{color-text-muted}};
+    border: 1px solid {{color-border}};
+    border-radius: {{radius-sm}};
+    font-size: {{font-size-xs}};
+    font-weight: 650;
+}
+
+QToolButton#LyricsMoreActions:hover,
+QToolButton#LyricsMoreActions:open {
+    background: {{color-bg-elevated}};
+    border-color: {{color-accent}};
+    color: {{color-text}};
+}
+
 QPushButton#LyricsAutofix {
     background: {{color-warning-bg}};
     color: {{color-warning-text}};
