@@ -15,7 +15,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from ui.icon_loader import load_svg_icon
+from ui.icon_loader import ICON_SIZE_NORMAL, load_svg_icon
 from ui.services.download_modes import download_missing_tooltip
 from ui.spacing import SPACE_1, SPACE_2, set_layout_spacing
 
@@ -232,11 +232,11 @@ class TopBarController(QWidget):
 
     def _set_action_icon(self, button: QToolButton, icon_name: str) -> None:
         self._action_icons[button] = icon_name
-        button.setIcon(load_svg_icon(icon_name, 18))
+        button.setIcon(load_svg_icon(icon_name, ICON_SIZE_NORMAL))
 
     def refresh_theme_icons(self) -> None:
         for button, icon_name in self._action_icons.items():
-            button.setIcon(load_svg_icon(icon_name, 18))
+            button.setIcon(load_svg_icon(icon_name, ICON_SIZE_NORMAL))
 
     def apply_current_palette(self) -> None:
         self.refresh_theme_icons()

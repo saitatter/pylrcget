@@ -6,7 +6,7 @@ from PySide6.QtGui import QColor, QCursor, QPainter, QPen
 from PySide6.QtWidgets import QStyle, QStyledItemDelegate, QStyleOptionViewItem
 
 from core.tracklist_models import DownloadState, TrackListRow
-from ui.icon_loader import load_svg_icon
+from ui.icon_loader import ICON_SIZE_COMPACT, load_svg_icon
 from ui.theme_tokens import STYLE_TOKENS
 
 
@@ -40,7 +40,7 @@ class ActionsDelegate(QStyledItemDelegate):
         self._update_resources()
 
     def _update_resources(self) -> None:
-        size = round(14 * self._ui_scale)
+        size = round(ICON_SIZE_COMPACT * self._ui_scale)
         self._refresh_icon = load_svg_icon("refresh-cw.svg", size, STYLE_TOKENS.get("color-text-soft", "#e5e7eb"))
 
     def _button_rects(self, cell_rect: QRect) -> tuple[QRect, QRect]:
@@ -94,7 +94,7 @@ class ActionsDelegate(QStyledItemDelegate):
         selected = bool(option.state & QStyle.State_Selected)
         hover_refresh = self._hover_row == index.row() and self._hover_button == "refresh"
         hover_download = self._hover_row == index.row() and self._hover_button == "download"
-        icon_size = round(14 * self._ui_scale)
+        icon_size = round(ICON_SIZE_COMPACT * self._ui_scale)
         self._draw_action_button(
             painter,
             refresh_rect,

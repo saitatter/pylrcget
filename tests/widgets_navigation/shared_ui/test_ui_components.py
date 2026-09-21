@@ -1,5 +1,10 @@
 from tests.widgets_navigation._shared import *
 from ui.button_roles import set_button_role
+from ui.icon_loader import (
+    ICON_SIZE_COMPACT,
+    ICON_SIZE_NORMAL,
+    ICON_SIZE_PLAYBACK,
+)
 
 
 @unittest.skipUnless(HAS_QT, "PySide6 is required for widget tests")
@@ -76,6 +81,31 @@ class SharedUiComponentTests(unittest.TestCase):
             self.assertNotIn("min-height: 72px;", stylesheet)
         finally:
             widget.deleteLater()
+
+    def test_icon_sizes_follow_shared_ui_scale(self):
+        def noop(*args, **kwargs):
+            return None
+
+        widget = TopBarController(
+            on_refresh=noop,
+            on_download_missing=noop,
+            on_export_library=noop,
+            on_open_settings=noop,
+            on_open_about=noop,
+            on_toggle_logs=noop,
+            on_toggle_hotkey_hints=noop,
+            on_schedule_search=noop,
+            on_filter_changed=noop,
+        )
+        player = PlayerBar(None)
+        try:
+            self.assertEqual(widget.btn_refresh.iconSize().width(), ICON_SIZE_NORMAL)
+            self.assertEqual(player.btn_prev.iconSize().width(), ICON_SIZE_COMPACT)
+            self.assertEqual(player.btn_play.iconSize().width(), ICON_SIZE_PLAYBACK)
+            self.assertEqual(player.lbl_volume.iconSize().width(), ICON_SIZE_NORMAL)
+        finally:
+            widget.deleteLater()
+            player.deleteLater()
 
     def test_main_navigation_separates_library_and_lrclib_tabs(self):
         tab_bar = LibraryNavigationTabBar()

@@ -9,6 +9,11 @@ from PySide6.QtSvg import QSvgRenderer
 from ui.style_loader import asset_path
 from ui.theme_tokens import STYLE_TOKENS
 
+ICON_SIZE_COMPACT = 14
+ICON_SIZE_NORMAL = 16
+ICON_SIZE_PROMINENT = 18
+ICON_SIZE_PLAYBACK = 20
+
 
 def load_app_icon() -> QIcon:
     svg_path = asset_path("assets", "app-icon.svg")

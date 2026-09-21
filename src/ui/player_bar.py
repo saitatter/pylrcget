@@ -19,7 +19,12 @@ from PySide6.QtWidgets import (
 )
 
 from core.artwork import extract_embedded_cover_bytes, find_sidecar_cover_path
-from ui.icon_loader import load_svg_icon
+from ui.icon_loader import (
+    ICON_SIZE_COMPACT,
+    ICON_SIZE_NORMAL,
+    ICON_SIZE_PLAYBACK,
+    load_svg_icon,
+)
 from ui.spacing import SPACE_2, set_layout_spacing
 from ui.style_loader import load_stylesheet
 from ui.theme_tokens import STYLE_TOKENS
@@ -287,9 +292,9 @@ class PlayerBar(QWidget):
 
         self._icons = {}
         self._refresh_theme_icons()
-        self.btn_prev.setIconSize(QSize(12, 12))
-        self.btn_next.setIconSize(QSize(12, 12))
-        self.btn_play.setIconSize(QSize(18, 18))
+        self.btn_prev.setIconSize(QSize(ICON_SIZE_COMPACT, ICON_SIZE_COMPACT))
+        self.btn_next.setIconSize(QSize(ICON_SIZE_COMPACT, ICON_SIZE_COMPACT))
+        self.btn_play.setIconSize(QSize(ICON_SIZE_PLAYBACK, ICON_SIZE_PLAYBACK))
 
         controls_row.addWidget(self.btn_prev)
         controls_row.addWidget(self.btn_play)
@@ -392,7 +397,7 @@ class PlayerBar(QWidget):
         self.lbl_volume.setAutoRaise(True)
         self.lbl_volume.setFixedSize(32, 28)
         self.lbl_volume.setIcon(self._icons["volume"])
-        self.lbl_volume.setIconSize(QSize(18, 18))
+        self.lbl_volume.setIconSize(QSize(ICON_SIZE_NORMAL, ICON_SIZE_NORMAL))
         self._muted = False
         self._pre_mute_volume = 70
 
@@ -781,12 +786,12 @@ class PlayerBar(QWidget):
     def _refresh_theme_icons(self) -> None:
         icon_color = STYLE_TOKENS.get("color-text-soft", "#e5e7eb")
         self._icons = {
-            "prev": load_svg_icon("skip-back.svg", 20, icon_color),
-            "next": load_svg_icon("skip-forward.svg", 20, icon_color),
-            "play": load_svg_icon("play.svg", 28, icon_color),
-            "pause": load_svg_icon("pause.svg", 28, icon_color),
-            "volume": load_svg_icon("volume-2.svg", 16, icon_color),
-            "volume_muted": load_svg_icon("volume-x.svg", 16, icon_color),
+            "prev": load_svg_icon("skip-back.svg", ICON_SIZE_COMPACT, icon_color),
+            "next": load_svg_icon("skip-forward.svg", ICON_SIZE_COMPACT, icon_color),
+            "play": load_svg_icon("play.svg", ICON_SIZE_PLAYBACK, icon_color),
+            "pause": load_svg_icon("pause.svg", ICON_SIZE_PLAYBACK, icon_color),
+            "volume": load_svg_icon("volume-2.svg", ICON_SIZE_NORMAL, icon_color),
+            "volume_muted": load_svg_icon("volume-x.svg", ICON_SIZE_NORMAL, icon_color),
         }
         self.btn_prev.setIcon(self._icons["prev"])
         self.btn_next.setIcon(self._icons["next"])
