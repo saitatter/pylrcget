@@ -29,7 +29,7 @@ class LyricsEditorWidgetTests(unittest.TestCase):
             self.assertEqual(widget.empty_state.action.text(), "Download Lyrics")
             self.assertEqual(widget.empty_state.secondary_action.text(), "Search Lyrics")
             self.assertEqual(widget.empty_state.tertiary_action.text(), "Write Lyrics")
-            self.assertEqual(widget.empty_state.quaternary_action.text(), "✨ Sync with AI")
+            self.assertEqual(widget.empty_state.quaternary_action.text(), "Sync with AI")
             self.assertIn("Download lyrics from enabled providers", widget.empty_state.body.text())
         finally:
             widget.deleteLater()

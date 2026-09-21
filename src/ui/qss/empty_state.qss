@@ -43,7 +43,7 @@ QPushButton#EmptyStateAction[neutralAction="true"] {
     background: {{color-bg-control}};
     color: {{color-text}};
     border-color: {{color-border}};
-    font-weight: 600;
+    font-weight: 400;
 }
 
 QPushButton#EmptyStateAction[neutralAction="true"]:hover {

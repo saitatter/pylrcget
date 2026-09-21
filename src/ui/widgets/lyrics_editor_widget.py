@@ -748,7 +748,7 @@ class LyricsEditorWidget(QWidget):
                 action_text="Download Lyrics",
                 secondary_action_text="Search Lyrics",
                 tertiary_action_text="Write Lyrics",
-                quaternary_action_text="✨ Sync with AI",
+                quaternary_action_text="Sync with AI",
             )
             self.stack.setCurrentWidget(self.empty_state)
         self._sync_header_height()
