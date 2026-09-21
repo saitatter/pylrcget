@@ -330,7 +330,7 @@ class TopBarController(QWidget):
             self.root_layout.setStretch(2, 1)
         self.updateGeometry()
 
-    def bind_tab_order(self, window, tabs_widget) -> None:
+    def bind_tab_order(self, window, _tabs_widget) -> None:
         filter_controls = (
             self.chk_synced,
             self.chk_plain,
@@ -341,7 +341,4 @@ class TopBarController(QWidget):
         window.setTabOrder(self.search_box, filter_controls[0])
         for current, following in pairwise(filter_controls):
             window.setTabOrder(current, following)
-        window.setTabOrder(filter_controls[-1], self.btn_refresh)
-        window.setTabOrder(self.btn_refresh, self.btn_config)
-        window.setTabOrder(self.btn_config, self.btn_about)
-        window.setTabOrder(self.btn_about, tabs_widget)
+        window.setTabOrder(filter_controls[-1], self.search_box)

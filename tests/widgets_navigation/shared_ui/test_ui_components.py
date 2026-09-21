@@ -121,6 +121,36 @@ class SharedUiComponentTests(unittest.TestCase):
         finally:
             widget.deleteLater()
 
+    def test_top_bar_tab_order_cycles_only_search_and_filters(self):
+        def noop(*args, **kwargs):
+            return None
+
+        widget = TopBarController(
+            on_refresh=noop,
+            on_download_missing=noop,
+            on_export_library=noop,
+            on_open_settings=noop,
+            on_open_about=noop,
+            on_toggle_logs=noop,
+            on_toggle_hotkey_hints=noop,
+            on_schedule_search=noop,
+            on_filter_changed=noop,
+        )
+        window = SimpleNamespace(setTabOrder=MagicMock())
+        tabs = QWidget()
+        try:
+            widget.bind_tab_order(window, tabs)
+
+            calls = window.setTabOrder.call_args_list
+            self.assertEqual(len(calls), 6)
+            self.assertIs(calls[0].args[0], widget.search_box)
+            self.assertIs(calls[-1].args[1], widget.search_box)
+            self.assertTrue(all(tabs not in call.args for call in calls))
+            self.assertTrue(all(widget.btn_refresh not in call.args for call in calls))
+        finally:
+            tabs.deleteLater()
+            widget.deleteLater()
+
     def test_icon_sizes_follow_shared_ui_scale(self):
         def noop(*args, **kwargs):
             return None
