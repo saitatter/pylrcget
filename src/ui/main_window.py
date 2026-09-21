@@ -51,6 +51,7 @@ from ui.constants import (
     PLAYBACK_VOLUME_SAVE_MS,
     SEARCH_DEBOUNCE_MS,
 )
+from ui.controllers.lyrics_cleanup_controller import LyricsCleanupController
 from ui.controllers.lyrics_download_controller import LyricsDownloadController
 from ui.controllers.lyrics_output_controller import LyricsOutputController
 from ui.controllers.navigation_controller import NavigationController
@@ -420,6 +421,11 @@ class MainWindow(QMainWindow):
             export_overlay=self.export_overlay,
             parent=self,
         )
+        self.lyrics_cleanup = LyricsCleanupController(
+            self.app_state,
+            show_status=self._show_status_message,
+            parent=self,
+        )
         self.track_maintenance = TrackMaintenanceController(
             self.app_state,
             window=self,
@@ -531,6 +537,7 @@ class MainWindow(QMainWindow):
         self.track_list.unmarkInstrumental.connect(self._on_unmark_instrumental)
         self.track_list.clearFiltersRequested.connect(self._reset_track_filters)
         self.track_list.configureFoldersRequested.connect(self.open_config_modal)
+        self.track_list.cleanupLyricsRequested.connect(self._on_cleanup_lyrics_requested)
         self.albums_tab.playTrack.connect(self.on_play_track)
         self.albums_tab.previewTrack.connect(self._preview_track)
         self.albums_tab.refreshTrack.connect(self.on_refresh_track)
@@ -546,6 +553,7 @@ class MainWindow(QMainWindow):
         self.albums_tab.clearSearchRequested.connect(self._clear_library_search)
         self.albums_tab.refreshLibraryRequested.connect(self.refresh_library)
         self.albums_tab.configureFoldersRequested.connect(self.open_config_modal)
+        self.albums_tab.cleanupLyricsRequested.connect(self._on_cleanup_lyrics_requested)
         self.artists_tab.playTrack.connect(self.on_play_track)
         self.artists_tab.previewTrack.connect(self._preview_track)
         self.artists_tab.refreshTrack.connect(self.on_refresh_track)
@@ -561,6 +569,7 @@ class MainWindow(QMainWindow):
         self.artists_tab.clearSearchRequested.connect(self._clear_library_search)
         self.artists_tab.refreshLibraryRequested.connect(self.refresh_library)
         self.artists_tab.configureFoldersRequested.connect(self.open_config_modal)
+        self.artists_tab.cleanupLyricsRequested.connect(self._on_cleanup_lyrics_requested)
         # --- Album Artists tab signals ---
         self.album_artists_tab.playTrack.connect(self.on_play_track)
         self.album_artists_tab.previewTrack.connect(self._preview_track)
@@ -577,6 +586,7 @@ class MainWindow(QMainWindow):
         self.album_artists_tab.clearSearchRequested.connect(self._clear_library_search)
         self.album_artists_tab.refreshLibraryRequested.connect(self.refresh_library)
         self.album_artists_tab.configureFoldersRequested.connect(self.open_config_modal)
+        self.album_artists_tab.cleanupLyricsRequested.connect(self._on_cleanup_lyrics_requested)
         self.mylrclib_tab.playTrack.connect(self.on_play_track)
 
         # --- Filters wiring ---
@@ -1517,6 +1527,14 @@ class MainWindow(QMainWindow):
     def _on_lyrics_save_requested(self, lrc: str, txt: str):
         lyrics_actions.on_lyrics_save_requested(self, lrc, txt)
 
+    def _on_cleanup_lyrics_requested(self, track_ids: list[int]) -> None:
+        lyrics_actions.cleanup_lyrics(self, track_ids)
+
+    def _clear_current_track_lyrics(self) -> None:
+        track_id = getattr(self, "_editing_track_id", None)
+        if track_id is not None:
+            lyrics_actions.cleanup_lyrics(self, [int(track_id)])
+
     def _on_propagate_lyrics_requested(self, lrc: str, txt: str) -> None:
         lyrics_actions.on_propagate_lyrics_requested(self, lrc, txt)
 
@@ -2102,6 +2120,7 @@ class MainWindow(QMainWindow):
         view.downloadRequested.connect(self._download_current_track_lyrics)
         view.searchRequested.connect(self._search_current_track_lyrics)
         view.exportFilesRequested.connect(self._export_current_track_sidecars)
+        view.clearLyricsRequested.connect(self._clear_current_track_lyrics)
 
     def eventFilter(self, watched, event):
         if watched is self.player_bar.slider and event.type() == QEvent.Type.KeyPress:
@@ -2304,6 +2323,7 @@ class MainWindow(QMainWindow):
                     dirty_txt_lyrics=getattr(track, "dirty_txt_lyrics", None),
                     dirty_lrc_lyrics=getattr(track, "dirty_lrc_lyrics", None),
                     dirty_lyrics_present=bool(getattr(track, "dirty_lyrics_present", False)),
+                    track_id=int(track.id),
                 )
         finally:
             self._loading_lyrics_views = False

@@ -66,6 +66,7 @@ class TrackListWidget(QWidget):
     unmarkInstrumental = Signal(list)      # list[int]
     clearFiltersRequested = Signal()
     configureFoldersRequested = Signal()
+    cleanupLyricsRequested = Signal(list)  # track_ids
 
     def __init__(self, app_state, *, show_bulk_context_actions: bool = True):
         super().__init__()
@@ -489,6 +490,11 @@ class TrackListWidget(QWidget):
         actions["open_artist"].setEnabled(focused_artist_id is not None)
         actions["open_album"].setEnabled(focused_album_id is not None)
 
+        menu.addSeparator()
+        self._add_context_section(menu, "Lyrics", f"{len(selected_ids)} selected track(s)")
+        actions["cleanup_lyrics"] = menu.addAction("Clean lyrics…")
+        actions["cleanup_lyrics"].setEnabled(bool(selected_ids))
+
         actions.update(
             {
                 "download": None,
@@ -529,6 +535,8 @@ class TrackListWidget(QWidget):
         elif chosen == actions.get("open_album"):
             if focused_album_id is not None:
                 self._emit_album_navigation(int(focused_album_id))
+        elif chosen == actions.get("cleanup_lyrics"):
+            self.cleanupLyricsRequested.emit(selected_ids)
         elif chosen == actions.get("download_selected"):
             self.bulkDownloadRequested.emit(selected_ids, "use_global")
         elif chosen == actions.get("download_synced"):

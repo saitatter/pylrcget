@@ -61,6 +61,7 @@ class AlbumArtistListWidget(QWidget):
     clearFiltersRequested = Signal()
     clearSearchRequested = Signal()
     refreshLibraryRequested = Signal()
+    cleanupLyricsRequested = Signal(list)
     configureFoldersRequested = Signal()
     navigateRequested = Signal(object)
 
@@ -148,6 +149,7 @@ class AlbumArtistListWidget(QWidget):
         self.album_browser.navigateRequested.connect(self.navigateRequested.emit)
         self.album_browser.markInstrumental.connect(self.markInstrumental.emit)
         self.album_browser.unmarkInstrumental.connect(self.unmarkInstrumental.emit)
+        self.album_browser.cleanupLyricsRequested.connect(self.cleanupLyricsRequested.emit)
         self.album_browser.clearFiltersRequested.connect(self.clearFiltersRequested.emit)
         self.album_browser.clearSearchRequested.connect(self.clearSearchRequested.emit)
         self.album_browser.refreshLibraryRequested.connect(self.refreshLibraryRequested.emit)

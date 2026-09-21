@@ -113,6 +113,7 @@ class LyricsEditorWidget(QWidget):
     downloadRequested = Signal()
     searchRequested = Signal()
     exportFilesRequested = Signal()
+    clearLyricsRequested = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -313,6 +314,12 @@ class LyricsEditorWidget(QWidget):
         self.btn_publish_synced.clicked.connect(lambda: self.publishSyncedRequested.emit())
         self.btn_publish_plain.clicked.connect(lambda: self.publishPlainRequested.emit())
 
+        self.btn_clear_lyrics = QPushButton("Clear Lyrics")
+        self.btn_clear_lyrics.setObjectName("LyricsClearLyrics")
+        self.btn_clear_lyrics.setToolTip("Clean saved lyrics, sidecar files, or embedded lyrics")
+        self.btn_clear_lyrics.setEnabled(False)
+        self.btn_clear_lyrics.clicked.connect(self.clearLyricsRequested.emit)
+
         self.btn_more_actions = QPushButton("More")
         self.btn_more_actions.setObjectName("LyricsMoreActions")
         self.btn_more_actions.setToolTip("More lyrics editing actions")
@@ -325,6 +332,7 @@ class LyricsEditorWidget(QWidget):
             self.btn_export_files,
             self.btn_publish_synced,
             self.btn_publish_plain,
+            self.btn_clear_lyrics,
         ):
             action = self.more_actions_menu.addAction(button.text())
             action.triggered.connect(button.click)
@@ -340,6 +348,7 @@ class LyricsEditorWidget(QWidget):
             self.btn_export_files,
             self.btn_publish_synced,
             self.btn_publish_plain,
+            self.btn_clear_lyrics,
         ):
             button.hide()
 
@@ -360,6 +369,7 @@ class LyricsEditorWidget(QWidget):
             self.btn_export_files,
             self.btn_publish_synced,
             self.btn_publish_plain,
+            self.btn_clear_lyrics,
             self.btn_more_actions,
         ):
             button.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
@@ -462,6 +472,7 @@ class LyricsEditorWidget(QWidget):
             self.btn_export_files: "Export Files",
             self.btn_publish_synced: "Publish Synced",
             self.btn_publish_plain: "Publish Plain",
+            self.btn_clear_lyrics: "Clear Lyrics",
         }
 
         self._apply_styles()
@@ -616,11 +627,13 @@ class LyricsEditorWidget(QWidget):
         dirty_txt_lyrics: str | None = None,
         dirty_lrc_lyrics: str | None = None,
         dirty_lyrics_present: bool = False,
+        track_id: int | None = None,
     ):
         self._loading_track = True
         self._saved_lrc = (lrc_lyrics or "").strip()
         self._saved_txt = (txt_lyrics or "").strip()
         self.title.setText(title or "Lyrics")
+        has_track = track_id is not None
         has_dirty_draft = bool(
             dirty_lyrics_present
             and ((dirty_txt_lyrics or "").strip() or (dirty_lrc_lyrics or "").strip())
@@ -628,6 +641,7 @@ class LyricsEditorWidget(QWidget):
 
         if instrumental:
             self._reset_state()
+            self.btn_clear_lyrics.setEnabled(has_track)
             self.empty_state.configure(
                 icon_name="audio-lines.svg",
                 title="Instrumental track",
@@ -645,6 +659,7 @@ class LyricsEditorWidget(QWidget):
         publish_synced_available = bool((lrc_lyrics or "").strip()) and not has_dirty_draft
         publish_plain_available = bool((txt_lyrics or "").strip()) and not has_dirty_draft
         self._set_dirty_badge(has_dirty_draft)
+        self.btn_clear_lyrics.setEnabled(has_track)
 
         # Prefer showing synced editor if we have LRC that parses
         if lrc:
@@ -717,6 +732,7 @@ class LyricsEditorWidget(QWidget):
         self.btn_save.setEnabled(False)
         self.btn_sync_others.setEnabled(False)
         self.btn_export_files.setEnabled(False)
+        self.btn_clear_lyrics.setEnabled(False)
         self._update_publish_enabled()
         self.mode_selector.hide()
         self.btn_clear_timestamps.hide()

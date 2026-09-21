@@ -173,7 +173,14 @@ class LyricsEditorWidgetTests(unittest.TestCase):
             action_texts = [action.text() for action in widget.more_actions_menu.actions()]
             self.assertEqual(
                 action_texts,
-                ["Shift All from First", "Sync to Others", "Export Files", "Publish Synced", "Publish Plain"],
+                [
+                    "Shift All from First",
+                    "Sync to Others",
+                    "Export Files",
+                    "Publish Synced",
+                    "Publish Plain",
+                    "Clear Lyrics",
+                ],
             )
             self.assertFalse(widget.btn_shift_all_from_first.isVisible())
             self.assertFalse(widget.btn_more_actions.isHidden())

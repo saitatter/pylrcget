@@ -533,23 +533,36 @@ def clear_tracks_lyrics(
     track_ids: list[int] | tuple[int, ...],
     *,
     commit: bool = True,
+    clear_drafts: bool = True,
 ) -> int:
     """Clear saved and draft lyrics for multiple tracks in one transaction."""
     unique_ids = list(dict.fromkeys(int(track_id) for track_id in track_ids))
     if not unique_ids:
         return 0
     try:
-        db.executemany(
-            """
-            UPDATE tracks
-            SET txt_lyrics = NULL, lrc_lyrics = NULL,
-                txt_lyrics_source = NULL, lrc_lyrics_source = NULL,
-                dirty_lrc_lyrics = NULL, dirty_txt_lyrics = NULL,
-                dirty_lyrics_present = 0, instrumental = 0
-            WHERE id = ?
-            """,
-            [(track_id,) for track_id in unique_ids],
-        )
+        if clear_drafts:
+            db.executemany(
+                """
+                UPDATE tracks
+                SET txt_lyrics = NULL, lrc_lyrics = NULL,
+                    txt_lyrics_source = NULL, lrc_lyrics_source = NULL,
+                    dirty_lrc_lyrics = NULL, dirty_txt_lyrics = NULL,
+                    dirty_lyrics_present = 0, instrumental = 0
+                WHERE id = ?
+                """,
+                [(track_id,) for track_id in unique_ids],
+            )
+        else:
+            db.executemany(
+                """
+                UPDATE tracks
+                SET txt_lyrics = NULL, lrc_lyrics = NULL,
+                    txt_lyrics_source = NULL, lrc_lyrics_source = NULL,
+                    instrumental = 0
+                WHERE id = ?
+                """,
+                [(track_id,) for track_id in unique_ids],
+            )
         if commit:
             db.commit()
         return len(unique_ids)

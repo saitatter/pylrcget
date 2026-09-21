@@ -164,6 +164,45 @@ class TrackListWidgetTests(unittest.TestCase):
             widget.deleteLater()
             app_state.db.close()
 
+    def test_context_menu_can_request_lyrics_cleanup_for_selection(self):
+        app_state = simple_app_state()
+        widget = TrackListWidget(app_state)
+        routes = []
+        try:
+            widget.cleanupLyricsRequested.connect(routes.append)
+            focused_row = TrackListRow(
+                track_id=1,
+                title="Song",
+                artist="Radiohead",
+                artist_id=7,
+                album="Kid A",
+                album_id=11,
+                track_number=1,
+                duration_s=120,
+                lyrics_state=LyricsState.SYNCED,
+            )
+            menu = QMenu(widget)
+            actions = widget._build_track_context_menu(
+                menu,
+                selected_ids=[1, 2],
+                current_track_id=1,
+                focused_row=focused_row,
+            )
+
+            widget._handle_track_context_menu_choice(
+                actions["cleanup_lyrics"],
+                actions,
+                selected_ids=[1, 2],
+                current_track_id=1,
+                focused_artist_id=7,
+                focused_album_id=11,
+            )
+
+            self.assertEqual(routes, [[1, 2]])
+        finally:
+            widget.deleteLater()
+            app_state.db.close()
+
     def test_context_menu_omits_bulk_actions_duplicated_in_selection_bar(self):
         app_state = simple_app_state()
         widget = TrackListWidget(app_state)

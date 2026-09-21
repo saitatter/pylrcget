@@ -12,6 +12,7 @@ from db.queries import (
     clear_download_history,
     clear_publish_history,
     clear_track_dirty_lyrics,
+    clear_tracks_lyrics,
     find_artist,
     get_config,
     get_download_history_rows,
@@ -542,6 +543,27 @@ class TrackRefreshQueryTests(unittest.TestCase):
                 self.assertFalse(cleared.dirty_lyrics_present)
                 self.assertIsNone(cleared.dirty_txt_lyrics)
                 self.assertEqual(cleared.txt_lyrics, "saved plain")
+            finally:
+                db.close()
+
+    def test_clear_tracks_lyrics_can_preserve_drafts_when_requested(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db = initialize_database(tmp)
+            try:
+                audio = Path(tmp) / "song.mp3"
+                touch_text(audio, "a")
+                add_tracks(db, [make_fs_track(audio, artist="Artist A", album="Album A", title="Song A")])
+
+                track_id = int(db.execute("SELECT id FROM tracks LIMIT 1").fetchone()["id"])
+                update_track_plain_lyrics(db, track_id, "saved plain")
+                update_track_dirty_lyrics(db, track_id, "", "draft plain")
+
+                clear_tracks_lyrics(db, [track_id], clear_drafts=False)
+                cleared = get_track_by_id(db, track_id)
+
+                self.assertIsNone(cleared.txt_lyrics)
+                self.assertTrue(cleared.dirty_lyrics_present)
+                self.assertEqual(cleared.dirty_txt_lyrics, "draft plain")
             finally:
                 db.close()
 

@@ -56,6 +56,7 @@ class AlbumListWidget(QWidget):
     clearFiltersRequested = Signal()
     clearSearchRequested = Signal()
     refreshLibraryRequested = Signal()
+    cleanupLyricsRequested = Signal(list)
     configureFoldersRequested = Signal()
     navigateRequested = Signal(object)
 
@@ -162,6 +163,7 @@ class AlbumListWidget(QWidget):
         self.track_list.navigateRequested.connect(self._handle_track_route)
         self.track_list.markInstrumental.connect(self.markInstrumental.emit)
         self.track_list.unmarkInstrumental.connect(self.unmarkInstrumental.emit)
+        self.track_list.cleanupLyricsRequested.connect(self.cleanupLyricsRequested.emit)
         self.track_list.clearFiltersRequested.connect(self.clearFiltersRequested.emit)
         self.track_list.configureFoldersRequested.connect(self.configureFoldersRequested.emit)
         self.stack.addWidget(self.track_list)

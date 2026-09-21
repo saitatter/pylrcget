@@ -20,6 +20,7 @@ from db.queries import (
     update_track_plain_lyrics,
     update_track_synced_lyrics,
 )
+from ui.dialogs.lyrics_cleanup_dialog import LyricsCleanupDialog
 from ui.services.feedback import exception_message, log_and_notify, notify_user
 from ui.services.lyrics_download_service import sync_track_outputs_with_result
 
@@ -306,6 +307,57 @@ def on_discard_draft_requested(window) -> None:
         window._show_status_message("Draft discarded.", 2500)
     except sqlite3.Error as exc:
         logger.warning("Failed to discard dirty lyrics draft for track %s: %s", track_id, exc)
+
+
+def cleanup_lyrics(window, track_ids: list[int]) -> None:
+    unique_ids = list(dict.fromkeys(int(track_id) for track_id in track_ids if track_id is not None))
+    if not unique_ids:
+        return
+
+    try:
+        tracks = [get_track_by_id(window.app_state.db, track_id) for track_id in unique_ids]
+        config = get_config(window.app_state.db)
+    except (sqlite3.Error, KeyError, ValueError) as exc:
+        log_and_notify(
+            window.app_state,
+            logger,
+            logging.ERROR,
+            exception_message("Failed to prepare lyrics cleanup", exc),
+            "error",
+            show_status=window._show_status_message,
+            status_timeout_ms=4000,
+        )
+        return
+
+    dialog = LyricsCleanupDialog(tracks, config, parent=window)
+    if dialog.exec() != QDialog.DialogCode.Accepted:
+        return
+
+    if not window.lyrics_cleanup.cleanup(
+        unique_ids,
+        dialog.options(),
+        on_finished=lambda ok, summary, stats: _on_cleanup_finished(window, ok, summary, stats),
+    ):
+        notify_user(
+            window.app_state,
+            "Lyrics cleanup is already running.",
+            "warning",
+            show_status=window._show_status_message,
+            status_timeout_ms=3000,
+        )
+
+
+def _on_cleanup_finished(window, ok: bool, summary: str, stats: dict) -> None:
+    if int(stats.get("cleaned", 0)) > 0:
+        window._refresh_visible_library_view_after_downloads()
+    notify_user(
+        window.app_state,
+        summary,
+        "success" if ok else "warning",
+        show_status=window._show_status_message,
+        status_timeout_ms=4500,
+    )
+    window.toasts.show_toast(summary, "success" if ok else "warning")
 
 
 def download_current_track_lyrics(window) -> None:
