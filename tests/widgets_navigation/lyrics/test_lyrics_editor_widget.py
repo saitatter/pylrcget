@@ -938,6 +938,8 @@ class LyricsEditorWidgetTests(unittest.TestCase):
     def test_lyrics_editor_uses_semantic_roles_for_primary_and_destructive_actions(self):
         widget = LyricsEditorWidget()
         try:
+            self.assertEqual(widget.btn_shift_minus.property("buttonRole"), "secondary")
+            self.assertEqual(widget.btn_shift_plus.property("buttonRole"), "secondary")
             self.assertEqual(widget.btn_save.property("buttonRole"), "primary")
             self.assertEqual(widget.btn_auto_sync.property("buttonRole"), "primary")
             self.assertEqual(widget.btn_del.property("buttonRole"), "danger")
