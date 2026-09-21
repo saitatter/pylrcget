@@ -63,6 +63,16 @@ def test_optional_theme_keeps_its_palette_mode_for_semantic_fallbacks() -> None:
     assert tokens["color-success-bg"] == "#102A20"
 
 
+def test_typography_tokens_use_the_modern_desktop_scale() -> None:
+    tokens = get_theme_tokens("LightTheme")
+
+    assert tokens["font-family-base"].startswith("'Segoe UI Variable Text', 'Segoe UI'")
+    assert tokens["font-size-xs"] == "11px"
+    assert tokens["font-size-sm"] == "12px"
+    assert tokens["font-size-md"] == "13px"
+    assert tokens["font-size-lg"] == "16px"
+
+
 def test_album_table_reloads_qss_after_palette_change() -> None:
     app = QApplication.instance() or QApplication([])
     del app

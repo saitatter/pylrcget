@@ -36,7 +36,7 @@ def _theme(
     text_soft: str,
     palette_mode: str,
     accent_alt: str | None = None,
-    font_family: str = "'Segoe UI', 'Segoe UI Variable Text', system-ui, sans-serif",
+    font_family: str = "'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif",
     radius_scale: str = "default",
     extra: dict[str, str] | None = None,
 ) -> dict[str, str]:
@@ -484,10 +484,10 @@ THEMES = {
 }
 
 FONT_TOKENS = {
-    "font-size-xs": "10px",
-    "font-size-sm": "11px",
-    "font-size-md": "12px",
-    "font-size-lg": "14px",
+    "font-size-xs": "11px",
+    "font-size-sm": "12px",
+    "font-size-md": "13px",
+    "font-size-lg": "16px",
 }
 
 SPACE_TOKENS = {
