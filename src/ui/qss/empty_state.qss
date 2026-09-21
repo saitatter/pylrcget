@@ -39,6 +39,19 @@ QPushButton#EmptyStateAction:hover {
     border-color: {{color-border-hover}};
 }
 
+QPushButton#EmptyStateAction[neutralAction="true"] {
+    background: {{color-bg-control}};
+    color: {{color-text}};
+    border-color: {{color-border}};
+    font-weight: 600;
+}
+
+QPushButton#EmptyStateAction[neutralAction="true"]:hover {
+    background: {{color-bg-elevated}};
+    border-color: {{color-accent}};
+    color: {{color-text}};
+}
+
 QPushButton#EmptyStateSecondaryAction,
 QPushButton#EmptyStateTertiaryAction,
 QPushButton#EmptyStateQuaternaryAction {

@@ -354,6 +354,19 @@ class LyricsEditorWidget(QWidget):
 
         toolbar.addWidget(self.btn_more_actions)
 
+        self._editor_toolbar_controls = (
+            self.btn_snap,
+            self.btn_shift_minus,
+            self.btn_shift_plus,
+            self.shift_spin,
+            self.btn_shift_selected,
+            self.btn_add,
+            self.btn_del,
+            self.btn_autofix,
+            self.btn_save,
+            self.btn_more_actions,
+        )
+
         for button in (
             self.btn_snap,
             self.btn_shift_minus,
@@ -388,6 +401,7 @@ class LyricsEditorWidget(QWidget):
         root.addWidget(self.stack, 1)
 
         self.empty_state = EmptyStateWidget()
+        self.empty_state.action.setProperty("neutralAction", True)
         self.empty_state.actionTriggered.connect(self.downloadRequested.emit)
         self.empty_state.secondaryActionTriggered.connect(self.searchRequested.emit)
         self.empty_state.tertiaryActionTriggered.connect(self._start_writing_lyrics)
@@ -608,7 +622,9 @@ class LyricsEditorWidget(QWidget):
 
     def show_none(self, message: str):
         self._reset_state()
+        self._set_editor_toolbar_visible(False)
         self._set_dirty_badge(False)
+        self.empty_state.set_content_centered(True)
         self.empty_state.configure(
             icon_name="audio-lines.svg",
             title="No track selected",
@@ -630,6 +646,7 @@ class LyricsEditorWidget(QWidget):
         track_id: int | None = None,
     ):
         self._loading_track = True
+        self.empty_state.set_content_centered(False)
         self._saved_lrc = (lrc_lyrics or "").strip()
         self._saved_txt = (txt_lyrics or "").strip()
         self.title.setText(title or "Lyrics")
@@ -641,6 +658,7 @@ class LyricsEditorWidget(QWidget):
 
         if instrumental:
             self._reset_state()
+            self._set_editor_toolbar_visible(False)
             self.btn_clear_lyrics.setEnabled(has_track)
             self.empty_state.configure(
                 icon_name="audio-lines.svg",
@@ -686,13 +704,15 @@ class LyricsEditorWidget(QWidget):
             self._set_publish_available(publish_synced_available, publish_plain_available)
         else:
             self._reset_state()
+            self._set_editor_toolbar_visible(False)
             self._set_publish_available(False, False)
+            self.empty_state.set_content_centered(True)
             self.empty_state.configure(
                 icon_name="audio-lines.svg",
                 title="No lyrics yet",
                 body="Download lyrics from enabled providers or search manually, then edit them here.",
                 action_text="Download Lyrics",
-                secondary_action_text="Search LRCLIB",
+                secondary_action_text="Search Lyrics",
                 tertiary_action_text="Write Lyrics",
                 quaternary_action_text="Auto Sync",
             )
@@ -701,6 +721,11 @@ class LyricsEditorWidget(QWidget):
         self._loading_track = False
 
     # --- internal helpers ---
+    def _set_editor_toolbar_visible(self, visible: bool) -> None:
+        """Show editing controls only when the panel has editable lyrics state."""
+        for control in self._editor_toolbar_controls:
+            control.setVisible(bool(visible))
+
     def _reset_state(self):
         self._times = []
         self._current_index = -1
@@ -759,6 +784,7 @@ class LyricsEditorWidget(QWidget):
 
     def _set_plain(self, txt: str):
         self._reset_state()
+        self._set_editor_toolbar_visible(True)
         self.plain.blockSignals(True)
         self.plain.setPlainText(txt)
         self.plain.blockSignals(False)
@@ -916,6 +942,7 @@ class LyricsEditorWidget(QWidget):
 
     def _set_synced(self, pairs: list[tuple[int, str]]):
         self._reset_state()
+        self._set_editor_toolbar_visible(True)
         self.stack.setCurrentWidget(self.table)
 
         self.table.blockSignals(True)

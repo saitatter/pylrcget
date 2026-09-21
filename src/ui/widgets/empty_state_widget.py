@@ -22,6 +22,7 @@ class EmptyStateWidget(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setObjectName("EmptyState")
+        self._content_centered = False
 
         layout = QVBoxLayout(self)
         set_layout_spacing(layout, margins=(SPACE_4, SPACE_3, SPACE_4, SPACE_3), spacing=SPACE_2)
@@ -39,6 +40,9 @@ class EmptyStateWidget(QWidget):
         self.body.setObjectName("EmptyStateBody")
         self.body.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.body.setWordWrap(True)
+        # Keep short empty-state messages from collapsing to their minimum
+        # wrapped width (which can clip the second line in a narrow layout).
+        self.body.setMinimumWidth(EMPTY_STATE_BODY_MIN_WIDTH)
         self.body.setMaximumWidth(EMPTY_STATE_BODY_MIN_WIDTH)
 
         self.action = QPushButton()
@@ -116,6 +120,24 @@ class EmptyStateWidget(QWidget):
             self.quaternary_action.hide()
 
         self._sync_text_width()
+
+    def set_content_centered(self, centered: bool) -> None:
+        """Center the empty-state group vertically when no actions are needed."""
+        centered = bool(centered)
+        if centered == self._content_centered:
+            return
+
+        layout = self.layout()
+        if layout is None:
+            return
+
+        if centered:
+            layout.insertStretch(0, 1)
+        else:
+            layout.takeAt(0)
+        self._content_centered = centered
+        layout.invalidate()
+        self.updateGeometry()
 
     def _sync_text_width(self) -> None:
         visible_buttons = [

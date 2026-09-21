@@ -27,7 +27,7 @@ class LyricsEditorWidgetTests(unittest.TestCase):
             self.assertFalse(widget.empty_state.quaternary_action.isHidden())
             self.assertEqual(widget.empty_state.title.text(), "No lyrics yet")
             self.assertEqual(widget.empty_state.action.text(), "Download Lyrics")
-            self.assertEqual(widget.empty_state.secondary_action.text(), "Search LRCLIB")
+            self.assertEqual(widget.empty_state.secondary_action.text(), "Search Lyrics")
             self.assertEqual(widget.empty_state.tertiary_action.text(), "Write Lyrics")
             self.assertEqual(widget.empty_state.quaternary_action.text(), "Auto Sync")
             self.assertIn("Download lyrics from enabled providers", widget.empty_state.body.text())
@@ -60,7 +60,7 @@ class LyricsEditorWidgetTests(unittest.TestCase):
             widget.hide()
             widget.deleteLater()
 
-    def test_no_selection_toolbar_buttons_remain_fully_visible_in_narrow_layouts(self):
+    def test_no_selection_hides_editor_toolbar_in_narrow_layouts(self):
         widget = LyricsEditorWidget()
         try:
             widget.resize(520, 360)
@@ -69,6 +69,26 @@ class LyricsEditorWidgetTests(unittest.TestCase):
 
             widget.show_none("Choose a track to review or edit its lyrics.")
             self.app.processEvents()
+
+            self.assertEqual(widget.empty_state.body.text(), "Choose a track to review or edit its lyrics.")
+            self.assertGreaterEqual(widget.empty_state.body.width(), 360)
+
+            content_top = min(
+                widget.empty_state.icon.geometry().top(),
+                widget.empty_state.title.geometry().top(),
+                widget.empty_state.body.geometry().top(),
+            )
+            content_bottom = max(
+                widget.empty_state.icon.geometry().bottom(),
+                widget.empty_state.title.geometry().bottom(),
+                widget.empty_state.body.geometry().bottom(),
+            )
+            content_center = (content_top + content_bottom) / 2
+            panel_center = widget.empty_state.rect().center().y()
+            self.assertLessEqual(abs(content_center - panel_center), 12)
+            panel_center_x = widget.empty_state.rect().center().x()
+            for control in (widget.empty_state.icon, widget.empty_state.title, widget.empty_state.body):
+                self.assertLessEqual(abs(control.geometry().center().x() - panel_center_x), 1)
 
             toolbar_buttons = [
                 widget.btn_snap,
@@ -85,15 +105,32 @@ class LyricsEditorWidgetTests(unittest.TestCase):
                 widget.btn_publish_plain,
             ]
 
-            visible_buttons = [button for button in toolbar_buttons if button.isVisible()]
-            self.assertTrue(visible_buttons)
-            self.assertTrue(all(button.geometry().top() >= 0 for button in visible_buttons))
-            self.assertLessEqual(
-                max(button.geometry().bottom() for button in visible_buttons),
-                widget.stack.geometry().top() + 8,
-            )
+            self.assertTrue(all(button.isHidden() for button in toolbar_buttons))
         finally:
             widget.hide()
+            widget.deleteLater()
+
+    def test_empty_track_hides_editor_toolbar_but_keeps_empty_actions(self):
+        widget = LyricsEditorWidget()
+        try:
+            widget.set_track_lyrics("Song", "", "", False, track_id=1)
+
+            self.assertTrue(widget.btn_more_actions.isHidden())
+            self.assertTrue(widget.btn_save.isHidden())
+            self.assertTrue(widget.empty_state._content_centered)
+            self.assertFalse(widget.empty_state.action.isHidden())
+            self.assertFalse(widget.empty_state.secondary_action.isHidden())
+        finally:
+            widget.deleteLater()
+
+    def test_lyrics_content_shows_editor_toolbar(self):
+        widget = LyricsEditorWidget()
+        try:
+            widget.set_track_lyrics("Song", "Plain lyrics", "", False, track_id=1)
+
+            self.assertFalse(widget.btn_more_actions.isHidden())
+            self.assertFalse(widget.btn_save.isHidden())
+        finally:
             widget.deleteLater()
 
     def test_lyrics_header_does_not_inflate_minimum_height_hint(self):
@@ -170,6 +207,7 @@ class LyricsEditorWidgetTests(unittest.TestCase):
     def test_secondary_lyrics_actions_are_available_from_more_menu(self):
         widget = LyricsEditorWidget()
         try:
+            widget.set_track_lyrics("Song", "Plain lyrics", "", False, track_id=1)
             action_texts = [action.text() for action in widget.more_actions_menu.actions()]
             self.assertEqual(
                 action_texts,
