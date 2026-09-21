@@ -1,19 +1,16 @@
 QWidget#TopBar {
-    background: transparent;
-}
-
-QWidget#TopBarGroup {
-    background: transparent;
+    background: {{color-bg-panel}};
     border: 1px solid {{color-border-strong}};
     border-radius: {{radius-lg}};
-}
-
-QWidget#TopBarGroup:hover {
-    border-color: {{color-border}};
+    min-height: 46px;
+    max-height: 52px;
 }
 
 QWidget#TopBarGroup {
-    min-height: 72px;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    min-height: 0;
 }
 
 QLabel#TopBarLabel {
@@ -40,6 +37,7 @@ QCheckBox#TopBarFilterCheck::indicator:checked:hover {
 QLineEdit#TopBarSearch {
     background: transparent;
     border-color: {{color-border}};
+    min-width: 260px;
 }
 
 QLineEdit#TopBarSearch:focus {
@@ -49,6 +47,12 @@ QLineEdit#TopBarSearch:focus {
 QToolButton#TopBarAction {
     min-width: 36px;
     min-height: 36px;
+}
+
+QCheckBox#TopBarFilterCheck {
+    min-height: 28px;
+    padding: 0;
+    spacing: 6px;
 }
 
 QLabel#HotkeyHintBadge {

@@ -17,7 +17,7 @@ from PySide6.QtWidgets import (
 
 from ui.icon_loader import load_svg_icon
 from ui.services.download_modes import download_missing_tooltip
-from ui.spacing import SPACE_1, SPACE_2, SPACE_3, set_layout_spacing
+from ui.spacing import SPACE_1, SPACE_2, set_layout_spacing
 
 
 class TopBarController(QWidget):
@@ -49,47 +49,50 @@ class TopBarController(QWidget):
 
         root = QHBoxLayout(self)
         self.root_layout = root
-        set_layout_spacing(root, margins=SPACE_2, spacing=SPACE_2)
+        set_layout_spacing(root, margins=SPACE_1, spacing=SPACE_2)
 
         self.search_group = QWidget()
         self.search_group.setObjectName("TopBarGroup")
         self.search_group.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
         search_layout = QVBoxLayout(self.search_group)
-        set_layout_spacing(search_layout, margins=SPACE_2, spacing=SPACE_1)
-        search_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+        set_layout_spacing(search_layout, margins=0, spacing=0)
+        search_layout.setAlignment(Qt.AlignmentFlag.AlignVCenter)
 
         self.search_label = QLabel("Search Library")
         self.search_label.setObjectName("TopBarLabel")
-        search_layout.addWidget(self.search_label)
+        self.search_label.hide()
 
         self.search_box = QLineEdit()
         self.search_box.setPlaceholderText("Search tracks / artists / albums...")
         self.search_box.setObjectName("TopBarSearch")
         self.search_box.setAccessibleName("Library search")
+        self.search_box.setMinimumWidth(260)
+        self.search_box.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.search_box.textChanged.connect(on_schedule_search)
         search_layout.addWidget(self.search_box)
         root.addWidget(self.search_group, stretch=3)
 
         self.filters_group = QWidget()
         self.filters_group.setObjectName("TopBarGroup")
+        self.filters_group.setAccessibleName("Library filters")
         self.filters_group.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
         filters_layout = QVBoxLayout(self.filters_group)
-        set_layout_spacing(filters_layout, margins=SPACE_2, spacing=SPACE_1)
-        filters_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+        set_layout_spacing(filters_layout, margins=0, spacing=0)
+        filters_layout.setAlignment(Qt.AlignmentFlag.AlignVCenter)
 
         self.filters_label = QLabel("Filter Lyrics")
         self.filters_label.setObjectName("TopBarLabel")
-        filters_layout.addWidget(self.filters_label)
+        self.filters_label.hide()
 
         filters_row = QHBoxLayout()
-        set_layout_spacing(filters_row, margins=(0, SPACE_3, 0, 0), spacing=SPACE_2)
+        set_layout_spacing(filters_row, margins=0, spacing=SPACE_1)
 
         self.chk_synced = QCheckBox("Synced")
         self.chk_synced.setObjectName("TopBarFilterCheck")
         self.chk_synced.setChecked(True)
         self.chk_synced.setAccessibleName("Filter synced lyrics")
         self.chk_synced.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self.chk_synced.setMinimumHeight(36)
+        self.chk_synced.setMinimumHeight(28)
         self.chk_synced.toggled.connect(on_filter_changed)
         filters_row.addWidget(self.chk_synced)
 
@@ -98,7 +101,7 @@ class TopBarController(QWidget):
         self.chk_plain.setChecked(True)
         self.chk_plain.setAccessibleName("Filter plain lyrics")
         self.chk_plain.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self.chk_plain.setMinimumHeight(36)
+        self.chk_plain.setMinimumHeight(28)
         self.chk_plain.toggled.connect(on_filter_changed)
         filters_row.addWidget(self.chk_plain)
 
@@ -107,7 +110,7 @@ class TopBarController(QWidget):
         self.chk_instr.setChecked(False)
         self.chk_instr.setAccessibleName("Filter instrumental tracks")
         self.chk_instr.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self.chk_instr.setMinimumHeight(36)
+        self.chk_instr.setMinimumHeight(28)
         self.chk_instr.toggled.connect(on_filter_changed)
         filters_row.addWidget(self.chk_instr)
 
@@ -116,7 +119,7 @@ class TopBarController(QWidget):
         self.chk_none.setChecked(True)
         self.chk_none.setAccessibleName("Filter tracks without lyrics")
         self.chk_none.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self.chk_none.setMinimumHeight(36)
+        self.chk_none.setMinimumHeight(28)
         self.chk_none.toggled.connect(on_filter_changed)
         filters_row.addWidget(self.chk_none)
 
@@ -125,7 +128,7 @@ class TopBarController(QWidget):
         self.chk_unsaved.setChecked(False)
         self.chk_unsaved.setAccessibleName("Filter tracks with unsaved draft")
         self.chk_unsaved.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self.chk_unsaved.setMinimumHeight(36)
+        self.chk_unsaved.setMinimumHeight(28)
         self.chk_unsaved.toggled.connect(on_filter_changed)
         filters_row.addWidget(self.chk_unsaved)
 
@@ -135,17 +138,18 @@ class TopBarController(QWidget):
 
         self.actions_group = QWidget()
         self.actions_group.setObjectName("TopBarGroup")
+        self.actions_group.setAccessibleName("Global actions")
         self.actions_group.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
         actions_layout = QVBoxLayout(self.actions_group)
-        set_layout_spacing(actions_layout, margins=SPACE_2, spacing=SPACE_1)
-        actions_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+        set_layout_spacing(actions_layout, margins=0, spacing=0)
+        actions_layout.setAlignment(Qt.AlignmentFlag.AlignVCenter)
 
         self.actions_label = QLabel("Global Actions")
         self.actions_label.setObjectName("TopBarLabel")
-        actions_layout.addWidget(self.actions_label)
+        self.actions_label.hide()
 
         actions_row = QHBoxLayout()
-        set_layout_spacing(actions_row, spacing=SPACE_2)
+        set_layout_spacing(actions_row, margins=0, spacing=SPACE_1)
         self._action_icons: dict[QToolButton, str] = {}
 
         self.btn_refresh = self._make_action_button(

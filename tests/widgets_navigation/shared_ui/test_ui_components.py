@@ -30,6 +30,36 @@ class SharedUiComponentTests(unittest.TestCase):
         finally:
             widget.deleteLater()
 
+    def test_top_bar_uses_flat_command_bar_layout(self):
+        def noop(*args, **kwargs):
+            return None
+
+        widget = TopBarController(
+            on_refresh=noop,
+            on_download_missing=noop,
+            on_export_library=noop,
+            on_open_settings=noop,
+            on_open_about=noop,
+            on_toggle_logs=noop,
+            on_toggle_hotkey_hints=noop,
+            on_schedule_search=noop,
+            on_filter_changed=noop,
+        )
+        try:
+            self.assertFalse(widget.search_label.isVisible())
+            self.assertFalse(widget.filters_label.isVisible())
+            self.assertFalse(widget.actions_label.isVisible())
+            self.assertEqual(widget.search_box.minimumWidth(), 260)
+            self.assertEqual(widget.chk_synced.minimumHeight(), 28)
+
+            stylesheet = Path("src/ui/qss/main_window.qss").read_text(encoding="utf-8")
+            self.assertIn("QWidget#TopBar {", stylesheet)
+            self.assertIn("max-height: 52px;", stylesheet)
+            self.assertIn("QCheckBox#TopBarFilterCheck", stylesheet)
+            self.assertNotIn("min-height: 72px;", stylesheet)
+        finally:
+            widget.deleteLater()
+
     def test_player_hotkey_badges_use_shared_badge_style(self):
         stylesheet = Path("src/ui/qss/player_bar.qss").read_text(encoding="utf-8")
         self.assertIn("QLabel#HotkeyHintBadge", stylesheet)
