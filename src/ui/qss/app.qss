@@ -290,35 +290,35 @@ QTabWidget#MainTabs QTabBar {
 }
 
 QTabWidget#MainTabs QTabBar::tab {
-    background: {{color-bg-panel}};
+    background: transparent;
     color: {{color-text-muted}};
-    border: 1px solid {{color-border-strong}};
-    border-radius: {{radius-lg}};
-    padding: 10px {{space-4}};
-    margin-right: 8px;
+    border: none;
+    border-bottom: 2px solid transparent;
+    border-radius: 0;
+    padding: 8px {{space-4}} 9px;
+    margin-right: 4px;
     min-width: 92px;
     font-weight: 600;
 }
 
 QTabWidget#MainTabs QTabBar::tab:hover {
     color: {{color-text}};
-    border-color: {{color-border}};
     background: {{color-bg-control}};
+    border-radius: {{radius-sm}};
 }
 
 QTabWidget#MainTabs QTabBar::tab:selected {
-    background: {{color-bg-elevated}};
-    color: {{color-text-strong}};
-    border-color: {{color-accent}};
+    color: {{color-accent}};
+    border-bottom-color: {{color-accent}};
 }
 
 QTabWidget#MainTabs QTabBar::tab:focus {
-    border-color: {{color-accent}};
-    color: {{color-text-strong}};
+    color: {{color-accent}};
+    border-bottom-color: {{color-accent}};
 }
 
 QTabWidget#MainTabs QTabBar::tab:!selected {
-    margin-top: 4px;
+    margin-top: 0;
 }
 
 /* Settings uses tabs as navigation, without an extra framed panel around each page. */

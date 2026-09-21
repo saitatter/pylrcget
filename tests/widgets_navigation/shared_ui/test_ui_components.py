@@ -63,6 +63,20 @@ class SharedUiComponentTests(unittest.TestCase):
         finally:
             widget.deleteLater()
 
+    def test_main_navigation_separates_library_and_lrclib_tabs(self):
+        tab_bar = LibraryNavigationTabBar()
+        for label in ("Tracks", "Albums", "Artists", "Album Artists", "LRCLIB Browser", "My LRCLIB"):
+            tab_bar.addTab(label)
+        try:
+            self.assertEqual(tab_bar.LIBRARY_TAB_COUNT, 4)
+            self.assertEqual(tab_bar.tabText(4), "LRCLIB Browser")
+            stylesheet = Path("src/ui/qss/app.qss").read_text(encoding="utf-8")
+            self.assertIn("border-bottom: 2px solid transparent;", stylesheet)
+            self.assertIn("border-bottom-color: {{color-accent}};", stylesheet)
+            self.assertIn("border-radius: 0;", stylesheet)
+        finally:
+            tab_bar.deleteLater()
+
     def test_player_hotkey_badges_use_shared_badge_style(self):
         stylesheet = Path("src/ui/qss/player_bar.qss").read_text(encoding="utf-8")
         self.assertIn("QLabel#HotkeyHintBadge", stylesheet)

@@ -90,6 +90,7 @@ from ui.widgets.album_list_widget import AlbumListWidget
 from ui.widgets.artist_list_widget import ArtistListWidget
 from ui.widgets.download_progress_overlay import DownloadProgressOverlay
 from ui.widgets.hotkey_hints import HotkeyHintManager
+from ui.widgets.library_navigation_tab_bar import LibraryNavigationTabBar
 from ui.widgets.log_panel import LogPanel, QtLogHandler
 from ui.widgets.lrclib_browser_widget import LrclibBrowserWidget
 from ui.widgets.lyrics_editor_widget import LyricsEditorWidget
@@ -215,6 +216,8 @@ class MainWindow(QMainWindow):
         # --- Tabs ---
         self.tabs = QTabWidget()
         self.tabs.setObjectName("MainTabs")
+        self.tabs.setTabBar(LibraryNavigationTabBar())
+        self.tabs.tabBar().setObjectName("MainNavigationTabBar")
         self.tabs.setDocumentMode(True)
         self.tabs.tabBar().setExpanding(False)
         self.tabs.tabBar().setDrawBase(False)

@@ -65,6 +65,7 @@ from ui.main_window import MainWindow
 from ui.player_bar import PLAYER_COVER_SIZE, PlayerBar
 from ui.theme_tokens import get_theme_tokens
 from ui.widgets.hotkey_hints import HotkeyHintManager
+from ui.widgets.library_navigation_tab_bar import LibraryNavigationTabBar
 from ui.widgets.lrclib_browser_widget import _BrowserPublishDialog
 from ui.widgets.lyrics_editor_widget import (
     LINE_NUMBER_COLUMN,
