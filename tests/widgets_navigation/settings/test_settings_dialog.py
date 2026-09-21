@@ -71,6 +71,10 @@ class SettingsDialogTests(unittest.TestCase):
                 try:
                     labels = [dialog.lyrics_sections_tabs.tabText(index) for index in range(dialog.lyrics_sections_tabs.count())]
                     self.assertEqual(labels, ["Download", "Providers", "Files", "Embed", "Editor"])
+                    self.assertTrue(dialog.tabs.documentMode())
+                    self.assertFalse(dialog.tabs.tabBar().drawBase())
+                    self.assertTrue(dialog.lyrics_sections_tabs.documentMode())
+                    self.assertFalse(dialog.lyrics_sections_tabs.tabBar().drawBase())
                 finally:
                     dialog.deleteLater()
             finally:

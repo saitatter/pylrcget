@@ -292,6 +292,20 @@ QTabWidget#MainTabs QTabBar::tab:!selected {
     margin-top: 4px;
 }
 
+/* Settings uses tabs as navigation, without an extra framed panel around each page. */
+QTabWidget#SettingsTabs::pane,
+QTabWidget#LyricsSettingsTabs::pane {
+    border: none;
+    margin: 0;
+    padding: 0;
+    background: transparent;
+}
+
+QTabWidget#SettingsTabs QTabBar,
+QTabWidget#LyricsSettingsTabs QTabBar {
+    left: 0;
+}
+
 QMenu {
     padding: 8px;
 }

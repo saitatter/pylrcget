@@ -69,6 +69,8 @@ class MusicFoldersDialog(QDialog):
         layout = QVBoxLayout(self)
         self.tabs = QTabWidget()
         self.tabs.setObjectName("SettingsTabs")
+        self.tabs.setDocumentMode(True)
+        self.tabs.tabBar().setDrawBase(False)
         layout.addWidget(self.tabs, 1)
 
         library_tab = QWidget()
@@ -76,7 +78,12 @@ class MusicFoldersDialog(QDialog):
 
         lyrics_tab = QWidget()
         lyrics_tab_layout = QVBoxLayout(lyrics_tab)
+        lyrics_tab_layout.setContentsMargins(0, 0, 0, 0)
+        lyrics_tab_layout.setSpacing(0)
         self.lyrics_sections_tabs = QTabWidget()
+        self.lyrics_sections_tabs.setObjectName("LyricsSettingsTabs")
+        self.lyrics_sections_tabs.setDocumentMode(True)
+        self.lyrics_sections_tabs.tabBar().setDrawBase(False)
         lyrics_tab_layout.addWidget(self.lyrics_sections_tabs)
 
         lyrics_download_tab = QWidget()
