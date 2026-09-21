@@ -168,32 +168,39 @@ def reset_refresh_feedback(window) -> None:
     window.top_bar.reset_refresh_feedback(window._refresh_default_label)
 
 
+def _reorient_splitter(splitter, orientation: Qt.Orientation, extent: int) -> None:
+    if splitter.orientation() == orientation:
+        return
+
+    sizes = splitter.sizes()
+    total = sum(max(0, int(size)) for size in sizes[:2])
+    first_ratio = (sizes[0] / total) if total > 0 and sizes else 0.60
+    first_ratio = max(0.0, min(1.0, first_ratio))
+
+    splitter.setOrientation(orientation)
+    total = max(1, int(extent))
+    first_size = round(total * first_ratio)
+    splitter.setSizes([first_size, total - first_size])
+
+
 def update_responsive_layout(window) -> None:
     width = max(0, window.width())
     window.top_bar.update_responsive_layout(width)
 
     if hasattr(window, "content_splitter"):
         if width < RESPONSIVE_LAYOUT_BREAKPOINT:
-            if window.content_splitter.orientation() != Qt.Orientation.Vertical:
-                window.content_splitter.setOrientation(Qt.Orientation.Vertical)
-                window.content_splitter.setSizes([int(window.height() * 0.60), int(window.height() * 0.40)])
+            _reorient_splitter(window.content_splitter, Qt.Orientation.Vertical, window.height())
         else:
-            if window.content_splitter.orientation() != Qt.Orientation.Horizontal:
-                window.content_splitter.setOrientation(Qt.Orientation.Horizontal)
-                window.content_splitter.setSizes([int(width * 0.60), int(width * 0.40)])
+            _reorient_splitter(window.content_splitter, Qt.Orientation.Horizontal, width)
 
     for splitter_name in ("albums_splitter", "artists_splitter", "album_artists_splitter"):
         splitter = getattr(window, splitter_name, None)
         if splitter is None:
             continue
         if width < RESPONSIVE_LAYOUT_BREAKPOINT:
-            if splitter.orientation() != Qt.Orientation.Vertical:
-                splitter.setOrientation(Qt.Orientation.Vertical)
-                splitter.setSizes([int(window.height() * 0.60), int(window.height() * 0.40)])
+            _reorient_splitter(splitter, Qt.Orientation.Vertical, window.height())
         else:
-            if splitter.orientation() != Qt.Orientation.Horizontal:
-                splitter.setOrientation(Qt.Orientation.Horizontal)
-                splitter.setSizes([int(width * 0.60), int(width * 0.40)])
+            _reorient_splitter(splitter, Qt.Orientation.Horizontal, width)
 
     if hasattr(window, "player_bar"):
         window.player_bar.set_compact_mode(width < RESPONSIVE_LAYOUT_BREAKPOINT)

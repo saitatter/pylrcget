@@ -616,6 +616,44 @@ class MainWindowInstrumentalTests(unittest.TestCase):
         self.assertEqual(window.albums_splitter.sizes(), [312, 188])
         self.assertEqual(window.artists_splitter.sizes(), [312, 188])
 
+    def test_responsive_splitter_keeps_manual_ratio_when_orientation_changes(self):
+        class DummySplitter:
+            def __init__(self):
+                self._sizes = [800, 400]
+                self._orientation = Qt.Orientation.Horizontal
+
+            def sizes(self):
+                return list(self._sizes)
+
+            def setSizes(self, sizes):
+                self._sizes = [int(value) for value in sizes]
+
+            def orientation(self):
+                return self._orientation
+
+            def setOrientation(self, orientation):
+                self._orientation = orientation
+
+        width = [900]
+        window = SimpleNamespace(
+            width=lambda: width[0],
+            height=lambda: 700,
+            top_bar=SimpleNamespace(update_responsive_layout=MagicMock()),
+            content_splitter=DummySplitter(),
+            player_bar=SimpleNamespace(set_compact_mode=MagicMock()),
+        )
+
+        preferences.update_responsive_layout(window)
+        self.assertEqual(window.content_splitter.orientation(), Qt.Orientation.Vertical)
+        vertical_sizes = window.content_splitter.sizes()
+        self.assertAlmostEqual(vertical_sizes[0] / sum(vertical_sizes), 2 / 3, delta=0.01)
+
+        width[0] = 1400
+        preferences.update_responsive_layout(window)
+        self.assertEqual(window.content_splitter.orientation(), Qt.Orientation.Horizontal)
+        horizontal_sizes = window.content_splitter.sizes()
+        self.assertAlmostEqual(horizontal_sizes[0] / sum(horizontal_sizes), 2 / 3, delta=0.01)
+
     def test_apply_hotkey_preferences_updates_lyrics_views_and_hints(self):
         window = MainWindow.__new__(MainWindow)
         lyrics_view = SimpleNamespace(
