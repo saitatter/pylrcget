@@ -188,6 +188,7 @@ class TrackListWidgetTests(unittest.TestCase):
                 current_track_id=1,
                 focused_row=focused_row,
             )
+            self.assertEqual(actions["cleanup_lyrics"].text(), "Clear lyrics…")
 
             widget._handle_track_context_menu_choice(
                 actions["cleanup_lyrics"],

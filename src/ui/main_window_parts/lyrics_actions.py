@@ -322,7 +322,7 @@ def cleanup_lyrics(window, track_ids: list[int]) -> None:
             window.app_state,
             logger,
             logging.ERROR,
-            exception_message("Failed to prepare lyrics cleanup", exc),
+            exception_message("Failed to prepare clear lyrics", exc),
             "error",
             show_status=window._show_status_message,
             status_timeout_ms=4000,
@@ -340,7 +340,7 @@ def cleanup_lyrics(window, track_ids: list[int]) -> None:
     ):
         notify_user(
             window.app_state,
-            "Lyrics cleanup is already running.",
+            "Clear lyrics is already running.",
             "warning",
             show_status=window._show_status_message,
             status_timeout_ms=3000,

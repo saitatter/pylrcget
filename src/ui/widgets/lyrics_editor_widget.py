@@ -337,7 +337,7 @@ class LyricsEditorWidget(QWidget):
         self.btn_clear_lyrics = QPushButton("Clear Lyrics")
         self.btn_clear_lyrics.setObjectName("LyricsClearLyrics")
         set_button_role(self.btn_clear_lyrics, "danger")
-        self.btn_clear_lyrics.setToolTip("Clean saved lyrics, sidecar files, or embedded lyrics")
+        self.btn_clear_lyrics.setToolTip("Clear saved lyrics, sidecar files, or embedded lyrics")
         self.btn_clear_lyrics.setEnabled(False)
         self.btn_clear_lyrics.clicked.connect(self.clearLyricsRequested.emit)
 
@@ -357,7 +357,10 @@ class LyricsEditorWidget(QWidget):
             self.btn_clear_lyrics,
         ):
             action = self.more_actions_menu.addAction(button.text())
-            action.triggered.connect(button.click)
+            if button is self.btn_clear_lyrics:
+                action.triggered.connect(self.clearLyricsRequested.emit)
+            else:
+                action.triggered.connect(button.click)
             self._more_action_bindings.append((action, button))
         bound_actions = {action for action, _button in self._more_action_bindings}
         for action in tuple(self.more_actions_menu.actions()):
@@ -720,6 +723,7 @@ class LyricsEditorWidget(QWidget):
                     self.plain.blockSignals(True)
                     self.plain.setPlainText("\n".join([t.rstrip() for _, t in pairs]).rstrip())
                     self.plain.blockSignals(False)
+                self.btn_clear_lyrics.setEnabled(has_track)
                 self._sync_header_height()
                 self._loading_track = False
                 return
@@ -731,6 +735,7 @@ class LyricsEditorWidget(QWidget):
                 txt = lrc
             self._set_plain(txt)
             self._set_publish_available(False, bool(txt) and not has_dirty_draft)
+            self.btn_clear_lyrics.setEnabled(has_track)
             self._sync_header_height()
             self._loading_track = False
             return
@@ -754,6 +759,7 @@ class LyricsEditorWidget(QWidget):
                 quaternary_action_text="Sync with AI",
             )
             self.stack.setCurrentWidget(self.empty_state)
+        self.btn_clear_lyrics.setEnabled(has_track)
         self._sync_header_height()
         self._loading_track = False
 

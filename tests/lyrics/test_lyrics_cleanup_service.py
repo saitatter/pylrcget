@@ -105,6 +105,24 @@ class LyricsCleanupServiceTests(unittest.TestCase):
         self.assertTrue(result.embedded_cleared)
         clear_embedded.assert_called_once_with(track)
 
+    @patch("ui.services.lyrics_cleanup_service.clear_embedded_lyrics_for_track")
+    def test_file_cleanup_can_remove_only_embedded_txt(self, clear_embedded):
+        track = make_track("C:/music/song.mp3")
+
+        result = apply_file_cleanup(
+            track,
+            make_config(),
+            LyricsCleanupOptions(
+                clear_library=False,
+                clear_embedded_txt=True,
+                clear_embedded_lrc=False,
+            ),
+        )
+
+        self.assertIsNone(result.error)
+        self.assertTrue(result.embedded_cleared)
+        clear_embedded.assert_called_once_with(track, clear_txt=True, clear_lrc=False)
+
 
 if __name__ == "__main__":
     unittest.main()

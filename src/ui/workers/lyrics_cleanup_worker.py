@@ -57,6 +57,8 @@ class LyricsCleanupWorker(QThread):
                             db,
                             [track_id],
                             clear_drafts=self.options.discard_drafts,
+                            clear_txt=self.options.clear_txt,
+                            clear_lrc=self.options.clear_lrc,
                         )
                     elif self.options.discard_drafts:
                         clear_track_dirty_lyrics(db, track_id)
@@ -67,7 +69,7 @@ class LyricsCleanupWorker(QThread):
                         "status": "cleaned",
                         "deleted_sidecars": result.deleted_sidecars,
                         "embedded_cleared": result.embedded_cleared,
-                        "message": "Lyrics cleaned.",
+                        "message": "Lyrics cleared.",
                     }
                 except Exception as exc:  # noqa: BLE001
                     failed += 1
@@ -84,7 +86,7 @@ class LyricsCleanupWorker(QThread):
         except Exception as exc:
             logger.exception("Lyrics cleanup worker failed")
             stats = {"cleaned": cleaned, "failed": failed, "total": total, "cancelled": cancelled}
-            self.finishedCleanup.emit(False, f"Lyrics cleanup failed: {exc}", stats)
+            self.finishedCleanup.emit(False, f"Clear lyrics failed: {exc}", stats)
             return
         finally:
             if db is not None:
@@ -92,7 +94,7 @@ class LyricsCleanupWorker(QThread):
 
         stats = {"cleaned": cleaned, "failed": failed, "total": total, "cancelled": cancelled}
         if cancelled:
-            summary = f"Lyrics cleanup cancelled. {cleaned} cleaned, {failed} failed."
+            summary = f"Clear lyrics cancelled. {cleaned} cleared, {failed} failed."
         else:
-            summary = f"Lyrics cleanup complete. {cleaned} cleaned, {failed} failed."
+            summary = f"Lyrics cleared. {cleaned} cleared, {failed} failed."
         self.finishedCleanup.emit(not cancelled and failed == 0, summary, stats)

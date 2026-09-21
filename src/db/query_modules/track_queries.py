@@ -534,33 +534,39 @@ def clear_tracks_lyrics(
     *,
     commit: bool = True,
     clear_drafts: bool = True,
+    clear_txt: bool = True,
+    clear_lrc: bool = True,
 ) -> int:
-    """Clear saved and draft lyrics for multiple tracks in one transaction."""
+    """Clear selected saved lyric types and their matching drafts."""
     unique_ids = list(dict.fromkeys(int(track_id) for track_id in track_ids))
     if not unique_ids:
         return 0
     try:
+        assignments: list[str] = []
+        if clear_txt:
+            assignments.extend(("txt_lyrics = NULL", "txt_lyrics_source = NULL"))
+        if clear_lrc:
+            assignments.extend(("lrc_lyrics = NULL", "lrc_lyrics_source = NULL", "instrumental = 0"))
+
         if clear_drafts:
+            if clear_txt:
+                assignments.append("dirty_txt_lyrics = NULL")
+            if clear_lrc:
+                assignments.append("dirty_lrc_lyrics = NULL")
+            if clear_txt or clear_lrc:
+                if clear_txt and clear_lrc:
+                    dirty_present = "0"
+                elif clear_txt:
+                    dirty_present = "CASE WHEN dirty_lrc_lyrics IS NOT NULL THEN 1 ELSE 0 END"
+                else:
+                    dirty_present = "CASE WHEN dirty_txt_lyrics IS NOT NULL THEN 1 ELSE 0 END"
+                assignments.append(f"dirty_lyrics_present = {dirty_present}")
+            else:
+                assignments.extend(("dirty_lrc_lyrics = NULL", "dirty_txt_lyrics = NULL", "dirty_lyrics_present = 0"))
+
+        if assignments:
             db.executemany(
-                """
-                UPDATE tracks
-                SET txt_lyrics = NULL, lrc_lyrics = NULL,
-                    txt_lyrics_source = NULL, lrc_lyrics_source = NULL,
-                    dirty_lrc_lyrics = NULL, dirty_txt_lyrics = NULL,
-                    dirty_lyrics_present = 0, instrumental = 0
-                WHERE id = ?
-                """,
-                [(track_id,) for track_id in unique_ids],
-            )
-        else:
-            db.executemany(
-                """
-                UPDATE tracks
-                SET txt_lyrics = NULL, lrc_lyrics = NULL,
-                    txt_lyrics_source = NULL, lrc_lyrics_source = NULL,
-                    instrumental = 0
-                WHERE id = ?
-                """,
+                f"UPDATE tracks SET {', '.join(assignments)} WHERE id = ?",
                 [(track_id,) for track_id in unique_ids],
             )
         if commit:

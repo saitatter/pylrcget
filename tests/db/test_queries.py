@@ -30,6 +30,7 @@ from db.queries import (
     set_config,
     update_track_dirty_lyrics,
     update_track_plain_lyrics,
+    update_track_synced_lyrics,
     upsert_track_scan_state,
 )
 from library.scan_state import TrackScanState
@@ -564,6 +565,33 @@ class TrackRefreshQueryTests(unittest.TestCase):
                 self.assertIsNone(cleared.txt_lyrics)
                 self.assertTrue(cleared.dirty_lyrics_present)
                 self.assertEqual(cleared.dirty_txt_lyrics, "draft plain")
+            finally:
+                db.close()
+
+    def test_clear_tracks_lyrics_can_clear_txt_and_lrc_separately(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db = initialize_database(tmp)
+            try:
+                audio = Path(tmp) / "song.mp3"
+                touch_text(audio, "a")
+                add_tracks(db, [make_fs_track(audio, artist="Artist A", album="Album A", title="Song A")])
+                track_id = int(db.execute("SELECT id FROM tracks LIMIT 1").fetchone()["id"])
+                update_track_synced_lyrics(db, track_id, "[00:01.00]synced", "plain")
+                update_track_dirty_lyrics(db, track_id, "[00:02.00]draft synced", "draft plain")
+
+                clear_tracks_lyrics(db, [track_id], clear_txt=True, clear_lrc=False)
+                after_plain = get_track_by_id(db, track_id)
+                self.assertIsNone(after_plain.txt_lyrics)
+                self.assertEqual(after_plain.lrc_lyrics, "[00:01.00]synced")
+                self.assertIsNone(after_plain.dirty_txt_lyrics)
+                self.assertEqual(after_plain.dirty_lrc_lyrics, "[00:02.00]draft synced")
+                self.assertTrue(after_plain.dirty_lyrics_present)
+
+                clear_tracks_lyrics(db, [track_id], clear_txt=False, clear_lrc=True)
+                after_synced = get_track_by_id(db, track_id)
+                self.assertIsNone(after_synced.lrc_lyrics)
+                self.assertIsNone(after_synced.dirty_lrc_lyrics)
+                self.assertFalse(after_synced.dirty_lyrics_present)
             finally:
                 db.close()
 

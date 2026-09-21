@@ -39,6 +39,7 @@ ASF_SYNCED_KEY = "LRCLIB_LRC"
 
 logger = logging.getLogger(__name__)
 _MANAGED_ID3_TXXX_DESCS = {ID3_PLAIN_DESC, ID3_SYNCED_DESC}
+_KEEP_EMBEDDED = object()
 
 
 def _norm(s: str | None) -> str | None:
@@ -53,11 +54,21 @@ def _is_managed_uslt(frame: USLT) -> bool:
     return getattr(frame, "lang", "") == "und" and getattr(frame, "desc", "") == ""
 
 
-def _prune_managed_id3_frames(tags: ID3) -> None:
-    uslt_frames = [frame for frame in tags.getall("USLT") if not _is_managed_uslt(frame)]
-    tags.setall("USLT", uslt_frames)
-    txxx_frames = [frame for frame in tags.getall("TXXX") if getattr(frame, "desc", "") not in _MANAGED_ID3_TXXX_DESCS]
-    tags.setall("TXXX", txxx_frames)
+def _prune_managed_id3_frames(tags: ID3, *, clear_txt: bool = True, clear_lrc: bool = True) -> None:
+    if clear_txt:
+        uslt_frames = [frame for frame in tags.getall("USLT") if not _is_managed_uslt(frame)]
+        tags.setall("USLT", uslt_frames)
+    if clear_txt or clear_lrc:
+        if clear_txt and clear_lrc:
+            managed_descs = _MANAGED_ID3_TXXX_DESCS
+        elif clear_txt:
+            managed_descs = {ID3_PLAIN_DESC}
+        else:
+            managed_descs = {ID3_SYNCED_DESC}
+        txxx_frames = [
+            frame for frame in tags.getall("TXXX") if getattr(frame, "desc", "") not in managed_descs
+        ]
+        tags.setall("TXXX", txxx_frames)
 
 
 def embed_lyrics_for_track(track: Track, output_format: str = "both") -> None:
@@ -79,9 +90,18 @@ def embed_lyrics_for_track(track: Track, output_format: str = "both") -> None:
     embed_lyrics_in_file(path, plain, synced)
 
 
-def clear_embedded_lyrics_for_track(track: Track) -> None:
-    """Remove only lyrics fields managed by PyLrcGet from the audio file."""
-    embed_lyrics_in_file(track.file_path, None, None)
+def clear_embedded_lyrics_for_track(
+    track: Track,
+    *,
+    clear_txt: bool = True,
+    clear_lrc: bool = True,
+) -> None:
+    """Remove selected PyLrcGet-managed lyric fields from the audio file."""
+    embed_lyrics_in_file(
+        track.file_path,
+        None if clear_txt else _KEEP_EMBEDDED,
+        None if clear_lrc else _KEEP_EMBEDDED,
+    )
 
 
 def _select_lyrics_for_output(
@@ -101,7 +121,7 @@ def _select_lyrics_for_output(
     return plain, synced
 
 
-def embed_lyrics_in_file(path: str, plain: str | None, synced: str | None) -> None:
+def embed_lyrics_in_file(path: str, plain: str | None | object, synced: str | None | object) -> None:
     """
     Embed lyrics depending on file extension:
       - .mp3/.wav       -> ID3: USLT for plain + TXXX for synced (LYRICS)
@@ -142,29 +162,32 @@ def embed_lyrics_in_file(path: str, plain: str | None, synced: str | None) -> No
         if audio is None:
             return
 
-        if plain:
-            audio["lyrics"] = [plain]
-        elif "lyrics" in audio:
-            del audio["lyrics"]
+        if plain is not _KEEP_EMBEDDED:
+            if plain:
+                audio["lyrics"] = [plain]
+            elif "lyrics" in audio:
+                del audio["lyrics"]
 
         audio.save()
     except Exception as exc:  # noqa: BLE001
         logger.warning("Failed to embed lyrics in %s (fallback): %s", path, exc)
 
 
-def _embed_vorbis_comment(audio_cls, path: str, plain: str | None, synced: str | None) -> None:
+def _embed_vorbis_comment(audio_cls, path: str, plain: str | None | object, synced: str | None | object) -> None:
     """Helper for formats that use Vorbis comments (FLAC/Vorbis/Opus)."""
     audio = audio_cls(path)
 
-    if plain:
-        audio[VORBIS_PLAIN_KEY] = [plain]
-    elif VORBIS_PLAIN_KEY in audio:
-        del audio[VORBIS_PLAIN_KEY]
+    if plain is not _KEEP_EMBEDDED:
+        if plain:
+            audio[VORBIS_PLAIN_KEY] = [plain]
+        elif VORBIS_PLAIN_KEY in audio:
+            del audio[VORBIS_PLAIN_KEY]
 
-    if synced:
-        audio[VORBIS_SYNCED_KEY] = [synced]
-    elif VORBIS_SYNCED_KEY in audio:
-        del audio[VORBIS_SYNCED_KEY]
+    if synced is not _KEEP_EMBEDDED:
+        if synced:
+            audio[VORBIS_SYNCED_KEY] = [synced]
+        elif VORBIS_SYNCED_KEY in audio:
+            del audio[VORBIS_SYNCED_KEY]
 
     audio.save()
 
@@ -181,18 +204,22 @@ def _embed_ogg_opus(path: str, plain: str | None, synced: str | None) -> None:
     _embed_vorbis_comment(OggOpus, path, plain, synced)
 
 
-def _embed_mp3(path: str, plain: str | None, synced: str | None) -> None:
+def _embed_mp3(path: str, plain: str | None | object, synced: str | None | object) -> None:
     try:
         tags = ID3(path)
     except ID3NoHeaderError:
         tags = ID3()
 
     # Remove only the lyric frames owned by PyLrcGet.
-    _prune_managed_id3_frames(tags)
+    _prune_managed_id3_frames(
+        tags,
+        clear_txt=plain is not _KEEP_EMBEDDED,
+        clear_lrc=synced is not _KEEP_EMBEDDED,
+    )
 
     # Plain lyrics: use USLT. ID3 requires a 3-letter language code, but we avoid
     # a real language and use "und" (undefined).
-    if plain:
+    if plain is not _KEEP_EMBEDDED and plain:
         tags.add(
             USLT(
                 encoding=3,  # UTF-8
@@ -212,7 +239,7 @@ def _embed_mp3(path: str, plain: str | None, synced: str | None) -> None:
         )
 
     # Synced lyrics (raw LRC): store in a custom TXXX with desc="LYRICS".
-    if synced:
+    if synced is not _KEEP_EMBEDDED and synced:
         tags.add(
             TXXX(
                 encoding=3,
@@ -232,10 +259,14 @@ def _embed_wav(path: str, plain: str | None, synced: str | None) -> None:
     audio.save()
 
 
-def _write_id3_lyrics(tags: ID3, plain: str | None, synced: str | None) -> None:
-    _prune_managed_id3_frames(tags)
+def _write_id3_lyrics(tags: ID3, plain: str | None | object, synced: str | None | object) -> None:
+    _prune_managed_id3_frames(
+        tags,
+        clear_txt=plain is not _KEEP_EMBEDDED,
+        clear_lrc=synced is not _KEEP_EMBEDDED,
+    )
 
-    if plain:
+    if plain is not _KEEP_EMBEDDED and plain:
         tags.add(
             USLT(
                 encoding=3,
@@ -252,7 +283,7 @@ def _write_id3_lyrics(tags: ID3, plain: str | None, synced: str | None) -> None:
             )
         )
 
-    if synced:
+    if synced is not _KEEP_EMBEDDED and synced:
         tags.add(
             TXXX(
                 encoding=3,
@@ -262,59 +293,66 @@ def _write_id3_lyrics(tags: ID3, plain: str | None, synced: str | None) -> None:
         )
 
 
-def _embed_mp4(path: str, plain: str | None, synced: str | None) -> None:
+def _embed_mp4(path: str, plain: str | None | object, synced: str | None | object) -> None:
     audio = MP4(path)
 
     # Plain lyrics: standard Apple tag ©lyr.
-    if plain:
-        audio[MP4_PLAIN_KEY] = [plain]
-    elif MP4_PLAIN_KEY in audio:
-        del audio[MP4_PLAIN_KEY]
+    if plain is not _KEEP_EMBEDDED:
+        if plain:
+            audio[MP4_PLAIN_KEY] = [plain]
+        elif MP4_PLAIN_KEY in audio:
+            del audio[MP4_PLAIN_KEY]
 
     # Synced lyrics: custom atom.
-    if synced:
-        audio[MP4_SYNCED_KEY] = [synced.encode("utf-8")]
-    elif MP4_SYNCED_KEY in audio:
-        del audio[MP4_SYNCED_KEY]
+    if synced is not _KEEP_EMBEDDED:
+        if synced:
+            audio[MP4_SYNCED_KEY] = [synced.encode("utf-8")]
+        elif MP4_SYNCED_KEY in audio:
+            del audio[MP4_SYNCED_KEY]
 
     audio.save()
 
 
-def _embed_asf(path: str, plain: str | None, synced: str | None) -> None:
+def _embed_asf(path: str, plain: str | None | object, synced: str | None | object) -> None:
     audio = ASF(path)
 
-    if ASF_PLAIN_KEY in audio:
+    if plain is not _KEEP_EMBEDDED and ASF_PLAIN_KEY in audio:
         del audio[ASF_PLAIN_KEY]
-    if ASF_SYNCED_KEY in audio:
+    if synced is not _KEEP_EMBEDDED and ASF_SYNCED_KEY in audio:
         del audio[ASF_SYNCED_KEY]
 
-    if plain:
+    if plain is not _KEEP_EMBEDDED and plain:
         audio[ASF_PLAIN_KEY] = [ASFUnicodeAttribute(plain)]
-    if synced:
+    if synced is not _KEEP_EMBEDDED and synced:
         audio[ASF_SYNCED_KEY] = [ASFUnicodeAttribute(synced)]
 
     audio.save()
 
 
-def _embed_musepack(path: str, plain: str | None, synced: str | None) -> None:
+def _embed_musepack(path: str, plain: str | None | object, synced: str | None | object) -> None:
     audio = Musepack(path)
     if getattr(audio, "tags", None) is None:
         audio.add_tags()
 
     tags = audio.tags
-    for key in ("UNSYNCEDLYRICS", "LYRICS", "lyrics", "LRCLIB_LRC"):
-        if key in tags:
-            del tags[key]
+    if plain is not _KEEP_EMBEDDED:
+        for key in ("UNSYNCEDLYRICS", "lyrics"):
+            if key in tags:
+                del tags[key]
+    if synced is not _KEEP_EMBEDDED:
+        for key in ("LYRICS", "LRCLIB_LRC"):
+            if key in tags:
+                del tags[key]
 
-    if plain:
+    if plain is not _KEEP_EMBEDDED and plain:
         tags["UNSYNCEDLYRICS"] = APETextValue(plain)
-    if synced:
+    if synced is not _KEEP_EMBEDDED and synced:
         tags["LYRICS"] = APETextValue(synced)
 
     audio.save()
 
 
-def _embed_dsf(path: str, plain: str | None, synced: str | None) -> None:
+def _embed_dsf(path: str, plain: str | None | object, synced: str | None | object) -> None:
     audio = DSF(path)
     if getattr(audio, "tags", None) is None:
         audio.add_tags()
@@ -322,7 +360,7 @@ def _embed_dsf(path: str, plain: str | None, synced: str | None) -> None:
     audio.save()
 
 
-def _embed_dsdiff(path: str, plain: str | None, synced: str | None) -> None:
+def _embed_dsdiff(path: str, plain: str | None | object, synced: str | None | object) -> None:
     audio = DSDIFF(path)
     if getattr(audio, "tags", None) is None:
         audio.add_tags()

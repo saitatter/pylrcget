@@ -10,8 +10,12 @@ from db.models import Config, Track
 @dataclass(frozen=True)
 class LyricsCleanupOptions:
     clear_library: bool = True
+    clear_txt: bool = True
+    clear_lrc: bool = True
     delete_sidecars: bool = False
     clear_embedded: bool = False
+    clear_embedded_txt: bool = False
+    clear_embedded_lrc: bool = False
     discard_drafts: bool = True
 
 
@@ -44,6 +48,13 @@ def apply_file_cleanup(
             deleted_sidecars = delete_lyrics_sidecars(track, config)
         if options.clear_embedded:
             clear_embedded_lyrics_for_track(track)
+            embedded_cleared = True
+        elif options.clear_embedded_txt or options.clear_embedded_lrc:
+            clear_embedded_lyrics_for_track(
+                track,
+                clear_txt=options.clear_embedded_txt,
+                clear_lrc=options.clear_embedded_lrc,
+            )
             embedded_cleared = True
     except (OSError, ValueError, RuntimeError) as exc:
         return LyricsCleanupResult(

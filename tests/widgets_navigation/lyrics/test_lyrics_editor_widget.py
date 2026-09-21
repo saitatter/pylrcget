@@ -306,6 +306,25 @@ class LyricsEditorWidgetTests(unittest.TestCase):
         finally:
             widget.deleteLater()
 
+    def test_clear_lyrics_from_more_menu_emits_the_same_request(self):
+        widget = LyricsEditorWidget()
+        emitted: list[bool] = []
+        widget.clearLyricsRequested.connect(lambda: emitted.append(True))
+        try:
+            widget.set_track_lyrics("Song", "Plain lyrics", "", False, track_id=1)
+            widget._sync_more_actions()
+
+            clear_action = next(
+                action for action in widget.more_actions_menu.actions() if action.text() == "Clear Lyrics"
+            )
+            self.assertTrue(widget.btn_clear_lyrics.isEnabled())
+            self.assertTrue(clear_action.isEnabled())
+            clear_action.trigger()
+
+            self.assertEqual(emitted, [True])
+        finally:
+            widget.deleteLater()
+
     def test_switching_modes_preserves_synced_timestamps(self):
         widget = LyricsEditorWidget()
         try:

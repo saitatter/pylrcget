@@ -15,6 +15,7 @@ from core.embed_lyrics import (
     MP4_SYNCED_KEY,
     VORBIS_PLAIN_KEY,
     VORBIS_SYNCED_KEY,
+    clear_embedded_lyrics_for_track,
     embed_lyrics_for_track,
     embed_lyrics_in_file,
 )
@@ -83,6 +84,21 @@ class _FakeAudioWithTags:
 
 
 class EmbedLyricsFormatTests(unittest.TestCase):
+    def test_flac_clear_embedded_lrc_preserves_plain(self):
+        fake_audio = _FakeTagAudio(
+            {
+                VORBIS_PLAIN_KEY: ["Plain lyrics"],
+                VORBIS_SYNCED_KEY: ["[00:01.00]Synced lyrics"],
+            }
+        )
+        track = SimpleNamespace(file_path="song.flac")
+
+        with patch("core.embed_lyrics.FLAC", return_value=fake_audio):
+            clear_embedded_lyrics_for_track(track, clear_txt=False, clear_lrc=True)
+
+        self.assertEqual(fake_audio[VORBIS_PLAIN_KEY], ["Plain lyrics"])
+        self.assertNotIn(VORBIS_SYNCED_KEY, fake_audio)
+
     def test_flac_writes_vorbis_plain_and_synced_tags(self):
         fake_audio = _FakeTagAudio()
 
