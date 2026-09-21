@@ -205,7 +205,7 @@ class MyLrclibWidget(QWidget):
                     self._item(
                         str(row["publish_status"] or "Published"),
                         row,
-                        color=STYLE_TOKENS.get("color-success-border", "#16a34a"),
+                        color=STYLE_TOKENS.get("color-success-text", "#067647"),
                     ),
                     self._item(
                         self._display_kind(row["publish_kind"]),
@@ -363,9 +363,9 @@ class MyLrclibWidget(QWidget):
     def _kind_color(value: str | None) -> str:
         text = (value or "").strip().lower()
         if text == "synced":
-            return STYLE_TOKENS.get("color-success-border", "#16a34a")
+            return STYLE_TOKENS.get("color-success-text", "#067647")
         if text == "plain":
-            return STYLE_TOKENS.get("color-warning-border", "#f59e0b")
+            return STYLE_TOKENS.get("color-warning-text", "#b54708")
         return STYLE_TOKENS.get("color-text-soft", "#94a3b8")
 
     @staticmethod
@@ -392,12 +392,12 @@ class MyLrclibWidget(QWidget):
     def _download_status_color(value: str | None) -> str:
         text = (value or "").strip().lower()
         if text == "synced":
-            return STYLE_TOKENS.get("color-success-border", "#16a34a")
+            return STYLE_TOKENS.get("color-success-text", "#067647")
         if text == "plain":
-            return STYLE_TOKENS.get("color-warning-border", "#f59e0b")
+            return STYLE_TOKENS.get("color-warning-text", "#b54708")
         if text == "instrumental":
-            return STYLE_TOKENS.get("color-accent-alt", "#60a5fa")
-        return STYLE_TOKENS.get("color-error-border", "#ef4444")
+            return STYLE_TOKENS.get("color-info-text", "#175cd3")
+        return STYLE_TOKENS.get("color-error-text", "#b42318")
 
     def _apply_styles(self) -> None:
         qss = load_stylesheet("data_table.qss", table_name="MyLrclibTable")
