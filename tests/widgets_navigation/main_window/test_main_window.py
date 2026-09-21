@@ -258,6 +258,7 @@ class MainWindowInstrumentalTests(unittest.TestCase):
 
         try:
             self.assertEqual(bar.sizePolicy().verticalPolicy(), QSizePolicy.Policy.Fixed)
+            self.assertEqual(bar.minimumHeight(), 44)
             self.assertEqual(bar.maximumHeight(), 44)
         finally:
             bar.deleteLater()

@@ -104,6 +104,7 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_WINDOW_WIDTH = 1200
 DEFAULT_WINDOW_HEIGHT = 760
+LIBRARY_NAV_BAR_HEIGHT = 44
 
 
 class MainWindow(QMainWindow):
@@ -206,11 +207,13 @@ class MainWindow(QMainWindow):
 
         self.nav_bar = QWidget()
         self.nav_bar.setObjectName("LibraryNavBar")
+        self.nav_bar.setFixedHeight(LIBRARY_NAV_BAR_HEIGHT)
         nav_layout = QHBoxLayout(self.nav_bar)
         self.nav_layout = nav_layout
         set_layout_spacing(nav_layout, margins=(SPACE_2, 0, SPACE_2, 0), spacing=SPACE_2)
         self.breadcrumbs = QWidget()
         self.breadcrumbs.setObjectName("LibraryBreadcrumbs")
+        self.breadcrumbs.setFixedHeight(LIBRARY_NAV_BAR_HEIGHT)
         self.breadcrumbs_layout = QHBoxLayout(self.breadcrumbs)
         set_layout_spacing(self.breadcrumbs_layout, margins=0, spacing=SPACE_1)
         nav_layout.addWidget(self.breadcrumbs, 1)
@@ -718,7 +721,7 @@ class MainWindow(QMainWindow):
             ],
         )
         layout.addStretch(1)
-        bar.setMaximumHeight(44)
+        bar.setFixedHeight(LIBRARY_NAV_BAR_HEIGHT)
         bar.hide()
         return bar, label, buttons
 
