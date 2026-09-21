@@ -69,6 +69,8 @@ from ui.widgets.library_navigation_tab_bar import LibraryNavigationTabBar
 from ui.widgets.lrclib_browser_widget import _BrowserPublishDialog
 from ui.widgets.lyrics_editor_widget import (
     LINE_NUMBER_COLUMN,
+    TEXT_COLUMN,
+    TIME_COLUMN,
     TIMESTAMP_MS_ROLE,
     LyricsEditorWidget,
 )

@@ -53,9 +53,9 @@ TIMESTAMP_MS_ROLE = Qt.ItemDataRole.UserRole
 TIMESTAMP_VALID_ROLE = Qt.ItemDataRole.UserRole + 1
 SHIFT_SPIN_MIN_WIDTH = 96
 LINE_NUMBER_HEADER_WIDTH = 42
-TIME_COLUMN = 0
-TEXT_COLUMN = 1
-LINE_NUMBER_COLUMN = 2
+LINE_NUMBER_COLUMN = 0
+TIME_COLUMN = 1
+TEXT_COLUMN = 2
 logger = logging.getLogger(__name__)
 
 
@@ -393,7 +393,7 @@ class LyricsEditorWidget(QWidget):
 
         # Synced editor table
         self.table = _LyricsTableWidget(0, 3)
-        self.table.setHorizontalHeaderLabels(["Time", "Text", "#"])
+        self.table.setHorizontalHeaderLabels(["#", "Time", "Lyrics"])
         line_header = self.table.verticalHeader()
         line_header.setVisible(False)
         line_header.setSectionResizeMode(QHeaderView.ResizeMode.Fixed)
@@ -562,7 +562,7 @@ class LyricsEditorWidget(QWidget):
 
         self._refresh_row_styles()
 
-        self.table.scrollToItem(self.table.item(idx, 1), self.table.ScrollHint.PositionAtCenter)
+        self.table.scrollToItem(self.table.item(idx, TEXT_COLUMN), self.table.ScrollHint.PositionAtCenter)
 
     def set_reaction_delay_ms(self, reaction_delay_ms: int) -> None:
         self._reaction_delay_ms = int(reaction_delay_ms or 0)
@@ -795,7 +795,7 @@ class LyricsEditorWidget(QWidget):
             self._cached_synced_pairs = self._take_snapshot()
             lines: list[str] = []
             for r in range(self.table.rowCount()):
-                it_text = self.table.item(r, 1)
+                it_text = self.table.item(r, TEXT_COLUMN)
                 lines.append(it_text.text().rstrip() if it_text else "")
             txt = "\n".join(lines)
             self._set_plain(txt)
@@ -829,8 +829,8 @@ class LyricsEditorWidget(QWidget):
         """Capture all (ms, text) pairs from the synced table."""
         pairs: list[tuple[int, str]] = []
         for r in range(self.table.rowCount()):
-            it_time = self.table.item(r, 0)
-            it_text = self.table.item(r, 1)
+            it_time = self.table.item(r, TIME_COLUMN)
+            it_text = self.table.item(r, TEXT_COLUMN)
             ms = int(it_time.data(TIMESTAMP_MS_ROLE) or 0) if it_time else 0
             text = it_text.text() if it_text else ""
             pairs.append((ms, text))
@@ -856,11 +856,12 @@ class LyricsEditorWidget(QWidget):
             it_time = QTableWidgetItem(_ms_to_ts(ms))
             it_time.setData(TIMESTAMP_MS_ROLE, ms)
             it_time.setData(TIMESTAMP_VALID_ROLE, True)
+            it_time.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
             it_time.setFlags(it_time.flags() | Qt.ItemIsEditable)
             it_text = QTableWidgetItem(text)
             it_text.setFlags(it_text.flags() | Qt.ItemIsEditable)
-            self.table.setItem(row, 0, it_time)
-            self.table.setItem(row, 1, it_text)
+            self.table.setItem(row, TIME_COLUMN, it_time)
+            self.table.setItem(row, TEXT_COLUMN, it_text)
             self.table.setItem(row, LINE_NUMBER_COLUMN, self._line_number_item(row))
             self._times.append(ms)
         self._sync_line_numbers()
@@ -909,13 +910,14 @@ class LyricsEditorWidget(QWidget):
             it_time = QTableWidgetItem(_ms_to_ts(int(ms)))
             it_time.setData(TIMESTAMP_MS_ROLE, int(ms))
             it_time.setData(TIMESTAMP_VALID_ROLE, True)
+            it_time.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
             it_time.setFlags(it_time.flags() | Qt.ItemIsEditable)
 
             it_text = QTableWidgetItem(text)
             it_text.setFlags(it_text.flags() | Qt.ItemIsEditable)
 
-            self.table.setItem(row, 0, it_time)
-            self.table.setItem(row, 1, it_text)
+            self.table.setItem(row, TIME_COLUMN, it_time)
+            self.table.setItem(row, TEXT_COLUMN, it_text)
             self.table.setItem(row, LINE_NUMBER_COLUMN, self._line_number_item(row))
 
         self._sync_line_numbers()
@@ -943,7 +945,7 @@ class LyricsEditorWidget(QWidget):
     def _rebuild_times_cache(self):
         times: list[int] = []
         for r in range(self.table.rowCount()):
-            it_time = self.table.item(r, 0)
+            it_time = self.table.item(r, TIME_COLUMN)
             ms = int(it_time.data(TIMESTAMP_MS_ROLE) or 0) if it_time else 0
             times.append(ms)
         self._times = times
@@ -1294,8 +1296,8 @@ class LyricsEditorWidget(QWidget):
         for row in rows:
             if row < 0 or row >= self.table.rowCount():
                 continue
-            it_time = self.table.item(row, 0)
-            it_text = self.table.item(row, 1)
+            it_time = self.table.item(row, TIME_COLUMN)
+            it_text = self.table.item(row, TEXT_COLUMN)
             ms = int(it_time.data(TIMESTAMP_MS_ROLE) or 0) if it_time else 0
             text = it_text.text().strip() if it_text else ""
             timestamp = _ms_to_ts(ms)
@@ -1319,7 +1321,7 @@ class LyricsEditorWidget(QWidget):
         self._restore_snapshot(pairs)
         if self.table.rowCount():
             self.table.selectRow(0)
-            self.table.setCurrentCell(0, 1)
+            self.table.setCurrentCell(0, TEXT_COLUMN)
         if not self._invalid_rows and not self._validation_problems:
             self._set_validation_message("Pasted synced lyrics.", state="success")
         self._emit_dirty_draft_changed()
@@ -1337,19 +1339,19 @@ class LyricsEditorWidget(QWidget):
             return False
         if self.table.state() == self.table.State.EditingState:
             return False
-        if col == 0:
-            item = self.table.item(row, 0)
+        if col == TIME_COLUMN:
+            item = self.table.item(row, TIME_COLUMN)
             if item is None:
                 return False
             self.table.editItem(item)
             return True
-        if col == 1:
+        if col == TEXT_COLUMN:
             self._seek_to_table_row(row)
             return True
         return False
 
     def _seek_to_table_row(self, row: int) -> None:
-        it_time = self.table.item(row, 0)
+        it_time = self.table.item(row, TIME_COLUMN)
         if not it_time:
             return
         ms = it_time.data(TIMESTAMP_MS_ROLE)
@@ -1391,8 +1393,8 @@ class LyricsEditorWidget(QWidget):
     def _table_has_only_zero_timestamps(self) -> bool:
         has_timestamps = False
         for row in range(self.table.rowCount()):
-            it_time = self.table.item(row, 0)
-            it_text = self.table.item(row, 1)
+            it_time = self.table.item(row, TIME_COLUMN)
+            it_text = self.table.item(row, TEXT_COLUMN)
             if it_time is None or it_text is None or not it_text.text().strip():
                 continue
             has_timestamps = True
@@ -1402,7 +1404,7 @@ class LyricsEditorWidget(QWidget):
 
     def _on_table_item_changed(self, item: QTableWidgetItem):
         # If user edited the Time cell, validate and update ms
-        if item.column() != 0:
+        if item.column() != TIME_COLUMN:
             self._validate_current_lyrics()
             self._refresh_row_styles()
             self._emit_dirty_draft_changed()
@@ -1433,8 +1435,8 @@ class LyricsEditorWidget(QWidget):
         if self.stack.currentWidget() is self.table:
             pairs: list[tuple[int, str]] = []
             for r in range(self.table.rowCount()):
-                it_time = self.table.item(r, 0)
-                it_text = self.table.item(r, 1)
+                it_time = self.table.item(r, TIME_COLUMN)
+                it_text = self.table.item(r, TEXT_COLUMN)
                 ms = int(it_time.data(TIMESTAMP_MS_ROLE) or 0) if it_time else 0
                 text = it_text.text() if it_text else ""
                 pairs.append((ms, text.rstrip()))
@@ -1481,7 +1483,7 @@ class LyricsEditorWidget(QWidget):
 
     def _chronological_insert_index(self, ms: int) -> int:
         for r in range(self.table.rowCount()):
-            it = self.table.item(r, 0)
+            it = self.table.item(r, TIME_COLUMN)
             if it:
                 row_ms = it.data(TIMESTAMP_MS_ROLE)
                 if row_ms is not None and int(row_ms) > ms:
@@ -1529,13 +1531,14 @@ class LyricsEditorWidget(QWidget):
         it_time = QTableWidgetItem(_ms_to_ts(ms))
         it_time.setData(TIMESTAMP_MS_ROLE, ms)
         it_time.setData(TIMESTAMP_VALID_ROLE, True)
+        it_time.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         it_time.setFlags(it_time.flags() | Qt.ItemIsEditable)
 
         it_text = QTableWidgetItem("")
         it_text.setFlags(it_text.flags() | Qt.ItemIsEditable)
 
-        self.table.setItem(insert_at, 0, it_time)
-        self.table.setItem(insert_at, 1, it_text)
+        self.table.setItem(insert_at, TIME_COLUMN, it_time)
+        self.table.setItem(insert_at, TEXT_COLUMN, it_text)
         self.table.setItem(insert_at, LINE_NUMBER_COLUMN, self._line_number_item(insert_at))
         self._sync_line_numbers()
         self.table.blockSignals(False)
@@ -1569,7 +1572,7 @@ class LyricsEditorWidget(QWidget):
         self.table.blockSignals(False)
         self._invalid_rows = {
             r for r in range(self.table.rowCount())
-            if self.table.item(r, 0) and self.table.item(r, 0).data(TIMESTAMP_VALID_ROLE) is False
+            if self.table.item(r, TIME_COLUMN) and self.table.item(r, TIME_COLUMN).data(TIMESTAMP_VALID_ROLE) is False
         }
         self._rebuild_times_cache()
         self._validate_current_lyrics()
@@ -1583,7 +1586,7 @@ class LyricsEditorWidget(QWidget):
         if row < 0:
             return
 
-        it_time = self.table.item(row, 0)
+        it_time = self.table.item(row, TIME_COLUMN)
         if not it_time:
             return
 
@@ -1631,7 +1634,7 @@ class LyricsEditorWidget(QWidget):
     def _shift_all_lines_from_first_delta(self):
         if self.table.rowCount() <= 0:
             return
-        first_item = self.table.item(0, 0)
+        first_item = self.table.item(0, TIME_COLUMN)
         if not first_item:
             return
         first_ms = int(first_item.data(TIMESTAMP_MS_ROLE) or 0)
@@ -1661,7 +1664,7 @@ class LyricsEditorWidget(QWidget):
         self._push_undo()
         self.table.blockSignals(True)
         for row in rows:
-            it_time = self.table.item(row, 0)
+            it_time = self.table.item(row, TIME_COLUMN)
             if not it_time:
                 continue
             current_ms = int(it_time.data(TIMESTAMP_MS_ROLE) or 0)
@@ -1682,7 +1685,7 @@ class LyricsEditorWidget(QWidget):
         if delta_ms >= 0:
             return collapse_rows
         for row in rows:
-            it_time = self.table.item(row, 0)
+            it_time = self.table.item(row, TIME_COLUMN)
             if not it_time:
                 continue
             current_ms = int(it_time.data(TIMESTAMP_MS_ROLE) or 0)

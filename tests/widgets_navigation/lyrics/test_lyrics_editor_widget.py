@@ -136,10 +136,10 @@ class LyricsEditorWidgetTests(unittest.TestCase):
             widget._toggle_editor_mode()
 
             self.assertEqual(widget.table.rowCount(), 2)
-            self.assertEqual(widget.table.item(0, 1).text(), "First line")
-            self.assertEqual(widget.table.item(1, 1).text(), "Second line")
-            self.assertEqual(widget.table.item(0, 0).text(), "00:01.20")
-            self.assertEqual(widget.table.item(1, 0).text(), "00:03.00")
+            self.assertEqual(widget.table.item(0, TEXT_COLUMN).text(), "First line")
+            self.assertEqual(widget.table.item(1, TEXT_COLUMN).text(), "Second line")
+            self.assertEqual(widget.table.item(0, TIME_COLUMN).text(), "00:01.20")
+            self.assertEqual(widget.table.item(1, TIME_COLUMN).text(), "00:03.00")
         finally:
             widget.deleteLater()
 
@@ -180,8 +180,8 @@ class LyricsEditorWidgetTests(unittest.TestCase):
             widget._toggle_editor_mode()
             widget._toggle_editor_mode()
 
-            self.assertEqual(widget.table.item(0, 0).text(), "00:01.20")
-            self.assertEqual(widget.table.item(1, 0).text(), "00:03.00")
+            self.assertEqual(widget.table.item(0, TIME_COLUMN).text(), "00:01.20")
+            self.assertEqual(widget.table.item(1, TIME_COLUMN).text(), "00:03.00")
         finally:
             widget.deleteLater()
 
@@ -193,9 +193,9 @@ class LyricsEditorWidgetTests(unittest.TestCase):
             widget._toggle_editor_mode()
 
             self.assertEqual(widget.table.rowCount(), 3)
-            self.assertEqual(widget.table.item(0, 0).text(), "00:01.20")
-            self.assertEqual(widget.table.item(1, 0).text(), "00:03.00")
-            self.assertEqual(widget.table.item(2, 1).text(), "")
+            self.assertEqual(widget.table.item(0, TIME_COLUMN).text(), "00:01.20")
+            self.assertEqual(widget.table.item(1, TIME_COLUMN).text(), "00:03.00")
+            self.assertEqual(widget.table.item(2, TEXT_COLUMN).text(), "")
         finally:
             widget.deleteLater()
 
@@ -222,11 +222,11 @@ class LyricsEditorWidgetTests(unittest.TestCase):
             self.assertFalse(widget.btn_clear_timestamps.isHidden())
             widget._clear_timestamps()
 
-            self.assertEqual(widget.table.item(0, 0).text(), "00:00.00")
-            self.assertEqual(widget.table.item(1, 0).text(), "00:00.00")
+            self.assertEqual(widget.table.item(0, TIME_COLUMN).text(), "00:00.00")
+            self.assertEqual(widget.table.item(1, TIME_COLUMN).text(), "00:00.00")
             widget._undo()
-            self.assertEqual(widget.table.item(0, 0).text(), "00:01.20")
-            self.assertEqual(widget.table.item(1, 0).text(), "00:03.00")
+            self.assertEqual(widget.table.item(0, TIME_COLUMN).text(), "00:01.20")
+            self.assertEqual(widget.table.item(1, TIME_COLUMN).text(), "00:03.00")
         finally:
             widget.deleteLater()
 
@@ -251,10 +251,10 @@ class LyricsEditorWidgetTests(unittest.TestCase):
             self.assertTrue(widget._paste_synced_from_clipboard())
 
             self.assertEqual(widget.table.rowCount(), 2)
-            self.assertEqual(widget.table.item(0, 0).text(), "00:02.50")
-            self.assertEqual(widget.table.item(0, 1).text(), "New line")
-            self.assertEqual(widget.table.item(1, 0).text(), "00:04.00")
-            self.assertEqual(widget.table.item(1, 1).text(), "Next line")
+            self.assertEqual(widget.table.item(0, TIME_COLUMN).text(), "00:02.50")
+            self.assertEqual(widget.table.item(0, TEXT_COLUMN).text(), "New line")
+            self.assertEqual(widget.table.item(1, TIME_COLUMN).text(), "00:04.00")
+            self.assertEqual(widget.table.item(1, TEXT_COLUMN).text(), "Next line")
         finally:
             widget.deleteLater()
 
@@ -276,8 +276,8 @@ class LyricsEditorWidgetTests(unittest.TestCase):
             self.assertIs(widget._shortcut_shift_plus.parent(), widget.table)
 
             widget._shortcut_shift_plus.activated.emit()
-            self.assertEqual(widget.table.item(0, 0).text(), "00:01.30")
-            self.assertEqual(widget.table.item(0, 0).data(TIMESTAMP_MS_ROLE), 1300)
+            self.assertEqual(widget.table.item(0, TIME_COLUMN).text(), "00:01.30")
+            self.assertEqual(widget.table.item(0, TIME_COLUMN).data(TIMESTAMP_MS_ROLE), 1300)
         finally:
             widget.deleteLater()
 
@@ -328,16 +328,16 @@ class LyricsEditorWidgetTests(unittest.TestCase):
         try:
             widget.set_current_position_provider(lambda: 500)
             widget._set_synced([(1200, "First line"), (3000, "Second line")])
-            widget.table.setCurrentCell(0, 1)
+            widget.table.setCurrentCell(0, TEXT_COLUMN)
 
             widget._add_line_before_selection()
 
             self.assertEqual(widget.table.rowCount(), 3)
-            self.assertEqual(widget.table.item(0, 0).text(), "00:00.50")
-            self.assertEqual(widget.table.item(0, 1).text(), "")
+            self.assertEqual(widget.table.item(0, TIME_COLUMN).text(), "00:00.50")
+            self.assertEqual(widget.table.item(0, TEXT_COLUMN).text(), "")
             self.assertEqual(widget.table.currentRow(), 0)
-            self.assertEqual(widget.table.currentColumn(), 1)
-            self.assertEqual(widget.table.item(1, 1).text(), "First line")
+            self.assertEqual(widget.table.currentColumn(), TEXT_COLUMN)
+            self.assertEqual(widget.table.item(1, TEXT_COLUMN).text(), "First line")
         finally:
             widget.deleteLater()
 
@@ -347,7 +347,7 @@ class LyricsEditorWidgetTests(unittest.TestCase):
         widget.seekRequested.connect(emitted.append)
         try:
             widget._set_synced([(1200, "First line"), (3000, "Second line")])
-            widget.table.setCurrentCell(0, 0)
+            widget.table.setCurrentCell(0, TIME_COLUMN)
 
             self.assertTrue(widget._handle_synced_table_enter())
 
@@ -400,7 +400,7 @@ class LyricsEditorWidgetTests(unittest.TestCase):
         try:
             widget._set_synced([(1200, "First line"), (3000, "Second line"), (5000, "")])
             widget.table.selectRow(0)
-            widget.table.setCurrentCell(0, 1)
+            widget.table.setCurrentCell(0, TEXT_COLUMN)
             event = QKeyEvent(
                 QEvent.Type.KeyPress,
                 Qt.Key.Key_Down,
@@ -426,7 +426,7 @@ class LyricsEditorWidgetTests(unittest.TestCase):
         widget.seekRequested.connect(emitted.append)
         try:
             widget._set_synced([(1200, "First line"), (3000, "Second line")])
-            widget.table.setCurrentCell(1, 1)
+            widget.table.setCurrentCell(1, TEXT_COLUMN)
 
             self.assertTrue(widget._handle_synced_table_enter())
 
@@ -440,7 +440,7 @@ class LyricsEditorWidgetTests(unittest.TestCase):
         widget.seekRequested.connect(emitted.append)
         try:
             widget._set_synced([(1200, "First line"), (3000, "Second line")])
-            widget.table.setCurrentCell(1, 1)
+            widget.table.setCurrentCell(1, TEXT_COLUMN)
             event = QKeyEvent(
                 QEvent.Type.KeyPress,
                 Qt.Key.Key_Enter,
@@ -488,10 +488,10 @@ class LyricsEditorWidgetTests(unittest.TestCase):
             self.assertEqual(widget._lint_rows, {0, 1})
             self.assertIn("Duplicate timestamp", widget.validation_hint.text())
             self.assertEqual(widget.validation_badge.text(), "2 issues")
-            self.assertIn("Duplicate timestamp", widget.table.item(0, 0).toolTip())
-            self.assertIn("Duplicate timestamp", widget.table.item(1, 1).toolTip())
-            self.assertEqual(widget.table.item(0, 0).background().color(), QColor("#321414"))
-            self.assertEqual(widget.table.item(1, 1).background().color(), QColor("#321414"))
+            self.assertIn("Duplicate timestamp", widget.table.item(0, TIME_COLUMN).toolTip())
+            self.assertIn("Duplicate timestamp", widget.table.item(1, TEXT_COLUMN).toolTip())
+            self.assertEqual(widget.table.item(0, TIME_COLUMN).background().color(), QColor("#321414"))
+            self.assertEqual(widget.table.item(1, TEXT_COLUMN).background().color(), QColor("#321414"))
             self.assertNotEqual(widget.table.item(0, LINE_NUMBER_COLUMN).background().color(), QColor("#321414"))
             self.assertEqual(widget.table.item(0, LINE_NUMBER_COLUMN).foreground().color(), QColor("#FDA29B"))
         finally:
@@ -513,7 +513,7 @@ class LyricsEditorWidgetTests(unittest.TestCase):
             self.assertTrue(widget.eventFilter(widget.validation_hint, event))
 
             self.assertEqual(widget.table.currentRow(), 1)
-            self.assertEqual(widget.table.currentColumn(), 0)
+            self.assertEqual(widget.table.currentColumn(), TIME_COLUMN)
         finally:
             widget.deleteLater()
 
@@ -525,8 +525,8 @@ class LyricsEditorWidgetTests(unittest.TestCase):
             widget._autofix_validation_problems()
 
             self.assertTrue(widget.btn_save.isEnabled())
-            self.assertEqual(widget.table.item(0, 0).text(), "00:01.20")
-            self.assertEqual(widget.table.item(1, 0).text(), "00:01.25")
+            self.assertEqual(widget.table.item(0, TIME_COLUMN).text(), "00:01.20")
+            self.assertEqual(widget.table.item(1, TIME_COLUMN).text(), "00:01.25")
             self.assertEqual(widget.validation_badge.text(), "Valid")
         finally:
             widget.deleteLater()
@@ -595,7 +595,7 @@ class LyricsEditorWidgetTests(unittest.TestCase):
             self.assertTrue(widget.btn_publish_synced.isEnabled())
             self.assertTrue(widget.btn_publish_plain.isEnabled())
 
-            widget.table.item(0, 1).setText("Changed line")
+            widget.table.item(0, TEXT_COLUMN).setText("Changed line")
 
             self.assertTrue(widget._has_dirty_draft)
             self.assertFalse(widget.btn_publish_synced.isEnabled())
@@ -626,11 +626,17 @@ class LyricsEditorWidgetTests(unittest.TestCase):
             widget._set_synced([(1200, "First line"), (3000, "Second line")])
 
             self.assertTrue(widget.table.verticalHeader().isHidden())
+            self.assertEqual(
+                [widget.table.horizontalHeaderItem(column).text() for column in range(widget.table.columnCount())],
+                ["#", "Time", "Lyrics"],
+            )
             self.assertEqual(widget.table.horizontalHeaderItem(LINE_NUMBER_COLUMN).text(), "#")
+            self.assertEqual(widget.table.horizontalHeaderItem(TIME_COLUMN).text(), "Time")
+            self.assertEqual(widget.table.horizontalHeaderItem(TEXT_COLUMN).text(), "Lyrics")
             self.assertEqual(widget.table.item(0, LINE_NUMBER_COLUMN).text(), "1")
             self.assertEqual(widget.table.item(1, LINE_NUMBER_COLUMN).text(), "2")
 
-            widget.table.setCurrentCell(0, 1)
+            widget.table.setCurrentCell(0, TEXT_COLUMN)
             widget._add_line_before_selection()
             self.assertEqual(
                 [widget.table.item(row, LINE_NUMBER_COLUMN).text() for row in range(widget.table.rowCount())],
