@@ -7,7 +7,13 @@ from dataclasses import replace
 from pathlib import Path
 
 from PySide6.QtCore import Qt, QThread, QUrl, Signal
-from PySide6.QtGui import QDesktopServices, QFont, QKeySequence
+from PySide6.QtGui import (
+    QDesktopServices,
+    QFont,
+    QKeySequence,
+    QStandardItem,
+    QStandardItemModel,
+)
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -293,8 +299,7 @@ class MusicFoldersDialog(QDialog):
         appearance_box = QGroupBox("Appearance")
         appearance_layout = QGridLayout(appearance_box)
         self.theme_combo = QComboBox()
-        for theme_key, theme_name in get_available_themes():
-            self.theme_combo.addItem(theme_name, theme_key)
+        self._populate_theme_combo()
         self.ui_scale_combo = QComboBox()
         for percent in (90, 100, 110, 125):
             self.ui_scale_combo.addItem(f"{percent}%", percent)
@@ -1309,6 +1314,37 @@ class MusicFoldersDialog(QDialog):
         self.musixmatch_mode_combo.setCurrentIndex(max(0, mode_index))
         self.musixmatch_api_key_edit.setText(str(musixmatch.get("api_key") or ""))
         self._update_musixmatch_api_key_state()
+
+    def _populate_theme_combo(self) -> None:
+        recommended_keys = {"auto", "DarkTheme", "LightTheme"}
+        model = QStandardItemModel(self.theme_combo)
+
+        def add_section(title: str) -> None:
+            item = QStandardItem(title)
+            item.setFlags(Qt.ItemFlag.NoItemFlags)
+            font = item.font()
+            font.setBold(True)
+            item.setFont(font)
+            model.appendRow(item)
+
+        themes = get_available_themes()
+        add_section("Recommended")
+        for theme_key, theme_name in themes:
+            if theme_key != "auto" and theme_key not in recommended_keys:
+                continue
+            item = QStandardItem(theme_name)
+            item.setData(theme_key, Qt.ItemDataRole.UserRole)
+            model.appendRow(item)
+
+        add_section("More themes")
+        for theme_key, theme_name in themes:
+            if theme_key in recommended_keys:
+                continue
+            item = QStandardItem(theme_name)
+            item.setData(theme_key, Qt.ItemDataRole.UserRole)
+            model.appendRow(item)
+
+        self.theme_combo.setModel(model)
 
     def _update_musixmatch_api_key_state(self) -> None:
         self.musixmatch_api_key_edit.setEnabled(self.musixmatch_mode_combo.currentData() == "official")

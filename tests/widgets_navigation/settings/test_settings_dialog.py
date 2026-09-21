@@ -138,6 +138,27 @@ class SettingsDialogTests(unittest.TestCase):
             finally:
                 app_state.db.close()
 
+    def test_settings_theme_selector_groups_recommended_and_extra_themes(self):
+        with TemporaryDirectory() as tmp:
+            app_state = simple_app_state(initialize_database(tmp))
+            try:
+                dialog = MusicFoldersDialog(app_state)
+                try:
+                    labels = [dialog.theme_combo.itemText(index) for index in range(dialog.theme_combo.count())]
+                    self.assertEqual(labels[0], "Recommended")
+                    self.assertIn("Auto", labels)
+                    self.assertIn("Dark", labels)
+                    self.assertIn("Light", labels)
+                    self.assertIn("More themes", labels)
+                    self.assertGreater(labels.index("More themes"), labels.index("Light"))
+                    self.assertGreaterEqual(dialog.theme_combo.findData("DarkTheme"), 0)
+                    self.assertGreaterEqual(dialog.theme_combo.findData("CatppuccinMacchiatoTheme"), 0)
+                    self.assertEqual(dialog.theme_combo.model().item(0).flags(), Qt.ItemFlag.NoItemFlags)
+                finally:
+                    dialog.deleteLater()
+            finally:
+                app_state.db.close()
+
     def test_settings_dialog_splits_lyrics_settings_into_sub_tabs(self):
         with TemporaryDirectory() as tmp:
             app_state = simple_app_state(initialize_database(tmp))
