@@ -150,7 +150,7 @@ class TrackListWidget(QWidget):
         self.table.setObjectName("TrackTable")
         self._apply_column_widths()
 
-        self.table.verticalHeader().setDefaultSectionSize(44)
+        self.table.verticalHeader().setDefaultSectionSize(36)
 
         self._apply_styles()
 
@@ -198,7 +198,7 @@ class TrackListWidget(QWidget):
 
     def set_ui_scale(self, scale: float) -> None:
         self._ui_scale = max(0.85, min(1.5, float(scale or 1.0)))
-        self.table.verticalHeader().setDefaultSectionSize(round(44 * self._ui_scale))
+        self.table.verticalHeader().setDefaultSectionSize(round(36 * self._ui_scale))
         self._apply_column_widths()
         if hasattr(self.actions, "set_ui_scale"):
             self.actions.set_ui_scale(self._ui_scale)

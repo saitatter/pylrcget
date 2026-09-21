@@ -218,6 +218,7 @@ class TrackListWidgetTests(unittest.TestCase):
             self.assertGreaterEqual(widget.table.columnWidth(2), 90)
             self.assertEqual(widget.header.sectionResizeMode(3), QHeaderView.ResizeMode.Fixed)
             self.assertGreaterEqual(widget.table.columnWidth(3), 100)
+            self.assertEqual(widget.table.verticalHeader().defaultSectionSize(), 36)
         finally:
             widget.deleteLater()
             app_state.db.close()

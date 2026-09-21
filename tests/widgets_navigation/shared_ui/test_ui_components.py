@@ -85,6 +85,12 @@ class SharedUiComponentTests(unittest.TestCase):
         self.assertIn("border: none;", stylesheet)
         self.assertIn("LibraryBreadcrumbButton", stylesheet)
 
+    def test_library_table_headers_use_readable_case_and_density(self):
+        stylesheet = Path("src/ui/qss/data_table.qss").read_text(encoding="utf-8")
+        self.assertIn("padding: 6px 8px;", stylesheet)
+        self.assertIn("font-weight: 600;", stylesheet)
+        self.assertNotIn("text-transform: uppercase;", stylesheet)
+
     def test_lyrics_splitter_toggle_is_reversible(self):
         splitter = LyricsPaneSplitter()
         splitter.addWidget(QWidget())
