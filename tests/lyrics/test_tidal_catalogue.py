@@ -154,7 +154,11 @@ def test_search_is_used_when_local_track_has_no_isrc():
     assert resolution is not None
     assert resolution.track.provider_track_id == "456"
     assert session.get.call_count == 1
-    assert "/searchResults/Artist%20Song/relationships/tracks" in session.get.call_args.args[0]
+    assert session.get.call_args.args[0].endswith("/searchResults")
+    assert session.get.call_args.kwargs["params"] == {
+        "filter[query]": "Artist Song",
+        "include": "tracks",
+    }
 
 
 def test_http_errors_are_explicit_and_invalid_json_is_not_accepted():

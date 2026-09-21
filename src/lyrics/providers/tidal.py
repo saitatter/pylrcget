@@ -109,13 +109,33 @@ class TidalCatalogueClient:
         query = " ".join(part.strip() for part in (artist, title) if part and part.strip())
         if not query:
             return []
-        encoded_query = quote(query, safe="")
         try:
-            payload = self._get(
-                f"/searchResults/{encoded_query}/relationships/tracks",
+            search_payload = self._get(
+                "/searchResults",
                 params={
+                    "filter[query]": query,
+                    "include": "tracks",
+                },
+            )
+            track_ids = _search_result_track_ids(search_payload)
+            if not track_ids:
+                # Keep compatibility with older TIDAL/search fixtures that
+                # return track resources directly instead of a search result
+                # relationship. The current API path above remains preferred.
+                direct_tracks = _parse_tracks(search_payload)
+                if direct_tracks:
+                    return direct_tracks[: self.search_limit]
+                return []
+
+            # TIDAL's search response includes track attributes but not their
+            # artist/album relationships. Enrich the returned IDs in one
+            # request so matching keeps the same metadata quality as an
+            # ISRC lookup.
+            payload = self._get(
+                "/tracks",
+                params={
+                    "filter[id]": ",".join(track_ids),
                     "include": "artists,albums",
-                    "limit": self.search_limit,
                 },
             )
         except TidalCatalogueNotFoundError:
@@ -203,8 +223,8 @@ class TidalCatalogueClient:
 
     def _get(self, path: str, *, params: dict[str, object]) -> dict:
         headers = {
-            "Accept": "application/vnd.tidal.v1+json",
-            "Content-Type": "application/vnd.tidal.v1+json",
+            "Accept": "application/vnd.api+json",
+            "Content-Type": "application/vnd.api+json",
         }
         if self._access_token:
             headers["Authorization"] = f"Bearer {self._access_token}"
@@ -242,6 +262,28 @@ class TidalCatalogueClient:
         return result
 
 
+def _search_result_track_ids(payload: dict) -> list[str]:
+    data = payload.get("data", [])
+    resources = data if isinstance(data, list) else [data] if isinstance(data, dict) else []
+    track_ids: list[str] = []
+    seen: set[str] = set()
+    for resource in resources:
+        if not isinstance(resource, dict):
+            continue
+        relationships = resource.get("relationships")
+        tracks = relationships.get("tracks") if isinstance(relationships, dict) else None
+        related_data = tracks.get("data") if isinstance(tracks, dict) else None
+        refs = related_data if isinstance(related_data, list) else [related_data] if isinstance(related_data, dict) else []
+        for ref in refs:
+            if not isinstance(ref, dict) or str(ref.get("type", "")) != "tracks":
+                continue
+            track_id = str(ref.get("id") or "").strip()
+            if track_id and track_id not in seen:
+                seen.add(track_id)
+                track_ids.append(track_id)
+    return track_ids
+
+
 def _parse_tracks(payload: dict) -> list[TidalTrack]:
     data = payload.get("data", [])
     items = data if isinstance(data, list) else [data] if isinstance(data, dict) else []
@@ -277,7 +319,7 @@ def _parse_track(item: dict, included: Mapping[tuple[str, str], dict]) -> TidalT
     if not album_values:
         album_values = _related_values(item, attributes, "album", included)
     album = album_values[0] if album_values else _first_text(attributes.get("album"))
-    duration = _number(attributes.get("duration", attributes.get("durationSeconds")))
+    duration = _duration_seconds(attributes.get("duration", attributes.get("durationSeconds")))
     track_number = _integer(attributes.get("trackNumber", attributes.get("track_number")))
     return TidalTrack(
         provider_track_id=provider_track_id,
@@ -355,6 +397,32 @@ def _number(value) -> float | None:
         return float(value) if value is not None else None
     except (TypeError, ValueError):
         return None
+
+
+_ISO_DURATION_RE = re.compile(
+    r"^P(?:(?P<days>\d+(?:\.\d+)?)D)?T"
+    r"(?:(?P<hours>\d+(?:\.\d+)?)H)?"
+    r"(?:(?P<minutes>\d+(?:\.\d+)?)M)?"
+    r"(?:(?P<seconds>\d+(?:\.\d+)?)S)?$"
+)
+
+
+def _duration_seconds(value) -> float | None:
+    numeric = _number(value)
+    if numeric is not None:
+        return numeric
+    if not isinstance(value, str):
+        return None
+    match = _ISO_DURATION_RE.fullmatch(value.strip().upper())
+    if match is None:
+        return None
+    parts = {key: float(raw or 0.0) for key, raw in match.groupdict().items()}
+    return (
+        parts["days"] * 86400
+        + parts["hours"] * 3600
+        + parts["minutes"] * 60
+        + parts["seconds"]
+    )
 
 
 def _integer(value) -> int | None:
