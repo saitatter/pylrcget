@@ -1,4 +1,4 @@
-from PySide6.QtWidgets import QGroupBox
+from PySide6.QtWidgets import QGridLayout, QGroupBox
 
 from tests.widgets_navigation._shared import *
 from ui.hotkeys import HOTKEY_SPECS
@@ -105,6 +105,32 @@ class SettingsDialogTests(unittest.TestCase):
                     global_box = next(box for box in dialog.findChildren(QGroupBox) if box.title() == "App Shortcuts")
                     global_shortcut_count = sum(1 for spec in HOTKEY_SPECS.values() if spec.group == "global")
                     self.assertLess(global_box.layout().rowCount(), global_shortcut_count)
+                finally:
+                    dialog.deleteLater()
+            finally:
+                app_state.db.close()
+
+    def test_settings_forms_use_consistent_label_alignment_and_control_height(self):
+        with TemporaryDirectory() as tmp:
+            app_state = simple_app_state(initialize_database(tmp))
+            try:
+                dialog = MusicFoldersDialog(app_state)
+                try:
+                    appearance_box = next(
+                        box for box in dialog.findChildren(QGroupBox) if box.title() == "Appearance"
+                    )
+                    layout = appearance_box.layout()
+                    self.assertIsInstance(layout, QGridLayout)
+                    self.assertEqual(layout.columnMinimumWidth(0), 148)
+
+                    label = layout.itemAtPosition(0, 0).widget()
+                    self.assertEqual(label.minimumWidth(), 148)
+                    self.assertEqual(
+                        label.alignment(),
+                        Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter,
+                    )
+                    self.assertGreaterEqual(dialog.theme_combo.minimumHeight(), 32)
+                    self.assertTrue(dialog.save_btn.isDefault())
                 finally:
                     dialog.deleteLater()
             finally:

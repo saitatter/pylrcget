@@ -850,5 +850,10 @@ class LyricsEditorWidgetTests(unittest.TestCase):
         try:
             self.assertFalse(dialog._pub_synced.acceptRichText())
             self.assertFalse(dialog._pub_plain.acceptRichText())
+            form_layout = dialog.stack.widget(0).layout()
+            self.assertEqual(form_layout.labelAlignment(), Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+            self.assertEqual(form_layout.horizontalSpacing(), 12)
+            self.assertEqual(form_layout.verticalSpacing(), 8)
+            self.assertGreaterEqual(dialog._pub_artist.minimumHeight(), 32)
         finally:
             dialog.deleteLater()

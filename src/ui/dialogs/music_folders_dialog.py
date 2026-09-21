@@ -48,6 +48,7 @@ from ui.ai_sync_settings import (
     load_ai_sync_settings,
     merge_ai_sync_settings,
 )
+from ui.dialogs.form_layout import configure_form_grid
 from ui.hotkeys import (
     HOTKEY_SPECS,
     find_duplicate_hotkeys,
@@ -653,8 +654,13 @@ class MusicFoldersDialog(QDialog):
         self.tabs.addTab(shortcuts_tab, "Shortcuts")
 
         self.save_btn = QPushButton("Save")
-        layout.addWidget(self.save_btn)
+        self.save_btn.setDefault(True)
+        save_actions = QHBoxLayout()
+        save_actions.addStretch(1)
+        save_actions.addWidget(self.save_btn)
+        layout.addLayout(save_actions)
 
+        self._standardize_form_layouts()
         self._load()
 
         self.add_btn.clicked.connect(self.add_folder)
@@ -1039,6 +1045,17 @@ class MusicFoldersDialog(QDialog):
         document_margin = int(edit.document().documentMargin() * 2)
         extra_padding = 12
         edit.setFixedHeight(max(38, line_height * rows + frame_height + document_margin + extra_padding))
+
+    def _standardize_form_layouts(self) -> None:
+        for group_box in self.findChildren(QGroupBox):
+            grid = group_box.layout()
+            if isinstance(grid, QGridLayout):
+                configure_form_grid(grid)
+
+        for title in ("App Shortcuts", "Lyrics Sync Shortcuts"):
+            group_box = next((box for box in self.findChildren(QGroupBox) if box.title() == title), None)
+            if group_box is not None and isinstance(group_box.layout(), QGridLayout):
+                configure_form_grid(group_box.layout(), label_columns=(0, 3))
 
     def _build_shortcut_controls(self, layout: QGridLayout, *, group: str, columns: int = 1) -> None:
         actions = [(action, spec) for action, spec in HOTKEY_SPECS.items() if spec.group == group]

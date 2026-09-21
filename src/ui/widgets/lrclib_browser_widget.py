@@ -29,6 +29,7 @@ from db.database import get_config
 from lyrics.provider_search import search_configured_providers
 from lyrics.providers.contracts import LyricsSearchContext, LyricsSearchResult
 from lyrics.source_settings import LYRICS_SOURCE_LABELS, load_lyrics_source_settings
+from ui.dialogs.form_layout import configure_form_layout
 from ui.dialogs.publish_lyrics_dialog import PublishProgress, PublishWorker
 from ui.spacing import SPACE_2, SPACE_3, SPACE_4, set_layout_spacing
 
@@ -130,6 +131,7 @@ class _BrowserPublishDialog(QDialog):
         self._pub_plain.setAcceptRichText(False)
         self._pub_plain.setPlaceholderText("Paste plain lyrics here...")
         form_layout.addRow("Plain lyrics:", self._pub_plain)
+        configure_form_layout(form_layout)
 
         self.stack.addWidget(form_page)
 
