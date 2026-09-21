@@ -48,9 +48,11 @@ class MyLrclibWidget(QWidget):
         summary_layout.setContentsMargins(12, 12, 12, 12)
         summary_layout.setHorizontalSpacing(10)
         summary_layout.setVerticalSpacing(10)
-        self.summary_title = QLabel("My LRCLIB")
+        self.summary_title = QLabel("Lyrics Activity")
         self.summary_title.setObjectName("MyLrclibSummaryTitle")
-        self.summary_body = QLabel("Local history for published contributions and lyrics downloads.")
+        self.summary_body = QLabel(
+            "Local history for lyrics downloads and provider publications. Publishing is currently available through LRCLIB."
+        )
         self.summary_body.setObjectName("MyLrclibSummaryBody")
         self.summary_body.setWordWrap(True)
         summary_layout.addWidget(self.summary_title, 0, 0, 1, 4)
@@ -72,7 +74,7 @@ class MyLrclibWidget(QWidget):
 
         self.publish_table, self.publish_model, self.publish_empty = self._build_table_page(
             table_name="MyLrclibTable",
-            headers=["Status", "Type", "Title", "Artist", "Album", "Published", "LRCLIB"],
+            headers=["Status", "Type", "Title", "Artist", "Album", "Published", "Provider / Instance"],
             column_widths=[90, 80, 260, 180, 180, 160],
             empty_icon="check.svg",
             empty_title="No published contributions yet",
@@ -81,7 +83,7 @@ class MyLrclibWidget(QWidget):
         )
         self.download_table, self.download_model, self.download_empty = self._build_table_page(
             table_name="DownloadHistoryTable",
-            headers=["Result", "Mode", "Title", "Artist", "Album", "Downloaded", "Details"],
+            headers=["Result", "Mode", "Title", "Artist", "Album", "Downloaded", "Provider / Instance"],
             column_widths=[90, 120, 260, 180, 180, 160],
             empty_icon="download.svg",
             empty_title="No lyrics downloads yet",
@@ -219,7 +221,7 @@ class MyLrclibWidget(QWidget):
                     self._item(str(row["artist_name"] or ""), row),
                     self._item(str(row["album_name"] or ""), row),
                     self._item(str(row["published_at"] or ""), row),
-                    self._item(str(row["lrclib_instance"] or ""), row),
+                    self._item(self._display_source_instance(row["lrclib_instance"]), row),
                 ]
             )
         self._apply_page_visibility(self.publish_table, self.publish_empty, self.publish_model.rowCount() > 0)
@@ -245,7 +247,10 @@ class MyLrclibWidget(QWidget):
                     self._item(str(row["artist_name"] or ""), row),
                     self._item(str(row["album_name"] or ""), row),
                     self._item(str(row["downloaded_at"] or ""), row),
-                    self._item(str(row["message"] or ""), row),
+                    self._item(
+                        f"{self._display_source_instance(row['lrclib_instance'])} · {row['message'] or ''}".strip(" ·"),
+                        row,
+                    ),
                 ]
             )
         self._apply_page_visibility(self.download_table, self.download_empty, self.download_model.rowCount() > 0)
@@ -379,6 +384,11 @@ class MyLrclibWidget(QWidget):
             "plain_only": "Plain only",
         }
         return mapping.get((value or "").strip(), (value or "").strip().title() or "Unknown")
+
+    @staticmethod
+    def _display_source_instance(value: str | None) -> str:
+        instance = (value or "").strip()
+        return f"LRCLIB · {instance}" if instance else "LRCLIB"
 
     @staticmethod
     def _display_download_status(value: str | None) -> str:

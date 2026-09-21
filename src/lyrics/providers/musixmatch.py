@@ -16,6 +16,8 @@ from .contracts import (
     DownloadMode,
     LyricsProviderCapabilities,
     LyricsProviderResult,
+    LyricsSearchContext,
+    LyricsSearchResult,
     TrackLookupContext,
 )
 from .diagnostics import (
@@ -468,6 +470,62 @@ class MusixmatchProvider:
             remote_isrc=selected.isrc,
             diagnostics=diagnostics,
         )
+
+    def search(
+        self,
+        context: LyricsSearchContext,
+        *,
+        cancel_event: threading.Event | None = None,
+    ) -> list[LyricsSearchResult]:
+        """Return interactive search rows with lyrics ready for selection.
+
+        Musixmatch search returns metadata first and lyrics through a second
+        endpoint. Limit the interactive hydration to the top five rows so a
+        manual search does not turn into an uncontrolled request burst.
+        """
+        track = TrackLookupContext(
+            track_id=None,
+            file_path="",
+            title=context.title or context.query,
+            artists=(context.artist,) if context.artist else (),
+            album=context.album or None,
+            album_artist=None,
+            duration_seconds=None,
+            track_number=None,
+            isrc=None,
+        )
+        candidates = self._client.search(track, cancel_event=cancel_event)
+        results: list[LyricsSearchResult] = []
+        for candidate in candidates[:5]:
+            self._check_cancelled(cancel_event)
+            lyrics = self._client.get_lyrics(candidate, cancel_event=cancel_event)
+            score = score_track_match(
+                track,
+                TrackMatchMetadata(
+                    title=candidate.title,
+                    artists=(candidate.artist,) if candidate.artist else (),
+                    album=candidate.album,
+                    duration_seconds=candidate.duration_seconds,
+                    isrc=candidate.isrc,
+                    instrumental=candidate.instrumental,
+                ),
+            )
+            results.append(
+                LyricsSearchResult(
+                    provider=self.provider_id,
+                    provider_track_id=candidate.provider_track_id,
+                    title=candidate.title,
+                    artist=candidate.artist,
+                    album=candidate.album,
+                    duration_seconds=candidate.duration_seconds,
+                    instrumental=bool(candidate.instrumental),
+                    plain_lyrics=lyrics.plain_lyrics if lyrics is not None else None,
+                    synced_lyrics=lyrics.synced_lyrics if lyrics is not None else None,
+                    match_score=float(score.score),
+                )
+            )
+        results.sort(key=lambda result: (-(result.match_score or 0.0), result.provider_track_id or ""))
+        return results
 
     def _log(
         self,

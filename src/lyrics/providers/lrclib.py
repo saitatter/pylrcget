@@ -11,6 +11,8 @@ from .contracts import (
     DownloadMode,
     LyricsProviderCapabilities,
     LyricsProviderResult,
+    LyricsSearchContext,
+    LyricsSearchResult,
     TrackLookupContext,
 )
 from .diagnostics import (
@@ -157,3 +159,32 @@ class LrclibProvider:
             remote_isrc=getattr(source, "isrc", None),
             diagnostics={"query_label": match.query_label, **diagnostics},
         )
+
+    def search(
+        self,
+        context: LyricsSearchContext,
+        *,
+        cancel_event: threading.Event | None = None,
+    ) -> list[LyricsSearchResult]:
+        if cancel_event is not None and cancel_event.is_set():
+            return []
+        results = self._api.search_lyrics(
+            query=context.query or None,
+            track_name=context.title or None,
+            artist_name=context.artist or None,
+            album_name=context.album or None,
+        )
+        return [
+            LyricsSearchResult(
+                provider=self.provider_id,
+                provider_track_id=str(result.id) if result.id is not None else None,
+                title=result.track_name,
+                artist=result.artist_name,
+                album=result.album_name,
+                duration_seconds=float(result.duration) if result.duration is not None else None,
+                instrumental=bool(result.instrumental),
+                plain_lyrics=result.plain_lyrics,
+                synced_lyrics=result.synced_lyrics,
+            )
+            for result in results
+        ]

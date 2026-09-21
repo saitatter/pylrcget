@@ -356,8 +356,8 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(self.albums_page, "Albums")
         self.tabs.addTab(self.artists_page, "Artists")
         self.tabs.addTab(self.album_artists_page, "Album Artists")
-        self.tabs.addTab(self.lrclib_browser_tab, "LRCLIB Browser")
-        self.tabs.addTab(self.mylrclib_tab, "My LRCLIB")
+        self.tabs.addTab(self.lrclib_browser_tab, "Lyrics Browser")
+        self.tabs.addTab(self.mylrclib_tab, "Lyrics Activity")
         self.tabs.setAccessibleName("Library navigation tabs")
 
         self.layout.addWidget(self.tabs)

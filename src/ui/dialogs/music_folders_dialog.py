@@ -206,7 +206,7 @@ class MusicFoldersDialog(QDialog):
         self.startup_view_combo.addItem("Albums", "albums")
         self.startup_view_combo.addItem("Artists", "artists")
         self.startup_view_combo.addItem("Album Artists", "album_artists")
-        self.startup_view_combo.addItem("My LRCLIB", "my_lrclib")
+        self.startup_view_combo.addItem("Lyrics Activity", "my_lrclib")
         appearance_layout.addWidget(QLabel("Theme"), 0, 0)
         appearance_layout.addWidget(self.theme_combo, 0, 1)
         appearance_layout.addWidget(QLabel("UI scale"), 1, 0)

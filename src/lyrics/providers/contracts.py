@@ -23,6 +23,32 @@ class TrackLookupContext:
     instrumental: bool = False
 
 
+@dataclass(slots=True, frozen=True)
+class LyricsSearchContext:
+    """Provider-independent fields for an interactive lyrics search."""
+
+    query: str = ""
+    artist: str = ""
+    title: str = ""
+    album: str = ""
+
+
+@dataclass(slots=True, frozen=True)
+class LyricsSearchResult:
+    """A provider-neutral row returned by an interactive search."""
+
+    provider: str
+    provider_track_id: str | None
+    title: str | None
+    artist: str | None
+    album: str | None
+    duration_seconds: float | None
+    instrumental: bool
+    plain_lyrics: str | None = None
+    synced_lyrics: str | None = None
+    match_score: float | None = None
+
+
 @dataclass(slots=True)
 class LyricsProviderResult:
     """Lyrics and match metadata returned by a provider lookup."""
@@ -69,4 +95,12 @@ class LyricsProvider(Protocol):
         requested_mode: DownloadMode,
         cancel_event: threading.Event | None = None,
     ) -> LyricsProviderResult | None:
+        ...
+
+    def search(
+        self,
+        context: LyricsSearchContext,
+        *,
+        cancel_event: threading.Event | None = None,
+    ) -> list[LyricsSearchResult]:
         ...

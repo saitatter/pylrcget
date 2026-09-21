@@ -25,7 +25,10 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from core.lrclib_client import LrcLibAPI
+from db.database import get_config
+from lyrics.provider_search import search_configured_providers
+from lyrics.providers.contracts import LyricsSearchContext, LyricsSearchResult
+from lyrics.source_settings import LYRICS_SOURCE_LABELS, load_lyrics_source_settings
 from ui.dialogs.publish_lyrics_dialog import PublishProgress, PublishWorker
 from ui.spacing import SPACE_2, SPACE_3, SPACE_4, set_layout_spacing
 
@@ -39,26 +42,39 @@ logger = logging.getLogger(__name__)
 class _SearchWorker(QThread):
     finished = Signal(list, str)
 
-    def __init__(self, query: str, artist: str, title: str, album: str, lrclib_instance: str, parent=None):
+    def __init__(
+        self,
+        query: str,
+        artist: str,
+        title: str,
+        album: str,
+        lrclib_instance: str,
+        source_settings: dict[str, object],
+        parent=None,
+    ):
         super().__init__(parent)
         self.query = query
         self.artist = artist
         self.title = title
         self.album = album
         self.lrclib_instance = lrclib_instance
+        self.source_settings = source_settings
 
     def run(self):
         try:
-            api = LrcLibAPI(self.lrclib_instance)
-            results = api.search_lyrics(
-                query=self.query or None,
-                track_name=self.title or None,
-                artist_name=self.artist or None,
-                album_name=self.album or None,
+            results, errors = search_configured_providers(
+                self.lrclib_instance,
+                self.source_settings,
+                LyricsSearchContext(
+                    query=self.query,
+                    artist=self.artist,
+                    title=self.title,
+                    album=self.album,
+                ),
             )
-            self.finished.emit(list(results), "")
+            self.finished.emit(list(results), "\n".join(errors))
         except Exception as exc:  # noqa: BLE001
-            logger.warning("LRCLIB browser search failed: %s", exc)
+            logger.warning("Lyrics browser provider search failed: %s", exc)
             self.finished.emit([], str(exc))
 
 
@@ -120,10 +136,10 @@ class _BrowserPublishDialog(QDialog):
         # Pre-fill from selected result
         if selected_result is not None:
             r = selected_result
-            self._pub_artist.setText(r.artist_name or "")
-            self._pub_title.setText(r.track_name or "")
-            self._pub_album.setText(r.album_name or "")
-            self._pub_duration.setValue(int(r.duration or 180))
+            self._pub_artist.setText(r.artist or "")
+            self._pub_title.setText(r.title or "")
+            self._pub_album.setText(r.album or "")
+            self._pub_duration.setValue(int(r.duration_seconds or 180))
             self._pub_synced.setPlainText(r.synced_lyrics or "")
             self._pub_plain.setPlainText(r.plain_lyrics or "")
 
@@ -260,7 +276,7 @@ _TYPE_COLORS = {
 }
 
 
-def _match_rank(r) -> int:
+def _match_rank(r: LyricsSearchResult) -> int:
     if r.synced_lyrics:
         return 0
     if r.plain_lyrics:
@@ -271,7 +287,7 @@ def _match_rank(r) -> int:
 
 
 class LrclibBrowserWidget(QWidget):
-    """Standalone LRCLIB browser tab — search, view, edit, publish any lyrics."""
+    """Standalone lyrics browser — search providers, preview, and publish to LRCLIB."""
 
     def __init__(self, app_state, parent=None):
         super().__init__(parent)
@@ -312,15 +328,15 @@ class LrclibBrowserWidget(QWidget):
         search_layout.addWidget(self.search_btn)
         root.addLayout(search_layout)
 
-        self.status_label = QLabel("Search LRCLIB for any lyrics.")
+        self.status_label = QLabel("Search enabled lyrics providers for any lyrics.")
         root.addWidget(self.status_label)
 
         # --- Splitter: results table | lyrics preview ---
         self.splitter = QSplitter(Qt.Orientation.Horizontal)
 
         # Left: results table
-        self.table = QTableWidget(0, 5)
-        self.table.setHorizontalHeaderLabels(["Artist", "Title", "Album", "Duration", "Type"])
+        self.table = QTableWidget(0, 6)
+        self.table.setHorizontalHeaderLabels(["Artist", "Title", "Album", "Duration", "Type", "Source"])
         self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
         self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
@@ -331,6 +347,7 @@ class LrclibBrowserWidget(QWidget):
         header.setSectionResizeMode(2, QHeaderView.ResizeMode.Interactive)
         header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(5, QHeaderView.ResizeMode.ResizeToContents)
         self.splitter.addWidget(self.table)
 
         # Right: preview panel
@@ -362,7 +379,7 @@ class LrclibBrowserWidget(QWidget):
 
         self.copy_synced_btn = QPushButton("Copy Synced")
         self.copy_plain_btn = QPushButton("Copy Plain")
-        self.publish_btn = QPushButton("Publish New Lyrics")
+        self.publish_btn = QPushButton("Publish to LRCLIB")
         self.copy_synced_btn.setEnabled(False)
         self.copy_plain_btn.setEnabled(False)
 
@@ -403,12 +420,22 @@ class LrclibBrowserWidget(QWidget):
             return
 
         self.search_btn.setEnabled(False)
-        self.status_label.setText("Searching LRCLIB...")
+        self.status_label.setText("Searching enabled lyrics providers...")
         self.table.setRowCount(0)
         self._results.clear()
         self._clear_preview()
 
-        self._search_worker = _SearchWorker(query, artist, title, album, self._lrclib_url, self)
+        config = get_config(self._app_state.db)
+        source_settings = load_lyrics_source_settings(config.ui_state_json)
+        self._search_worker = _SearchWorker(
+            query,
+            artist,
+            title,
+            album,
+            self._lrclib_url,
+            source_settings,
+            self,
+        )
         self._search_worker.finished.connect(self._on_search_finished)
         self._search_worker.start()
 
@@ -416,25 +443,24 @@ class LrclibBrowserWidget(QWidget):
         self.search_btn.setEnabled(True)
         self._search_worker = None
 
-        if error:
-            self.status_label.setText(f"Search failed: {error}")
-            return
-
         if not results:
             self._results = []
-            self.status_label.setText("No results found.")
+            self.status_label.setText(f"No results found. {error}".strip())
             return
 
         results.sort(key=_match_rank)
         self._results = results
 
-        self.status_label.setText(f"{len(results)} result(s) found.")
+        status = f"{len(results)} result(s) found."
+        if error:
+            status += f" Some providers failed: {error}"
+        self.status_label.setText(status)
         self.table.setRowCount(len(results))
         for row, r in enumerate(results):
-            self.table.setItem(row, 0, QTableWidgetItem(r.artist_name or ""))
-            self.table.setItem(row, 1, QTableWidgetItem(r.track_name or ""))
-            self.table.setItem(row, 2, QTableWidgetItem(r.album_name or ""))
-            minutes, seconds = divmod(int(r.duration or 0), 60)
+            self.table.setItem(row, 0, QTableWidgetItem(r.artist or ""))
+            self.table.setItem(row, 1, QTableWidgetItem(r.title or ""))
+            self.table.setItem(row, 2, QTableWidgetItem(r.album or ""))
+            minutes, seconds = divmod(int(r.duration_seconds or 0), 60)
             self.table.setItem(row, 3, QTableWidgetItem(f"{minutes}:{seconds:02d}"))
 
             if r.instrumental:
@@ -448,6 +474,8 @@ class LrclibBrowserWidget(QWidget):
             type_item = QTableWidgetItem(kind)
             type_item.setForeground(QColor(_TYPE_COLORS.get(kind, "#888888")))
             self.table.setItem(row, 4, type_item)
+            source = LYRICS_SOURCE_LABELS.get(r.provider.casefold(), r.provider.title())
+            self.table.setItem(row, 5, QTableWidgetItem(source))
 
     # --- Preview ---
 
@@ -464,10 +492,10 @@ class LrclibBrowserWidget(QWidget):
 
         r = self._results[idx]
         self._selected_result = r
-        artist = r.artist_name or ""
-        title = r.track_name or ""
-        album = r.album_name or ""
-        minutes, seconds = divmod(int(r.duration or 0), 60)
+        artist = r.artist or ""
+        title = r.title or ""
+        album = r.album or ""
+        minutes, seconds = divmod(int(r.duration_seconds or 0), 60)
         duration_str = f"{minutes}:{seconds:02d}"
 
         header_parts = []

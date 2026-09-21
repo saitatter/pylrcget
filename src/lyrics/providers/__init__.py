@@ -5,6 +5,8 @@ from .contracts import (
     LyricsProvider,
     LyricsProviderCapabilities,
     LyricsProviderResult,
+    LyricsSearchContext,
+    LyricsSearchResult,
     TrackLookupContext,
 )
 from .diagnostics import (
@@ -68,6 +70,8 @@ __all__ = [
     "LyricsProviderResult",
     "LyricsProviderRouter",
     "LyricsResultSelector",
+    "LyricsSearchContext",
+    "LyricsSearchResult",
     "MatchQuality",
     "MusixmatchClient",
     "MusixmatchError",

@@ -18,8 +18,10 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
-from core.lrclib_client import LrcLibAPI
-from db.database import get_recent_search_queries, record_search_history
+from db.database import get_config, get_recent_search_queries, record_search_history
+from lyrics.provider_search import search_configured_providers
+from lyrics.providers.contracts import LyricsSearchContext, LyricsSearchResult
+from lyrics.source_settings import LYRICS_SOURCE_LABELS, load_lyrics_source_settings
 
 logger = logging.getLogger(__name__)
 
@@ -27,31 +29,44 @@ logger = logging.getLogger(__name__)
 class _SearchWorker(QThread):
     finished = Signal(list, str)  # results, error
 
-    def __init__(self, query: str, artist: str, title: str, album: str, lrclib_instance: str, parent=None):
+    def __init__(
+        self,
+        query: str,
+        artist: str,
+        title: str,
+        album: str,
+        lrclib_instance: str,
+        source_settings: dict[str, object],
+        parent=None,
+    ):
         super().__init__(parent)
         self.query = query
         self.artist = artist
         self.title = title
         self.album = album
         self.lrclib_instance = lrclib_instance
+        self.source_settings = source_settings
 
     def run(self):
         try:
-            api = LrcLibAPI(self.lrclib_instance)
-            results = api.search_lyrics(
-                query=self.query or None,
-                track_name=self.title or None,
-                artist_name=self.artist or None,
-                album_name=self.album or None,
+            results, errors = search_configured_providers(
+                self.lrclib_instance,
+                self.source_settings,
+                LyricsSearchContext(
+                    query=self.query,
+                    artist=self.artist,
+                    title=self.title,
+                    album=self.album,
+                ),
             )
-            self.finished.emit(list(results), "")
+            self.finished.emit(list(results), "\n".join(errors))
         except Exception as exc:  # noqa: BLE001
-            logger.warning("LRCLIB search failed: %s", exc)
+            logger.warning("Lyrics provider search failed: %s", exc)
             self.finished.emit([], str(exc))
 
 
 class SearchLyricsDialog(QDialog):
-    """Dialog for searching LRCLIB and picking a lyrics result."""
+    """Dialog for searching enabled lyrics providers and picking a result."""
 
     lyricsSelected = Signal(str, str)  # plain_lyrics, synced_lyrics
 
@@ -67,12 +82,17 @@ class SearchLyricsDialog(QDialog):
         parent=None,
     ):
         super().__init__(parent)
-        self.setWindowTitle("Search LRCLIB")
+        self.setWindowTitle("Search Lyrics")
         self.resize(750, 500)
         self.lrclib_instance = lrclib_instance
         self._db = db
         self._results: list = []
         self._worker: _SearchWorker | None = None
+        if db is not None:
+            config = get_config(db)
+            self.source_settings = load_lyrics_source_settings(config.ui_state_json)
+        else:
+            self.source_settings = load_lyrics_source_settings("")
 
         layout = QVBoxLayout(self)
 
@@ -131,8 +151,8 @@ class SearchLyricsDialog(QDialog):
         self.status_label = QLabel("")
         layout.addWidget(self.status_label)
 
-        self.table = QTableWidget(0, 5)
-        self.table.setHorizontalHeaderLabels(["Artist", "Title", "Album", "Duration", "Type"])
+        self.table = QTableWidget(0, 6)
+        self.table.setHorizontalHeaderLabels(["Artist", "Title", "Album", "Duration", "Type", "Source"])
         self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
         self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
@@ -143,6 +163,7 @@ class SearchLyricsDialog(QDialog):
         header.setSectionResizeMode(2, QHeaderView.ResizeMode.Interactive)
         header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(5, QHeaderView.ResizeMode.ResizeToContents)
         layout.addWidget(self.table, 1)
 
         btn_row = QHBoxLayout()
@@ -199,12 +220,20 @@ class SearchLyricsDialog(QDialog):
             return
 
         self.search_btn.setEnabled(False)
-        self.status_label.setText("Searching...")
+        self.status_label.setText("Searching enabled lyrics providers...")
         self.table.setRowCount(0)
         self._results.clear()
         self._record_search(artist, title, album)
 
-        self._worker = _SearchWorker(query, artist, title, album, self.lrclib_instance, self)
+        self._worker = _SearchWorker(
+            query,
+            artist,
+            title,
+            album,
+            self.lrclib_instance,
+            self.source_settings,
+            self,
+        )
         self._worker.finished.connect(self._on_search_finished)
         self._worker.start()
 
@@ -216,7 +245,7 @@ class SearchLyricsDialog(QDialog):
     }
 
     @staticmethod
-    def _match_rank(r) -> int:
+    def _match_rank(r: LyricsSearchResult) -> int:
         """Lower = better match. Synced > Plain > Instrumental > none."""
         if r.synced_lyrics:
             return 0
@@ -230,25 +259,24 @@ class SearchLyricsDialog(QDialog):
         self.search_btn.setEnabled(True)
         self._worker = None
 
-        if error:
-            self.status_label.setText(f"Search failed: {error}")
-            return
-
         if not results:
             self._results = []
-            self.status_label.setText("No results found.")
+            self.status_label.setText(f"No results found. {error}".strip())
             return
 
         results.sort(key=self._match_rank)
         self._results = results
 
-        self.status_label.setText(f"{len(results)} result(s) found.")
+        status = f"{len(results)} result(s) found."
+        if error:
+            status += f" Some providers failed: {error}"
+        self.status_label.setText(status)
         self.table.setRowCount(len(results))
         for row, r in enumerate(results):
-            self.table.setItem(row, 0, QTableWidgetItem(r.artist_name or ""))
-            self.table.setItem(row, 1, QTableWidgetItem(r.track_name or ""))
-            self.table.setItem(row, 2, QTableWidgetItem(r.album_name or ""))
-            minutes, seconds = divmod(int(r.duration or 0), 60)
+            self.table.setItem(row, 0, QTableWidgetItem(r.artist or ""))
+            self.table.setItem(row, 1, QTableWidgetItem(r.title or ""))
+            self.table.setItem(row, 2, QTableWidgetItem(r.album or ""))
+            minutes, seconds = divmod(int(r.duration_seconds or 0), 60)
             self.table.setItem(row, 3, QTableWidgetItem(f"{minutes}:{seconds:02d}"))
             if r.instrumental:
                 kind = "Instrumental"
@@ -261,6 +289,8 @@ class SearchLyricsDialog(QDialog):
             type_item = QTableWidgetItem(kind)
             type_item.setForeground(QColor(self._TYPE_COLORS.get(kind, "#888888")))
             self.table.setItem(row, 4, type_item)
+            source = LYRICS_SOURCE_LABELS.get(r.provider.casefold(), r.provider.title())
+            self.table.setItem(row, 5, QTableWidgetItem(source))
 
     def _on_selection_changed(self):
         has_selection = bool(self.table.selectionModel().selectedRows())
