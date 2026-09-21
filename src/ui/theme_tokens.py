@@ -137,10 +137,10 @@ def _theme(
         })
     else:
         theme.update({
-            "radius-sm": "8px",
-            "radius-md": "10px",
-            "radius-lg": "14px",
-            "radius-xl": "16px",
+            "radius-sm": "6px",
+            "radius-md": "8px",
+            "radius-lg": "10px",
+            "radius-xl": "12px",
             "radius-pill": "999px",
         })
 
@@ -495,6 +495,14 @@ SPACE_TOKENS = {
     "space-2": "8px",
     "space-3": "12px",
     "space-4": "16px",
+    "space-5": "24px",
+}
+
+CONTROL_TOKENS = {
+    "control-height-compact": "28px",
+    "control-height-normal": "34px",
+    "control-height-prominent": "38px",
+    "control-height-primary": "44px",
 }
 
 
@@ -516,6 +524,7 @@ def get_theme_tokens(theme_mode: str | None, *, prefers_dark: bool | None = None
     tokens = deepcopy(THEMES[resolve_theme_key(theme_mode, prefers_dark=prefers_dark)])
     tokens.update(FONT_TOKENS)
     tokens.update(SPACE_TOKENS)
+    tokens.update(CONTROL_TOKENS)
     return tokens
 
 

@@ -73,6 +73,19 @@ def test_typography_tokens_use_the_modern_desktop_scale() -> None:
     assert tokens["font-size-lg"] == "16px"
 
 
+def test_spacing_and_control_tokens_use_the_compact_desktop_metrics() -> None:
+    tokens = get_theme_tokens("LightTheme")
+
+    assert tokens["space-5"] == "24px"
+    assert tokens["control-height-compact"] == "28px"
+    assert tokens["control-height-normal"] == "34px"
+    assert tokens["control-height-prominent"] == "38px"
+    assert tokens["control-height-primary"] == "44px"
+    assert tokens["radius-sm"] == "6px"
+    assert tokens["radius-md"] == "8px"
+    assert tokens["radius-lg"] == "10px"
+
+
 def test_album_table_reloads_qss_after_palette_change() -> None:
     app = QApplication.instance() or QApplication([])
     del app

@@ -120,7 +120,7 @@ QPushButton#LyricsAutofix:disabled {
 }
 
 QDoubleSpinBox#LyricsShiftSpin {
-    min-height: 38px;
+    min-height: {{control-height-normal}};
     padding: {{space-2}} {{space-3}};
     border: 1px solid {{color-border}};
     border-radius: {{radius-md}};

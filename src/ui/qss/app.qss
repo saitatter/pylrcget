@@ -27,7 +27,7 @@ QLineEdit, QTextEdit, QPlainTextEdit {
 }
 
 QLineEdit, QComboBox, QPushButton {
-    min-height: 38px;
+    min-height: {{control-height-normal}};
 }
 
 QLineEdit:focus, QTextEdit:focus, QPlainTextEdit:focus, QComboBox:focus {
@@ -176,7 +176,7 @@ QComboBox {
     border: 1px solid {{color-border}};
     border-radius: {{radius-md}};
     padding: 4px 32px 4px 12px;
-    min-height: 38px;
+    min-height: {{control-height-normal}};
     selection-background-color: {{color-accent}};
     selection-color: {{color-bg-app}};
 }

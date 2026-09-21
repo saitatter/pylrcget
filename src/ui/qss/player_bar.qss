@@ -68,10 +68,10 @@ QToolButton#BtnPlay {
     border: 1px solid {{color-border}};
     border-radius: 22px;
     padding: 0;
-    min-width: 44px;
-    min-height: 44px;
-    max-width: 44px;
-    max-height: 44px;
+    min-width: {{control-height-primary}};
+    min-height: {{control-height-primary}};
+    max-width: {{control-height-primary}};
+    max-height: {{control-height-primary}};
     color: {{color-text}};
 }
 
