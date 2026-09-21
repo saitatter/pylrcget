@@ -1075,18 +1075,35 @@ class MainWindow(QMainWindow):
 
     # ------------------ modals ------------------
     def open_config_modal(self):
+        previous_config = get_config(self.app_state.db)
         dlg = MusicFoldersDialog(self.app_state, self)
         if dlg.exec():
             updated_config = get_config(self.app_state.db)
-            self._apply_appearance_preferences(updated_config)
-            self._apply_logging_preferences(updated_config)
-            self._apply_hotkey_preferences(updated_config)
-            self._sync_download_mode_ui()
-            self.lrclib_browser_tab.set_lrclib_url(
-                self._normalize_lrclib_base(updated_config.lrclib_instance)
+            appearance_changed = any(
+                getattr(previous_config, field) != getattr(updated_config, field)
+                for field in (
+                    "theme_mode",
+                    "ui_scale_percent",
+                    "font_size_mode",
+                    "show_album_art",
+                    "ignore_sort_articles",
+                )
             )
-            for view in self._all_lyrics_views():
-                view.set_reaction_delay_ms(updated_config.reaction_delay_ms)
+            if appearance_changed:
+                self._apply_appearance_preferences(updated_config)
+            if previous_config.logging_verbosity != updated_config.logging_verbosity:
+                self._apply_logging_preferences(updated_config)
+            if previous_config.hotkey_bindings_json != updated_config.hotkey_bindings_json:
+                self._apply_hotkey_preferences(updated_config)
+            if previous_config.download_lyrics_mode != updated_config.download_lyrics_mode:
+                self._sync_download_mode_ui()
+            if previous_config.lrclib_instance != updated_config.lrclib_instance:
+                self.lrclib_browser_tab.set_lrclib_url(
+                    self._normalize_lrclib_base(updated_config.lrclib_instance)
+                )
+            if previous_config.reaction_delay_ms != updated_config.reaction_delay_ms:
+                for view in self._all_lyrics_views():
+                    view.set_reaction_delay_ms(updated_config.reaction_delay_ms)
             after_dirs = get_directories(self.app_state.db)
             if dlg.directories_changed:
                 if after_dirs:
@@ -1095,8 +1112,6 @@ class MainWindow(QMainWindow):
                     from db.database import purge_all_tracks
                     purge_all_tracks(self.app_state.db)
                     self._apply_track_filters()
-            else:
-                self._apply_track_filters()
             self._validate_current_selected_track()
 
     def _sync_download_mode_ui(self) -> None:

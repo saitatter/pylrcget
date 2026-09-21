@@ -1012,8 +1012,10 @@ class MusicFoldersDialog(QDialog):
             ignore_sort_articles=self.ignore_sort_articles_chk.isChecked(),
         )
 
-        set_directories(self.app_state.db, folders)
-        set_config(self.app_state.db, new_config)
+        if folders != previous_folders:
+            set_directories(self.app_state.db, folders)
+        if new_config != config:
+            set_config(self.app_state.db, new_config)
         self.directories_changed = folders != previous_folders
         self.accept()
 

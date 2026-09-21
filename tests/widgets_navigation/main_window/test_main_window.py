@@ -51,6 +51,57 @@ class MainWindowInstrumentalTests(unittest.TestCase):
         )
         window._publish_instrumental_to_lrclib.assert_called_once_with([1, 2])
 
+    def test_saving_unchanged_settings_does_not_rebuild_library_ui(self):
+        window = MainWindow.__new__(MainWindow)
+        window.app_state = SimpleNamespace(db=object())
+        window._apply_appearance_preferences = MagicMock()
+        window._apply_logging_preferences = MagicMock()
+        window._apply_hotkey_preferences = MagicMock()
+        window._sync_download_mode_ui = MagicMock()
+        window._validate_current_selected_track = MagicMock()
+
+        config = Config(
+            skip_tracks_with_synced_lyrics=False,
+            skip_tracks_with_plain_lyrics=False,
+            download_lyrics_mode="prefer_synced",
+            show_line_count=True,
+            save_lyrics_sidecars=False,
+            lyrics_sidecar_format="both",
+            try_embed_lyrics=True,
+            lyrics_embed_format="both",
+            theme_mode="auto",
+            ui_scale_percent=100,
+            font_size_mode="normal",
+            show_album_art=True,
+            startup_view="remember_last",
+            lrclib_instance="https://lrclib.net",
+            lyrics_output_dir="",
+            lyrics_file_pattern="{filename}",
+            lyrics_lookup_subdir="",
+            scan_excluded_paths="",
+            scan_excluded_patterns="",
+            reaction_delay_ms=0,
+            playback_speed=1.0,
+            playback_volume=0.7,
+            last_library_route="",
+        )
+        dialog = MagicMock()
+        dialog.exec.return_value = True
+        dialog.directories_changed = False
+
+        with (
+            patch("ui.main_window.get_config", side_effect=[config, config]),
+            patch("ui.main_window.get_directories", return_value=[]),
+            patch("ui.main_window.MusicFoldersDialog", return_value=dialog),
+        ):
+            MainWindow.open_config_modal(window)
+
+        window._apply_appearance_preferences.assert_not_called()
+        window._apply_logging_preferences.assert_not_called()
+        window._apply_hotkey_preferences.assert_not_called()
+        window._sync_download_mode_ui.assert_not_called()
+        window._validate_current_selected_track.assert_called_once_with()
+
     def test_auto_sync_missing_dependencies_opens_modal_dialog(self):
         window = MainWindow.__new__(MainWindow)
         window._editing_track_id = 1
