@@ -86,6 +86,8 @@ def test_checked_checkbox_focus_keeps_light_accent_fill() -> None:
         stylesheet = load_stylesheet("app.qss")
 
         assert "QCheckBox::indicator:checked:focus" in stylesheet
+        assert "QCheckBox::indicator:checked:hover" in stylesheet
         assert "background: #3f51b5;" in stylesheet
+        assert "background: #5f5fc4;" in stylesheet
     finally:
         set_theme_tokens("DarkTheme")
