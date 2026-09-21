@@ -551,6 +551,7 @@ class MusicFoldersDialog(QDialog):
         self.tabs.addTab(library_tab, "Library")
         self.tabs.addTab(lyrics_tab, "Lyrics")
         self.tabs.addTab(ai_sync_tab, "AI Sync")
+        self._ai_sync_tab_index = self.tabs.indexOf(ai_sync_tab)
         self.tabs.addTab(appearance_tab, "Appearance")
         self.tabs.addTab(shortcuts_tab, "Shortcuts")
 
@@ -585,6 +586,7 @@ class MusicFoldersDialog(QDialog):
         self.ai_runtime_manage_btn.clicked.connect(self._open_ai_runtime_folder)
         self.ai_device_combo.currentIndexChanged.connect(self._refresh_ai_runtime_status)
         self.ai_enable_demucs_chk.toggled.connect(self._refresh_ai_runtime_status)
+        self.tabs.currentChanged.connect(self._on_settings_tab_changed)
 
     def _load(self):
         directories = get_directories(self.app_state.db)
@@ -669,7 +671,10 @@ class MusicFoldersDialog(QDialog):
         self._update_download_mode_hint()
         self._update_pattern_preview()
         self._validate_regex_patterns()
-        self._refresh_ai_runtime_status()
+
+    def _on_settings_tab_changed(self, index: int) -> None:
+        if int(index) == int(getattr(self, "_ai_sync_tab_index", -1)):
+            self._refresh_ai_runtime_status()
 
     def _set_ai_runtime_status(self, key: str, text: str, tone: str) -> None:
         label = self.ai_runtime_status_labels.get(key)

@@ -76,6 +76,7 @@ class SettingsDialogTests(unittest.TestCase):
                 ):
                     dialog = MusicFoldersDialog(app_state)
                     try:
+                        dialog._refresh_ai_runtime_status()
                         dialog.ai_device_combo.setCurrentIndex(dialog.ai_device_combo.findData("auto"))
                         self.assertEqual(dialog.ai_runtime_status_labels["runtime"].text(), "Ready · optional Demucs missing")
                         self.assertEqual(dialog.ai_runtime_status_labels["device"].text(), "Auto → NVIDIA CUDA")
