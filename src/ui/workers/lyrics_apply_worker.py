@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 import sqlite3
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from PySide6.QtCore import QObject, QThread, Signal
 
@@ -123,5 +123,5 @@ class LyricsApplyCandidatesWorker(QThread):
             "download_status": "synced" if synced else "plain",
             "message": message,
             "lrclib_instance": self.lrclib_instance,
-            "downloaded_at": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC"),
+            "downloaded_at": datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S UTC"),
         }

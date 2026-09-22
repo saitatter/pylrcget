@@ -7,8 +7,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-_SUPPORTED_PYTHON_MIN = (3, 10)
-_SUPPORTED_PYTHON_MAX = (3, 13)
+_SUPPORTED_PYTHON = (3, 13, 15)
 
 
 def _is_supported_python(executable: Path) -> bool:
@@ -17,7 +16,7 @@ def _is_supported_python(executable: Path) -> bool:
             [
                 str(executable),
                 "-c",
-                "import sys; print(f'{sys.version_info[0]}.{sys.version_info[1]}')",
+                "import sys; print(f'{sys.version_info[0]}.{sys.version_info[1]}.{sys.version_info[2]}')",
             ],
             capture_output=True,
             text=True,
@@ -29,10 +28,10 @@ def _is_supported_python(executable: Path) -> bool:
     if result.returncode != 0:
         return False
     try:
-        version = tuple(int(part) for part in result.stdout.strip().split(".", 2))
+        version = tuple(int(part) for part in result.stdout.strip().split(".", 3))
     except ValueError:
         return False
-    return _SUPPORTED_PYTHON_MIN <= version[:2] <= _SUPPORTED_PYTHON_MAX
+    return version == _SUPPORTED_PYTHON
 
 
 def default_ai_runtime_dir() -> Path:
@@ -86,19 +85,19 @@ def resolve_ai_install_command(packages: list[str]) -> tuple[list[str] | None, s
             system_python = shutil.which("python")
             bootstrap_python = Path(system_python) if system_python else None
     if bootstrap_python is None:
-        return None, "Install Python 3.10-3.13 and set PYLRCGET_AI_BOOTSTRAP_PYTHON."
+        return None, "Install Python 3.13.15 and set PYLRCGET_AI_BOOTSTRAP_PYTHON."
     if not _is_supported_python(bootstrap_python):
         return None, (
             "The selected AI bootstrap interpreter is unsupported. "
-            "Install Python 3.10-3.13 and set PYLRCGET_AI_BOOTSTRAP_PYTHON."
+            "Install Python 3.13.15 and set PYLRCGET_AI_BOOTSTRAP_PYTHON."
         )
 
     runtime_dir = os.environ.get("PYLRCGET_AI_RUNTIME_DIR", "").strip()
     runtime_root = Path(runtime_dir).expanduser() if runtime_dir else default_ai_runtime_dir()
-    if not getattr(sys, "frozen", False) and tuple(sys.version_info[:2]) >= (3, 14):
+    if not getattr(sys, "frozen", False) and tuple(sys.version_info[:3]) != _SUPPORTED_PYTHON:
         return None, (
-            "AI dependencies currently support Python 3.10-3.13. "
-            "Use a compatible interpreter via PYLRCGET_AI_BOOTSTRAP_PYTHON."
+            "PyLrcGet requires Python 3.13.15. "
+            "Run the app with that interpreter or set PYLRCGET_AI_BOOTSTRAP_PYTHON to it."
         )
     script = (
         "import os,subprocess,sys,venv\n"

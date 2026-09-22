@@ -1,20 +1,22 @@
 from pathlib import Path
 import sys
+from PyInstaller.utils.hooks import collect_data_files
 
 
 SPEC_PATH = Path(globals().get("__file__", "pylrcget.spec")).resolve()
 ROOT = SPEC_PATH.parent if SPEC_PATH.exists() else Path.cwd()
 
-if not (3, 10) <= tuple(sys.version_info[:2]) <= (3, 13):
+if tuple(sys.version_info[:3]) != (3, 13, 15):
     raise SystemExit(
-        "PyLrcGet builds require Python 3.10-3.13; "
-        f"the current interpreter is Python {sys.version_info[0]}.{sys.version_info[1]}."
+        "PyLrcGet builds require Python 3.13.15; "
+        f"the current interpreter is Python {sys.version_info[0]}.{sys.version_info[1]}.{sys.version_info[2]}."
     )
 
 AI_RUNTIME_DATAS = [
     (str(path), "ai_runtime_src/ui/workers/ai")
     for path in (ROOT / "src" / "ui" / "workers" / "ai").glob("*.py")
 ]
+LANGDETECT_DATAS = collect_data_files("langdetect", includes=["profiles/*"])
 
 AI_EXCLUDES = [
     "torch",
@@ -39,6 +41,7 @@ a = Analysis(
     pathex=[str(ROOT), str(ROOT / "src")],
     datas=[
         *AI_RUNTIME_DATAS,
+        *LANGDETECT_DATAS,
         (str(ROOT / "src" / "ui" / "qss"), "ui/qss"),
         (str(ROOT / "src" / "ui" / "assets"), "ui/assets"),
         (str(ROOT / "pyproject.toml"), "."),

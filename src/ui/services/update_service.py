@@ -11,6 +11,7 @@ import subprocess
 import sys
 import tarfile
 import tempfile
+import tomllib
 import uuid
 import zipfile
 from contextlib import nullcontext
@@ -18,7 +19,6 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import requests
-import tomllib
 from packaging.version import InvalidVersion, Version
 
 logger = logging.getLogger(__name__)

@@ -4,7 +4,7 @@ import logging
 import sqlite3
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from PySide6.QtCore import QObject, QTimer
 
@@ -511,7 +511,7 @@ class LyricsDownloadController(QObject):
             "download_status": status,
             "message": normalized_message,
             "lrclib_instance": lrclib_instance,
-            "downloaded_at": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC"),
+            "downloaded_at": datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S UTC"),
         }
 
     def _flush_pending_download_history(self) -> None:

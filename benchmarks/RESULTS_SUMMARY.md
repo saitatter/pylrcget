@@ -15,8 +15,10 @@ local application directories.
 
 ## Scanner: optimized Mutagen
 
-Windows, Python 3.14.2, four workers, median of three measured runs after
-warmups:
+Historical measurements: Windows, Python 3.14.2, four workers, median of
+three measured runs after warmups. They were collected before the project was
+pinned to Python 3.13.15; the recorded Python version describes the benchmark
+environment, not the current supported runtime.
 
 | Scenario | Main | Optimized Mutagen | Delta |
 |---|---:|---:|---:|

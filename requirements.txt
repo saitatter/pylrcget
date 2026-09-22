@@ -3,3 +3,4 @@ mutagen
 requests
 packaging
 keyring
+langdetect==1.0.9

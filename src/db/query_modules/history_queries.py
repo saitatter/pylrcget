@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import sqlite3
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 
 def record_publish_history(
@@ -15,7 +15,7 @@ def record_publish_history(
     lrclib_instance: str,
     publish_status: str = "Published",
 ) -> int:
-    published_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+    published_at = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
     cursor = db.execute(
         """
         INSERT INTO publish_history (
@@ -88,7 +88,7 @@ def record_download_history(
     lrclib_instance: str,
     commit: bool = True,
 ) -> int:
-    downloaded_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+    downloaded_at = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
     cursor = db.execute(
         """
         INSERT INTO download_history (
@@ -139,7 +139,7 @@ def record_download_history_batch(
                 str(entry.get("download_status") or "").strip() or "unknown",
                 str(entry.get("message") or "").strip(),
                 str(entry.get("lrclib_instance") or "").strip(),
-                str(entry.get("downloaded_at") or datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")),
+                str(entry.get("downloaded_at") or datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S UTC")),
             )
         )
 
@@ -201,7 +201,7 @@ def record_search_history(
     title: str,
     album: str = "",
 ) -> None:
-    searched_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+    searched_at = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%S UTC")
     db.execute(
         "INSERT INTO search_history (artist, title, album, searched_at) VALUES (?, ?, ?, ?)",
         (

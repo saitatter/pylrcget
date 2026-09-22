@@ -8,7 +8,7 @@
 
 ## Project Context
 
-- PyLrcGet is a Python 3.10+ PySide6 desktop app for local music library scanning, lyrics editing, playback, LRCLIB integration, sidecar export, embedding, updates, and optional local AI auto-sync.
+- PyLrcGet is a Python 3.13.15 PySide6 desktop app for local music library scanning, lyrics editing, playback, LRCLIB integration, sidecar export, embedding, updates, and optional local AI auto-sync.
 - Entry point: `main.py`.
 - App code lives in `src/`; tests live in `tests/`.
 - SQLite schema and migrations live in `src/db/`.
@@ -28,7 +28,7 @@
 
 ## Python and Style
 
-- Target Python 3.10+.
+- Target Python 3.13.15 exactly; keep metadata, CI, packaged builds, and the optional AI bootstrap aligned to that interpreter.
 - Prefer standard-library solutions unless a dependency already exists in `pyproject.toml`.
 - Keep type hints on new public helpers and dataclasses.
 - Avoid broad `except Exception` except at UI/service boundaries where errors are logged and surfaced to the user.
@@ -64,7 +64,7 @@
 
 - Run targeted tests first, then the full suite when touching shared paths.
 - Preferred command on Windows:
-  - `$env:PYTHONPATH='src'; .\venv\Scripts\python.exe -m pytest`
+  - `$env:PYTHONPATH='src'; .\.venv\Scripts\python.exe -m pytest`
 - If using global Python, ensure `PYTHONPATH=src` and PySide6 availability.
 - UI tests use offscreen Qt setup from `tests/test_support.py`.
 - Add regression tests for DB migrations, query behavior, parsing, and user-facing bug fixes.

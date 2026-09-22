@@ -2,13 +2,14 @@
 name = "pylrcget"
 version = "1.14.1"
 description = "Desktop-native lyrics manager and player built with PySide6"
-requires-python = ">=3.10"
+requires-python = "==3.13.15"
 dependencies = [
     "PySide6",
     "mutagen",
     "requests",
     "packaging",
     "keyring",
+    "langdetect==1.0.9",
 ]
 
 [project.optional-dependencies]
@@ -66,4 +67,4 @@ markers = [
 ]
 
 [tool.ruff]
-target-version = "py310"
+target-version = "py313"
