@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import logging
 import threading
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Final
 
+from ..language import detect_lyrics_language
 from .contracts import (
     DownloadMode,
     LyricsProvider,
@@ -19,6 +21,7 @@ ACCEPT_FINAL: Final = "ACCEPT_FINAL"
 KEEP_AS_FALLBACK: Final = "KEEP_AS_FALLBACK"
 REJECT: Final = "REJECT"
 CONTINUE: Final = "CONTINUE"
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True, slots=True)
@@ -62,6 +65,7 @@ class LyricsProviderRouter:
 
     def __init__(self, providers: Sequence[LyricsProvider]) -> None:
         self.providers = tuple(providers)
+        self.last_language_rejection: str | None = None
 
     def lookup(
         self,
@@ -73,6 +77,7 @@ class LyricsProviderRouter:
         execution_coordinator: ProviderExecutionCoordinator | None = None,
         continue_when_plain_for_synced: bool = True,
     ) -> LyricsProviderResult | None:
+        self.last_language_rejection = None
         selector = LyricsResultSelector()
         fallback: LyricsProviderResult | None = None
 
@@ -114,6 +119,33 @@ class LyricsProviderRouter:
                     execution_coordinator.release(provider_id)
             if candidate is None:
                 continue
+
+            expected_language = (track.expected_language or "").casefold().split("-", 1)[0]
+            if expected_language:
+                detection = detect_lyrics_language(candidate.plain_lyrics, candidate.synced_lyrics)
+                if detection is not None:
+                    candidate.diagnostics.update(
+                        {
+                            "lyrics_language": detection.language,
+                            "lyrics_language_confidence": round(detection.confidence, 4),
+                            "expected_lyrics_language": expected_language,
+                        }
+                    )
+                    if detection.language != expected_language:
+                        self.last_language_rejection = (
+                            f"Lyrics candidate rejected: detected language {detection.language}, "
+                            f"expected {expected_language}."
+                        )
+                        logger.warning(
+                            "Rejected %s lyrics for track %s due to language mismatch: "
+                            "detected=%s expected=%s confidence=%.3f",
+                            provider_id,
+                            track.track_id,
+                            detection.language,
+                            expected_language,
+                            detection.confidence,
+                        )
+                        continue
 
             decision = selector.consider(
                 candidate,

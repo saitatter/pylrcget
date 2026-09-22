@@ -23,12 +23,13 @@ and lyrics editing without changing library or database behavior.
 
 Focused UI tests cover the main window, shared components, lyrics editor,
 settings, track menus, splitter behavior, keyboard focus, and player layout.
-The full suite passed on Windows with Python 3.14.2 from the repository
-virtual environment: `798 passed, 1 warning, 5 subtests passed in 25.37s`.
-`ruff check .` also passed. The warning is from the optional AI test setup:
-`torchcodec` could not load its FFmpeg DLLs; it does not affect the test
-result. The code under test was commit `4afcee5` plus the documentation-only
-changes in this cleanup.
+The full suite originally passed on Windows with Python 3.14.2 from the
+repository virtual environment: `798 passed, 1 warning, 5 subtests passed in
+25.37s`. That was a historical validation run before the project was pinned to
+Python 3.13.15. The latest full suite, including the lyrics-language guard,
+passed on Windows with Python 3.13.15: `815 passed, 1 skipped, 5 subtests
+passed in 14.95s`. Ruff and `pip check` passed, and both directory and portable
+PyInstaller builds completed successfully with the language profiles bundled.
 
 Manual review covered:
 

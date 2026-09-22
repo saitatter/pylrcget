@@ -13,7 +13,7 @@ from lyrics.providers import (
 )
 
 
-def _context() -> TrackLookupContext:
+def _context(*, expected_language: str | None = None) -> TrackLookupContext:
     return TrackLookupContext(
         track_id=1,
         file_path="C:/Music/song.flac",
@@ -24,6 +24,7 @@ def _context() -> TrackLookupContext:
         duration_seconds=180.0,
         track_number=1,
         isrc=None,
+        expected_language=expected_language,
     )
 
 
@@ -173,3 +174,48 @@ def test_router_ignores_empty_instrumental_result():
     )
 
     assert LyricsProviderRouter((provider,)).lookup(_context(), requested_mode="prefer_synced") is None
+
+
+def test_router_rejects_confident_language_mismatch_then_tries_next_provider():
+    french = (
+        "Mon cœur cherche encore dans la nuit, mes pas disparaissent mais la lumière reste proche "
+        "et me ramène chez moi. Je cours sous la pluie pour trouver des réponses tandis que le "
+        "monde change chaque jour."
+    )
+    english = (
+        "My heart keeps searching through the night, my footsteps fade but the light stays close "
+        "and calls me home again. I run through rain and try to find the answer, while the world "
+        "keeps changing every day."
+    )
+    wrong_language = _FakeProvider(_result("musixmatch", plain=french))
+    correct_language = _FakeProvider(_result("lrclib", plain=english))
+    router = LyricsProviderRouter((wrong_language, correct_language))
+
+    result = router.lookup(
+        _context(expected_language="en"),
+        requested_mode="prefer_synced",
+    )
+
+    assert result is not None
+    assert result.provider == "lrclib"
+    assert wrong_language.result.diagnostics["lyrics_language"] == "fr"
+    assert wrong_language.result.diagnostics["expected_lyrics_language"] == "en"
+
+
+def test_router_reports_when_every_usable_result_has_the_wrong_language():
+    french = (
+        "Mon cœur cherche encore dans la nuit, mes pas disparaissent mais la lumière reste proche "
+        "et me ramène chez moi. Je cours sous la pluie pour trouver des réponses tandis que le "
+        "monde change chaque jour."
+    )
+    router = LyricsProviderRouter((_FakeProvider(_result("musixmatch", plain=french)),))
+
+    result = router.lookup(
+        _context(expected_language="en"),
+        requested_mode="prefer_synced",
+    )
+
+    assert result is None
+    assert router.last_language_rejection == (
+        "Lyrics candidate rejected: detected language fr, expected en."
+    )

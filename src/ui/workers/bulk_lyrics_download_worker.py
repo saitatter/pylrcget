@@ -13,7 +13,8 @@ from PySide6.QtCore import QObject, QThread, Signal
 
 from core.lrclib_client import LrcLibAPI
 from core.utils import prepare_input
-from db.queries import get_tracks_for_bulk_download
+from db.queries import get_album_lyrics_samples, get_tracks_for_bulk_download
+from lyrics.language import detect_lyrics_language, infer_album_language
 from lyrics.providers import (
     LrclibProvider,
     LyricsProvider,
@@ -98,6 +99,7 @@ class _DownloadJob:
     duration_s: int | None
     has_plain_lyrics: bool
     has_synced_lyrics: bool
+    expected_language: str | None = None
     provider_id: str = "lrclib"
 
 
@@ -111,7 +113,7 @@ class _DownloadFetchResult:
 
 @dataclass(frozen=True)
 class _DownloadLookupGroup:
-    key: tuple[str, str, str, str, str, int | None]
+    key: tuple[str, str, str, str, str, int | None, str]
     jobs: tuple[_DownloadJob, ...]
 
     @property
@@ -170,6 +172,34 @@ class BulkLyricsDownloadWorker(QThread):
             self._lyrics_source_settings = load_lyrics_source_settings(ui_state_json)
 
             tracks_by_id = get_tracks_for_bulk_download(db, self.track_ids)
+            expected_languages: dict[int, str] = {}
+            enabled_sources = self._lyrics_source_settings.get("enabled")
+            musixmatch_enabled = isinstance(enabled_sources, dict) and bool(
+                enabled_sources.get("musixmatch", False)
+            )
+            if musixmatch_enabled:
+                unresolved_tracks = []
+                for track in tracks_by_id.values():
+                    detection = detect_lyrics_language(track.txt_lyrics, track.lrc_lyrics)
+                    if detection is not None:
+                        expected_languages[int(track.id)] = detection.language
+                    elif not (track.txt_lyrics or track.lrc_lyrics):
+                        unresolved_tracks.append(track)
+                album_ids = list({int(track.album_id) for track in unresolved_tracks})
+                album_samples = get_album_lyrics_samples(db, album_ids)
+                album_languages = {
+                    album_id: language
+                    for album_id, samples in album_samples.items()
+                    if (
+                        language := infer_album_language(
+                            lyrics for _sample_track_id, lyrics in samples
+                        )
+                    )
+                }
+                for track in unresolved_tracks:
+                    language = album_languages.get(int(track.album_id))
+                    if language is not None:
+                        expected_languages[int(track.id)] = language
             for track_id in self.track_ids:
                 if self.isInterruptionRequested():
                     cancelled = True
@@ -211,6 +241,7 @@ class BulkLyricsDownloadWorker(QThread):
                             duration_s=duration_s,
                             has_plain_lyrics=bool(track.txt_lyrics),
                             has_synced_lyrics=bool(track.lrc_lyrics and not track.instrumental),
+                            expected_language=expected_languages.get(int(track.id)),
                             provider_id="router",
                         )
                     )
@@ -282,7 +313,11 @@ class BulkLyricsDownloadWorker(QThread):
                                 completed += 1
                                 if result.error:
                                     fail_count += 1
-                                    msg = f"Download failed: {result.error}"
+                                    msg = (
+                                        result.error
+                                        if result.error.startswith("Lyrics candidate rejected:")
+                                        else f"Download failed: {result.error}"
+                                    )
                                     self.itemFinished.emit(job.track_id, False, job.label, msg)
                                     self.progress.emit(completed, total, job.label, msg, self._elapsed())
                                     continue
@@ -347,8 +382,8 @@ class BulkLyricsDownloadWorker(QThread):
 
     @staticmethod
     def _group_jobs(jobs: list[_DownloadJob]) -> list[_DownloadLookupGroup]:
-        groups: dict[tuple[str, str, str, str, str, int | None], list[_DownloadJob]] = {}
-        order: list[tuple[str, str, str, str, str, int | None]] = []
+        groups: dict[tuple[str, str, str, str, str, int | None, str], list[_DownloadJob]] = {}
+        order: list[tuple[str, str, str, str, str, int | None, str]] = []
         for job in jobs:
             key = (
                 job.provider_id,
@@ -357,6 +392,7 @@ class BulkLyricsDownloadWorker(QThread):
                 prepare_input(job.title),
                 prepare_input(job.album),
                 job.duration_s,
+                prepare_input(job.expected_language or ""),
             )
             if key not in groups:
                 groups[key] = []
@@ -365,7 +401,7 @@ class BulkLyricsDownloadWorker(QThread):
         return [_DownloadLookupGroup(key=key, jobs=tuple(groups[key])) for key in order]
 
     @staticmethod
-    def _lookup_key(job: _DownloadJob) -> tuple[str, str, str, str, str, int | None]:
+    def _lookup_key(job: _DownloadJob) -> tuple[str, str, str, str, str, int | None, str]:
         return (
             job.provider_id,
             prepare_input(job.isrc or ""),
@@ -373,6 +409,7 @@ class BulkLyricsDownloadWorker(QThread):
             prepare_input(job.title),
             prepare_input(job.album),
             job.duration_s,
+            prepare_input(job.expected_language or ""),
         )
 
     def _provider_search_label(self) -> str:
@@ -436,6 +473,7 @@ class BulkLyricsDownloadWorker(QThread):
                 track_number=job.track_number,
                 isrc=job.isrc,
                 instrumental=job.instrumental,
+                expected_language=job.expected_language,
             )
             match = router.lookup(
                 lookup_context,
@@ -446,6 +484,11 @@ class BulkLyricsDownloadWorker(QThread):
                     self._lyrics_source_settings.get("continue_when_plain_for_synced", True)
                 ),
             )
+            if match is None and router.last_language_rejection:
+                return _DownloadFetchResult(
+                    job=job,
+                    error=router.last_language_rejection,
+                )
             self._lookup_result_cache.put(lookup_key, match)
             return _DownloadFetchResult(job=job, match=match)
         except LyricsMatchCancelled:

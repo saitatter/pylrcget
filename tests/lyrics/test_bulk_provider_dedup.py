@@ -6,7 +6,13 @@ from ui.workers.bulk_lyrics_download_worker import (
 )
 
 
-def _job(*, track_id: int, isrc: str | None = "USAAA0000001", provider_id: str = "lrclib") -> _DownloadJob:
+def _job(
+    *,
+    track_id: int,
+    isrc: str | None = "USAAA0000001",
+    provider_id: str = "lrclib",
+    expected_language: str | None = None,
+) -> _DownloadJob:
     return _DownloadJob(
         track_id=track_id,
         label="Artist - Song",
@@ -21,6 +27,7 @@ def _job(*, track_id: int, isrc: str | None = "USAAA0000001", provider_id: str =
         duration_s=180,
         has_plain_lyrics=False,
         has_synced_lyrics=False,
+        expected_language=expected_language,
         provider_id=provider_id,
     )
 
@@ -42,3 +49,14 @@ def test_bulk_grouping_keeps_isrc_and_provider_boundaries():
     )
 
     assert len(groups) == 3
+
+
+def test_bulk_grouping_keeps_distinct_expected_languages_separate():
+    groups = BulkLyricsDownloadWorker._group_jobs(
+        [
+            _job(track_id=1, expected_language="en"),
+            _job(track_id=2, expected_language="ro"),
+        ]
+    )
+
+    assert len(groups) == 2

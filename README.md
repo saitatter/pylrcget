@@ -8,7 +8,7 @@ without leaving your desktop workflow.
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![GitHub Release](https://img.shields.io/github/v/release/saitatter/pylrcget)](https://github.com/saitatter/pylrcget/releases)
 [![Issues](https://img.shields.io/github/issues/saitatter/pylrcget)](https://github.com/saitatter/pylrcget/issues)
-[![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![Python](https://img.shields.io/badge/Python-3.13.15-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![PySide6](https://img.shields.io/badge/PySide6-Qt-41CD52?logo=qt&logoColor=white)](https://doc.qt.io/qtforpython/)
 [![SQLite](https://img.shields.io/badge/SQLite-003B57?logo=sqlite&logoColor=white)](https://www.sqlite.org/)
 [![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)](#)
@@ -25,6 +25,8 @@ without leaving your desktop workflow.
 
 Provider settings are opt-in: a disabled provider is never used as an automatic
 fallback. See [Musixmatch provider notes](docs/MULTI_PROVIDER_MUSIXMATCH.md).
+When enough lyrics already exist on the same album, language detection can
+reject a confidently mismatched provider result instead of saving it.
 
 ## 📸 Screenshots
 
@@ -66,13 +68,14 @@ images inside the repository so the README also renders offline:
 ```powershell
 py -3.13 -m venv .venv
 .\.venv\Scripts\Activate.ps1
+python --version  # must report Python 3.13.15
 python -m pip install -e ".[dev]"
 python main.py
 ```
 
-The core application supports Python 3.10+. Python 3.13 is recommended for
-the optional AI runtime. The app does not modify a music folder during normal
-scanning; exports and embedding are explicit user actions.
+The project is pinned to Python 3.13.15 for development, AI setup, tests, and
+release builds. The app does not modify a music folder during normal scanning;
+exports and embedding are explicit user actions.
 
 ## 🤖 Optional AI Auto Sync
 
@@ -184,7 +187,7 @@ Releases use Conventional Commits and semantic-release. See
 [CHANGELOG.md](CHANGELOG.md) for published changes.
 
 - **No lyrics found:** check provider enablement/order and the track metadata.
-- **AI dependencies missing:** use the AI setup dialog or install the `ai` extra in a supported Python 3.10-3.13 environment.
+- **AI dependencies missing:** use the AI setup dialog or install the `ai` extra with Python 3.13.15.
 - **Playback issue:** verify the backend and codec support for the file format.
 - **Windows SmartScreen warning:** release executables are currently unsigned.
 

@@ -21,6 +21,7 @@ class TrackLookupContext:
     track_number: int | None
     isrc: str | None
     instrumental: bool = False
+    expected_language: str | None = None
 
 
 @dataclass(slots=True, frozen=True)

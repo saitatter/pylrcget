@@ -104,6 +104,59 @@ def get_tracks_for_bulk_download(
     return result
 
 
+def get_album_lyrics_samples(
+    db: sqlite3.Connection,
+    album_ids: list[int],
+    *,
+    per_album_limit: int = 4,
+    chunk_size: int = 500,
+) -> dict[int, list[tuple[int, str]]]:
+    """Read a bounded set of existing lyrics for language hints per album."""
+    unique_ids = list(dict.fromkeys(int(album_id) for album_id in album_ids if album_id is not None))
+    if not unique_ids:
+        return {}
+
+    result: dict[int, list[tuple[int, str]]] = {}
+    batch_size = max(1, int(chunk_size))
+    sample_limit = max(1, int(per_album_limit))
+    for start in range(0, len(unique_ids), batch_size):
+        chunk = unique_ids[start : start + batch_size]
+        placeholders = ",".join("?" for _ in chunk)
+        rows = db.execute(
+            f"""
+            WITH ranked_lyrics AS (
+                SELECT
+                    album_id,
+                    id AS track_id,
+                    CASE
+                        WHEN NULLIF(TRIM(txt_lyrics), '') IS NOT NULL
+                            AND LENGTH(TRIM(txt_lyrics)) >= LENGTH(TRIM(COALESCE(lrc_lyrics, '')))
+                        THEN SUBSTR(TRIM(txt_lyrics), 1, 5000)
+                        ELSE SUBSTR(TRIM(lrc_lyrics), 1, 5000)
+                    END AS lyrics,
+                    ROW_NUMBER() OVER (PARTITION BY album_id ORDER BY id) AS sample_number
+                FROM tracks
+                WHERE album_id IN ({placeholders})
+                    AND COALESCE(instrumental, 0) = 0
+                    AND (
+                        NULLIF(TRIM(txt_lyrics), '') IS NOT NULL
+                        OR NULLIF(TRIM(lrc_lyrics), '') IS NOT NULL
+                    )
+            )
+            SELECT album_id, track_id, lyrics
+            FROM ranked_lyrics
+            WHERE sample_number <= ?
+            ORDER BY album_id, track_id
+            """,
+            (*chunk, sample_limit),
+        ).fetchall()
+        for row in rows:
+            result.setdefault(int(row["album_id"]), []).append(
+                (int(row["track_id"]), str(row["lyrics"] or ""))
+            )
+    return result
+
+
 def add_track(db: sqlite3.Connection, track: FsTrack, *, commit: bool = True) -> None:
     try:
         artist_id = find_artist(db, track.artist)

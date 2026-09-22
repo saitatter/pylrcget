@@ -20,12 +20,14 @@ from core.lrclib_client import (
 )
 from core.lyrics_sidecar import export_lyrics_sidecars
 from db.database import (
+    get_album_lyrics_samples,
     get_config,
     get_track_by_id,
     update_track_plain_lyrics,
     update_track_synced_lyrics,
 )
 from db.models import Config, Track
+from lyrics.language import infer_track_language
 from lyrics.provenance import normalize_lyrics_source
 from lyrics.providers import (
     LrclibProvider,
@@ -424,18 +426,6 @@ def download_track_lyrics(
         if not is_valid_lrclib_duration(duration_s):
             return False, invalid_lrclib_duration_message(duration_s), track_id, title_for_ui
 
-        lookup_context = TrackLookupContext(
-            track_id=track_id,
-            file_path=track.file_path,
-            title=title,
-            artists=(artist,),
-            album=album,
-            album_artist=track.album_artist_name,
-            duration_seconds=float(duration_s) if duration_s else None,
-            track_number=track.track_number,
-            isrc=track.isrc,
-            instrumental=track.instrumental,
-        )
         effective_config = config or get_config(db)
         source_settings = load_lyrics_source_settings(getattr(effective_config, "ui_state_json", ""))
         providers = _build_single_track_providers(
@@ -447,6 +437,33 @@ def download_track_lyrics(
         )
         if not providers:
             return False, "No lyrics providers are configured.", track_id, title_for_ui
+        expected_language = None
+        if any(provider.provider_id == "musixmatch" for provider in providers):
+            expected_language = infer_track_language(
+                track.txt_lyrics,
+                track.lrc_lyrics,
+            )
+            if expected_language is None and not (track.txt_lyrics or track.lrc_lyrics):
+                album_samples = get_album_lyrics_samples(db, [track.album_id])
+                expected_language = infer_track_language(
+                    None,
+                    None,
+                    album_samples.get(track.album_id, ()),
+                    track_id=track.id,
+                )
+        lookup_context = TrackLookupContext(
+            track_id=track_id,
+            file_path=track.file_path,
+            title=title,
+            artists=(artist,),
+            album=album,
+            album_artist=track.album_artist_name,
+            duration_seconds=float(duration_s) if duration_s else None,
+            track_number=track.track_number,
+            isrc=track.isrc,
+            instrumental=track.instrumental,
+            expected_language=expected_language,
+        )
         router = LyricsProviderRouter(tuple(providers))
         match = router.lookup(
             lookup_context,
@@ -456,6 +473,8 @@ def download_track_lyrics(
             ),
         )
         if match is None:
+            if router.last_language_rejection:
+                return False, router.last_language_rejection, track_id, title_for_ui
             no_match_message = (
                 "No lyrics found on LRCLIB for this track."
                 if len(providers) == 1 and providers[0].provider_id == "lrclib"
