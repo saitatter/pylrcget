@@ -398,7 +398,7 @@ class MainWindow(QMainWindow):
             self.download_overlay,
             normalize_lrclib_base=self._normalize_lrclib_base,
             show_status=self._show_status_message,
-            current_player_track_id=self._current_player_track_id,
+            current_lyrics_track_id=lambda: self._editing_track_id,
             set_track_lyrics_views=self._set_track_lyrics_views,
             refresh_visible_library_view=self._refresh_visible_library_view_after_downloads,
             refresh_history=self.mylrclib_tab.refresh,
@@ -2364,6 +2364,8 @@ class MainWindow(QMainWindow):
 
     def _set_track_lyrics_views(self, track) -> None:
         track = self._normalize_dirty_lyrics_state(track)
+        if getattr(self, "_editing_track_id", None) == int(track.id):
+            self._editing_saved_lyrics = canonical_lyrics_pair(track.lrc_lyrics, track.txt_lyrics)
         title = f"{track.artist_name} — {track.title}"
         self._loading_lyrics_views = True
         try:

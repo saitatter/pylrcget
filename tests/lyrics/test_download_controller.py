@@ -160,7 +160,7 @@ class LyricsDownloadControllerTests(unittest.TestCase):
             overlay,
             normalize_lrclib_base=lambda url: f"{url.rstrip('/')}/api",
             show_status=lambda message, timeout=None: statuses.append((message, timeout)),
-            current_player_track_id=lambda: current_track_id,
+            current_lyrics_track_id=lambda: current_track_id,
             set_track_lyrics_views=lambda track: refreshed.append(f"lyrics:{track.id}"),
             refresh_visible_library_view=lambda: refreshed.append("view"),
             refresh_history=lambda: refreshed.append("history"),
@@ -377,7 +377,9 @@ class LyricsDownloadControllerTests(unittest.TestCase):
                 update_track_plain_lyrics(db, track_id, "existing plain")
                 app_state = SimpleNamespace(db=db, db_path=str(Path(tmp) / "pylrcget.db.sqlite3"))
                 overlay = _FakeOverlay()
-                controller, _, notifications, download_states, refreshed = self._make_controller(app_state, overlay)
+                controller, _, notifications, download_states, refreshed = self._make_controller(
+                    app_state, overlay, current_track_id=track_id
+                )
                 candidate = LyricsMatchCandidate(
                     track_id=track_id,
                     track_label="Air Supply - All Out Of Love",
@@ -417,6 +419,8 @@ class LyricsDownloadControllerTests(unittest.TestCase):
                 self.assertEqual(after_apply.lrc_lyrics, "[00:01.00]plain text")
                 self.assertEqual(after_apply.txt_lyrics, "existing plain")
                 self.assertEqual(download_states[track_id], "success")
+                self.assertIn(f"lyrics:{track_id}", refreshed)
+                self.assertLess(refreshed.index("view"), refreshed.index(f"lyrics:{track_id}"))
                 self.assertIn(("Applied lyrics to 1 downloaded track.", "success"), notifications)
                 self.assertIn("view", refreshed)
                 self.assertIn("history", refreshed)
@@ -433,7 +437,9 @@ class LyricsDownloadControllerTests(unittest.TestCase):
                 track_id = int(db.execute("SELECT id FROM tracks LIMIT 1").fetchone()["id"])
                 app_state = SimpleNamespace(db=db, db_path=str(Path(tmp) / "pylrcget.db.sqlite3"))
                 overlay = _FakeOverlay()
-                controller, _, notifications, download_states, _ = self._make_controller(app_state, overlay)
+                controller, _, notifications, download_states, refreshed = self._make_controller(
+                    app_state, overlay, current_track_id=track_id
+                )
                 candidate = LyricsMatchCandidate(
                     track_id=track_id,
                     track_label="Artist - Song",
@@ -466,6 +472,8 @@ class LyricsDownloadControllerTests(unittest.TestCase):
                 self.assertEqual(after_apply.txt_lyrics, "plain text")
                 self.assertIsNone(after_apply.lrc_lyrics)
                 self.assertEqual(download_states[track_id], "success")
+                self.assertIn(f"lyrics:{track_id}", refreshed)
+                self.assertLess(refreshed.index("view"), refreshed.index(f"lyrics:{track_id}"))
                 self.assertIn(("Applied lyrics to 1 downloaded track.", "success"), notifications)
                 self.assertEqual(_FakeMatchDialog.instances, [])
                 self.assertTrue(

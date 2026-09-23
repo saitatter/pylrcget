@@ -130,17 +130,36 @@ def get_album_lyrics_samples(
                     id AS track_id,
                     CASE
                         WHEN NULLIF(TRIM(txt_lyrics), '') IS NOT NULL
-                            AND LENGTH(TRIM(txt_lyrics)) >= LENGTH(TRIM(COALESCE(lrc_lyrics, '')))
+                            AND COALESCE(LOWER(TRIM(txt_lyrics_source)), '') NOT IN
+                                ('ai', 'external', 'lrclib', 'musixmatch', 'tidal', 'unknown')
+                            AND (
+                                NULLIF(TRIM(lrc_lyrics), '') IS NULL
+                                OR COALESCE(LOWER(TRIM(lrc_lyrics_source)), '') IN
+                                    ('ai', 'external', 'lrclib', 'musixmatch', 'tidal', 'unknown')
+                                OR LENGTH(TRIM(txt_lyrics)) >= LENGTH(TRIM(lrc_lyrics))
+                            )
                         THEN SUBSTR(TRIM(txt_lyrics), 1, 5000)
-                        ELSE SUBSTR(TRIM(lrc_lyrics), 1, 5000)
+                        WHEN NULLIF(TRIM(lrc_lyrics), '') IS NOT NULL
+                            AND COALESCE(LOWER(TRIM(lrc_lyrics_source)), '') NOT IN
+                                ('ai', 'external', 'lrclib', 'musixmatch', 'tidal', 'unknown')
+                        THEN SUBSTR(TRIM(lrc_lyrics), 1, 5000)
+                        ELSE NULL
                     END AS lyrics,
                     ROW_NUMBER() OVER (PARTITION BY album_id ORDER BY id) AS sample_number
                 FROM tracks
                 WHERE album_id IN ({placeholders})
                     AND COALESCE(instrumental, 0) = 0
                     AND (
-                        NULLIF(TRIM(txt_lyrics), '') IS NOT NULL
-                        OR NULLIF(TRIM(lrc_lyrics), '') IS NOT NULL
+                        (
+                            NULLIF(TRIM(txt_lyrics), '') IS NOT NULL
+                            AND COALESCE(LOWER(TRIM(txt_lyrics_source)), '') NOT IN
+                                ('ai', 'external', 'lrclib', 'musixmatch', 'tidal', 'unknown')
+                        )
+                        OR (
+                            NULLIF(TRIM(lrc_lyrics), '') IS NOT NULL
+                            AND COALESCE(LOWER(TRIM(lrc_lyrics_source)), '') NOT IN
+                                ('ai', 'external', 'lrclib', 'musixmatch', 'tidal', 'unknown')
+                        )
                     )
             )
             SELECT album_id, track_id, lyrics

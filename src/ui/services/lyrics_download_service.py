@@ -27,7 +27,11 @@ from db.database import (
     update_track_synced_lyrics,
 )
 from db.models import Config, Track
-from lyrics.language import infer_track_language
+from lyrics.language import (
+    infer_metadata_language,
+    infer_track_language,
+    is_trusted_language_source,
+)
 from lyrics.provenance import normalize_lyrics_source
 from lyrics.providers import (
     LrclibProvider,
@@ -440,10 +444,10 @@ def download_track_lyrics(
         expected_language = None
         if any(provider.provider_id == "musixmatch" for provider in providers):
             expected_language = infer_track_language(
-                track.txt_lyrics,
-                track.lrc_lyrics,
+                track.txt_lyrics if is_trusted_language_source(track.txt_lyrics_source) else None,
+                track.lrc_lyrics if is_trusted_language_source(track.lrc_lyrics_source) else None,
             )
-            if expected_language is None and not (track.txt_lyrics or track.lrc_lyrics):
+            if expected_language is None:
                 album_samples = get_album_lyrics_samples(db, [track.album_id])
                 expected_language = infer_track_language(
                     None,
@@ -451,6 +455,8 @@ def download_track_lyrics(
                     album_samples.get(track.album_id, ()),
                     track_id=track.id,
                 )
+            if expected_language is None:
+                expected_language = infer_metadata_language(track.title, track.album_name)
         lookup_context = TrackLookupContext(
             track_id=track_id,
             file_path=track.file_path,

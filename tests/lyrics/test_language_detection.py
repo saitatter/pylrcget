@@ -3,7 +3,9 @@ from __future__ import annotations
 from lyrics.language import (
     detect_lyrics_language,
     infer_album_language,
+    infer_metadata_language,
     infer_track_language,
+    is_trusted_language_source,
 )
 
 ROMANIAN = (
@@ -20,6 +22,12 @@ FRENCH = (
     "Mon cœur cherche encore dans la nuit, mes pas disparaissent mais la lumière "
     "reste proche et me ramène chez moi. Je cours sous la pluie pour trouver des "
     "réponses tandis que le monde change chaque jour."
+)
+SYNTHETIC_CROATIAN = (
+    "Moje srce traži put kroz noć, dok zvijezde sjaje iznad grada. Vjetar nosi tihe riječi, "
+    "a ja čekam da se vratiš. Svaki novi dan donosi nadu, ali bez tebe je svijet prazan. "
+    "Volim te i čuvam sve uspomene dok kiša pada na prozor i tiho svira stara pjesma. "
+    * 8
 )
 
 
@@ -55,3 +63,32 @@ def test_track_lyrics_override_album_consensus_and_self_is_excluded():
 
     assert infer_track_language(FRENCH, None, samples, track_id=1) == "fr"
     assert infer_track_language(None, None, samples, track_id=1) == "ro"
+
+
+def test_metadata_can_provide_strong_fallback_for_romanian_album():
+    album = "Muzică de colecție, volumul 26: Cenzurat: Cântece interzise"
+    assert (
+        infer_metadata_language(
+            "Fluierături în biserică",
+            album,
+        )
+        == "ro"
+    )
+    assert infer_metadata_language(album) == "ro"
+    assert infer_metadata_language("Short title", "") is None
+
+
+def test_long_lyrics_use_chunk_consensus_when_whole_text_is_ambiguous(monkeypatch):
+    monkeypatch.setattr("lyrics.language._detect_prepared_text", lambda _text: None)
+
+    result = detect_lyrics_language(SYNTHETIC_CROATIAN)
+
+    assert result is not None
+    assert result.language == "hr"
+
+
+def test_provider_lyrics_are_not_trusted_as_language_evidence():
+    assert not is_trusted_language_source("musixmatch")
+    assert not is_trusted_language_source("lrclib")
+    assert is_trusted_language_source("embedded")
+    assert is_trusted_language_source(None)

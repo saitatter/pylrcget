@@ -14,7 +14,12 @@ from PySide6.QtCore import QObject, QThread, Signal
 from core.lrclib_client import LrcLibAPI
 from core.utils import prepare_input
 from db.queries import get_album_lyrics_samples, get_tracks_for_bulk_download
-from lyrics.language import detect_lyrics_language, infer_album_language
+from lyrics.language import (
+    detect_lyrics_language,
+    infer_metadata_language,
+    infer_track_language,
+    is_trusted_language_source,
+)
 from lyrics.providers import (
     LrclibProvider,
     LyricsProvider,
@@ -180,26 +185,32 @@ class BulkLyricsDownloadWorker(QThread):
             if musixmatch_enabled:
                 unresolved_tracks = []
                 for track in tracks_by_id.values():
-                    detection = detect_lyrics_language(track.txt_lyrics, track.lrc_lyrics)
+                    trusted_txt = (
+                        track.txt_lyrics if is_trusted_language_source(track.txt_lyrics_source) else None
+                    )
+                    trusted_lrc = (
+                        track.lrc_lyrics if is_trusted_language_source(track.lrc_lyrics_source) else None
+                    )
+                    detection = detect_lyrics_language(trusted_txt, trusted_lrc)
                     if detection is not None:
                         expected_languages[int(track.id)] = detection.language
-                    elif not (track.txt_lyrics or track.lrc_lyrics):
+                    else:
                         unresolved_tracks.append(track)
                 album_ids = list({int(track.album_id) for track in unresolved_tracks})
                 album_samples = get_album_lyrics_samples(db, album_ids)
-                album_languages = {
-                    album_id: language
-                    for album_id, samples in album_samples.items()
-                    if (
-                        language := infer_album_language(
-                            lyrics for _sample_track_id, lyrics in samples
-                        )
-                    )
-                }
                 for track in unresolved_tracks:
-                    language = album_languages.get(int(track.album_id))
+                    language = infer_track_language(
+                        None,
+                        None,
+                        album_samples.get(int(track.album_id), ()),
+                        track_id=int(track.id),
+                    )
                     if language is not None:
                         expected_languages[int(track.id)] = language
+                        continue
+                    metadata_language = infer_metadata_language(track.title, track.album_name)
+                    if metadata_language is not None:
+                        expected_languages[int(track.id)] = metadata_language
             for track_id in self.track_ids:
                 if self.isInterruptionRequested():
                     cancelled = True

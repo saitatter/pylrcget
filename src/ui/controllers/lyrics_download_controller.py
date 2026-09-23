@@ -47,7 +47,7 @@ class LyricsDownloadController(QObject):
         *,
         normalize_lrclib_base: Callable[[str], str],
         show_status: Callable[[str, int | None], None],
-        current_player_track_id: Callable[[], int | None],
+        current_lyrics_track_id: Callable[[], int | None],
         set_track_lyrics_views: Callable[[Track], None],
         refresh_visible_library_view: Callable[[], None],
         refresh_history: Callable[[], None],
@@ -60,7 +60,7 @@ class LyricsDownloadController(QObject):
         self._overlay = overlay
         self._normalize_lrclib_base = normalize_lrclib_base
         self._show_status = show_status
-        self._current_player_track_id = current_player_track_id
+        self._current_lyrics_track_id = current_lyrics_track_id
         self._set_track_lyrics_views = set_track_lyrics_views
         self._refresh_visible_library_view = refresh_visible_library_view
         self._refresh_history = refresh_history
@@ -192,15 +192,24 @@ class LyricsDownloadController(QObject):
     def _on_download_batch_finished(self, ok: bool, msg: str, stats: dict) -> None:
         del ok
         self._show_status(msg, 4000)
+        candidates = [
+            candidate
+            for candidate in (stats.get("candidates", []) if isinstance(stats, dict) else [])
+            if isinstance(candidate, LyricsMatchCandidate)
+        ]
         for track_id in list(self._active_track_ids):
             self._set_track_download_state(int(track_id), DownloadState.IDLE)
         self._active_track_ids.clear()
         self._flush_pending_download_history()
 
-        try:
-            self._refresh_visible_library_view()
-        except (AttributeError, RuntimeError) as exc:
-            logger.warning("Failed to refresh current view after lyrics download: %s", exc)
+        has_unapplied_candidates = bool(candidates) and not bool(
+            stats.get("cancelled") if isinstance(stats, dict) else False
+        )
+        if not has_unapplied_candidates:
+            try:
+                self._refresh_visible_library_view()
+            except (AttributeError, RuntimeError) as exc:
+                logger.warning("Failed to refresh current view after lyrics download: %s", exc)
         try:
             self._refresh_history()
         except (sqlite3.Error, AttributeError) as exc:
@@ -218,11 +227,6 @@ class LyricsDownloadController(QObject):
             else 0,
         }
         self._overlay.finish_batch(msg, cancelled=bool(stats_dict.get("cancelled")))
-        candidates = [
-            candidate
-            for candidate in (stats.get("candidates", []) if isinstance(stats, dict) else [])
-            if isinstance(candidate, LyricsMatchCandidate)
-        ]
         exact_candidates = [candidate for candidate in candidates if int(candidate.score) >= 100]
         review_candidates = [candidate for candidate in candidates if int(candidate.score) < 100]
         show_retry_failed = getattr(self._overlay, "show_retry_failed", None)
@@ -409,12 +413,6 @@ class LyricsDownloadController(QObject):
         for track_id in applied_ids:
             self._set_track_download_state(int(track_id), DownloadState.SUCCESS)
             self._schedule_track_download_state_reset(int(track_id), DownloadState.SUCCESS)
-            if self._current_player_track_id() == int(track_id):
-                try:
-                    updated = get_track_by_id(self._app_state.db, int(track_id))
-                    self._set_track_lyrics_views(updated)
-                except (sqlite3.Error, AttributeError, TypeError) as exc:
-                    logger.warning("Failed to refresh applied lyrics for track %s: %s", track_id, exc)
         if error:
             notify_user(
                 self._app_state,
@@ -425,11 +423,26 @@ class LyricsDownloadController(QObject):
             )
         if not applied_count:
             return
-        self._after_candidates_applied(applied_count, context=context)
+        self._after_candidates_applied(applied_count, applied_ids=applied_ids, context=context)
 
-    def _after_candidates_applied(self, applied_count: int, *, context: str) -> None:
+    def _after_candidates_applied(
+        self,
+        applied_count: int,
+        *,
+        applied_ids: list[int],
+        context: str,
+    ) -> None:
         self._flush_pending_download_history()
         self._refresh_visible_library_view()
+        # Restoring table selection during refresh may emit preview signals, so
+        # reload the editor last to keep its saved lyrics in sync with the DB.
+        current_track_id = self._current_lyrics_track_id()
+        if current_track_id is not None and int(current_track_id) in {int(value) for value in applied_ids}:
+            try:
+                updated = get_track_by_id(self._app_state.db, int(current_track_id))
+                self._set_track_lyrics_views(updated)
+            except (sqlite3.Error, AttributeError, TypeError) as exc:
+                logger.warning("Failed to refresh applied lyrics for track %s: %s", current_track_id, exc)
         self._refresh_history()
         label = "downloaded" if context == "download" else "failed"
         notify_user(
