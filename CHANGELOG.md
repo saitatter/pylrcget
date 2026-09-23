@@ -1,4 +1,270 @@
 # Changelog
+## v1.15.0 (2026-09-23)
+
+### ✨ Features
+* **lyrics:** Reject confidently mismatched languages ([9add966](https://github.com/saitatter/pylrcget/commit/9add9663aafac6e128510efac46e6b9013a86344))
+* **ui:** Finish library pagination and top bar modernization ([816b7bb](https://github.com/saitatter/pylrcget/commit/816b7bb6d40c30c255a54024887e59175d7ce2d0))
+* **lyrics:** Add selective clear controls ([8dbbf25](https://github.com/saitatter/pylrcget/commit/8dbbf255743d0cba2639ae468522f8e3c52911b9))
+* **lyrics:** Generalize interactive provider search ([deca0a5](https://github.com/saitatter/pylrcget/commit/deca0a51ef1e10a47d7af4457bf136b01ec22103))
+* **ui:** Add safe lyrics cleanup workflow ([8ce38ef](https://github.com/saitatter/pylrcget/commit/8ce38ef4b616b08cfcfea91b1df33519bd34d7d3))
+* **lyrics:** Add safe cleanup primitives ([2e78ee5](https://github.com/saitatter/pylrcget/commit/2e78ee51022815d08b4e5fccab5b804230e43291))
+* Replace tidal lyrics provider with musixmatch ([7600ee6](https://github.com/saitatter/pylrcget/commit/7600ee60ff3ead40784d775a1b891da8c2ffc5e8))
+* **tidal:** Bundle registered public client id ([1623a65](https://github.com/saitatter/pylrcget/commit/1623a651fa8ea78172bfee00f5c99c0b3d915302))
+* **tidal:** Add native auth controls and single-track routing ([544ed22](https://github.com/saitatter/pylrcget/commit/544ed2235947a74cd8794fb1f12b34427f617b53))
+* **tidal:** Wire native transport into bulk downloads ([6f965b4](https://github.com/saitatter/pylrcget/commit/6f965b4df19ce05bceb9b29975c7f8b0594be6f0))
+* **tidal:** Add native oauth and lyrics transport ([4c23fd6](https://github.com/saitatter/pylrcget/commit/4c23fd607c68fcca97516e68d19a643e6bfc165a))
+* **lyrics:** Wire configured tidal provider into bulk router ([ac65222](https://github.com/saitatter/pylrcget/commit/ac65222ca4246b7cd2350766ec83273432eef521))
+* **tidal:** Connect catalogue and lyrics transport ([39847f2](https://github.com/saitatter/pylrcget/commit/39847f22531d21ab45814a7d2652b9b8dbd8282b))
+* **lyrics:** Add per-batch provider health state ([e0373b6](https://github.com/saitatter/pylrcget/commit/e0373b6909660d63e2ee83186632c2d6aaf9eae5))
+* **tidal:** Add auth session abstraction ([cf249f6](https://github.com/saitatter/pylrcget/commit/cf249f6e8b743e965912af4ecbc8e0234649d421))
+* **lyrics:** Add external tidal helper protocol ([396b31e](https://github.com/saitatter/pylrcget/commit/396b31e6595476a2083694b3370d6a861ed6e147))
+* **tidal:** Define swappable lyrics transport ([53b5d38](https://github.com/saitatter/pylrcget/commit/53b5d383d0fb8cfde531f0736b4eba474ed919b2))
+* **lyrics:** Persist lyrics source attribution ([4376e70](https://github.com/saitatter/pylrcget/commit/4376e70fcdee9a53c10e8eb02fa7d2694c5c0f09))
+* **tidal:** Add official catalogue resolver ([96648df](https://github.com/saitatter/pylrcget/commit/96648df242cf4356651efad80ab41981d4ff07d0))
+* **lyrics:** Add provider-neutral track match scoring ([86da0d6](https://github.com/saitatter/pylrcget/commit/86da0d66a0b211ac1f840ec8c19f8b0b5f33bda0))
+* **library:** Extract and persist isrc metadata ([fbaa71d](https://github.com/saitatter/pylrcget/commit/fbaa71d4223f34204633e5e94d9a6facf48b7261))
+* **lyrics:** Add provider priority and fallback router ([48d6796](https://github.com/saitatter/pylrcget/commit/48d6796938170b26a2fc9c8ca741b6b31b605cc1))
+* **ai:** Prefer available accelerator in auto mode ([ebb450c](https://github.com/saitatter/pylrcget/commit/ebb450c065cee00eccf40bea9c5ff19de5c257f2))
+* **ai:** Restrict whisper to low-confidence local rescue ([8ce5ebc](https://github.com/saitatter/pylrcget/commit/8ce5ebc807e62f661c34de3473abf1a25dc21883))
+* **ai:** Surface backend and fallback diagnostics without clutter ([a981e3b](https://github.com/saitatter/pylrcget/commit/a981e3b6031482d4effc5fc4839e35f038ad629a))
+* **ai:** Version persistent ai runtime protocol ([1649c1e](https://github.com/saitatter/pylrcget/commit/1649c1e13da709b34a363248b8478cc9223e1587))
+* **ai:** Add language-aware phonemization service ([6c741fc](https://github.com/saitatter/pylrcget/commit/6c741fc03a0c4a607182baafd518ebb199c61889))
+* **ai:** Integrate manual anchors into structural candidate selection ([cd0f016](https://github.com/saitatter/pylrcget/commit/cd0f0167a0373075474dd358c1200e1423e4a942))
+* **ai:** Replace transcript-centric viterbi scoring with structural candidate dp ([2d02d84](https://github.com/saitatter/pylrcget/commit/2d02d84aa2bf21cd7733207fa9253f5db6ef9951))
+* **ai:** Add hierarchical forced-alignment segmentation ([736a722](https://github.com/saitatter/pylrcget/commit/736a722d1b6559f491473d477104f5166b7e3761))
+* **ai:** Add language-aware alignment backend router ([0aa0736](https://github.com/saitatter/pylrcget/commit/0aa0736fc1b47759fa24727324a2eaae34a87eb4))
+* **ai:** Add backend-independent alignment confidence validator ([cab0f85](https://github.com/saitatter/pylrcget/commit/cab0f85791cb09c5d90e43ce6dd277a994f094f5))
+* Install demucs for ai sync ([52562c3](https://github.com/saitatter/pylrcget/commit/52562c311d8519f9a7f81c782a6fbd2ba5bac3bb))
+  Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+* Preserve and clear synced timestamps ([85712fa](https://github.com/saitatter/pylrcget/commit/85712fa7149200b37133a3ca790b5665205b7a7a))
+  Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+* Run ai sync in isolated runtime ([42a9e30](https://github.com/saitatter/pylrcget/commit/42a9e3098f29c94477f70ed37190ef4e899384aa))
+  Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+* Add wav id3 tag support ([479f281](https://github.com/saitatter/pylrcget/commit/479f2815c4674846c5b3e29bb111f7fc3114b804))
+  Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+* Add conditional demucs lyrics alignment ([f48d326](https://github.com/saitatter/pylrcget/commit/f48d32667728ead46fa47e403131f5c3819b82eb))
+  Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+* **ai-sync:** Add cancellable multilingual alignment backends ([f6f0143](https://github.com/saitatter/pylrcget/commit/f6f014377e6cb624a0757877171ea79cf0edcbaf))
+  Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+
+### 🐛 Fixes
+* **lyrics:** Refresh downloads and validate language ([3376fc3](https://github.com/saitatter/pylrcget/commit/3376fc34397a449af6fadca91828fcebc6bd9c29))
+* **lyrics:** Refresh editor after cleanup ([a225a3f](https://github.com/saitatter/pylrcget/commit/a225a3ffb34d626f4a5d6e9b964ea5ecba15df13))
+* **lyrics:** Show active timestamp shift buttons ([16312e6](https://github.com/saitatter/pylrcget/commit/16312e615a9a6176274b62432e605b063467ef47))
+* **accessibility:** Trap top bar tab cycle ([cdd2632](https://github.com/saitatter/pylrcget/commit/cdd26325ef2b16da01ea3b49391853ffa6efa7c3))
+* **accessibility:** Let focused controls consume space ([a2cbc68](https://github.com/saitatter/pylrcget/commit/a2cbc68d1883a74208a8d1e8b12c16735b70ab8f))
+* **player:** Keep focused slider handles inside bounds ([c538fc9](https://github.com/saitatter/pylrcget/commit/c538fc9b0f1bd14adcf7128e0ab16a00aa6289bb))
+* **player:** Keep slider handles inside track edges ([1e4e407](https://github.com/saitatter/pylrcget/commit/1e4e407d8d6b9fb019b685f065eef4f41da4d2b4))
+* **ui:** Reflow lyrics panel after tab changes ([40baeff](https://github.com/saitatter/pylrcget/commit/40baefff52c8fdd4b603f6b426c18f413da4a13f))
+* **ui:** Constrain empty lyrics actions ([4d8f7cf](https://github.com/saitatter/pylrcget/commit/4d8f7cff29547082d236402b3c97cb2281c40137))
+* **ui:** Stabilize library navigation height ([2473b73](https://github.com/saitatter/pylrcget/commit/2473b7381aba880a320bf56bbd972f8b87bcd0df))
+* **ui:** Compact instrumental status glyph ([7e2937a](https://github.com/saitatter/pylrcget/commit/7e2937ad0917cb1d66b12fb1c536d30c30ae5ff1))
+* **ui:** Size lyrics status column ([d3d3033](https://github.com/saitatter/pylrcget/commit/d3d3033c02838d7b11265866f9c6868c07e5bb5c))
+* **ui:** Unify empty lyrics actions ([f6caf44](https://github.com/saitatter/pylrcget/commit/f6caf445007d2fbf697aa6d8a7f460c7e178633b))
+* **lyrics:** Show legacy lrc text in editor ([0f136ae](https://github.com/saitatter/pylrcget/commit/0f136aedac762dd48cb25fdf0db2e7ed0fcd8b84))
+* **lyrics:** Recalculate synced header height ([35c2f89](https://github.com/saitatter/pylrcget/commit/35c2f89e8ac2529cd2a5cf989803bdaeddc900ab))
+* **ui:** Center lyrics empty states ([c40e21d](https://github.com/saitatter/pylrcget/commit/c40e21da75aa6e24f8ffc8fd5bdb6a4bab4c6cb5))
+* **ui:** Keep download action button neutral when selected ([2b58957](https://github.com/saitatter/pylrcget/commit/2b589575e55e382349e762294a5b7818d27b02e8))
+* **ui:** Refresh lyrics after provider download ([e8e744d](https://github.com/saitatter/pylrcget/commit/e8e744d6a5eff7136293aca0750c94d260aae971))
+* **ui:** Prevent duplicate lrclib sort arrows ([fb890e0](https://github.com/saitatter/pylrcget/commit/fb890e058b8c1cdce7bb9fc6fa82986831bd8a6f))
+* **ui:** Render sortable header arrows cleanly ([1da251a](https://github.com/saitatter/pylrcget/commit/1da251adef62538f74c8d91852227aa97507fe87))
+* **ui:** Improve my lrclib status contrast ([3b1ba94](https://github.com/saitatter/pylrcget/commit/3b1ba94ba5a4d1cf2098c3a704722dfcaad46f74))
+* **ui:** Align lyrics secondary buttons ([d7676a6](https://github.com/saitatter/pylrcget/commit/d7676a6b5cb75d6d4b5745164fdc7ed41370b81a))
+* **ui:** Preserve readable track row height ([9948742](https://github.com/saitatter/pylrcget/commit/9948742fa1561dfd2b0ac968166b28bce271a525))
+* **ui:** Restore lyrics collapse control on splitter ([d6a4670](https://github.com/saitatter/pylrcget/commit/d6a4670c9f0d2ffa91ad1a0f8024385b525f07b5))
+* **ui:** Keep lyrics collapse separate from splitter resize ([68ade6b](https://github.com/saitatter/pylrcget/commit/68ade6b00b550d3d31584763b612774d725b6c1f))
+* **ui:** Theme button tooltips consistently ([4e92ff1](https://github.com/saitatter/pylrcget/commit/4e92ff19f1d3d2d4657abc41c47bb2b945620980))
+* **ui:** Prevent command bar control clipping ([df9e5bf](https://github.com/saitatter/pylrcget/commit/df9e5bf0e5f5800b20b1b6e2d15dea90e3c3ccee))
+* **ui:** Avoid checkbox hover style overlap ([2fe7adf](https://github.com/saitatter/pylrcget/commit/2fe7adf47475713ccb0a8d2d25e19201e6cd3e6c))
+* **ui:** Show checkbox hover across settings controls ([eb9e6c8](https://github.com/saitatter/pylrcget/commit/eb9e6c813b43bb0ef130d67176ed17ae8d969cd2))
+* **ui:** Style checked checkbox hover state ([7defdb7](https://github.com/saitatter/pylrcget/commit/7defdb739b8b95cbab7fbd2ff9f7933393cd8549))
+* **ui:** Keep checked light checkboxes visible ([fd22266](https://github.com/saitatter/pylrcget/commit/fd222666255d46e0c20d4f598e46adbadfe7a6cf))
+* **ui:** Refresh table styles when palette changes ([ddc6af1](https://github.com/saitatter/pylrcget/commit/ddc6af1f878e1898d623ca79252b82395993330d))
+* Label lyric searches and preserve numeric lines ([1ed7cb6](https://github.com/saitatter/pylrcget/commit/1ed7cb641351e3baebf545642eef3d309c21cc50))
+* **tidal:** Keep catalogue search compatibility ([ac280b4](https://github.com/saitatter/pylrcget/commit/ac280b499b3db110c574ecc433f963fcd36b6e29))
+* **tidal:** Lock bundled oauth client configuration ([c377daa](https://github.com/saitatter/pylrcget/commit/c377daae99b7b1d18dd563b0dd881507f98e8052))
+* **db:** Consolidate unreleased migrations into version 6 ([988b341](https://github.com/saitatter/pylrcget/commit/988b341b81682ffb9ab77305dc1875bc861e7c5f))
+* **ui:** Align retry and cancel download actions ([3b7374a](https://github.com/saitatter/pylrcget/commit/3b7374a31235b882908c4c050b8ee174e7a5cf14))
+* **lyrics:** Honor disabled provider matrix during retries ([cd9dde7](https://github.com/saitatter/pylrcget/commit/cd9dde716075ccb70607a3270825f5b18f8ff817))
+* **tidal:** Classify native transport failures ([b4b7750](https://github.com/saitatter/pylrcget/commit/b4b7750df14dc83ed40cd9dcbef08b91461e95f3))
+* **lyrics:** Preserve fallback on provider failure ([9d6d7a3](https://github.com/saitatter/pylrcget/commit/9d6d7a3f7b4db59d730a1a4567c52911b0574319))
+* **lyrics:** Honor plain fallback preference setting ([3051ee3](https://github.com/saitatter/pylrcget/commit/3051ee333b0d81ccf03e1a5359729700c3a68153))
+* **tidal:** Launch python helpers with current interpreter ([bd9ad6f](https://github.com/saitatter/pylrcget/commit/bd9ad6f63993334f395f8e03ffd49368cb852a93))
+* **perf:** Distribute multi-provider fixture cases ([969595c](https://github.com/saitatter/pylrcget/commit/969595c608c3e373168ad33e7ade69f16884c09f))
+* **scan:** Parse native mp4 metadata keys ([8de012f](https://github.com/saitatter/pylrcget/commit/8de012f14e232faf65ba307da9573d7c8696ddf4))
+* **scrape:** Report instrumental publish cancellation ([92ee767](https://github.com/saitatter/pylrcget/commit/92ee767d87966afe977bfd0f2203ea1f3f62b421))
+* **scan:** Abort reconciliation when library root is unavailable ([7592427](https://github.com/saitatter/pylrcget/commit/7592427e3f2389a34e22dc562835e25e4f443fce))
+* Preserve trailing synced lyric lines ([fe5d950](https://github.com/saitatter/pylrcget/commit/fe5d95089a5a1e2313f4ee2862a33ed223ccf801))
+  Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+* Avoid dirty draft on lyrics mode switch ([982327c](https://github.com/saitatter/pylrcget/commit/982327c2aba2a2fc05de4b8a190331d10e1a8781))
+  Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+* Improve ai lyrics alignment ([ce83f6c](https://github.com/saitatter/pylrcget/commit/ce83f6cd5f9aa8fea498303ca692030e0acc7e67))
+  Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+* Satisfy complete ruff checks ([11817c6](https://github.com/saitatter/pylrcget/commit/11817c6d0a8a66b0d0349e43a7345e38ef46ebe2))
+  Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+* Resolve ci ruff import ordering ([7e0d7ec](https://github.com/saitatter/pylrcget/commit/7e0d7ec4157f0890d68dc58373da8ac9400a6d1c))
+  Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+* Support pascal gpus in ai sync ([d5951c4](https://github.com/saitatter/pylrcget/commit/d5951c43c877d946bb918bd197ac0140433a906a))
+  Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+* Detect standard synced id3 lyrics ([5c529c8](https://github.com/saitatter/pylrcget/commit/5c529c86adcdb8497381221b0198479027ec7e68))
+  Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+* **ai-sync:** Rescue forward jumps between lyric clusters ([30a2900](https://github.com/saitatter/pylrcget/commit/30a2900548b2c07d4d12aa467c17021c7b7345e1))
+  Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+
+### ♻️ Refactors
+* **ai:** Group sync modules under ai package ([271e09f](https://github.com/saitatter/pylrcget/commit/271e09fb3b5fc1bd76a0aa991f6f2b7dc7628fb0))
+* **lyrics:** Remove external tidal helper ([af4d9ba](https://github.com/saitatter/pylrcget/commit/af4d9ba29e3769789bbcc51d4a2f9c347feb6a6f))
+* **lyrics:** Remove external provider entry ([2bbf30d](https://github.com/saitatter/pylrcget/commit/2bbf30d981b377411371b5029fde02064fc14f69))
+* **ui:** Compact lyrics provider settings ([216a9d4](https://github.com/saitatter/pylrcget/commit/216a9d4b5696223868321ee208d72be69ec4c7f5))
+* **lyrics:** Add provider error classification ([701a5df](https://github.com/saitatter/pylrcget/commit/701a5df79f4868c85d6875ac56dd4404ad2bc169))
+* **lyrics:** Move lrclib lookup behind provider interface ([f0ac025](https://github.com/saitatter/pylrcget/commit/f0ac0250243605a0df0fd654100ad405847a6ff9))
+* **lyrics:** Add provider-neutral lookup contracts ([404f1d4](https://github.com/saitatter/pylrcget/commit/404f1d4140b87c6b4b590f1de2916b75439c9d8e))
+* **ai:** Add common alignmentrequest/alignmentresult contracts ([fa0274c](https://github.com/saitatter/pylrcget/commit/fa0274c7f0d438cdbaadcc52a51062ddd015a372))
+* Clarify ai sync pipeline ([853dcbd](https://github.com/saitatter/pylrcget/commit/853dcbd8eab1f99c18f59765ee09bb1d418f08b6))
+  Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+* Split ai sync worker modules ([4d5c008](https://github.com/saitatter/pylrcget/commit/4d5c0089793ddad905ac11bd07beee39ccc161c1))
+  Document AI sync experiments and keep WhisperX compatibility behavior while separating runtime, transcription, alignment, and LRC helpers.
+  Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+
+### 🧰 CI & Build
+* **deps-dev:** Bump ruff in the python-dependencies group ([616bfc8](https://github.com/saitatter/pylrcget/commit/616bfc8762f1362aafe3f96c873e1729b79faae2))
+  Bumps the python-dependencies group with 1 update: [ruff](https://github.com/astral-sh/ruff).
+  Updates `ruff` from 0.16.7 to 0.16.8
+- [Release notes](https://github.com/astral-sh/ruff/releases)
+- [Changelog](https://github.com/astral-sh/ruff/blob/main/CHANGELOG.md)
+- [Commits](https://github.com/astral-sh/ruff/compare/0.16.7...0.16.8)
+  ---
+updated-dependencies:
+- dependency-name: ruff dependency-version: 0.16.8
+  dependency-type: direct:development
+  update-type: version-update:semver-patch
+  dependency-group: python-dependencies ...
+  Signed-off-by: dependabot[bot] <support@github.com>
+* **tidal:** Package keyring backends ([31635a2](https://github.com/saitatter/pylrcget/commit/31635a2bd8657d5c01ae4f75ef9143791a4fcfea))
+* **deps:** Bump python-semantic-release/python-semantic-release ([ac7cfba](https://github.com/saitatter/pylrcget/commit/ac7cfbab3fb6a769afd4774219acfc07201d0da6))
+  Bumps the github-actions group with 1 update in the / directory: [python-semantic-release/python-semantic-release](https://github.com/python-semantic-release/python-semantic-release).
+  Updates `python-semantic-release/python-semantic-release` from 10.6.1 to 10.6.2
+- [Release notes](https://github.com/python-semantic-release/python-semantic-release/releases)
+- [Changelog](https://github.com/python-semantic-release/python-semantic-release/blob/master/CHANGELOG.rst)
+- [Commits](https://github.com/python-semantic-release/python-semantic-release/compare/v10.6.1...v10.6.2)
+  ---
+updated-dependencies:
+- dependency-name: python-semantic-release/python-semantic-release dependency-version: 10.6.2
+  dependency-type: direct:production
+  update-type: version-update:semver-patch
+  dependency-group: github-actions ...
+  Signed-off-by: dependabot[bot] <support@github.com>
+* **ai:** Define backend packaging and model-license policy ([5bb446f](https://github.com/saitatter/pylrcget/commit/5bb446f26fc0e88561eb10e1c71e064454672455))
+* **python:** Pin runtime to 3.13.15 ([3a0bc84](https://github.com/saitatter/pylrcget/commit/3a0bc84ebc190c907969a78bb048123c7c70878a))
+* Consolidate benchmark documentation ([ed750d8](https://github.com/saitatter/pylrcget/commit/ed750d8f32700b02db5b87fc502ea5167dee8021))
+* Clean ruff findings ([30802a5](https://github.com/saitatter/pylrcget/commit/30802a5a9ddd8c0938bed657ab4e8ce61f987cfe))
+* Publish ai-free application builds ([2dc5410](https://github.com/saitatter/pylrcget/commit/2dc54104d25c2d086c5a4e5ea12517b014c2c63b))
+  Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+* Clean project with ruff ([2cf1737](https://github.com/saitatter/pylrcget/commit/2cf1737d2d2875dc7af7fd7f6ee8a4574c39d90b))
+  Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+* Constrain pytest discovery to tests ([25880f2](https://github.com/saitatter/pylrcget/commit/25880f2a18d8857c301b147e15fa59cb940486a2))
+  Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+
+### 📚 Docs
+* Refresh readme with screenshot guide ([eeb82f6](https://github.com/saitatter/pylrcget/commit/eeb82f6588629c5b88056b872116c0aa603fad5b))
+* Consolidate project documentation ([b6b093d](https://github.com/saitatter/pylrcget/commit/b6b093d2be14c02355856396f038e1203a205c16))
+* Describe native tidal integration ([1d667dd](https://github.com/saitatter/pylrcget/commit/1d667dd045c573dde9f81a8a45f6393406481c6f))
+* **tidal:** Record final native test count ([9a13eac](https://github.com/saitatter/pylrcget/commit/9a13eaca8830d28f31d41f02bf5faadb9ad3f051))
+* **tidal:** Document native oauth transport ([2786f1a](https://github.com/saitatter/pylrcget/commit/2786f1a095ad0813c7ce7ab781a7e5685c979969))
+* Update multi-provider verification results ([e5abe98](https://github.com/saitatter/pylrcget/commit/e5abe98648cac7f294698bb5476625195d4a384f))
+* Refine tidal helper setup and packaging notes ([68b492e](https://github.com/saitatter/pylrcget/commit/68b492e4da4400a385def5efe05d098b19bf652f))
+* Publish multi-provider tidal results ([0b35fff](https://github.com/saitatter/pylrcget/commit/0b35fff1e349ebedfc6b400f53358aaa448f062c))
+* Document tidal #57 setup and provider architecture ([07b930b](https://github.com/saitatter/pylrcget/commit/07b930bb028359ed9031ea8888d561883965083a))
+* **ai:** Record cuda dtw optimization result ([1928a7a](https://github.com/saitatter/pylrcget/commit/1928a7a6d2018c41401d341d141b227e1bacc855))
+* **ai:** Report ten-track gpu lyrics benchmark ([1b95267](https://github.com/saitatter/pylrcget/commit/1b952674a39bc6ab03972f608bb7bd76c0e5c858))
+* **ai:** Report ten-track lyrics sync benchmark ([63375b7](https://github.com/saitatter/pylrcget/commit/63375b7bd5606afb059868328388441fd50d0052))
+* **ai:** Record read-only english quality sample ([eb01195](https://github.com/saitatter/pylrcget/commit/eb0119549e5348cef8e5c608888b2654c1f61528))
+* **ai:** Record isolated sofa runtime validation ([337abd8](https://github.com/saitatter/pylrcget/commit/337abd862134641601ec237363a01e8b3e77864b))
+* **ai:** Publish final backend benchmark and routing recommendation ([5c1c1d4](https://github.com/saitatter/pylrcget/commit/5c1c1d46ee7fdfc48b9e5f8caa46fb1c7c2bb770))
+* Document english aligner fallback policy ([8b4c5ce](https://github.com/saitatter/pylrcget/commit/8b4c5ce50ba63ae0c5abf6261cdf53177319d73f))
+  Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+* Document wav lyric tags ([cddd576](https://github.com/saitatter/pylrcget/commit/cddd576f6772465f9326fc91734d2bd676ea22a7))
+  Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+* **ai-sync:** Document lyrics-aligner routing and cancellation ([c011c8d](https://github.com/saitatter/pylrcget/commit/c011c8d6aa6767f3de154ccc1f12ff58a4f6b26a))
+  Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+
+### 🧪 Tests
+* **ai:** Skip optional aligner tests without runtime ([84ace28](https://github.com/saitatter/pylrcget/commit/84ace28b311592316a9108a18fc8ea3f4dde7ab2))
+* **lyrics:** Cover bulk provider fallback ([7ebac8c](https://github.com/saitatter/pylrcget/commit/7ebac8c90f7060d5d592db1303813be6c04fbeeb))
+* **tidal:** Cover unicode and version matching fixtures ([ae16834](https://github.com/saitatter/pylrcget/commit/ae16834a05bba870b6b933f2e2ae07da630206fb))
+* **tidal:** Add deterministic matching fixtures ([fafb196](https://github.com/saitatter/pylrcget/commit/fafb196bfd099f99249dd060714cbbb31b4ad938))
+* **db:** Track current schema version in migration assertion ([25a6c41](https://github.com/saitatter/pylrcget/commit/25a6c41ee928f0d9e8feff6fe195068ca264d372))
+* **lyrics:** Characterize current lrclib download behavior ([1797cbb](https://github.com/saitatter/pylrcget/commit/1797cbb862cbf86a82243a472403f5c075f14b01))
+* **media:** Add real audio format matrix ([253d19f](https://github.com/saitatter/pylrcget/commit/253d19fb59b27c478ba3d45a28e8bf536e58a081))
+* **player:** Cover mpv ipc lifecycle ([9d2f029](https://github.com/saitatter/pylrcget/commit/9d2f029976229f4a3394dc97388df7e08d5a0da1))
+* **scan:** Cover cancellation and migration safety ([e404e98](https://github.com/saitatter/pylrcget/commit/e404e98e3e658a38b7f75aef42c007e5d90b0599))
+* **ai:** Record stable-ts cpu time in benchmark reports ([0108acd](https://github.com/saitatter/pylrcget/commit/0108acd2f38d7d7f7715f241d88c0d4244deec19))
+* **ai:** Include stable-ts research benchmark runner ([e3edaa4](https://github.com/saitatter/pylrcget/commit/e3edaa43dc722f0fafc4a1fc4d5e1fbdb8c8acd2))
+* **ai:** Add stable-ts research benchmark runner ([c3101fd](https://github.com/saitatter/pylrcget/commit/c3101fd001cc5acea791d228308587165b87ddde))
+* **ai:** Add multilingual and structural stress regression suite ([3ff7c26](https://github.com/saitatter/pylrcget/commit/3ff7c265457d4b45e68bb34b821886dbe9046566))
+* **scan:** Add reference library soak oracle ([5537110](https://github.com/saitatter/pylrcget/commit/5537110359b513141d1924a73c85047e7aedb893))
+* **scan:** Add regression coverage for sidecar changes on unchanged audio ([ade35a2](https://github.com/saitatter/pylrcget/commit/ade35a26af9e957a4106fee81e329901228c0aa1))
+
+### 🔧 Other Changes
+* Simplify settings tab layout frames ([0a186c0](https://github.com/saitatter/pylrcget/commit/0a186c0b62564dba151fbe65d96138832c7fcec2))
+* **ui:** Check ai runtime status in background ([2980423](https://github.com/saitatter/pylrcget/commit/2980423bacdc0e0b38a8dd9a04fe9936c90dadca))
+* **ui:** Lazy-load ai runtime status ([6fbe576](https://github.com/saitatter/pylrcget/commit/6fbe5767d92c1ebc3ba9579173f4940d82a33292))
+* **ui:** Avoid rebuilding library on unchanged settings save ([a9dfd01](https://github.com/saitatter/pylrcget/commit/a9dfd019b2b678fdf72f9c2b5a17613545b883ff))
+* **tidal:** Probe lyric regions automatically ([43d2823](https://github.com/saitatter/pylrcget/commit/43d2823e2d7a1c973cc8c3d2f4235ee97faaa589))
+* **lyrics:** Coordinate provider rate limits ([aeb0ffc](https://github.com/saitatter/pylrcget/commit/aeb0ffc50ffacad997c4c0d2b2a925001ff36c31))
+* **lyrics:** Bound per-run provider result cache ([614a8df](https://github.com/saitatter/pylrcget/commit/614a8dfa87eb30617f4fc2d9ab66b44c03791e1e))
+* **lyrics:** Enforce provider concurrency and pacing ([48a13ce](https://github.com/saitatter/pylrcget/commit/48a13cebdcfd30ccab70dfee6ed30e131def418a))
+* **lyrics:** Add multi-provider benchmark harness ([be392a2](https://github.com/saitatter/pylrcget/commit/be392a2643ae3d47060ae702a0059576962774af))
+* **lyrics:** Cache provider results per bulk run ([2d263f3](https://github.com/saitatter/pylrcget/commit/2d263f366b9d20a9f3e945d24e82b600a9dba756))
+* **lyrics:** Deduplicate provider lookups in bulk runs ([04f7e06](https://github.com/saitatter/pylrcget/commit/04f7e06a2d880392be3162bb964951e13b3bd602))
+* **lyrics:** Add provider-specific concurrency policy ([ee3b5c0](https://github.com/saitatter/pylrcget/commit/ee3b5c040ace8e19155969224797cd4390f20ff0))
+* **lyrics:** Include provider metadata in bulk jobs ([46c34c9](https://github.com/saitatter/pylrcget/commit/46c34c92156b3fe8999c527125adf0a0fc788535))
+* **tidal:** Cache local-to-tidal track resolution ([34610f8](https://github.com/saitatter/pylrcget/commit/34610f8645be8f2c38ebfc4bce78f184d0c2279f))
+* **ai:** Vectorize cuda lyrics alignment dtw ([aac6f50](https://github.com/saitatter/pylrcget/commit/aac6f501361fcdc62766f5a22c74e57c5fae8ec6))
+* **ai:** Stop redundant full-song whisper retries by default ([8a96aa6](https://github.com/saitatter/pylrcget/commit/8a96aa65e223fdbd6c2ca9be0f736931bf6edcf2))
+* **ai:** Reuse decoded audio across alignment stages ([e36580b](https://github.com/saitatter/pylrcget/commit/e36580b537dac028608f8aa06bc9b9da16f8d010))
+* **ai:** Add bounded model cache and explicit unload policy ([b792f1c](https://github.com/saitatter/pylrcget/commit/b792f1cb340bfa6a6ba568253c6435c8d3a47b77))
+* **ai:** Run demucs only for low-confidence alignment ([9a63205](https://github.com/saitatter/pylrcget/commit/9a632058e95ba47f579d6e4a973a839d0d9d9ee8))
+* **ai:** Route known lyrics without full whisper language detection ([50b48ca](https://github.com/saitatter/pylrcget/commit/50b48ca56690a3256de6f5f543360eb18e2b3524))
+* **ai:** Run english lyrics-aligner in persistent runtime ([e2b92c7](https://github.com/saitatter/pylrcget/commit/e2b92c7ea02ced2b77c08c8ffbb68eb5a073dc45))
+* **ai:** Keep external ai runtime alive across sync jobs ([fd92962](https://github.com/saitatter/pylrcget/commit/fd92962d206a68c40f35d0f8e7533aa880b560e6))
+* **ai:** Add stage profiler and reproducible alignment benchmark ([258804e](https://github.com/saitatter/pylrcget/commit/258804e44c4be661ec63101010b38713d788bcc4))
+* Normalize benchmark report output ([eabff59](https://github.com/saitatter/pylrcget/commit/eabff597e0043b9a0b9583c0a39cd9cc1e7ab68a))
+* Publish final scan and scrape benchmark report ([b35fa4a](https://github.com/saitatter/pylrcget/commit/b35fa4a48b5a5c3aa56bed75c1d92e7c77642901))
+* Record current mutagen benchmark results ([71d4aeb](https://github.com/saitatter/pylrcget/commit/71d4aeb4e416880d480f4648c99a005fbaa108c6))
+* **scan:** Record taglib evaluation and drop decision ([f6f0f4c](https://github.com/saitatter/pylrcget/commit/f6f0f4c0d117d3130ab85ff78fc512297a8e97e6))
+* **scan:** Batch sidecar cache lookups ([725842a](https://github.com/saitatter/pylrcget/commit/725842a371c0087c2a8386444f8aa666af7b5823))
+* Benchmark lrclib fallback early exit ([164e3fe](https://github.com/saitatter/pylrcget/commit/164e3fe11ede9f96e11d820179b5eb454bc71b02))
+* **scrape:** Experiment with high-confidence fallback early exit ([c131483](https://github.com/saitatter/pylrcget/commit/c13148306972658cc025589e321b7f5d6d25e92e))
+* Record lrclib concurrency and sidecar reuse benchmarks ([b77c92d](https://github.com/saitatter/pylrcget/commit/b77c92d37f5346acf07f06a63da18744f0eff68f))
+* **scan:** Reuse resolved sidecar paths for content reads ([2976c5b](https://github.com/saitatter/pylrcget/commit/2976c5bc2e287111896b83b31dd9d8125e58ca0b))
+* Record main versus optimized mutagen scan benchmarks ([8a3a801](https://github.com/saitatter/pylrcget/commit/8a3a801276b98757c5da268c2cc7335614e3260c))
+* **scan:** Avoid reindex for missing sidecar aliases ([3234af3](https://github.com/saitatter/pylrcget/commit/3234af35716fe1dd2debd6a9c77a3ae68af0181c))
+* **scan:** Reuse combined sidecar signature aggregation ([7d576da](https://github.com/saitatter/pylrcget/commit/7d576da4dd50d3ca1ce692f3b091b114783b7b84))
+* Make scan benchmark compatible with main baseline ([5b2e146](https://github.com/saitatter/pylrcget/commit/5b2e1466508140e9f85b2c59aaca8eccede9e31b))
+* Benchmark optimized mutagen scanner on network library ([ba2cbf2](https://github.com/saitatter/pylrcget/commit/ba2cbf2b7716d8d2f3a2024bc10609791f1c9fb7))
+* Record optimized mutagen benchmark results ([bff4083](https://github.com/saitatter/pylrcget/commit/bff40838fd1c8c16bad66d9c397fb0da846c06c3))
+* Support read-only scan benchmark sources ([fe2813a](https://github.com/saitatter/pylrcget/commit/fe2813a7adea71d80b62b212ba917888d23911f2))
+* Measure cached sidecar directory scans ([993670c](https://github.com/saitatter/pylrcget/commit/993670c054f970737d395b7e80b0b8e8db4ec0e3))
+* **scan:** Reduce scan timing contention ([15ec32f](https://github.com/saitatter/pylrcget/commit/15ec32f5750c00662cbf046de8f2f7b78d4864c7))
+* **scan:** Benchmark and tune scan worker counts ([67a6f6f](https://github.com/saitatter/pylrcget/commit/67a6f6f6544c8b741f711a736aad4b152d9b5207))
+* **db:** Batch track writes with executemany ([a8b30cd](https://github.com/saitatter/pylrcget/commit/a8b30cd70b7efa2d2a7076db1d4b289d1915438b))
+* Align lrclib benchmark metrics ([cef051c](https://github.com/saitatter/pylrcget/commit/cef051ceb47c56a2b5c19aae824dd3ab8fd84ae4))
+* **scrape:** Coordinate lrclib rate-limit backoff ([73c5a4c](https://github.com/saitatter/pylrcget/commit/73c5a4c7de9304d8a1fa7f81ff3f95b95b743cbe))
+* **scrape:** Deduplicate lrclib lookups ([1b69458](https://github.com/saitatter/pylrcget/commit/1b69458fc905b330e7245d8f104aa879015723fa))
+* **scrape:** Bound pending lrclib futures ([21ec6e5](https://github.com/saitatter/pylrcget/commit/21ec6e593474235b02a9c5d8b58f9a1ecb7179cd))
+* **scrape:** Bulk load track metadata ([f055517](https://github.com/saitatter/pylrcget/commit/f05551797d918abf6af7b104d8c3e5a237cccc08))
+* **scan:** Skip unnecessary sidecar content reads ([430a72c](https://github.com/saitatter/pylrcget/commit/430a72cb96a38fd25a275afa1438cf6c3c084471))
+* **scan:** Normalize mutagen tag keys once per audio file ([64346bb](https://github.com/saitatter/pylrcget/commit/64346bbb3427d61365e30459c020dec19c19a663))
+* **scan:** Optimize sidecar directory cache with scandir metadata ([3b45e51](https://github.com/saitatter/pylrcget/commit/3b45e51c93d3bd9498803d84022b2e7756afcf99))
+* **scan:** Make unchanged fast path sidecar-aware ([a04d424](https://github.com/saitatter/pylrcget/commit/a04d4241980f3c4d93e385353674dce0b07e64a3))
+* **scan:** Split audio and sidecar signatures ([1752870](https://github.com/saitatter/pylrcget/commit/1752870852e29698aa40a97e58ab2ae76ef6a1b0))
+* **scan:** Add explicit track scan state ([3fd8ea2](https://github.com/saitatter/pylrcget/commit/3fd8ea20fab78f66786e2d459733a805633a2ce6))
+* Add scan and lrclib benchmark harness ([e0ebd83](https://github.com/saitatter/pylrcget/commit/e0ebd8314c1550c28ac94dc88404ea03b5198bcb))
+* Skip whisperx before english lyrics aligner ([2285aef](https://github.com/saitatter/pylrcget/commit/2285aefdf06156c727012b6c94fd53dc8f272cf8))
+  Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+
+
 ## v1.14.1 (2026-08-09)
 
 ### 🐛 Fixes
@@ -209,7 +475,7 @@ updated-dependencies:
   - Report staged progress (load/transcribe/align/select/build) to the UI
   - Cache WhisperX + alignment models; add relaxed-VAD retry and pass selection
   - Add tail-rescue for late repeated lines collapsing onto earlier clusters
-  - Document detection/alignment methods and add tests
+  - Document detection/alignment methods (AI_SYNC_WORKER_METHODS.md) and add tests
   Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
 * Harden ai sync alignment and document scoring pipeline ([55b413d](https://github.com/saitatter/pylrcget/commit/55b413dc849fdd2ca2d55e4becac4cc965dd6134))
   Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
