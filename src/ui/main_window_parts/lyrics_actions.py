@@ -333,10 +333,23 @@ def cleanup_lyrics(window, track_ids: list[int]) -> None:
     if dialog.exec() != QDialog.DialogCode.Accepted:
         return
 
+    cleaned_track_ids: set[int] = set()
+
+    def on_item_finished(track_id: int, payload: dict) -> None:
+        if payload.get("status") == "cleaned":
+            cleaned_track_ids.add(int(track_id))
+
     if not window.lyrics_cleanup.cleanup(
         unique_ids,
         dialog.options(),
-        on_finished=lambda ok, summary, stats: _on_cleanup_finished(window, ok, summary, stats),
+        on_item_finished=on_item_finished,
+        on_finished=lambda ok, summary, stats: _on_cleanup_finished(
+            window,
+            ok,
+            summary,
+            stats,
+            cleaned_track_ids=cleaned_track_ids,
+        ),
     ):
         notify_user(
             window.app_state,
@@ -347,9 +360,25 @@ def cleanup_lyrics(window, track_ids: list[int]) -> None:
         )
 
 
-def _on_cleanup_finished(window, ok: bool, summary: str, stats: dict) -> None:
+def _on_cleanup_finished(
+    window,
+    ok: bool,
+    summary: str,
+    stats: dict,
+    *,
+    cleaned_track_ids: set[int] | None = None,
+) -> None:
     if int(stats.get("cleaned", 0)) > 0:
         window._refresh_visible_library_view_after_downloads()
+    editing_track_id = getattr(window, "_editing_track_id", None)
+    if editing_track_id is not None and int(editing_track_id) in (cleaned_track_ids or set()):
+        try:
+            track = get_track_by_id(window.app_state.db, int(editing_track_id))
+            window._editing_saved_lyrics = canonical_lyrics_pair(track.lrc_lyrics, track.txt_lyrics)
+            window._set_track_lyrics_views(track)
+            window._update_single_track_lyrics_state(track)
+        except (sqlite3.Error, KeyError, ValueError) as exc:
+            logger.warning("Failed to refresh lyrics after cleanup for track %s: %s", editing_track_id, exc)
     notify_user(
         window.app_state,
         summary,
