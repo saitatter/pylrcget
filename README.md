@@ -82,6 +82,12 @@ exports and embedding are explicit user actions.
 Open **Settings > AI Sync > Manage AI runtime** to install missing AI packages.
 You can also select a track and click **Sync with AI** to open setup when needed.
 
+For a batch, select multiple tracks (or Ctrl+A for the current track list), then
+choose **Sync with AI** in the selection bar or **Sync selected tracks with AI**
+from the context menu. Tracks run one at a time; instrumental tracks, missing
+audio and tracks without lyrics are skipped. Results stay as unsaved drafts.
+Cancel stops the current sync and queue; drafts already completed remain available.
+
 ```powershell
 python -m pip install -e ".[ai]"
 ```

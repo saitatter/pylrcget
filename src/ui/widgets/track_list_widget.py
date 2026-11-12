@@ -57,6 +57,7 @@ class TrackListWidget(QWidget):
     downloadLyrics = Signal(int)  # track_id
     exportLyricsFiles = Signal(int)  # track_id
     importLyricsFile = Signal(int, str)  # track_id, file_path
+    bulkAISyncRequested = Signal(list)
     bulkDownloadRequested = Signal(list, str)  # track_ids, mode
     bulkPublishRequested = Signal(list, bool)   # track_ids, is_synced
     openArtist = Signal(int)
@@ -550,6 +551,8 @@ class TrackListWidget(QWidget):
 
         menu.addSeparator()
         self._add_context_section(menu, "Lyrics", f"{len(selected_ids)} selected track(s)")
+        actions["ai_sync_selected"] = menu.addAction("Sync selected tracks with AI")
+        actions["ai_sync_selected"].setEnabled(bool(selected_ids))
         actions["export"] = menu.addAction("Export lyrics files")
         actions["cleanup_lyrics"] = menu.addAction("Clear lyrics…")
         actions["export"].setEnabled(has_focused_track)
@@ -599,6 +602,8 @@ class TrackListWidget(QWidget):
         elif chosen == actions.get("export"):
             if current_track_id is not None:
                 self.exportLyricsFiles.emit(int(current_track_id))
+        elif chosen == actions.get("ai_sync_selected"):
+            self.bulkAISyncRequested.emit(selected_ids)
         elif chosen == actions.get("cleanup_lyrics"):
             self.cleanupLyricsRequested.emit(selected_ids)
         elif chosen == actions.get("download_selected"):

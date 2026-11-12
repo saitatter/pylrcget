@@ -121,14 +121,15 @@ class MainWindowInstrumentalTests(unittest.TestCase):
     def test_auto_sync_missing_dependencies_opens_modal_dialog(self):
         window = MainWindow.__new__(MainWindow)
         window._editing_track_id = 1
+        window.ai_batch_sync = SimpleNamespace(busy=False)
         window._ai_sync_worker = None
         window._show_status_message = MagicMock()
         window.app_state = SimpleNamespace()
 
         with (
-            patch("ui.workers.ai.ai_sync_worker._check_ai_sync_available", return_value=(False, "Missing deps")),
-            patch("ui.workers.ai.ai_sync_worker.get_missing_ai_dependencies", return_value=["torch", "torchaudio"]),
-            patch("ui.main_window.AIDependenciesDialog") as dialog_cls,
+            patch("ui.services.ai_setup._check_ai_sync_available", return_value=(False, "Missing deps")),
+            patch("ui.services.ai_setup.get_missing_ai_dependencies", return_value=["torch", "torchaudio"]),
+            patch("ui.services.ai_setup.AIDependenciesDialog") as dialog_cls,
             patch("ui.main_window.notify_user") as notify_mock,
         ):
             dialog_cls.return_value.exec.return_value = QDialog.DialogCode.Rejected
@@ -290,7 +291,7 @@ class MainWindowInstrumentalTests(unittest.TestCase):
         bar, _label, buttons = MainWindow._create_selection_actions_bar(window)
 
         try:
-            self.assertEqual([button.text() for button in buttons], ["Refresh", "Download", "Export", "Instrumental", "Publish"])
+            self.assertEqual([button.text() for button in buttons], ["Refresh", "Download", "Sync with AI", "Export", "Instrumental", "Publish"])
             self.assertIsInstance(buttons[1], QToolButton)
             self.assertEqual(buttons[1].toolButtonStyle(), Qt.ToolButtonStyle.ToolButtonTextOnly)
             self.assertIsNotNone(buttons[1].menu())

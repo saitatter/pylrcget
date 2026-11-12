@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Features
+- Synchronize selected tracks with AI from the selection bar or context menu, with sequential processing, cancellation, per-track results and unsaved drafts (#62).
+
 ### Docs
 - Document focused commits, safe migrations, isolated tests and project organization with shared contributor and agent rules.
 

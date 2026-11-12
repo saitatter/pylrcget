@@ -7,7 +7,6 @@ from PySide6.QtCore import QEvent, Qt, QTimer
 from PySide6.QtGui import QCloseEvent, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QApplication,
-    QDialog,
     QHBoxLayout,
     QLabel,
     QMainWindow,
@@ -53,6 +52,10 @@ from ui.constants import (
     PLAYBACK_VOLUME_SAVE_MS,
     SEARCH_DEBOUNCE_MS,
 )
+from ui.controllers.ai_batch_sync_controller import (
+    AIBatchSyncController,
+    batch_lyrics_source,
+)
 from ui.controllers.lyrics_cleanup_controller import LyricsCleanupController
 from ui.controllers.lyrics_download_controller import LyricsDownloadController
 from ui.controllers.lyrics_output_controller import LyricsOutputController
@@ -61,7 +64,6 @@ from ui.controllers.publish_history_controller import PublishHistoryController
 from ui.controllers.top_bar_controller import TopBarController
 from ui.controllers.track_maintenance_controller import TrackMaintenanceController
 from ui.dialogs.about_dialog import AboutDialog
-from ui.dialogs.ai_dependencies_dialog import AIDependenciesDialog
 from ui.dialogs.first_run_dialog import FirstRunDialog
 from ui.dialogs.music_folders_dialog import MusicFoldersDialog
 from ui.icon_loader import load_app_icon
@@ -80,6 +82,7 @@ from ui.main_window_parts import (
     preferences,
 )
 from ui.player_bar import PlayerBar
+from ui.services.ai_setup import ensure_ai_sync_dependencies
 from ui.services.feedback import (
     exception_message,
     log_and_notify,
@@ -419,6 +422,16 @@ class MainWindow(QMainWindow):
         self.scan_overlay.sync_to_parent()
         self.ai_sync_overlay = DownloadProgressOverlay(self.central_widget, verb="AI Sync")
         self.ai_sync_overlay.sync_to_parent()
+        self.ai_batch_sync = AIBatchSyncController(
+            get_track=self._get_ai_batch_track,
+            playback_path=self._track_playback_path,
+            store_result=lambda track_id, lrc: self._on_auto_sync_finished(
+                True, "Draft ready", lrc, track_id, batch=True,
+            ),
+            overlay=self.ai_sync_overlay,
+            progress_text=self._humanize_ai_sync_progress,
+            parent=self,
+        )
         self.publish_history = PublishHistoryController(
             self.app_state,
             normalize_lrclib_base=self._normalize_lrclib_base,
@@ -547,6 +560,7 @@ class MainWindow(QMainWindow):
         self.track_list.exportLyricsFiles.connect(self._export_track_sidecars)
         self.track_list.importLyricsFile.connect(self._import_lyrics_file_as_draft)
         self.track_list.bulkDownloadRequested.connect(self._on_bulk_download_requested)
+        self.track_list.bulkAISyncRequested.connect(self._on_bulk_ai_sync_requested)
         self.track_list.bulkPublishRequested.connect(self.publish_history.publish_batch)
         self.track_list.navigateRequested.connect(self.navigate_to)
         self.track_list.markInstrumental.connect(self._on_mark_instrumental)
@@ -562,6 +576,7 @@ class MainWindow(QMainWindow):
         self.albums_tab.exportLyricsFiles.connect(self._export_track_sidecars)
         self.albums_tab.importLyricsFile.connect(self._import_lyrics_file_as_draft)
         self.albums_tab.bulkDownloadRequested.connect(self._on_bulk_download_requested)
+        self.albums_tab.bulkAISyncRequested.connect(self._on_bulk_ai_sync_requested)
         self.albums_tab.navigateRequested.connect(self.navigate_to)
         self.albums_tab.markInstrumental.connect(self._on_mark_instrumental)
         self.albums_tab.unmarkInstrumental.connect(self._on_unmark_instrumental)
@@ -578,6 +593,7 @@ class MainWindow(QMainWindow):
         self.artists_tab.exportLyricsFiles.connect(self._export_track_sidecars)
         self.artists_tab.importLyricsFile.connect(self._import_lyrics_file_as_draft)
         self.artists_tab.bulkDownloadRequested.connect(self._on_bulk_download_requested)
+        self.artists_tab.bulkAISyncRequested.connect(self._on_bulk_ai_sync_requested)
         self.artists_tab.navigateRequested.connect(self.navigate_to)
         self.artists_tab.markInstrumental.connect(self._on_mark_instrumental)
         self.artists_tab.unmarkInstrumental.connect(self._on_unmark_instrumental)
@@ -595,6 +611,7 @@ class MainWindow(QMainWindow):
         self.album_artists_tab.exportLyricsFiles.connect(self._export_track_sidecars)
         self.album_artists_tab.importLyricsFile.connect(self._import_lyrics_file_as_draft)
         self.album_artists_tab.bulkDownloadRequested.connect(self._on_bulk_download_requested)
+        self.album_artists_tab.bulkAISyncRequested.connect(self._on_bulk_ai_sync_requested)
         self.album_artists_tab.navigateRequested.connect(self.navigate_to)
         self.album_artists_tab.markInstrumental.connect(self._on_mark_instrumental)
         self.album_artists_tab.unmarkInstrumental.connect(self._on_unmark_instrumental)
@@ -712,6 +729,11 @@ class MainWindow(QMainWindow):
                 ("Synced only", lambda: self._download_selected_tracks("synced_only")),
                 ("Plain only", lambda: self._download_selected_tracks("plain_only")),
             ],
+        )
+        add_button(
+            "Sync with AI",
+            "Synchronize lyrics for selected tracks, one at a time, as unsaved drafts.",
+            lambda: self._on_bulk_ai_sync_requested(self._selected_track_ids_for_toolbar()),
         )
         add_button(
             "Export",
@@ -1038,6 +1060,10 @@ class MainWindow(QMainWindow):
         if self._dirty_lyrics_timer.isActive():
             self._dirty_lyrics_timer.stop()
             self._flush_dirty_lyrics()
+        if not self.ai_batch_sync.shutdown():
+            self._show_status_message("AI sync is still shutting down. Please try closing again.")
+            event.ignore()
+            return
         # Cancel running workers before shutdown
         if self._ai_sync_worker is not None and self._ai_sync_worker.isRunning():
             self._ai_sync_worker.requestInterruption()
@@ -1577,13 +1603,29 @@ class MainWindow(QMainWindow):
     def _on_discard_draft_requested(self) -> None:
         lyrics_actions.on_discard_draft_requested(self)
 
+    def _get_ai_batch_track(self, track_id: int):
+        self._flush_dirty_lyrics()
+        return get_track_by_id(self.app_state.db, track_id)
+
+    def _on_bulk_ai_sync_requested(self, track_ids: list[int]) -> None:
+        if not track_ids:
+            return
+        if self.ai_batch_sync.busy or (
+            self._ai_sync_worker is not None and self._ai_sync_worker.isRunning()
+        ):
+            self._show_status_message("AI sync is already running. Please wait.")
+            return
+        self._flush_dirty_lyrics()
+        settings = load_ai_sync_settings(get_config(self.app_state.db).ui_state_json)
+        if ensure_ai_sync_dependencies(self, settings):
+            self.ai_batch_sync.start(track_ids, settings)
+
     def _on_auto_sync_requested(self) -> None:
-        from ui.workers.ai.ai_runtime import nvidia_gpu_available
-        from ui.workers.ai.ai_sync_worker import (
-            AiSyncWorker,
-            _check_ai_sync_available,
-            get_missing_ai_dependencies,
-        )
+        from ui.workers.ai.ai_sync_worker import AiSyncWorker
+
+        if self.ai_batch_sync.busy:
+            self._show_status_message("AI sync is already running. Please wait.")
+            return
 
         track_id = self._editing_track_id
         if track_id is None:
@@ -1608,33 +1650,7 @@ class MainWindow(QMainWindow):
 
         config = get_config(self.app_state.db) if getattr(self.app_state, "db", None) else None
         ai_sync_settings = load_ai_sync_settings(config.ui_state_json) if config else {}
-        device_setting = str(ai_sync_settings.get("device") or "auto")
-        prefer_cuda = device_setting == "cuda" or (
-            device_setting == "auto" and nvidia_gpu_available()
-        )
-        missing = get_missing_ai_dependencies(
-            prefer_cuda=prefer_cuda,
-            require_lyrics_aligner=True,
-            require_demucs=bool(ai_sync_settings.get("enable_demucs_candidate", True)),
-        )
-        ok, msg = _check_ai_sync_available()
-        if not ok or missing:
-            if prefer_cuda and "torch-cuda" in missing:
-                msg = (
-                    (msg + "\n\n") if msg else ""
-                ) + "CUDA-enabled Torch is required for the selected GPU mode."
-            dlg = AIDependenciesDialog(missing, msg, self)
-            if dlg.exec() == QDialog.DialogCode.Accepted:
-                ok_after_install, _ = _check_ai_sync_available()
-                missing_after_install = get_missing_ai_dependencies(
-                    prefer_cuda=prefer_cuda,
-                    require_lyrics_aligner=True,
-                    require_demucs=bool(
-                        ai_sync_settings.get("enable_demucs_candidate", True)
-                    ),
-                )
-                if ok_after_install and not missing_after_install:
-                    self._on_auto_sync_requested()
+        if not ensure_ai_sync_dependencies(self, ai_sync_settings):
             return
 
         track = get_track_by_id(self.app_state.db, int(track_id))
@@ -1709,21 +1725,23 @@ class MainWindow(QMainWindow):
         track_id: int,
         *,
         cancelled_worker: bool = False,
-    ) -> None:
+        batch: bool = False,
+    ) -> bool:
         if cancelled_worker:
-            return
+            return False
 
-        for view in self._all_lyrics_views():
-            view.btn_auto_sync.setEnabled(True)
-            view.btn_auto_sync.setText("Sync with AI")
+        if not batch:
+            for view in self._all_lyrics_views():
+                view.btn_auto_sync.setEnabled(True)
+                view.btn_auto_sync.setText("Sync with AI")
 
-        overlay = getattr(self, "ai_sync_overlay", None)
-        if overlay is not None:
-            overlay.append_result("AI Sync", msg, ok)
-            overlay.finish_batch(
-                "AI sync cancelled." if msg == "Cancelled." else msg,
-                cancelled=(msg == "Cancelled."),
-            )
+            overlay = getattr(self, "ai_sync_overlay", None)
+            if overlay is not None:
+                overlay.append_result("AI Sync", msg, ok)
+                overlay.finish_batch(
+                    "AI sync cancelled." if msg == "Cancelled." else msg,
+                    cancelled=(msg == "Cancelled."),
+                )
 
         if not ok:
             notify_user(
@@ -1733,7 +1751,7 @@ class MainWindow(QMainWindow):
                 show_status=self._show_status_message,
                 status_timeout_ms=5000,
             )
-            return
+            return False
 
         try:
             from core.utils import plain_text_from_lrc
@@ -1743,6 +1761,8 @@ class MainWindow(QMainWindow):
                 plain_source = (track.dirty_txt_lyrics or "").strip()
             elif track.txt_lyrics:
                 plain_source = (track.txt_lyrics or "").strip()
+            if batch:
+                plain_source = batch_lyrics_source(track)
             plain = plain_source if plain_source else plain_text_from_lrc(lrc)
             update_track_dirty_lyrics(self.app_state.db, int(track_id), lrc.strip(), plain.strip())
             if self._editing_track_id == track_id:
@@ -1752,13 +1772,15 @@ class MainWindow(QMainWindow):
             self.albums_tab.set_dirty_lyrics_state(int(track_id), True)
             self.artists_tab.set_dirty_lyrics_state(int(track_id), True)
             self.album_artists_tab.set_dirty_lyrics_state(int(track_id), True)
-            notify_user(
-                self.app_state,
-                msg + " (loaded as draft — save to apply)",
-                "success",
-                show_status=self._show_status_message,
-                status_timeout_ms=4000,
-            )
+            if not batch:
+                notify_user(
+                    self.app_state,
+                    msg + " (loaded as draft — save to apply)",
+                    "success",
+                    show_status=self._show_status_message,
+                    status_timeout_ms=4000,
+                )
+            return True
         except (sqlite3.Error, OSError, ValueError) as exc:
             log_and_notify(
                 self.app_state,
@@ -1769,6 +1791,7 @@ class MainWindow(QMainWindow):
                 show_status=self._show_status_message,
                 status_timeout_ms=4000,
             )
+            return False
 
     def _on_ai_sync_thread_finished(self, worker) -> None:
         was_cancelled = getattr(self, "_ai_sync_cancelled_worker", None) is worker
@@ -1889,6 +1912,9 @@ class MainWindow(QMainWindow):
             pass
 
     def _cancel_ai_sync(self) -> None:
+        if self.ai_batch_sync.busy:
+            self.ai_batch_sync.cancel()
+            return
         worker = getattr(self, "_ai_sync_worker", None)
         if worker is not None and worker.isRunning():
             self._ai_sync_cancelled_worker = worker
