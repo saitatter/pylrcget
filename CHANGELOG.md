@@ -5,16 +5,16 @@
 ### Features
 - Synchronize selected tracks with AI from the selection bar or context menu, with sequential processing, cancellation, per-track results and unsaved drafts (#62).
 
-### Docs
-- Document focused commits, safe migrations, isolated tests and project organization with shared contributor and agent rules.
-
-### CI & Build
-- Releases preserve reviewed changelog entries and historical notes, with plain headings and complete commit lists.
-
 ### Fixes
 - LRCLIB requests share a configurable pause (one second by default), respect Retry-After and retry rate-limited lookups instead of sending bursts across workers (#64).
 - Settings > AI Sync opens the AI setup dialog from Manage AI runtime, including on a fresh installation with no runtime folder (#61).
 - Packaged builds download and verify their own Python runtime when setting up AI synchronization, with setup instructions that require no separate Python installation (#41).
+
+### Docs
+- Document focused commits, safe migrations, isolated tests and project organization with shared contributor and agent rules.
+
+### CI & Build
+- Releases require passing tests and lint, preserve reviewed changelog entries and historical notes, and use plain headings, complete commit lists and conventional release commits.
 
 ## v1.15.0 (2026-09-23)
 

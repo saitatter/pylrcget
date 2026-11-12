@@ -1,4 +1,4 @@
-{%- set previous = ctx.read_file("CHANGELOG.md") -%}
+{%- set previous = ctx.prev_changelog_file | read_file -%}
 {%- for version_obj, release in ctx.history.released.items() -%}
 {%- if loop.first -%}
 {%- set heading = "## " ~ version_obj.as_tag() ~ " (" ~ release.tagged_date.strftime("%Y-%m-%d") ~ ")" -%}

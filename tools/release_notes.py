@@ -34,6 +34,21 @@ def render_notes(summary: list[str], commits: list[str], generated: str) -> str:
     return body + ("\n\n" + footer if footer else "") + "\n"
 
 
+def commit_rows(history: str, repo: str) -> list[str]:
+    rows = []
+    for record in history.split("\x1e"):
+        if not record.strip():
+            continue
+        sha, author, email, title, body = record.strip("\r\n").split("\x00", 4)
+        login = re.fullmatch(r"(?:\d+\+)?([\w-]+)@users\.noreply\.github\.com", email)
+        credit = f"[@{login[1]}](https://github.com/{login[1]})" if login else author
+        issues = dict.fromkeys(re.findall(r"(?<![\w/])#(\d+)\b", body))
+        links = ", ".join(f"[#{number}](https://github.com/{repo}/issues/{number})" for number in issues)
+        row = f"- {title} by {credit} ([{sha[:7]}](https://github.com/{repo}/commit/{sha}))"
+        rows.append(row + (f"; {links}" if links else ""))
+    return rows
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repo", default="saitatter/pylrcget")
@@ -45,11 +60,8 @@ def main() -> None:
     tags = run("git", "tag", "--merged", args.tag, "--sort=-version:refname").splitlines()
     previous = next((tag for tag in tags if tag != args.tag), None)
     revision = f"{previous}..{args.tag}" if previous else args.tag
-    history = run("git", "log", "--reverse", "--no-merges", "--format=%H%x09%an%x09%s", revision)
-    commits = []
-    for row in history.splitlines():
-        sha, author, title = row.split("\t", 2)
-        commits.append(f"- {title} by {author} ([{sha[:7]}](https://github.com/{args.repo}/commit/{sha}))")
+    history = run("git", "log", "--reverse", "--no-merges", "--format=%H%x00%an%x00%ae%x00%s%x00%b%x1e", revision)
+    commits = commit_rows(history, args.repo)
     summaries = json.loads((ROOT / "docs/release-summaries.json").read_text(encoding="utf-8"))
     summary = summaries.get(args.tag, {}).get("summary")
     if summary is None:
@@ -62,6 +74,11 @@ def main() -> None:
     if len(notes.encode("utf-8")) > 120000:
         raise ValueError("Release description is too large; shorten the history before publishing")
     if args.write:
+        release = json.loads(run("gh", "release", "view", args.tag, "--repo", args.repo, "--json", "isDraft,body"))
+        if release["isDraft"]:
+            raise ValueError("Draft releases are not updated")
+        if release["body"].strip() == notes.strip():
+            return
         subprocess.run(
             ["gh", "release", "edit", args.tag, "--repo", args.repo, "--notes-file", "-"],
             input=notes, text=True, encoding="utf-8", cwd=ROOT, check=True,
