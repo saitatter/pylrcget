@@ -516,7 +516,9 @@ def test_ai_sync_availability_message_guides_exe_users(monkeypatch):
     assert ok is False
     assert "Missing AI dependencies:" in msg
     assert "pip install .[ai]" in msg
-    assert "bundled Python" in msg
+    assert "Install missing dependencies" in msg
+    assert "do not need to install Python separately" in msg
+    assert "Settings > AI Sync > Manage AI runtime" in msg
 
 
 def test_get_missing_ai_dependencies_returns_expected_packages(monkeypatch):

@@ -365,8 +365,10 @@ def _check_ai_sync_available() -> tuple[bool, str]:
             f"Missing AI dependencies: {', '.join(missing)}.\n\n"
             "If you run PyLrcGet from source, install them in that environment:\n"
             "  pip install .[ai]\n\n"
-            "If you use the packaged .exe, install these packages in the app's bundled Python "
-            "(installing into system Python is not enough)."
+            "If you use a packaged app, select Install missing dependencies in this "
+            "dialog. PyLrcGet downloads and sets up everything automatically; "
+            "you do not need to install Python separately. You can also open "
+            "Settings > AI Sync > Manage AI runtime."
         )
     return True, ""
 
