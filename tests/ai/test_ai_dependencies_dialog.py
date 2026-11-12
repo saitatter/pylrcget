@@ -82,7 +82,7 @@ def test_ai_setup_dialog_enables_install_for_bootstrap_plan(tmp_path, monkeypatc
     try:
         assert dialog.btn_install.isEnabled()
         assert not dialog.btn_copy.isEnabled()
-        assert "bootstrap" in dialog.btn_copy.toolTip()
+        assert "setup downloads" in dialog.btn_copy.toolTip()
     finally:
         dialog.close()
 

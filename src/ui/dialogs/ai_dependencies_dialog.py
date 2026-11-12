@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
 
 from ui.button_roles import set_button_role
 from ui.spacing import SPACE_2, SPACE_3, SPACE_4, set_layout_spacing
+from ui.workers.ai.ai_aligner_bootstrap import ensure_lyrics_aligner
 from ui.workers.ai.ai_bootstrap import ensure_bootstrap_python
 from ui.workers.ai.ai_runtime import AIInstallPlan, resolve_ai_install_plan
 from ui.workers.ai.ai_sync_worker import get_missing_ai_dependencies
@@ -40,7 +41,7 @@ class _InstallAIDependenciesWorker(QThread):
             try:
                 self.lineReady.emit(
                     "Preparing standalone Python 3.13.15; the first download is "
-                    "about 20–35 MB."
+                    "about 20Ã¢â‚¬â€œ35 MB."
                 )
                 executable = ensure_bootstrap_python(
                     self._plan.bootstrap_artifact,
@@ -58,6 +59,13 @@ class _InstallAIDependenciesWorker(QThread):
                 False, self._plan.error or "No AI installation plan is available."
             )
             return
+
+        if self._plan.lyrics_aligner_root is not None:
+            try:
+                ensure_lyrics_aligner(self._plan.lyrics_aligner_root, self.lineReady.emit)
+            except (OSError, RuntimeError) as exc:
+                self.finishedInstall.emit(False, str(exc))
+                return
 
         self.lineReady.emit(f"Running: {' '.join(cmd)}")
         try:
@@ -150,13 +158,10 @@ class AIDependenciesDialog(QDialog):
         set_button_role(self.btn_close, "secondary")
         self.btn_retry.setEnabled(False)
         self.btn_install.setEnabled(self._install_plan.can_install)
-        self.btn_copy.setEnabled(self._install_plan.command is not None)
-        if (
-            self._install_plan.bootstrap_artifact is not None
-            and self._install_plan.command is None
-        ):
+        self.btn_copy.setEnabled(bool(self._install_command_text()))
+        if not self._install_command_text():
             self.btn_copy.setToolTip(
-                "A command is available after the automatic Python bootstrap is prepared."
+                "A command is available after the automatic setup downloads are prepared."
             )
 
         self.btn_install.clicked.connect(self._start_install)
@@ -201,6 +206,9 @@ class AIDependenciesDialog(QDialog):
         return "\n".join(lines)
 
     def _install_command_text(self) -> str:
+        aligner_root = self._install_plan.lyrics_aligner_root
+        if aligner_root is not None and not (aligner_root / "model_parameters.pth").is_file():
+            return ""
         if not self._install_plan.command:
             return ""
         return " ".join(self._install_plan.command)
@@ -248,13 +256,10 @@ class AIDependenciesDialog(QDialog):
                 self._install_plan = refreshed_plan
         self.details.append(f"\n{message}")
         self.btn_install.setEnabled(self._install_plan.can_install)
-        self.btn_copy.setEnabled(self._install_plan.command is not None)
+        self.btn_copy.setEnabled(bool(self._install_command_text()))
         self.btn_copy.setToolTip(
-            "A command is available after the automatic Python bootstrap is prepared."
-            if (
-                self._install_plan.bootstrap_artifact is not None
-                and self._install_plan.command is None
-            )
+            "A command is available after the automatic setup downloads are prepared."
+            if not self._install_command_text()
             else ""
         )
         self.btn_close.setEnabled(True)

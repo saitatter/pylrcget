@@ -93,7 +93,7 @@ python -m pip install -e ".[ai]"
 ```
 
 The packaged app can install the AI stack into its own runtime without a
-system Python installation. On the first install, it downloads and verifies a
+system Python or Git installation. On the first install, it downloads and verifies a
 pinned Python 3.13.15 bootstrap, caches it locally, and installs the AI stack
 into an isolated runtime. WhisperX supports the multilingual path;
 `lyrics-aligner` is used for English when it is available. CUDA is selected

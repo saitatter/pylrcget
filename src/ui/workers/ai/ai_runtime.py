@@ -27,6 +27,7 @@ class AIInstallPlan:
     bootstrap_runtime_root: Path | None = None
     bootstrap_arguments: tuple[str, ...] = ()
     error: str = ""
+    lyrics_aligner_root: Path | None = None
 
     @property
     def can_install(self) -> bool:
@@ -106,6 +107,7 @@ def resolve_ai_install_plan(packages: list[str]) -> AIInstallPlan:
     missing = [package for package in packages if str(package).strip()]
     if not missing:
         return AIInstallPlan(error="No missing AI dependencies were detected.")
+    aligner_root = default_lyrics_aligner_dir() if "lyrics-aligner" in missing else None
 
     bootstrap = os.environ.get("PYLRCGET_AI_BOOTSTRAP_PYTHON", "").strip()
     if bootstrap:
@@ -135,7 +137,10 @@ def resolve_ai_install_plan(packages: list[str]) -> AIInstallPlan:
                     "interpreter or set PYLRCGET_AI_BOOTSTRAP_PYTHON to it."
                 )
             )
-        return AIInstallPlan(command=_build_ai_install_command(bootstrap_python, missing))
+        return AIInstallPlan(
+            command=_build_ai_install_command(bootstrap_python, missing),
+            lyrics_aligner_root=aligner_root,
+        )
 
     if not getattr(sys, "frozen", False):
         if tuple(sys.version_info[:3]) != _SUPPORTED_PYTHON:
@@ -147,7 +152,8 @@ def resolve_ai_install_plan(packages: list[str]) -> AIInstallPlan:
                 )
             )
         return AIInstallPlan(
-            command=_build_ai_install_command(Path(sys.executable), missing)
+            command=_build_ai_install_command(Path(sys.executable), missing),
+            lyrics_aligner_root=aligner_root,
         )
 
     artifact = resolve_bootstrap_artifact()
@@ -171,6 +177,7 @@ def resolve_ai_install_plan(packages: list[str]) -> AIInstallPlan:
         bootstrap_artifact=artifact,
         bootstrap_runtime_root=bootstrap_root,
         bootstrap_arguments=tuple(_build_ai_install_arguments(missing)),
+        lyrics_aligner_root=aligner_root,
     )
 
 
@@ -193,12 +200,7 @@ def _build_ai_install_arguments(packages: list[str]) -> list[str]:
         "args=sys.argv[1:]\n"
         "aligner='lyrics-aligner' in args\n"
         "args=[arg for arg in args if arg != 'lyrics-aligner']\n"
-        f"aligner_root={str(default_lyrics_aligner_dir())!r}\n"
         "if aligner:\n"
-        "    if not os.path.isfile(os.path.join(aligner_root, 'align.py')):\n"
-        "        os.makedirs(os.path.dirname(aligner_root), exist_ok=True)\n"
-        "        subprocess.check_call(['git', 'clone', "
-        "'https://github.com/schufo/lyrics-aligner.git', aligner_root])\n"
         "    subprocess.check_call([python, '-m', 'pip', 'install', 'g2p-en', 'librosa'])\n"
         "cuda='torch-cuda' in args\n"
         "args=[arg for arg in args if arg != 'torch-cuda']\n"

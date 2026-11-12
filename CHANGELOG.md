@@ -8,7 +8,7 @@
 ### Fixes
 - LRCLIB requests share a configurable pause (one second by default), respect Retry-After and retry rate-limited lookups instead of sending bursts across workers (#64).
 - Settings > AI Sync opens the AI setup dialog from Manage AI runtime, including on a fresh installation with no runtime folder (#61).
-- Packaged builds download and verify their own Python runtime when setting up AI synchronization, with setup instructions that require no separate Python installation (#41).
+- Packaged builds download and verify Python and the English alignment backend during AI setup, without requiring separate Python or Git installations (#41).
 
 ### Docs
 - Document focused commits, safe migrations, isolated tests and project organization with shared contributor and agent rules.
