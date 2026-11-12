@@ -83,12 +83,18 @@ exports and embedding are explicit user actions.
 python -m pip install -e ".[ai]"
 ```
 
-The packaged app can install the AI stack into its own runtime. WhisperX
-supports the multilingual path; `lyrics-aligner` is used for English when it
-is available. CUDA is selected automatically when available, but GPU is not
-guaranteed to be faster for every backend.
+The packaged app can install the AI stack into its own runtime without a
+system Python installation. On the first install, it downloads and verifies a
+pinned Python 3.13.15 bootstrap, caches it locally, and installs the AI stack
+into an isolated runtime. WhisperX supports the multilingual path;
+`lyrics-aligner` is used for English when it is available. CUDA is selected
+automatically when available, but GPU is not guaranteed to be faster for every
+backend. AI packages and models are still downloaded separately and can be
+large. The bootstrap distribution is provided by
+[python-build-standalone](https://github.com/astral-sh/python-build-standalone);
+its license files are retained with the cached runtime.
 
-If the bootstrap interpreter must be selected explicitly:
+To use a separately installed Python 3.13.15 bootstrap explicitly:
 
 ```powershell
 $env:PYLRCGET_AI_BOOTSTRAP_PYTHON = "C:\Path\to\python.exe"
@@ -187,7 +193,8 @@ Releases use Conventional Commits and semantic-release. See
 [CHANGELOG.md](CHANGELOG.md) for published changes.
 
 - **No lyrics found:** check provider enablement/order and the track metadata.
-- **AI dependencies missing:** use the AI setup dialog or install the `ai` extra with Python 3.13.15.
+- **AI dependencies missing:** packaged builds can install them from the AI setup
+  dialog; source builds need Python 3.13.15.
 - **Playback issue:** verify the backend and codec support for the file format.
 - **Windows SmartScreen warning:** release executables are currently unsigned.
 

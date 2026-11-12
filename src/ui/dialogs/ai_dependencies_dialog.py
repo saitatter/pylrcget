@@ -17,7 +17,8 @@ from PySide6.QtWidgets import (
 
 from ui.button_roles import set_button_role
 from ui.spacing import SPACE_2, SPACE_3, SPACE_4, set_layout_spacing
-from ui.workers.ai.ai_runtime import resolve_ai_install_command
+from ui.workers.ai.ai_bootstrap import ensure_bootstrap_python
+from ui.workers.ai.ai_runtime import AIInstallPlan, resolve_ai_install_plan
 from ui.workers.ai.ai_sync_worker import get_missing_ai_dependencies
 
 logger = logging.getLogger(__name__)
@@ -27,12 +28,37 @@ class _InstallAIDependenciesWorker(QThread):
     lineReady = Signal(str)
     finishedInstall = Signal(bool, str)
 
-    def __init__(self, command: list[str], parent=None) -> None:
+    def __init__(self, plan: AIInstallPlan, parent=None) -> None:
         super().__init__(parent)
-        self._command = list(command)
+        self._plan = plan
 
     def run(self) -> None:
-        cmd = list(self._command)
+        if (
+            self._plan.bootstrap_artifact is not None
+            and self._plan.bootstrap_runtime_root is not None
+        ):
+            try:
+                self.lineReady.emit(
+                    "Preparing standalone Python 3.13.15; the first download is "
+                    "about 20–35 MB."
+                )
+                executable = ensure_bootstrap_python(
+                    self._plan.bootstrap_artifact,
+                    self._plan.bootstrap_runtime_root,
+                    self.lineReady.emit,
+                )
+            except (OSError, RuntimeError) as exc:
+                self.finishedInstall.emit(False, str(exc))
+                return
+            cmd = [str(executable), *self._plan.bootstrap_arguments]
+        elif self._plan.command is not None:
+            cmd = list(self._plan.command)
+        else:
+            self.finishedInstall.emit(
+                False, self._plan.error or "No AI installation plan is available."
+            )
+            return
+
         self.lineReady.emit(f"Running: {' '.join(cmd)}")
         try:
             process = subprocess.Popen(
@@ -44,7 +70,9 @@ class _InstallAIDependenciesWorker(QThread):
                 errors="replace",
             )
         except OSError as exc:
-            self.finishedInstall.emit(False, f"Could not start pip install: {exc}")
+            self.finishedInstall.emit(
+                False, f"Could not start AI dependency installation: {exc}"
+            )
             return
 
         assert process.stdout is not None
@@ -54,17 +82,21 @@ class _InstallAIDependenciesWorker(QThread):
         if exit_code == 0:
             self.finishedInstall.emit(True, "AI dependencies installed successfully.")
             return
-        self.finishedInstall.emit(False, f"pip install failed with exit code {exit_code}.")
+        self.finishedInstall.emit(
+            False, f"pip install failed with exit code {exit_code}."
+        )
 
 
 class AIDependenciesDialog(QDialog):
-    def __init__(self, missing_packages: list[str], check_message: str, parent=None) -> None:
+    def __init__(
+        self, missing_packages: list[str], check_message: str, parent=None
+    ) -> None:
         super().__init__(parent)
         self._missing_packages = list(missing_packages)
         self._check_message = (check_message or "").strip()
         self._worker: _InstallAIDependenciesWorker | None = None
         self._install_succeeded = False
-        self._install_cmd, self._install_cmd_error = resolve_ai_install_command(self._missing_packages)
+        self._install_plan = resolve_ai_install_plan(self._missing_packages)
 
         self.setWindowTitle("AI Sync setup")
         self.resize(760, 520)
@@ -76,15 +108,25 @@ class AIDependenciesDialog(QDialog):
         title.setObjectName("DialogTitle")
         root.addWidget(title)
 
-        summary_text = (
-            "You can install required packages directly from this dialog. "
-            "After installation, use Retry AI Sync to continue."
-            if self._install_cmd
-            else (
+        if (
+            self._install_plan.bootstrap_artifact is not None
+            and self._install_plan.command is None
+        ):
+            summary_text = (
+                "PyLrcGet will set up its pinned Python runtime automatically on "
+                "the first install, then install the required AI packages. "
+                "After installation, use Retry AI Sync to continue."
+            )
+        elif self._install_plan.can_install:
+            summary_text = (
+                "You can install required packages directly from this dialog. "
+                "After installation, use Retry AI Sync to continue."
+            )
+        else:
+            summary_text = (
                 "Automatic install is unavailable for this runtime. "
                 "Use the instructions below, then reopen AI Sync."
             )
-        )
         summary = QLabel(summary_text)
         summary.setWordWrap(True)
         summary.setObjectName("DialogSubtle")
@@ -107,8 +149,15 @@ class AIDependenciesDialog(QDialog):
         set_button_role(self.btn_retry, "primary")
         set_button_role(self.btn_close, "secondary")
         self.btn_retry.setEnabled(False)
-        self.btn_install.setEnabled(bool(self._install_cmd))
-        self.btn_copy.setEnabled(bool(self._install_cmd))
+        self.btn_install.setEnabled(self._install_plan.can_install)
+        self.btn_copy.setEnabled(self._install_plan.command is not None)
+        if (
+            self._install_plan.bootstrap_artifact is not None
+            and self._install_plan.command is None
+        ):
+            self.btn_copy.setToolTip(
+                "A command is available after the automatic Python bootstrap is prepared."
+            )
 
         self.btn_install.clicked.connect(self._start_install)
         self.btn_copy.clicked.connect(self._copy_install_command)
@@ -131,16 +180,30 @@ class AIDependenciesDialog(QDialog):
             "",
             f"Python runtime used by app:\n{sys.executable}",
         ]
-        if command:
+        if (
+            self._install_plan.bootstrap_artifact is not None
+            and self._install_plan.command is None
+        ):
+            lines.extend(
+                [
+                    "",
+                    (
+                        "On first install, PyLrcGet will download and verify Python "
+                        "3.13.15 for this device. The bootstrap is cached locally; AI "
+                        "packages are then installed into the app's isolated runtime."
+                    ),
+                ]
+            )
+        elif command:
             lines.extend(["", "Install command:", command])
-        elif self._install_cmd_error:
-            lines.extend(["", self._install_cmd_error])
+        elif self._install_plan.error:
+            lines.extend(["", self._install_plan.error])
         return "\n".join(lines)
 
     def _install_command_text(self) -> str:
-        if not self._install_cmd:
+        if not self._install_plan.command:
             return ""
-        return " ".join(self._install_cmd)
+        return " ".join(self._install_plan.command)
 
     def _copy_install_command(self) -> None:
         command = self._install_command_text()
@@ -154,9 +217,9 @@ class AIDependenciesDialog(QDialog):
             self.details.append("\nNo missing AI dependencies were detected.")
             self.btn_retry.setEnabled(True)
             return
-        if not self._install_cmd:
-            if self._install_cmd_error:
-                self.details.append(f"\n{self._install_cmd_error}")
+        if not self._install_plan.can_install:
+            if self._install_plan.error:
+                self.details.append(f"\n{self._install_plan.error}")
             return
         if self._worker is not None and self._worker.isRunning():
             return
@@ -167,7 +230,7 @@ class AIDependenciesDialog(QDialog):
         self.btn_retry.setEnabled(False)
         self.btn_close.setEnabled(False)
 
-        worker = _InstallAIDependenciesWorker(self._install_cmd, self)
+        worker = _InstallAIDependenciesWorker(self._install_plan, self)
         worker.lineReady.connect(self._append_line)
         worker.finishedInstall.connect(self._on_install_finished)
         self._worker = worker
@@ -179,14 +242,28 @@ class AIDependenciesDialog(QDialog):
         self.details.append(line)
 
     def _on_install_finished(self, ok: bool, message: str) -> None:
+        if self._install_plan.bootstrap_artifact is not None:
+            refreshed_plan = resolve_ai_install_plan(self._missing_packages)
+            if refreshed_plan.command is not None:
+                self._install_plan = refreshed_plan
         self.details.append(f"\n{message}")
-        self.btn_install.setEnabled(True)
-        self.btn_copy.setEnabled(True)
+        self.btn_install.setEnabled(self._install_plan.can_install)
+        self.btn_copy.setEnabled(self._install_plan.command is not None)
+        self.btn_copy.setToolTip(
+            "A command is available after the automatic Python bootstrap is prepared."
+            if (
+                self._install_plan.bootstrap_artifact is not None
+                and self._install_plan.command is None
+            )
+            else ""
+        )
         self.btn_close.setEnabled(True)
 
         if ok and not get_missing_ai_dependencies():
             self._install_succeeded = True
-            self.details.append("Dependencies are now available. You can retry AI Sync.")
+            self.details.append(
+                "Dependencies are now available. You can retry AI Sync."
+            )
             self.btn_retry.setEnabled(True)
             return
 

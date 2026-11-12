@@ -1,13 +1,36 @@
 """Resolution helpers for the optional external AI Python runtime."""
+
 from __future__ import annotations
 
 import os
 import shutil
 import subprocess
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 
+from .ai_bootstrap import (
+    BootstrapRuntimeArtifact,
+    bootstrap_python_path,
+    resolve_bootstrap_artifact,
+)
+
 _SUPPORTED_PYTHON = (3, 13, 15)
+
+
+@dataclass(frozen=True)
+class AIInstallPlan:
+    """Resolved direct install command or an on-demand Python bootstrap plan."""
+
+    command: list[str] | None = None
+    bootstrap_artifact: BootstrapRuntimeArtifact | None = None
+    bootstrap_runtime_root: Path | None = None
+    bootstrap_arguments: tuple[str, ...] = ()
+    error: str = ""
+
+    @property
+    def can_install(self) -> bool:
+        return self.command is not None or self.bootstrap_artifact is not None
 
 
 def _is_supported_python(executable: Path) -> bool:
@@ -42,9 +65,15 @@ def default_ai_runtime_dir() -> Path:
     return base / "PyLrcGet" / "ai-runtime"
 
 
+def default_ai_bootstrap_dir() -> Path:
+    return default_ai_runtime_dir().parent / "python-bootstrap"
+
+
 def default_lyrics_aligner_dir() -> Path:
     runtime_dir = os.environ.get("PYLRCGET_AI_RUNTIME_DIR", "").strip()
-    runtime_root = Path(runtime_dir).expanduser() if runtime_dir else default_ai_runtime_dir()
+    runtime_root = (
+        Path(runtime_dir).expanduser() if runtime_dir else default_ai_runtime_dir()
+    )
     return runtime_root.parent / "lyrics-aligner"
 
 
@@ -53,15 +82,17 @@ def resolve_ai_runtime_python() -> Path | None:
     configured = os.environ.get("PYLRCGET_AI_RUNTIME_PYTHON", "").strip()
     if configured:
         candidate = Path(configured).expanduser()
-        return candidate if candidate.is_file() and _is_supported_python(candidate) else None
+        return (
+            candidate
+            if candidate.is_file() and _is_supported_python(candidate)
+            else None
+        )
 
     runtime_dir = os.environ.get("PYLRCGET_AI_RUNTIME_DIR", "").strip()
     root = Path(runtime_dir).expanduser() if runtime_dir else default_ai_runtime_dir()
     executable_dir = root / ("Scripts" if sys.platform == "win32" else "bin")
     executables = (
-        ("python.exe", "pythonw.exe")
-        if sys.platform == "win32"
-        else ("python",)
+        ("python.exe", "pythonw.exe") if sys.platform == "win32" else ("python",)
     )
     for executable in executables:
         candidate = executable_dir / executable
@@ -70,35 +101,90 @@ def resolve_ai_runtime_python() -> Path | None:
     return None
 
 
-def resolve_ai_install_command(packages: list[str]) -> tuple[list[str] | None, str]:
-    """Build a command that creates and populates the isolated AI runtime."""
+def resolve_ai_install_plan(packages: list[str]) -> AIInstallPlan:
+    """Resolve how optional AI packages can be installed on this host."""
     missing = [package for package in packages if str(package).strip()]
     if not missing:
-        return None, "No missing AI dependencies were detected."
+        return AIInstallPlan(error="No missing AI dependencies were detected.")
 
     bootstrap = os.environ.get("PYLRCGET_AI_BOOTSTRAP_PYTHON", "").strip()
-    bootstrap_python = Path(bootstrap).expanduser() if bootstrap else None
-    if bootstrap_python is None or not bootstrap_python.is_file():
-        if not getattr(sys, "frozen", False) and Path(sys.executable).name.casefold().startswith("python"):
-            bootstrap_python = Path(sys.executable)
-        else:
-            system_python = shutil.which("python")
-            bootstrap_python = Path(system_python) if system_python else None
-    if bootstrap_python is None:
-        return None, "Install Python 3.13.15 and set PYLRCGET_AI_BOOTSTRAP_PYTHON."
-    if not _is_supported_python(bootstrap_python):
-        return None, (
-            "The selected AI bootstrap interpreter is unsupported. "
-            "Install Python 3.13.15 and set PYLRCGET_AI_BOOTSTRAP_PYTHON."
+    if bootstrap:
+        bootstrap_python = Path(bootstrap).expanduser()
+        if not bootstrap_python.is_file():
+            return AIInstallPlan(
+                error=(
+                    "The configured AI bootstrap interpreter was not found. "
+                    "Check PYLRCGET_AI_BOOTSTRAP_PYTHON or clear it to use the "
+                    "automatic setup."
+                )
+            )
+        if not _is_supported_python(bootstrap_python):
+            return AIInstallPlan(
+                error=(
+                    "The selected AI bootstrap interpreter is unsupported. "
+                    "Use Python 3.13.15 or clear PYLRCGET_AI_BOOTSTRAP_PYTHON."
+                )
+            )
+        if (
+            not getattr(sys, "frozen", False)
+            and tuple(sys.version_info[:3]) != _SUPPORTED_PYTHON
+        ):
+            return AIInstallPlan(
+                error=(
+                    "PyLrcGet requires Python 3.13.15. Run the app with that "
+                    "interpreter or set PYLRCGET_AI_BOOTSTRAP_PYTHON to it."
+                )
+            )
+        return AIInstallPlan(command=_build_ai_install_command(bootstrap_python, missing))
+
+    if not getattr(sys, "frozen", False):
+        if tuple(sys.version_info[:3]) != _SUPPORTED_PYTHON:
+            return AIInstallPlan(
+                error=(
+                    "The selected AI bootstrap interpreter is unsupported. "
+                    "Run the app with Python 3.13.15 or set "
+                    "PYLRCGET_AI_BOOTSTRAP_PYTHON to it."
+                )
+            )
+        return AIInstallPlan(
+            command=_build_ai_install_command(Path(sys.executable), missing)
         )
 
-    runtime_dir = os.environ.get("PYLRCGET_AI_RUNTIME_DIR", "").strip()
-    runtime_root = Path(runtime_dir).expanduser() if runtime_dir else default_ai_runtime_dir()
-    if not getattr(sys, "frozen", False) and tuple(sys.version_info[:3]) != _SUPPORTED_PYTHON:
-        return None, (
-            "PyLrcGet requires Python 3.13.15. "
-            "Run the app with that interpreter or set PYLRCGET_AI_BOOTSTRAP_PYTHON to it."
+    artifact = resolve_bootstrap_artifact()
+    if artifact is None:
+        return AIInstallPlan(
+            error=(
+                "Automatic Python setup is not available for this operating system "
+                "and processor architecture. Set PYLRCGET_AI_BOOTSTRAP_PYTHON to "
+                "Python 3.13.15."
+            )
         )
+
+    bootstrap_root = default_ai_bootstrap_dir() / artifact.platform_key
+    cached_python = bootstrap_python_path(bootstrap_root)
+    return AIInstallPlan(
+        command=(
+            _build_ai_install_command(cached_python, missing)
+            if cached_python.is_file()
+            else None
+        ),
+        bootstrap_artifact=artifact,
+        bootstrap_runtime_root=bootstrap_root,
+        bootstrap_arguments=tuple(_build_ai_install_arguments(missing)),
+    )
+
+
+def _build_ai_install_command(bootstrap_python: Path, packages: list[str]) -> list[str]:
+    return [str(bootstrap_python), *_build_ai_install_arguments(packages)]
+
+
+def _build_ai_install_arguments(packages: list[str]) -> list[str]:
+    """Build Python arguments that populate the isolated AI runtime."""
+    runtime_dir = os.environ.get("PYLRCGET_AI_RUNTIME_DIR", "").strip()
+    runtime_root = (
+        Path(runtime_dir).expanduser() if runtime_dir else default_ai_runtime_dir()
+    )
+    missing = list(packages)
     script = (
         "import os,subprocess,sys,venv\n"
         f"root={str(runtime_root)!r}\n"
@@ -124,7 +210,18 @@ def resolve_ai_install_command(packages: list[str]) -> tuple[list[str] | None, s
         "    raise SystemExit(subprocess.call([python, '-m', 'pip', 'install', *args]))\n"
         "raise SystemExit(0)"
     )
-    return [str(bootstrap_python), "-c", script, *missing], ""
+    return ["-c", script, *missing]
+
+
+def resolve_ai_install_command(packages: list[str]) -> tuple[list[str] | None, str]:
+    """Return a direct command when an interpreter has already been selected."""
+    plan = resolve_ai_install_plan(packages)
+    if plan.command is not None:
+        return plan.command, ""
+    return (
+        None,
+        plan.error or "Python 3.13.15 will be prepared automatically on install.",
+    )
 
 
 def nvidia_gpu_available() -> bool:
@@ -205,18 +302,22 @@ def resolve_ai_runtime_source() -> Path | None:
         candidates = [Path(__file__).resolve().parents[3]]
     for candidate in candidates:
         if (
-            (candidate / "ui" / "workers" / "ai" / "ai_sync_external_entry.py").is_file()
-            and (candidate / "ui" / "workers" / "ai" / "ai_sync_pipeline.py").is_file()
-        ):
+            candidate / "ui" / "workers" / "ai" / "ai_sync_external_entry.py"
+        ).is_file() and (
+            candidate / "ui" / "workers" / "ai" / "ai_sync_pipeline.py"
+        ).is_file():
             return candidate
     return None
 
 
 __all__ = [
+    "AIInstallPlan",
     "available_torch_devices",
+    "default_ai_bootstrap_dir",
     "default_ai_runtime_dir",
     "nvidia_gpu_available",
     "resolve_ai_install_command",
+    "resolve_ai_install_plan",
     "resolve_ai_runtime_python",
     "resolve_ai_runtime_source",
     "resolve_torch_device",

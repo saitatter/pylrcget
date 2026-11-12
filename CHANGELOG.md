@@ -1,4 +1,10 @@
 # Changelog
+
+## Unreleased
+
+### Fixes
+- Packaged builds download and verify their own Python runtime when setting up AI synchronization, without requiring a system Python installation.
+
 ## v1.15.0 (2026-09-23)
 
 ### ✨ Features
