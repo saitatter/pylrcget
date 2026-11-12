@@ -10,6 +10,9 @@
 - Settings > AI Sync opens the AI setup dialog from Manage AI runtime, including on a fresh installation with no runtime folder (#61).
 - Packaged builds download and verify Python and the English alignment backend during AI setup, without requiring separate Python or Git installations (#41).
 
+### Refactors
+- The instrumental lyrics status uses a plain text label without an emoji glyph.
+
 ### Docs
 - Document focused commits, safe migrations, isolated tests and project organization with shared contributor and agent rules.
 
