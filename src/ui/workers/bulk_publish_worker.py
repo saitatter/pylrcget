@@ -54,7 +54,7 @@ class BulkPublishWorker(QThread):
         try:
             db = sqlite3.connect(self.db_path, timeout=15.0)
             db.row_factory = sqlite3.Row
-            api = LrcLibAPI(self.lrclib_instance)
+            api = LrcLibAPI(self.lrclib_instance, is_cancelled=self.isInterruptionRequested)
 
             for idx, track_id in enumerate(self.track_ids, start=1):
                 if self.isInterruptionRequested():

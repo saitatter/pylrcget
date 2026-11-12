@@ -108,6 +108,11 @@ required for the base AI workflow.
 
 ## Lyrics providers
 
+In **Settings > Lyrics > Providers > LRCLIB**, adjust **Request interval** to
+pace requests across workers (default: one second). Rate-limited lookups honor
+the server's Retry-After delay and retry automatically. Increase the interval
+if your LRCLIB instance still limits requests; zero disables the regular pause.
+
 | Provider | Default | Notes |
 |---|:---:|---|
 | LRCLIB | Yes | Download, search, and publish support. |

@@ -347,7 +347,7 @@ class BulkLyricsDownloadWorker(QThread):
                                         str(candidate.provider or "lrclib").casefold(),
                                         str(candidate.provider or "lrclib").title(),
                                     )
-                                    msg = f"Candidate found · {provider_label}. Match: {candidate.score}%."
+                                    msg = f"Candidate found Â· {provider_label}. Match: {candidate.score}%."
                                 else:
                                     fail_count += 1
                                     msg = "No usable lyrics found on the enabled lyrics providers for this track."
@@ -562,7 +562,7 @@ class BulkLyricsDownloadWorker(QThread):
     def _api_for_current_thread(self) -> LrcLibAPI:
         api = getattr(self._thread_local, "api", None)
         if api is None:
-            api = LrcLibAPI(self.lrclib_instance)
+            api = LrcLibAPI(self.lrclib_instance, is_cancelled=self.isInterruptionRequested)
             self._thread_local.api = api
         return api
 

@@ -22,6 +22,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from core.request_pacing import lrclib_request_pacer
 from core.tracklist_models import LyricsState
 from core.utils import parse_lrc
 from db.queries import (
@@ -40,6 +41,7 @@ from db.queries import (
     update_track_dirty_lyrics,
 )
 from library.scan_library import AUDIO_EXTS, new_fs_track_from_path
+from lyrics.source_settings import load_lyrics_source_settings
 from player.player import NowPlaying, Player
 from ui.ai_sync_settings import load_ai_sync_settings
 from ui.constants import (
@@ -129,6 +131,9 @@ class MainWindow(QMainWindow):
         self.resize(DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT)
         self.setAcceptDrops(True)
         self.app_state = app_state
+        lrclib_request_pacer.configure(
+            load_lyrics_source_settings(get_config(app_state.db).ui_state_json)["lrclib"]["request_interval_s"]
+        )
 
         self._queue_ids: list[int] = []
         self._queue_index: int = -1
@@ -1130,6 +1135,9 @@ class MainWindow(QMainWindow):
         dlg = MusicFoldersDialog(self.app_state, self)
         if dlg.exec():
             updated_config = get_config(self.app_state.db)
+            lrclib_request_pacer.configure(
+                load_lyrics_source_settings(updated_config.ui_state_json)["lrclib"]["request_interval_s"]
+            )
             appearance_changed = any(
                 getattr(previous_config, field) != getattr(updated_config, field)
                 for field in (

@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 from collections.abc import Mapping
 
+from core.request_pacing import DEFAULT_REQUEST_INTERVAL_S, normalize_request_interval
+
 LYRICS_SOURCE_IDS: tuple[str, ...] = ("lrclib", "musixmatch")
 LYRICS_SOURCE_LABELS: dict[str, str] = {
     "lrclib": "LRCLIB",
@@ -16,6 +18,7 @@ def default_lyrics_source_settings() -> dict[str, object]:
         "priority": list(LYRICS_SOURCE_IDS),
         "enabled": {"lrclib": True, "musixmatch": False},
         "continue_when_plain_for_synced": True,
+        "lrclib": {"request_interval_s": DEFAULT_REQUEST_INTERVAL_S},
         "musixmatch": {
             "mode": MUSIXMATCH_DEFAULT_MODE,
             "api_key": "",
@@ -63,10 +66,13 @@ def normalize_lyrics_source_settings(raw: Mapping[str, object] | None) -> dict[s
     if mode not in {"website", "official"}:
         mode = MUSIXMATCH_DEFAULT_MODE
     api_key = str(raw_musixmatch.get("api_key") or "").strip()
+    raw_lrclib = raw.get("lrclib")
+    raw_lrclib = raw_lrclib if isinstance(raw_lrclib, Mapping) else {}
 
     return {
         "priority": priority,
         "enabled": enabled,
+        "lrclib": {"request_interval_s": normalize_request_interval(raw_lrclib.get("request_interval_s"))},
         "continue_when_plain_for_synced": _coerce_bool(
             raw.get("continue_when_plain_for_synced"),
             bool(defaults["continue_when_plain_for_synced"]),

@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
     QDialog,
+    QDoubleSpinBox,
     QFileDialog,
     QGridLayout,
     QGroupBox,
@@ -623,6 +624,17 @@ class MusicFoldersDialog(QDialog):
         lyrics_download_layout.addWidget(sources_box)
 
         self.lrclib_box = lrclib_box
+        self.lrclib_request_interval_spin = QDoubleSpinBox()
+        self.lrclib_request_interval_spin.setRange(0.0, 60.0)
+        self.lrclib_request_interval_spin.setSingleStep(0.25)
+        self.lrclib_request_interval_spin.setSuffix(" s")
+        self.lrclib_request_interval_spin.setToolTip(
+            "Minimum pause between LRCLIB requests across all downloads. "
+            "Default: 1 second. Increase it if your server limits requests."
+        )
+        interval_row = lrclib_box.layout().rowCount()
+        lrclib_box.layout().addWidget(QLabel("Request interval"), interval_row, 0)
+        lrclib_box.layout().addWidget(self.lrclib_request_interval_spin, interval_row, 1)
 
         musixmatch_box = QGroupBox("Musixmatch")
         musixmatch_layout = QGridLayout(musixmatch_box)
@@ -1325,6 +1337,7 @@ class MusicFoldersDialog(QDialog):
         self.accept()
 
     def _load_lyrics_source_settings(self, settings: dict[str, object]) -> None:
+        self.lrclib_request_interval_spin.setValue(float(settings["lrclib"]["request_interval_s"]))
         self.lyrics_source_list.clear()
         priority = [str(value) for value in settings.get("priority", LYRICS_SOURCE_IDS)]
         enabled = settings.get("enabled", {})
@@ -1396,6 +1409,7 @@ class MusicFoldersDialog(QDialog):
         return {
             "priority": priority,
             "enabled": enabled,
+            "lrclib": {"request_interval_s": self.lrclib_request_interval_spin.value()},
             "continue_when_plain_for_synced": self.lyrics_source_continue_plain_chk.isChecked(),
             "musixmatch": {
                 "mode": str(self.musixmatch_mode_combo.currentData() or MUSIXMATCH_DEFAULT_MODE),

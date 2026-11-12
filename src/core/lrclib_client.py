@@ -6,10 +6,13 @@ import hashlib
 import logging
 import os
 import threading
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
 import requests
+
+from core.request_pacing import lrclib_request_pacer, retry_after_seconds
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +47,9 @@ class NotFoundError(LrcLibError):
 
 
 class RateLimitError(LrcLibError):
-    pass
+    def __init__(self, status_code: int, reason: str, message: str = "", *, retry_after_s: float | None = None) -> None:
+        super().__init__(status_code, reason, message)
+        self.retry_after_s = retry_after_s
 
 
 class ServerError(LrcLibError):
@@ -69,7 +74,10 @@ def _raise_for_status(response: requests.Response) -> None:
     if code == 404:
         raise NotFoundError(code, reason, message)
     if code == 429:
-        raise RateLimitError(code, reason, message)
+        raise RateLimitError(
+            code, reason, message,
+            retry_after_s=retry_after_seconds(response.headers.get("Retry-After")),
+        )
     if code == 400:
         raise IncorrectPublishTokenError(code, reason, message) if "token" in message.lower() else LrcLibError(code, reason, message)
     if 500 <= code < 600:
@@ -195,10 +203,12 @@ class LrcLibAPI:
         *,
         timeout_s: float = _DEFAULT_TIMEOUT_S,
         session: requests.Session | None = None,
+        is_cancelled: Callable[[], bool] | None = None,
     ) -> None:
         self._base_url = (base_url or BASE_URL).rstrip("/")
         self._timeout = timeout_s
         self._session = session or requests.Session()
+        self._is_cancelled = is_cancelled or (lambda: False)
         version = _get_app_version()
         self._session.headers.setdefault(
             "User-Agent",
@@ -209,8 +219,19 @@ class LrcLibAPI:
         kwargs.setdefault("timeout", self._timeout)
         url = f"{self._base_url}{endpoint}"
         logger.debug("LRCLIB %s %s", method.upper(), endpoint)
-        response = self._session.request(method, url, **kwargs)
-        _raise_for_status(response)
+        for attempt in range(3):
+            lrclib_request_pacer.wait(self._base_url.casefold(), self._is_cancelled)
+            response = self._session.request(method, url, **kwargs)
+            try:
+                _raise_for_status(response)
+            except RateLimitError as exc:
+                delay = exc.retry_after_s if exc.retry_after_s is not None else 5.0 * (2 ** attempt)
+                lrclib_request_pacer.defer(self._base_url.casefold(), delay)
+                if method.upper() != "GET" or attempt == 2:
+                    raise
+                logger.warning("LRCLIB rate limited; retrying after %.1fs", delay)
+                continue
+            break
         logger.debug("LRCLIB %s %s -> %s", method.upper(), endpoint, response.status_code)
         return response
 

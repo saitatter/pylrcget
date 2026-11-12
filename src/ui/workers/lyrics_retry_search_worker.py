@@ -184,6 +184,6 @@ class LyricsRetrySearchWorker(QThread):
     def _api_for_current_thread(self) -> LrcLibAPI:
         api = getattr(self._thread_local, "api", None)
         if api is None:
-            api = LrcLibAPI(self.lrclib_instance)
+            api = LrcLibAPI(self.lrclib_instance, is_cancelled=self.isInterruptionRequested)
             self._thread_local.api = api
         return api
