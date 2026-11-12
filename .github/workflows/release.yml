@@ -1,5 +1,9 @@
 name: Release
 
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 on:
   workflow_dispatch:
 
@@ -9,6 +13,7 @@ permissions:
 
 jobs:
   release:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     outputs:
       released: ${{ steps.semantic-release.outputs.released || 'false' }}
@@ -31,6 +36,20 @@ jobs:
           git_committer_name: github-actions[bot]
           git_committer_email: 41898282+github-actions[bot]@users.noreply.github.com
           build: false
+
+      - name: Check out released history
+        if: steps.semantic-release.outputs.released == 'true'
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ steps.semantic-release.outputs.commit_sha }}
+          fetch-depth: 0
+
+      - name: Format release description
+        if: steps.semantic-release.outputs.released == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_PAT }}
+          RELEASE_TAG: ${{ steps.semantic-release.outputs.tag }}
+        run: python tools/release_notes.py --tag "$RELEASE_TAG" --write
 
   build-release-assets:
     needs: release

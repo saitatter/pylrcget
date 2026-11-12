@@ -1,6 +1,6 @@
 # PyLrcGet
 
-> 🎵 A native desktop lyrics manager and player for local music libraries.
+> A native desktop lyrics manager and player for local music libraries.
 
 Browse, edit, sync, download, export, embed, and publish synced or plain lyrics
 without leaving your desktop workflow.
@@ -13,22 +13,22 @@ without leaving your desktop workflow.
 [![SQLite](https://img.shields.io/badge/SQLite-003B57?logo=sqlite&logoColor=white)](https://www.sqlite.org/)
 [![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey)](#)
 
-## ✨ What it does
+## What it does
 
-- 🎧 Scans local folders recursively into SQLite with incremental refresh and exclusions.
-- 📚 Browses Tracks, Albums, Artists, Album Artists, Lyrics Browser, and Lyrics Activity.
-- 📝 Edits synced (`.lrc`) and plain lyrics, with unsaved drafts and playback highlighting.
-- 🌐 Downloads through an ordered provider matrix; LRCLIB is enabled by default.
-- 💾 Exports `.lrc` / `.txt` sidecars and embeds lyrics into supported formats.
-- 🤖 Provides local AI Auto Sync with CUDA when available and CPU fallback.
-- 🎨 Includes playback controls, themes, keyboard shortcuts, logs, and responsive layouts.
+- Scans local folders recursively into SQLite with incremental refresh and exclusions.
+- Browses Tracks, Albums, Artists, Album Artists, Lyrics Browser, and Lyrics Activity.
+- Edits synced (`.lrc`) and plain lyrics, with unsaved drafts and playback highlighting.
+- Downloads through an ordered provider matrix; LRCLIB is enabled by default.
+- Exports `.lrc` / `.txt` sidecars and embeds lyrics into supported formats.
+- Provides local AI Auto Sync with CUDA when available and CPU fallback.
+- Includes playback controls, themes, keyboard shortcuts, logs, and responsive layouts.
 
 Provider settings are opt-in: a disabled provider is never used as an automatic
 fallback. See [Musixmatch provider notes](docs/MULTI_PROVIDER_MUSIXMATCH.md).
 When enough lyrics already exist on the same album, language detection can
 reject a confidently mismatched provider result instead of saving it.
 
-## 📸 Screenshots
+## Screenshots
 
 Add final captures under `docs/screenshots/`. The following views are the most
 useful for the project page and release notes:
@@ -63,7 +63,7 @@ images inside the repository so the README also renders offline:
 ![Clear Lyrics dialog](docs/screenshots/clear-lyrics.png)
 -->
 
-## 🚀 Quick start
+## Quick start
 
 ```powershell
 py -3.13 -m venv .venv
@@ -77,7 +77,7 @@ The project is pinned to Python 3.13.15 for development, AI setup, tests, and
 release builds. The app does not modify a music folder during normal scanning;
 exports and embedding are explicit user actions.
 
-## 🤖 Optional AI Auto Sync
+## Optional AI Auto Sync
 
 ```powershell
 python -m pip install -e ".[ai]"
@@ -103,7 +103,7 @@ $env:PYLRCGET_AI_BOOTSTRAP_PYTHON = "C:\Path\to\python.exe"
 Optional Demucs is used only as a candidate vocal-stem path and is not
 required for the base AI workflow.
 
-## 🌐 Lyrics providers
+## Lyrics providers
 
 | Provider | Default | Notes |
 |---|:---:|---|
@@ -115,7 +115,7 @@ matching uses artist, title, album, duration, and version metadata. Full
 transport limitations are documented in
 [docs/MULTI_PROVIDER_MUSIXMATCH.md](docs/MULTI_PROVIDER_MUSIXMATCH.md).
 
-## 🎼 Supported audio formats
+## Supported audio formats
 
 | Format | Scan | Lyrics read/write | Sidecar export |
 |---|:---:|:---:|:---:|
@@ -128,7 +128,7 @@ transport limitations are documented in
 Playback depends on the active backend and installed codecs. Metadata support
 can be broader than playback support for a specific format.
 
-## ⚙️ Important settings
+## Important settings
 
 | Area | Examples |
 |---|---|
@@ -141,7 +141,7 @@ can be broader than playback support for a specific format.
 Download modes are `Prefer synced`, `Synced only`, and `Plain only`. Export
 and embedding format choices are configured independently from download mode.
 
-## ⚡ Performance and design notes
+## Performance and design notes
 
 The scanner separates audio and sidecar state, reuses stored metadata for
 unchanged audio, and avoids unnecessary Mutagen and sidecar reads. LRCLIB
@@ -153,7 +153,7 @@ results, known trade-offs, and the TagLib decision. The benchmark harnesses
 are documented in [tools/perf/README.md](tools/perf/README.md) and
 [tools/ai_sync_bench/README.md](tools/ai_sync_bench/README.md).
 
-## 🛠️ Development
+## Development
 
 Run the test suite and static checks from the repository root:
 
@@ -174,7 +174,7 @@ Performance fixtures and benchmark output are generated under `benchmarks/`;
 do not point a mutating benchmark at a real music folder. Read-only source
 measurements must use the harness `--read-only-source` option.
 
-## 📦 Building locally
+## Building locally
 
 ```powershell
 python -m pip install -r requirements.txt pyinstaller
@@ -187,7 +187,7 @@ For the portable single-file build:
 pyinstaller --noconfirm pylrcget-portable.spec
 ```
 
-## 🧭 Releases and troubleshooting
+## Releases and troubleshooting
 
 Releases use Conventional Commits and semantic-release. See
 [CHANGELOG.md](CHANGELOG.md) for published changes.

@@ -73,4 +73,7 @@ node_modules/
 # Misc
 .cache/
 .mypy_cache/
-tools/
+
+# Local benchmark tooling is retained separately; release tooling is versioned.
+tools/*
+!tools/release_notes.py

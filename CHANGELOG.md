@@ -2,12 +2,18 @@
 
 ## Unreleased
 
+### Docs
+- Document focused commits, safe migrations, isolated tests and project organization with shared contributor and agent rules.
+
+### CI & Build
+- Releases preserve reviewed changelog entries and historical notes, with plain headings and complete commit lists.
+
 ### Fixes
 - Packaged builds download and verify their own Python runtime when setting up AI synchronization, without requiring a system Python installation.
 
 ## v1.15.0 (2026-09-23)
 
-### ✨ Features
+### Features
 * **lyrics:** Reject confidently mismatched languages ([9add966](https://github.com/saitatter/pylrcget/commit/9add9663aafac6e128510efac46e6b9013a86344))
 * **ui:** Finish library pagination and top bar modernization ([816b7bb](https://github.com/saitatter/pylrcget/commit/816b7bb6d40c30c255a54024887e59175d7ce2d0))
 * **lyrics:** Add selective clear controls ([8dbbf25](https://github.com/saitatter/pylrcget/commit/8dbbf255743d0cba2639ae468522f8e3c52911b9))
@@ -53,7 +59,7 @@
 * **ai-sync:** Add cancellable multilingual alignment backends ([f6f0143](https://github.com/saitatter/pylrcget/commit/f6f014377e6cb624a0757877171ea79cf0edcbaf))
   Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
 
-### 🐛 Fixes
+### Fixes
 * **lyrics:** Refresh downloads and validate language ([3376fc3](https://github.com/saitatter/pylrcget/commit/3376fc34397a449af6fadca91828fcebc6bd9c29))
 * **lyrics:** Refresh editor after cleanup ([a225a3f](https://github.com/saitatter/pylrcget/commit/a225a3ffb34d626f4a5d6e9b964ea5ecba15df13))
 * **lyrics:** Show active timestamp shift buttons ([16312e6](https://github.com/saitatter/pylrcget/commit/16312e615a9a6176274b62432e605b063467ef47))
@@ -117,7 +123,7 @@
 * **ai-sync:** Rescue forward jumps between lyric clusters ([30a2900](https://github.com/saitatter/pylrcget/commit/30a2900548b2c07d4d12aa467c17021c7b7345e1))
   Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
 
-### ♻️ Refactors
+### Refactors
 * **ai:** Group sync modules under ai package ([271e09f](https://github.com/saitatter/pylrcget/commit/271e09fb3b5fc1bd76a0aa991f6f2b7dc7628fb0))
 * **lyrics:** Remove external tidal helper ([af4d9ba](https://github.com/saitatter/pylrcget/commit/af4d9ba29e3769789bbcc51d4a2f9c347feb6a6f))
 * **lyrics:** Remove external provider entry ([2bbf30d](https://github.com/saitatter/pylrcget/commit/2bbf30d981b377411371b5029fde02064fc14f69))
@@ -132,7 +138,7 @@
   Document AI sync experiments and keep WhisperX compatibility behavior while separating runtime, transcription, alignment, and LRC helpers.
   Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
 
-### 🧰 CI & Build
+### CI & Build
 * **deps-dev:** Bump ruff in the python-dependencies group ([616bfc8](https://github.com/saitatter/pylrcget/commit/616bfc8762f1362aafe3f96c873e1729b79faae2))
   Bumps the python-dependencies group with 1 update: [ruff](https://github.com/astral-sh/ruff).
   Updates `ruff` from 0.16.7 to 0.16.8
@@ -171,7 +177,7 @@ updated-dependencies:
 * Constrain pytest discovery to tests ([25880f2](https://github.com/saitatter/pylrcget/commit/25880f2a18d8857c301b147e15fa59cb940486a2))
   Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
 
-### 📚 Docs
+### Docs
 * Refresh readme with screenshot guide ([eeb82f6](https://github.com/saitatter/pylrcget/commit/eeb82f6588629c5b88056b872116c0aa603fad5b))
 * Consolidate project documentation ([b6b093d](https://github.com/saitatter/pylrcget/commit/b6b093d2be14c02355856396f038e1203a205c16))
 * Describe native tidal integration ([1d667dd](https://github.com/saitatter/pylrcget/commit/1d667dd045c573dde9f81a8a45f6393406481c6f))
@@ -194,7 +200,7 @@ updated-dependencies:
 * **ai-sync:** Document lyrics-aligner routing and cancellation ([c011c8d](https://github.com/saitatter/pylrcget/commit/c011c8d6aa6767f3de154ccc1f12ff58a4f6b26a))
   Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
 
-### 🧪 Tests
+### Tests
 * **ai:** Skip optional aligner tests without runtime ([84ace28](https://github.com/saitatter/pylrcget/commit/84ace28b311592316a9108a18fc8ea3f4dde7ab2))
 * **lyrics:** Cover bulk provider fallback ([7ebac8c](https://github.com/saitatter/pylrcget/commit/7ebac8c90f7060d5d592db1303813be6c04fbeeb))
 * **tidal:** Cover unicode and version matching fixtures ([ae16834](https://github.com/saitatter/pylrcget/commit/ae16834a05bba870b6b933f2e2ae07da630206fb))
@@ -211,7 +217,7 @@ updated-dependencies:
 * **scan:** Add reference library soak oracle ([5537110](https://github.com/saitatter/pylrcget/commit/5537110359b513141d1924a73c85047e7aedb893))
 * **scan:** Add regression coverage for sidecar changes on unchanged audio ([ade35a2](https://github.com/saitatter/pylrcget/commit/ade35a26af9e957a4106fee81e329901228c0aa1))
 
-### 🔧 Other Changes
+### Other Changes
 * Simplify settings tab layout frames ([0a186c0](https://github.com/saitatter/pylrcget/commit/0a186c0b62564dba151fbe65d96138832c7fcec2))
 * **ui:** Check ai runtime status in background ([2980423](https://github.com/saitatter/pylrcget/commit/2980423bacdc0e0b38a8dd9a04fe9936c90dadca))
 * **ui:** Lazy-load ai runtime status ([6fbe576](https://github.com/saitatter/pylrcget/commit/6fbe5767d92c1ebc3ba9579173f4940d82a33292))
@@ -273,14 +279,14 @@ updated-dependencies:
 
 ## v1.14.1 (2026-08-09)
 
-### 🐛 Fixes
+### Fixes
 * **ci:** Skip oversized portable ai single-file build on linux runner ([18dfe9b](https://github.com/saitatter/pylrcget/commit/18dfe9b2a6e45bb08a4539f283e94fa37f935622))
   PyInstaller single-file mode fails on Linux when PyTorch, Torchaudio, Transformers, and WhisperX dependencies are installed because total payload size exceeds PyInstaller's 32-bit archive header size limit (4GB). Skip building and uploading the oversized single-file AI portable asset on Linux while retaining the main Linux build, deb package, and portable executable.
 
 
 ## v1.14.0 (2026-08-08)
 
-### ✨ Features
+### Features
 * Expand alpha index bar & bucketed pagination to tracks view and increase letter button size ([f30ad83](https://github.com/saitatter/pylrcget/commit/f30ad839d70fbe0a187d51e45dc980d5c8595029))
   - TrackListWidget: integrated AlphaIndexWidget with letter_prefix query support and get_track_letter_counts aggregation.
 - AlphaIndexWidget: enlarged letter buttons (28x28px, 13px bold font) and improved sub-page pagination controls styling for better readability and touch/click targets.
@@ -313,7 +319,7 @@ updated-dependencies:
 - main_window_parts/*: propagate album_artists_tab to dirty-lyrics, search,
   download state, now-playing, UI scale, and palette methods
 
-### 🐛 Fixes
+### Fixes
 * Maintain database current_db_version at 5 ([a3e46ad](https://github.com/saitatter/pylrcget/commit/a3e46ad68ea94b68e5572f48da27fc5ea764cedc))
   Keep database version at 5 and backfill ignore_sort_articles column within v5 migration path, ensuring database version increments strictly per official release policy.
 * **ai:** Don't pass string as vad_model in newer whisperx - let whisperx use built-in vad default ([27035db](https://github.com/saitatter/pylrcget/commit/27035dbadbf4fee78bd0ee595467a30667742d26))
@@ -344,10 +350,10 @@ updated-dependencies:
 * **scanner:** Expand album artist tag parsing for mp3, m4a, flac, and wma ([7c39596](https://github.com/saitatter/pylrcget/commit/7c39596e8e70d661e1267a3e940eedcb9e8172e8))
 * **packaging:** Collect whisperx submodules and datas in pyinstaller specs ([4a9fd84](https://github.com/saitatter/pylrcget/commit/4a9fd84aa8391d5fd448f49c0057898f4862bb73))
 
-### ♻️ Refactors
+### Refactors
 * **ui:** Use pure qss subcontrol arrow for qcombobox down-arrow to eliminate file i/o ([ff619d7](https://github.com/saitatter/pylrcget/commit/ff619d7860a8ca384656197abadab4a9d98ebce4))
 
-### 🧰 CI & Build
+### CI & Build
 * **deps:** Bump the github-actions group across 1 directory with 2 updates ([095009e](https://github.com/saitatter/pylrcget/commit/095009efb76f51aeda27d8953db8ce3b2187c120))
   Bumps the github-actions group with 2 updates in the / directory: [python-semantic-release/python-semantic-release](https://github.com/python-semantic-release/python-semantic-release) and [actions/setup-python](https://github.com/actions/setup-python).
   Updates `python-semantic-release/python-semantic-release` from 10.6.0 to 10.6.1
@@ -370,20 +376,20 @@ updated-dependencies:
   Co-authored-by: dependabot[bot] <49699333+dependabot[bot]@users.noreply.github.com>
 * **release:** 1.14.0 ([658a028](https://github.com/saitatter/pylrcget/commit/658a028ee653b05f8c0a922272e450400a2a4e17))
 
-### 🔧 Other Changes
+### Other Changes
 * **ui:** Optimize settings dialog load speed by removing blocking i/o ([967255d](https://github.com/saitatter/pylrcget/commit/967255d73f77588f899693d20fa32d1d70b6db5e))
 
 
 ## v1.13.1 (2026-07-06)
 
-### 🐛 Fixes
+### Fixes
 * Package macos app bundle in release ([72866f4](https://github.com/saitatter/pylrcget/commit/72866f4142ce57d11d9fdf8f88d3b44f25de834f))
   Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
 
 
 ## v1.13.0 (2026-07-06)
 
-### ✨ Features
+### Features
 * Improve export button and behavior ([c7952e4](https://github.com/saitatter/pylrcget/commit/c7952e4069fce1e34130081de41a32727d047644))
   Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
 * Improve macos packaging and updates ([b2ad430](https://github.com/saitatter/pylrcget/commit/b2ad430709bd48b24ccab7466bc942fc1c88e3d4))
@@ -403,7 +409,7 @@ updated-dependencies:
 * Expand library scan timing logs ([52e3506](https://github.com/saitatter/pylrcget/commit/52e3506f70c4835135912baace4e3879480be70d))
 * Add library scan timing instrumentation ([81b1045](https://github.com/saitatter/pylrcget/commit/81b1045b6901495e5a1c3439a7eea7e19a7f51f5))
 
-### 🐛 Fixes
+### Fixes
 * Restore scan throughput log ([2abfec8](https://github.com/saitatter/pylrcget/commit/2abfec817eb540cd412c7ef034591afd75107727))
   Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
 * Clarify scan timing logs ([3bdd1d1](https://github.com/saitatter/pylrcget/commit/3bdd1d192ce09a3f1313d5ac9483597e1ef77f79))
@@ -431,7 +437,7 @@ updated-dependencies:
   Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
 * **release:** Skip oversized linux ai asset upload\n\nlinux ai portable exceeds github's 2gb asset limit, so keep building it as a\nworkflow artifact but skip publishing it as a release asset. update the readme\nto reflect the actual published ai portable set.\n\nco-authored-by: copilot <223556219+copilot@users.noreply.github.com> ([6d96c76](https://github.com/saitatter/pylrcget/commit/6d96c76db1b2788419d98a18b0003ccab03a2195))
 
-### ♻️ Refactors
+### Refactors
 * Move lyrics outputs off ui thread ([22b8c60](https://github.com/saitatter/pylrcget/commit/22b8c605c0bd83a5d3b4e20981cf0bdd062fb93d))
   - add a controller and worker for lyrics output sync
 - route save, propagate, and search flows through async output sync
@@ -445,7 +451,7 @@ updated-dependencies:
 - add regression coverage for the new query shapes and worker path
   Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
 
-### 🧰 CI & Build
+### CI & Build
 * **deps:** Bump python-semantic-release/python-semantic-release ([90c5ddc](https://github.com/saitatter/pylrcget/commit/90c5ddc66ec6a784fc6fea728fbf214c6ad716b5))
   Bumps the github-actions group with 1 update: [python-semantic-release/python-semantic-release](https://github.com/python-semantic-release/python-semantic-release).
   Updates `python-semantic-release/python-semantic-release` from 10.5.3 to 10.6.0
@@ -460,17 +466,17 @@ updated-dependencies:
   dependency-group: github-actions ...
   Signed-off-by: dependabot[bot] <support@github.com>
 
-### 📚 Docs
+### Docs
 * Update ai sync readme for whisperx\n\nremove outdated demucs references and describe the current whisperx-based\nai sync workflow and install instructions.\n\nco-authored-by: copilot <223556219+copilot@users.noreply.github.com> ([87a6c89](https://github.com/saitatter/pylrcget/commit/87a6c890f648298bd8f35e8716532030100fcc40))
 
-### 🔧 Other Changes
+### Other Changes
 * Reduce first scan i/o ([ec092a1](https://github.com/saitatter/pylrcget/commit/ec092a1312dc98ce4ee8d22f8a5c5ce0f4ba1c83))
   Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
 
 
 ## v1.12.0 (2026-07-01)
 
-### ✨ Features
+### Features
 * **release:** Add ai portable assets for linux and macos\n\nbuild ai-enabled portable variants for windows, linux, and macos, and\nupdate the release notes to describe the remaining ffmpeg prerequisite.\n\nco-authored-by: copilot <223556219+copilot@users.noreply.github.com> ([c81966b](https://github.com/saitatter/pylrcget/commit/c81966bafe3cc7beadeaf3b2a3ecccd6530421bd))
 * **ai-sync:** Multi-onset relaxed vad with vocab-weighted selection ([1a5bba3](https://github.com/saitatter/pylrcget/commit/1a5bba3e687152ba859101f89079dc67ec68aa93))
   Run three relaxed VAD onsets (0.15/0.10/0.02) when the coverage retry gate fires and keep the best candidate by alignment quality. Raise the vocab_ratio weight in the quality proxy so an over-detecting aggressive onset (diluted with out-of-vocabulary instrumental noise) is rejected while an aggressive onset that recovers genuine softly-sung lyrics is accepted.
@@ -504,14 +510,14 @@ updated-dependencies:
   Algorithm: O(n_lines × n_words × window_size) ≈ 60 × 500 × 100 = 3M ops (tractable)
   Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
 
-### 🐛 Fixes
+### Fixes
 * **ui:** Polish lyrics editor navigation and autofix\n\ntrim and capitalize lines during autofix, stop unsynced zero-timestamp clicks\nfrom seeking to the start, make up/down move lyric selection from toolbar and\nseekbar focus, and stop add/delete from causing lyric-view scroll jumps.\n\nco-authored-by: copilot <223556219+copilot@users.noreply.github.com> ([f8c2ea3](https://github.com/saitatter/pylrcget/commit/f8c2ea3328f819d1cdef7f3b524c7ab13f13d885))
 * **packaging:** Add linux launcher assets and ffmpeg dep\n\nadd shared linux desktop-entry and icon assets, install them from the .deb\nworkflow, and declare ffmpeg as a package dependency so whisper/whisperx\ncan decode audio on apt-based distros without extra manual setup.\n\nco-authored-by: copilot <223556219+copilot@users.noreply.github.com> ([58e0830](https://github.com/saitatter/pylrcget/commit/58e08303457a5620a1eb5e9ed2ceda44fc10a6e7))
 * **ai-sync:** Add cpu fallback for alignment on cuda errors ([5d8621e](https://github.com/saitatter/pylrcget/commit/5d8621eac473c5fc0f87d0da40cf4bb47d6a1cd8))
   WhisperX alignment with Pyannote VAD can hang on Windows when using CUDA (Triton kernel initialization issue). Add try/except with automatic CPU fallback.
   Also fixes edge case where alignment fails silently - now logs warnings and continues with raw segment timestamps.
 
-### 🧰 CI & Build
+### CI & Build
 * Remove tools from repository tracking ([4a557fd](https://github.com/saitatter/pylrcget/commit/4a557fd2d9923cac3dd77bb64f76dae6cd993901))
   - keep tools/ ignored via .gitignore
 - remove tracked tools scripts and benchmark artifacts
@@ -521,7 +527,7 @@ updated-dependencies:
 
 ## v1.11.0 (2026-06-22)
 
-### ✨ Features
+### Features
 * **ai-sync:** Replace whisper with whisperx and add cuda device toggle ([cecf900](https://github.com/saitatter/pylrcget/commit/cecf9008b1762526685a863da8ee95789518bb85))
   - Replace Whisper base model with WhisperX for consistent forced alignment
 - Remove vocal separation (Demucs) integration entirely
@@ -564,13 +570,13 @@ updated-dependencies:
 * **ai:** Add guided packaged flow and ai-enabled portable release ([d5bc85a](https://github.com/saitatter/pylrcget/commit/d5bc85af7340d6c1625f6ba28e4de2f28ce9065d))
   Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
 
-### 🐛 Fixes
+### Fixes
 * **ui:** Avoid ai sync settings layout break; add watchdog for long 'building lrc' progress ([637691c](https://github.com/saitatter/pylrcget/commit/637691c60b07addc48087f209568232f37706b5f))
 
 
 ## v1.10.1 (2026-06-22)
 
-### 🐛 Fixes
+### Fixes
 * **ai-sync:** Harden worker shutdown and dependency guidance ([142d2ba](https://github.com/saitatter/pylrcget/commit/142d2ba7945664fce5dbb5aaa17df7bc3d911cc8))
   Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
 * **lrclib:** Send instrumental flag on publish ([46e6b70](https://github.com/saitatter/pylrcget/commit/46e6b706cb97f21cb3b43de7019ea984305fcd42))
@@ -578,7 +584,7 @@ updated-dependencies:
 * **settings:** Persist empty lyrics filename pattern ([47221c1](https://github.com/saitatter/pylrcget/commit/47221c1b17a20c0144a333db229cf430c7194ec0))
   Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
 
-### 🧰 CI & Build
+### CI & Build
 * **deps:** Bump actions/checkout in the github-actions group ([d366e8f](https://github.com/saitatter/pylrcget/commit/d366e8f966436bd1ca65d8832e387547d59b294a))
   Bumps the github-actions group with 1 update: [actions/checkout](https://github.com/actions/checkout).
   Updates `actions/checkout` from 6 to 7
@@ -594,19 +600,19 @@ updated-dependencies:
   Signed-off-by: dependabot[bot] <support@github.com>
 * Add copilot instructions ([b5adcab](https://github.com/saitatter/pylrcget/commit/b5adcab3e195ab82cbe3c7591fbd7e6949713b36))
 
-### 📚 Docs
+### Docs
 * Add ko-fi support badge ([0ff0c5f](https://github.com/saitatter/pylrcget/commit/0ff0c5f4f6ac7df668677205e2369a589bb064d0))
 * Add ko-fi support footer ([6ec470c](https://github.com/saitatter/pylrcget/commit/6ec470c31344d06f09f5ffa2367618fb56899ded))
 
 
 ## v1.10.0 (2026-05-23)
 
-### ✨ Features
+### Features
 * Streamline settings and selection actions ([bfaf60c](https://github.com/saitatter/pylrcget/commit/bfaf60cf0e5a52a1176e0b15bdb558b8ec89ddc5))
 * Improve ai auto-sync workflow ([17b0d34](https://github.com/saitatter/pylrcget/commit/17b0d34c4d1c6de98fe21b5330dabb7ae95203cf))
 * Persist ui state and customizable shortcuts ([ae4945b](https://github.com/saitatter/pylrcget/commit/ae4945b7653e5230d14721b59d9b34f7fab40f3f))
 
-### 🐛 Fixes
+### Fixes
 * Refresh lyrics layout on tab change ([419133f](https://github.com/saitatter/pylrcget/commit/419133f018d63b9c5c662655af4e392d6d29d643))
 * Prevent clipped lyrics toolbar on tab switch ([881f2ce](https://github.com/saitatter/pylrcget/commit/881f2ce83a117756b77d9819c5a311c54ef26b08))
 * Sync library splitter sizes ([773bc79](https://github.com/saitatter/pylrcget/commit/773bc79781551e83654e799d48ea469a073d9970))
@@ -618,20 +624,20 @@ updated-dependencies:
 * Simplify selection action menus ([2c2665a](https://github.com/saitatter/pylrcget/commit/2c2665a55ec7aa2b19a56f3b66b28dd2b9c959ee))
 * Restore startup appearance hooks ([03f65f3](https://github.com/saitatter/pylrcget/commit/03f65f39fe4c5d94e494324778f06304a75d1eda))
 
-### ♻️ Refactors
+### Refactors
 * Modularize query and main window helpers ([abcff41](https://github.com/saitatter/pylrcget/commit/abcff41be860ea96c2505a2deb5b1f723fe86634))
 
-### 🧰 CI & Build
+### CI & Build
 * Run tests with pytest ([cdd3744](https://github.com/saitatter/pylrcget/commit/cdd37444b6c98fb70392db6098940fabb7b71b31))
 
-### 🧪 Tests
+### Tests
 * Organize top-level test suites ([2e1a770](https://github.com/saitatter/pylrcget/commit/2e1a770d8e3c9985971f55b14db94a513b695e39))
 * Reorganize widget navigation suites ([e506877](https://github.com/saitatter/pylrcget/commit/e5068773295a9a3ae1c2016e0ab8d114538a1ac5))
 
 
 ## v1.9.0 (2026-05-11)
 
-### ✨ Features
+### Features
 * Improve lyrics editor validation ux ([15b2895](https://github.com/saitatter/pylrcget/commit/15b28952855318dfbb54ceb1f031f50d68199ce7))
   Improve synced lyrics validation and editor UX.
   - Detect duplicate timestamps and make them autofixable
@@ -643,11 +649,11 @@ updated-dependencies:
 
 ## v1.8.0 (2026-05-10)
 
-### ✨ Features
+### Features
 * Add lyric diff to sync dialog ([de8215f](https://github.com/saitatter/pylrcget/commit/de8215f5f1cd7be076bcdb63be9d3078ebdaebda))
 * Sync lyrics to similar tracks ([4aa2666](https://github.com/saitatter/pylrcget/commit/4aa26660a883d40927a29a2cd927480333e40d29))
 
-### 🐛 Fixes
+### Fixes
 * Match sync dialog table styling ([ad157a2](https://github.com/saitatter/pylrcget/commit/ad157a27dbc9e073d0d1bd0fc0cf283f94571b27))
 * Improve selected sync diff button contrast ([200dea7](https://github.com/saitatter/pylrcget/commit/200dea70e3d20f0e32d1060c533ddff39efe6c6c))
 * Render sync diff action with delegate ([0ad29b6](https://github.com/saitatter/pylrcget/commit/0ad29b6385dfc4a3fb842039729770fdadb6729a))
@@ -658,11 +664,11 @@ updated-dependencies:
 
 ## v1.7.0 (2026-05-10)
 
-### ✨ Features
+### Features
 * Add easier synced lyric line insertion ([b6af4ae](https://github.com/saitatter/pylrcget/commit/b6af4ae78ade7b1908f4521279ecf90c24457bb0))
 * Show sortable track numbers in library ([5f84620](https://github.com/saitatter/pylrcget/commit/5f846206a886326d7ba2afe22128897d9a1d5ee7))
 
-### 🐛 Fixes
+### Fixes
 * Scope enter playback shortcut to track lists ([048d7a9](https://github.com/saitatter/pylrcget/commit/048d7a9cdc68541877b6b3dad238d57414f42d3e))
 * Reset download success state ([9c73dae](https://github.com/saitatter/pylrcget/commit/9c73dae43eb551fbd130997bd6e88e07ee304243))
 * Add synced lyrics editor context menu ([ff99a04](https://github.com/saitatter/pylrcget/commit/ff99a049608cd3a0ee286ea9f1d690dd0dc4b5a1))
@@ -671,16 +677,16 @@ updated-dependencies:
 
 ## v1.6.0 (2026-05-10)
 
-### ✨ Features
+### Features
 * Configure lyrics file and embed output formats ([64b986f](https://github.com/saitatter/pylrcget/commit/64b986f0d8409f4d5c9704a54ee25500c6251630))
 
-### 🐛 Fixes
+### Fixes
 * Improve light theme button contrast ([447740e](https://github.com/saitatter/pylrcget/commit/447740e3b4d6ebe5aa0c160c22e6c8d27c806ea3))
 * Reposition hotkey badges after log panel toggle ([61f4bf3](https://github.com/saitatter/pylrcget/commit/61f4bf3361ca88a42eed7ceca12983c3dfe10f5e))
 * Clarify lyrics download settings layout ([71fccb0](https://github.com/saitatter/pylrcget/commit/71fccb0bcdcdcd6ce55b74ee8103d169b029891c))
 * Retry publish requests on network timeouts ([a420d32](https://github.com/saitatter/pylrcget/commit/a420d3224ad33e747978ef0d98c48cf39014b9db))
 
-### 🧰 CI & Build
+### CI & Build
 * **deps:** Bump the github-actions group with 4 updates ([dc174cc](https://github.com/saitatter/pylrcget/commit/dc174ccbbbf457c1cabbc3e69125c8c09312e2d9))
   Bumps the github-actions group with 4 updates: [amannn/action-semantic-pull-request](https://github.com/amannn/action-semantic-pull-request), [actions/checkout](https://github.com/actions/checkout), [actions/setup-python](https://github.com/actions/setup-python) and [actions/upload-artifact](https://github.com/actions/upload-artifact).
   Updates `amannn/action-semantic-pull-request` from 5 to 6
@@ -713,21 +719,21 @@ updated-dependencies:
 * Make release workflow manual ([fcda2ed](https://github.com/saitatter/pylrcget/commit/fcda2ed5592c37e142b28ccb56ead10ba40af00f))
 * Add dependabot updates ([e971215](https://github.com/saitatter/pylrcget/commit/e971215a7fe2216d106edd8478c3ba7ee1c3fbcc))
 
-### 📚 Docs
+### Docs
 * Update feature and release documentation ([3bbf48d](https://github.com/saitatter/pylrcget/commit/3bbf48dc1a855c18b3a6c4f6cf81b8f9055a66bb))
 
-### 🧪 Tests
+### Tests
 * Cover lyrics embedding formats ([be45daa](https://github.com/saitatter/pylrcget/commit/be45daa29977639deef81737ee3d0c5969711e43))
 
 
 ## v1.5.0 (2026-05-06)
 
-### ✨ Features
+### Features
 * Improve player controls and library scans ([f10e70f](https://github.com/saitatter/pylrcget/commit/f10e70fa862e6aa0aed474bed1cba7a621670f8f))
 * Add lyrics validation autofix ([f10e70f](https://github.com/saitatter/pylrcget/commit/f10e70fa862e6aa0aed474bed1cba7a621670f8f))
 * Show library scan progress overlay ([f10e70f](https://github.com/saitatter/pylrcget/commit/f10e70fa862e6aa0aed474bed1cba7a621670f8f))
 
-### 🐛 Fixes
+### Fixes
 * Refine player and overlay ux ([f10e70f](https://github.com/saitatter/pylrcget/commit/f10e70fa862e6aa0aed474bed1cba7a621670f8f))
 * Refine track action hover states ([f10e70f](https://github.com/saitatter/pylrcget/commit/f10e70fa862e6aa0aed474bed1cba7a621670f8f))
 * Refine speed control alignment ([f10e70f](https://github.com/saitatter/pylrcget/commit/f10e70fa862e6aa0aed474bed1cba7a621670f8f))
@@ -739,25 +745,25 @@ updated-dependencies:
 
 ## v1.4.0 (2026-05-01)
 
-### ✨ Features
+### Features
 * **lyrics:** Improve download and sidecar workflows ([4034293](https://github.com/saitatter/pylrcget/commit/403429397f715fa8290f7e91b2a5363650922177))
 * **lyrics:** Import lyric files as drafts ([4034293](https://github.com/saitatter/pylrcget/commit/403429397f715fa8290f7e91b2a5363650922177))
 * **ui:** Polish navigation and history controls ([4034293](https://github.com/saitatter/pylrcget/commit/403429397f715fa8290f7e91b2a5363650922177))
 
-### 🐛 Fixes
+### Fixes
 * **lyrics:** Save only selected download format ([4034293](https://github.com/saitatter/pylrcget/commit/403429397f715fa8290f7e91b2a5363650922177))
 * **scanner:** Detect metadata-named lrc sidecars ([4034293](https://github.com/saitatter/pylrcget/commit/403429397f715fa8290f7e91b2a5363650922177))
 * **scanner:** Avoid duplicate metadata reads ([4034293](https://github.com/saitatter/pylrcget/commit/403429397f715fa8290f7e91b2a5363650922177))
 * **ui:** Keep download tooltip out of status bar ([4034293](https://github.com/saitatter/pylrcget/commit/403429397f715fa8290f7e91b2a5363650922177))
 * **lyrics:** Address review regressions ([4034293](https://github.com/saitatter/pylrcget/commit/403429397f715fa8290f7e91b2a5363650922177))
 
-### ♻️ Refactors
+### Refactors
 * **ui:** Simplify review cleanup paths ([4034293](https://github.com/saitatter/pylrcget/commit/403429397f715fa8290f7e91b2a5363650922177))
 
 
 ## v1.3.0 (2026-04-27)
 
-### ✨ Features
+### Features
 * Lyrics draft management, editor mode toggle, and drag-and-drop file import ([fbb94b7](https://github.com/saitatter/pylrcget/commit/fbb94b7e8bc2ec0177cc6b529405f2bfba188e73))
   * Add open containing folder action
   * Move selection actions to toolbar
@@ -814,7 +820,7 @@ updated-dependencies:
   * Cache saved lyrics baseline to avoid DB query on every dirty flush
   * Move file-path query to queries.py, add AI sync cancellation checks
 
-### 🐛 Fixes
+### Fixes
 * Address code review feedback ([fbb94b7](https://github.com/saitatter/pylrcget/commit/fbb94b7e8bc2ec0177cc6b529405f2bfba188e73))
   - Batch commit dropped files instead of per-file commits
 - Debounce dirty lyrics DB writes with 500ms QTimer
@@ -852,7 +858,7 @@ updated-dependencies:
 * Reject timestamps with seconds >= 60 in parse_ts_str ([fbb94b7](https://github.com/saitatter/pylrcget/commit/fbb94b7e8bc2ec0177cc6b529405f2bfba188e73))
   Previously '01:75.00' was accepted as valid. Now returns None for out-of-range seconds values.
 
-### ♻️ Refactors
+### Refactors
 * Move lrc parsing functions to core/utils ([fbb94b7](https://github.com/saitatter/pylrcget/commit/fbb94b7e8bc2ec0177cc6b529405f2bfba188e73))
   Move parse_lrc, ms_to_ts, parse_ts_str, and _ts_to_ms from lyrics_editor_widget to core/utils for reuse across modules.
 * Extract _read_vorbis_lyrics helper in scan_library ([fbb94b7](https://github.com/saitatter/pylrcget/commit/fbb94b7e8bc2ec0177cc6b529405f2bfba188e73))
@@ -870,12 +876,12 @@ updated-dependencies:
 * Deduplicate lrc timestamp regex ([fbb94b7](https://github.com/saitatter/pylrcget/commit/fbb94b7e8bc2ec0177cc6b529405f2bfba188e73))
   Export LRC_TS_RE from core/utils.py and reuse it in lyrics_editor_widget.py instead of defining an identical regex.
 
-### 📚 Docs
+### Docs
 * Update readme with new features ([fbb94b7](https://github.com/saitatter/pylrcget/commit/fbb94b7e8bc2ec0177cc6b529405f2bfba188e73))
   - Add synced/plain editor toggle, draft management, unsaved filter
 - Add drag-and-drop audio files support
 
-### 🧪 Tests
+### Tests
 * Add tests for lrclib_client, scan exclusions, lrc parsing, ai sync ([fbb94b7](https://github.com/saitatter/pylrcget/commit/fbb94b7e8bc2ec0177cc6b529405f2bfba188e73))
   - test_lrclib_client: _raise_for_status, model helpers, challenge solver, API methods
 - test_scan_exclusions: path/pattern exclusion helpers
@@ -884,7 +890,7 @@ updated-dependencies:
 * Add path traversal tests for lyrics sidecar export ([fbb94b7](https://github.com/saitatter/pylrcget/commit/fbb94b7e8bc2ec0177cc6b529405f2bfba188e73))
   Verify that patterns containing '../' and malicious track metadata cannot write files outside the configured output directory.
 
-### 🔧 Other Changes
+### Other Changes
 * Cache artist/album lookups in add_tracks ([fbb94b7](https://github.com/saitatter/pylrcget/commit/fbb94b7e8bc2ec0177cc6b529405f2bfba188e73))
   Pre-load artist and album ID caches before bulk insert loop, eliminating per-track find_artist/find_album database queries. New entries are added to the cache as they're created.
 * Cache get_config result at module level ([fbb94b7](https://github.com/saitatter/pylrcget/commit/fbb94b7e8bc2ec0177cc6b529405f2bfba188e73))
@@ -897,14 +903,14 @@ updated-dependencies:
 
 ## v1.2.0 (2026-04-24)
 
-### ✨ Features
+### Features
 * **ui:** Improve responsive layout and retry workflow ([45a80d1](https://github.com/saitatter/pylrcget/commit/45a80d1129b2cd3b5c1a594bb90fd155b91b68c0))
 * **ui:** Add hotkey hint badges ([45a80d1](https://github.com/saitatter/pylrcget/commit/45a80d1129b2cd3b5c1a594bb90fd155b91b68c0))
 * **lyrics:** Parallelize batch download matching ([45a80d1](https://github.com/saitatter/pylrcget/commit/45a80d1129b2cd3b5c1a594bb90fd155b91b68c0))
 * **lyrics:** Require review before applying batch matches ([45a80d1](https://github.com/saitatter/pylrcget/commit/45a80d1129b2cd3b5c1a594bb90fd155b91b68c0))
 * **lyrics:** Auto-apply exact batch matches ([45a80d1](https://github.com/saitatter/pylrcget/commit/45a80d1129b2cd3b5c1a594bb90fd155b91b68c0))
 
-### 🐛 Fixes
+### Fixes
 * **ui:** Improve responsive resizing ([45a80d1](https://github.com/saitatter/pylrcget/commit/45a80d1129b2cd3b5c1a594bb90fd155b91b68c0))
 * **ui:** Keep top bar groups compact vertically ([45a80d1](https://github.com/saitatter/pylrcget/commit/45a80d1129b2cd3b5c1a594bb90fd155b91b68c0))
 * **ui:** Protect lyrics panel minimum width ([45a80d1](https://github.com/saitatter/pylrcget/commit/45a80d1129b2cd3b5c1a594bb90fd155b91b68c0))
@@ -936,35 +942,35 @@ updated-dependencies:
 * **ui:** Import context menu spacing helper ([45a80d1](https://github.com/saitatter/pylrcget/commit/45a80d1129b2cd3b5c1a594bb90fd155b91b68c0))
 * **lyrics:** Track concurrent apply workers ([45a80d1](https://github.com/saitatter/pylrcget/commit/45a80d1129b2cd3b5c1a594bb90fd155b91b68c0))
 
-### ♻️ Refactors
+### Refactors
 * **ui:** Name responsive layout dimensions ([45a80d1](https://github.com/saitatter/pylrcget/commit/45a80d1129b2cd3b5c1a594bb90fd155b91b68c0))
 
-### 🔧 Other Changes
+### Other Changes
 * **lyrics:** Parallelize relaxed retry queries ([45a80d1](https://github.com/saitatter/pylrcget/commit/45a80d1129b2cd3b5c1a594bb90fd155b91b68c0))
 * **lyrics:** Parallelize retry search across tracks ([45a80d1](https://github.com/saitatter/pylrcget/commit/45a80d1129b2cd3b5c1a594bb90fd155b91b68c0))
 
 
 ## v1.1.0 (2026-04-24)
 
-### ✨ Features
+### Features
 * **lyrics:** Batch retry failed downloads with relaxed search ([bc7ecde](https://github.com/saitatter/pylrcget/commit/bc7ecded7cc662793768c170eaf3aa92f5ce8e71))
 * **release:** Add portable single-file build assets ([bc7ecde](https://github.com/saitatter/pylrcget/commit/bc7ecded7cc662793768c170eaf3aa92f5ce8e71))
 * **release:** Include extended commit descriptions ([bc7ecde](https://github.com/saitatter/pylrcget/commit/bc7ecded7cc662793768c170eaf3aa92f5ce8e71))
 
-### 🐛 Fixes
+### Fixes
 * Don't quit app before installer starts — let inno setup handle it ([bc7ecde](https://github.com/saitatter/pylrcget/commit/bc7ecded7cc662793768c170eaf3aa92f5ce8e71))
   Remove QApplication.quit() after launching the installer. The Inno Setup /CLOSEAPPLICATIONS and /FORCECLOSEAPPLICATIONS flags tell the installer to close the running app via Windows Restart Manager, which then knows to reopen it after the update via /RESTARTAPPLICATIONS.
   Previously the app quit immediately after os.startfile() returned (which is non-blocking), causing two issues: 1. Installer window appeared behind other windows (lost focus context) 2. Restart Manager had nothing to restart (app already exited on its own)
 * **release:** Parse squash commits for changelog ([bc7ecde](https://github.com/saitatter/pylrcget/commit/bc7ecded7cc662793768c170eaf3aa92f5ce8e71))
 * **lyrics:** Keep retry search resilient per track ([bc7ecde](https://github.com/saitatter/pylrcget/commit/bc7ecded7cc662793768c170eaf3aa92f5ce8e71))
 
-### ♻️ Refactors
+### Refactors
 * **lyrics:** Tidy retry match review internals ([bc7ecde](https://github.com/saitatter/pylrcget/commit/bc7ecded7cc662793768c170eaf3aa92f5ce8e71))
 
 
 ## v1.0.3 (2026-04-23)
 
-### ✨ Features
+### Features
 * Implement real lrclib lyrics publishing ([c7c0bd3](https://github.com/saitatter/pylrcget/commit/c7c0bd36b3b8e19fbefa3280c613aef968da22ba))
   - replace stub PublishWorker with actual lrclib API integration
 - use lrclib.LrcLibAPI for challenge request, nonce solving, and publish
@@ -993,7 +999,7 @@ updated-dependencies:
 * Allow minimizing bulk download/publish overlays to background ([c7c0bd3](https://github.com/saitatter/pylrcget/commit/c7c0bd36b3b8e19fbefa3280c613aef968da22ba))
   The close button (×) now hides the overlay instead of cancelling the operation. A progress button appears in the top bar while a background operation is running — click it to reopen the overlay and check progress. STOP button still cancels the operation as before.
 
-### 🐛 Fixes
+### Fixes
 * Update flow, cleanup, and lrclib integration features ([c7c0bd3](https://github.com/saitatter/pylrcget/commit/c7c0bd36b3b8e19fbefa3280c613aef968da22ba))
 * Resolve update installer not launching from smoke test ([c7c0bd3](https://github.com/saitatter/pylrcget/commit/c7c0bd36b3b8e19fbefa3280c613aef968da22ba))
   - bump default smoke test version tag from v0.9.99 to v99.0.0 so updates are always detected
@@ -1054,7 +1060,7 @@ updated-dependencies:
   and solve_challenge as separate steps instead of lumping both under
   the solve step.
 
-### ♻️ Refactors
+### Refactors
 * Remove dead code ([c7c0bd3](https://github.com/saitatter/pylrcget/commit/c7c0bd36b3b8e19fbefa3280c613aef968da22ba))
   - delete unused LrcLibClient class and LyricsResult dataclass (lrclib_client.py)
 - remove 12 unused accessor methods from FsTrack in core/models.py
@@ -1074,12 +1080,12 @@ updated-dependencies:
 - Fix IncorrectPublishTokenError to only apply to 400 on /publish,
   not to all 400 responses.
 
-### 🧰 CI & Build
+### CI & Build
 * Update release note and changelog templates ([c7c0bd3](https://github.com/saitatter/pylrcget/commit/c7c0bd36b3b8e19fbefa3280c613aef968da22ba))
 * Remove legacy library/fs_track.py (dead code) ([c7c0bd3](https://github.com/saitatter/pylrcget/commit/c7c0bd36b3b8e19fbefa3280c613aef968da22ba))
   All code uses core.models.FsTrack (frozen dataclass with modified_time, file_size, instrumental). The legacy FsTrack class, ScanProgress, load_tracks_from_entry_batch, load_tracks_from_directories, and count_files_from_directories were unused dead code.
 
-### 📚 Docs
+### Docs
 * Rewrite readme with badges, tables, and structured sections ([c7c0bd3](https://github.com/saitatter/pylrcget/commit/c7c0bd36b3b8e19fbefa3280c613aef968da22ba))
   - add shield.io badges for license, release, issues, tech stack, and platform
 - reorganize features into emoji-prefixed sections
@@ -1090,22 +1096,22 @@ updated-dependencies:
 
 ## v1.0.2 (2026-04-23)
 
-### 🐛 Fixes
+### Fixes
 * **release:** Enforce semantic pr titles for squash merges ([25cdb77](https://github.com/saitatter/pylrcget/commit/25cdb770c17c20ab49d1b8a5dd92feeb5a38685b))
 
 
 ## v1.0.1 (2026-04-23)
 
-### 🐛 Fixes
+### Fixes
 * **release:** Treat ci and chore commits as patch ([cb217e7](https://github.com/saitatter/pylrcget/commit/cb217e7dd5d25a5c13a8251ddbe5f7b6b2772e98))
 
-### 🧰 CI & Build
+### CI & Build
 * Add codeowners to require owner approval ([05e0c5d](https://github.com/saitatter/pylrcget/commit/05e0c5d6c3d5c0e1f54de2b76b4877cda8783f74))
 
 
 ## v1.0.0 (2026-04-23)
 
-### ✨ Features
+### Features
 * Switch release notes to semantic templates and fix installer assets ([657dade](https://github.com/saitatter/pylrcget/commit/657dadeb21bb4cc16808627e35c357962c620a4e))
 * Add per-track refresh from disk in the library view ([657dade](https://github.com/saitatter/pylrcget/commit/657dadeb21bb4cc16808627e35c357962c620a4e))
 * Support configurable lyrics lookup subfolders with embedded-first priority ([657dade](https://github.com/saitatter/pylrcget/commit/657dadeb21bb4cc16808627e35c357962c620a4e))
@@ -1116,7 +1122,7 @@ updated-dependencies:
   Use semantic-release changelog templates for both release notes and CHANGELOG output with ordered emoji categories.
 * Improve updater flow, release assets, and migration baseline ([671106e](https://github.com/saitatter/pylrcget/commit/671106e53fc87fdd647088a43d4f5e98f7e2b2dc))
 
-### 🐛 Fixes
+### Fixes
 * Add track restart logic and improve file picker dialog ([657dade](https://github.com/saitatter/pylrcget/commit/657dadeb21bb4cc16808627e35c357962c620a4e))
 * Add windows exe icon and improve playback/settings behavior ([657dade](https://github.com/saitatter/pylrcget/commit/657dadeb21bb4cc16808627e35c357962c620a4e))
 * Harden windows self-update flow with backup, hash check, and logging ([657dade](https://github.com/saitatter/pylrcget/commit/657dadeb21bb4cc16808627e35c357962c620a4e))
@@ -1133,7 +1139,7 @@ updated-dependencies:
 * Harden startup timer lifetime and add updater log dir fallback on windows ([657dade](https://github.com/saitatter/pylrcget/commit/657dadeb21bb4cc16808627e35c357962c620a4e))
 * Prepare db versioning path, persist track refresh updates, and polish updater ui/hover behavior ([657dade](https://github.com/saitatter/pylrcget/commit/657dadeb21bb4cc16808627e35c357962c620a4e))
 
-### ♻️ Refactors
+### Refactors
 * Simplify track context menu and group actions by selection ([657dade](https://github.com/saitatter/pylrcget/commit/657dadeb21bb4cc16808627e35c357962c620a4e))
 * Rename app to pylrcget and drop legacy data path fallback ([657dade](https://github.com/saitatter/pylrcget/commit/657dadeb21bb4cc16808627e35c357962c620a4e))
 * Reset database schema to v1 for clean release ([657dade](https://github.com/saitatter/pylrcget/commit/657dadeb21bb4cc16808627e35c357962c620a4e))
@@ -1142,28 +1148,28 @@ updated-dependencies:
 * Centralize updater app path name and document inno setup flags ([657dade](https://github.com/saitatter/pylrcget/commit/657dadeb21bb4cc16808627e35c357962c620a4e))
 * Remove redundant player position signal wiring from main window init ([657dade](https://github.com/saitatter/pylrcget/commit/657dadeb21bb4cc16808627e35c357962c620a4e))
 
-### 🧰 CI & Build
+### CI & Build
 * Switch pyinstaller packaging to onedir for installer workflows ([205d4d7](https://github.com/saitatter/pylrcget/commit/205d4d77860a65322abb713399a92e91950ab777))
 * Switch to github categorized release notes and dedupe squash parsing ([657dade](https://github.com/saitatter/pylrcget/commit/657dadeb21bb4cc16808627e35c357962c620a4e))
 * Stabilize release pipeline, installers, and github notes ([347abde](https://github.com/saitatter/pylrcget/commit/347abde20e169fecea8d1ecf879fd7ec7cf2ab81))
 * Add cross-platform installer assets to release workflow while keeping archive fallbacks ([657dade](https://github.com/saitatter/pylrcget/commit/657dadeb21bb4cc16808627e35c357962c620a4e))
 
-### 📚 Docs
+### Docs
 * Update readme ([657dade](https://github.com/saitatter/pylrcget/commit/657dadeb21bb4cc16808627e35c357962c620a4e))
 
-### 🧪 Tests
+### Tests
 * Remove obsolete legacy migration tests after clean v1 reset ([657dade](https://github.com/saitatter/pylrcget/commit/657dadeb21bb4cc16808627e35c357962c620a4e))
 
 
 ## v0.9.0 (2026-04-12)
 
-### ✨ Features
+### Features
 * Playback, library refresh, lyrics lookup, and appearance settings ([4d16e86](https://github.com/saitatter/pylrcget/commit/4d16e863444270e6b59467bbd214a0e3be7227a1))
 * Add per-track refresh from disk in the library view ([4d16e86](https://github.com/saitatter/pylrcget/commit/4d16e863444270e6b59467bbd214a0e3be7227a1))
 * Support configurable lyrics lookup subfolders with embedded-first priority ([4d16e86](https://github.com/saitatter/pylrcget/commit/4d16e863444270e6b59467bbd214a0e3be7227a1))
 * Add appearance settings for ui scale, font size, album art, and startup view ([4d16e86](https://github.com/saitatter/pylrcget/commit/4d16e863444270e6b59467bbd214a0e3be7227a1))
 
-### 🐛 Fixes
+### Fixes
 * Add track restart logic and improve file picker dialog ([4d16e86](https://github.com/saitatter/pylrcget/commit/4d16e863444270e6b59467bbd214a0e3be7227a1))
 * Add windows exe icon and improve playback/settings behavior ([4d16e86](https://github.com/saitatter/pylrcget/commit/4d16e863444270e6b59467bbd214a0e3be7227a1))
 * Harden windows self-update flow with backup, hash check, and logging ([4d16e86](https://github.com/saitatter/pylrcget/commit/4d16e863444270e6b59467bbd214a0e3be7227a1))
@@ -1171,13 +1177,13 @@ updated-dependencies:
 * Scale track action buttons and columns with ui scale ([4d16e86](https://github.com/saitatter/pylrcget/commit/4d16e863444270e6b59467bbd214a0e3be7227a1))
 * Correct border-sradius typo in volume slider styling ([4d16e86](https://github.com/saitatter/pylrcget/commit/4d16e863444270e6b59467bbd214a0e3be7227a1))
 
-### ♻️ Refactors
+### Refactors
 * Simplify track context menu and group actions by selection ([4d16e86](https://github.com/saitatter/pylrcget/commit/4d16e863444270e6b59467bbd214a0e3be7227a1))
 
 
 ## v0.8.0 (2026-04-11)
 
-### ✨ Features
+### Features
 * Expand lrclib download workflows and tooling ([87118cd](https://github.com/saitatter/pylrcget/commit/87118cd4c326905d3fca1bf87b029910978e4246))
 * Add support for musepack audio format in lyrics embedding and scanning ([87118cd](https://github.com/saitatter/pylrcget/commit/87118cd4c326905d3fca1bf87b029910978e4246))
 * Add export functionality for lyrics files across various views ([87118cd](https://github.com/saitatter/pylrcget/commit/87118cd4c326905d3fca1bf87b029910978e4246))
@@ -1205,10 +1211,10 @@ updated-dependencies:
 * Add application icon loading functionality and set window icon ([87118cd](https://github.com/saitatter/pylrcget/commit/87118cd4c326905d3fca1bf87b029910978e4246))
 * Streamline download state management in album and artist widgets ([87118cd](https://github.com/saitatter/pylrcget/commit/87118cd4c326905d3fca1bf87b029910978e4246))
 
-### 🐛 Fixes
+### Fixes
 * Ensure database connection is properly managed in bulk lyrics download worker ([87118cd](https://github.com/saitatter/pylrcget/commit/87118cd4c326905d3fca1bf87b029910978e4246))
 
-### ♻️ Refactors
+### Refactors
 * Streamline plain lyrics update logic in download_track_lyrics function ([87118cd](https://github.com/saitatter/pylrcget/commit/87118cd4c326905d3fca1bf87b029910978e4246))
 * Centralize lyrics download workflow orchestration ([87118cd](https://github.com/saitatter/pylrcget/commit/87118cd4c326905d3fca1bf87b029910978e4246))
 * Extract publish history workflow from main window ([87118cd](https://github.com/saitatter/pylrcget/commit/87118cd4c326905d3fca1bf87b029910978e4246))
@@ -1227,11 +1233,11 @@ updated-dependencies:
 * Split shared helpers from large library widgets ([87118cd](https://github.com/saitatter/pylrcget/commit/87118cd4c326905d3fca1bf87b029910978e4246))
 * Streamline cover extraction and normalize download mode in lyrics service ([87118cd](https://github.com/saitatter/pylrcget/commit/87118cd4c326905d3fca1bf87b029910978e4246))
 
-### 📚 Docs
+### Docs
 * Enhance readme with new features and diagnostics information ([87118cd](https://github.com/saitatter/pylrcget/commit/87118cd4c326905d3fca1bf87b029910978e4246))
 * Describe lyrics download modes and missing behavior ([87118cd](https://github.com/saitatter/pylrcget/commit/87118cd4c326905d3fca1bf87b029910978e4246))
 
-### 🧪 Tests
+### Tests
 * Cover bulk lyrics download controller flows ([87118cd](https://github.com/saitatter/pylrcget/commit/87118cd4c326905d3fca1bf87b029910978e4246))
 * Cover migration from v20 to v21 ([87118cd](https://github.com/saitatter/pylrcget/commit/87118cd4c326905d3fca1bf87b029910978e4246))
 * Cover musepack scan embed and artwork flows ([87118cd](https://github.com/saitatter/pylrcget/commit/87118cd4c326905d3fca1bf87b029910978e4246))
@@ -1239,7 +1245,7 @@ updated-dependencies:
 
 ## v0.7.0 (2026-04-11)
 
-### ✨ Features
+### Features
 * Add sync quality-of-life controls ([074896d](https://github.com/saitatter/pylrcget/commit/074896d1329a5c33294a2d6691abbc91e7b0c174))
 * Add sync qol controls and auto-scan folders ([074896d](https://github.com/saitatter/pylrcget/commit/074896d1329a5c33294a2d6691abbc91e7b0c174))
 * Update volume control layout and styling in player bar ([074896d](https://github.com/saitatter/pylrcget/commit/074896d1329a5c33294a2d6691abbc91e7b0c174))
@@ -1252,7 +1258,7 @@ updated-dependencies:
 
 ## v0.6.0 (2026-04-09)
 
-### ✨ Features
+### Features
 * Improve library scanning and lyrics personalization ([3440ab3](https://github.com/saitatter/pylrcget/commit/3440ab34f395696095d14844dcd09d67db15aced))
 * Enhance audio track extraction with error handling for unreadable files ([3440ab3](https://github.com/saitatter/pylrcget/commit/3440ab34f395696095d14844dcd09d67db15aced))
 * Implement exclusion paths and patterns for audio library scanning ([3440ab3](https://github.com/saitatter/pylrcget/commit/3440ab34f395696095d14844dcd09d67db15aced))
@@ -1273,21 +1279,21 @@ updated-dependencies:
 * Enhance playerbar button styles and layout for improved usability ([3440ab3](https://github.com/saitatter/pylrcget/commit/3440ab34f395696095d14844dcd09d67db15aced))
 * Enhance seekslider appearance with custom paint event and update qss for rounded slider edges ([3440ab3](https://github.com/saitatter/pylrcget/commit/3440ab34f395696095d14844dcd09d67db15aced))
 
-### ♻️ Refactors
+### Refactors
 * Remove unused excluded paths ui components and streamline library scanner error handling ([3440ab3](https://github.com/saitatter/pylrcget/commit/3440ab34f395696095d14844dcd09d67db15aced))
 * Remove back navigation functionality from albumlistwidget and artistlistwidget ([3440ab3](https://github.com/saitatter/pylrcget/commit/3440ab34f395696095d14844dcd09d67db15aced))
 
-### 📚 Docs
+### Docs
 * Add windows release note regarding unsigned builds and smartscreen warnings ([3440ab3](https://github.com/saitatter/pylrcget/commit/3440ab34f395696095d14844dcd09d67db15aced))
 
-### 🔧 Other Changes
+### Other Changes
 * Update layout spacing and border styles for playerbar and playershell ([3440ab3](https://github.com/saitatter/pylrcget/commit/3440ab34f395696095d14844dcd09d67db15aced))
 * Refine layout and button sizes in playerbar for improved aesthetics and usability ([3440ab3](https://github.com/saitatter/pylrcget/commit/3440ab34f395696095d14844dcd09d67db15aced))
 
 
 ## v0.5.0 (2026-04-06)
 
-### ✨ Features
+### Features
 * Improve library drilldown navigation and settings organization ([fcaf261](https://github.com/saitatter/pylrcget/commit/fcaf2619e7fe05199eae9e2198cef088c4da26a3))
 * Enhance player bar with artist and album navigation ([fcaf261](https://github.com/saitatter/pylrcget/commit/fcaf2619e7fe05199eae9e2198cef088c4da26a3))
   - Added signals for artist and album navigation requests in PlayerBar.
@@ -1307,12 +1313,12 @@ updated-dependencies:
 * Update database version to 17 and enhance album/artist widgets with pagination and sorting ([fcaf261](https://github.com/saitatter/pylrcget/commit/fcaf2619e7fe05199eae9e2198cef088c4da26a3))
 * Implement caching for artist and album labels in main window; enhance album and artist list widgets with loaded row tracking ([fcaf261](https://github.com/saitatter/pylrcget/commit/fcaf2619e7fe05199eae9e2198cef088c4da26a3))
 
-### 🐛 Fixes
+### Fixes
 * Update artist and album id checks to use 'and' condition for clarity ([fcaf261](https://github.com/saitatter/pylrcget/commit/fcaf2619e7fe05199eae9e2198cef088c4da26a3))
 * Ensure loading state is reset after attempting to load rows in tracklistwidget ([fcaf261](https://github.com/saitatter/pylrcget/commit/fcaf2619e7fe05199eae9e2198cef088c4da26a3))
 * Improve artist name retrieval in album queries to handle empty album artist names ([fcaf261](https://github.com/saitatter/pylrcget/commit/fcaf2619e7fe05199eae9e2198cef088c4da26a3))
 
-### ♻️ Refactors
+### Refactors
 * Simplify test setup by removing unnecessary database table creation for album and artist widgets ([fcaf261](https://github.com/saitatter/pylrcget/commit/fcaf2619e7fe05199eae9e2198cef088c4da26a3))
 * Remove navigation buttons from mainwindow and update layout accordingly ([fcaf261](https://github.com/saitatter/pylrcget/commit/fcaf2619e7fe05199eae9e2198cef088c4da26a3))
 * Enhance album and artist tabs with dedicated lyrics views and improved layout ([fcaf261](https://github.com/saitatter/pylrcget/commit/fcaf2619e7fe05199eae9e2198cef088c4da26a3))
@@ -1321,7 +1327,7 @@ updated-dependencies:
 
 ## v0.4.0 (2026-04-06)
 
-### ✨ Features
+### Features
 * Improve syncing workflow and incremental library scanning ([ad6dc32](https://github.com/saitatter/pylrcget/commit/ad6dc3248230349e51ab6034b42f8a6ee765bad0))
 * Enhance audio track extraction with error handling for unreadable files ([ad6dc32](https://github.com/saitatter/pylrcget/commit/ad6dc3248230349e51ab6034b42f8a6ee765bad0))
 * Implement exclusion paths and patterns for audio library scanning ([ad6dc32](https://github.com/saitatter/pylrcget/commit/ad6dc3248230349e51ab6034b42f8a6ee765bad0))
@@ -1340,7 +1346,7 @@ updated-dependencies:
 
 ## v0.3.0 (2026-04-06)
 
-### ✨ Features
+### Features
 * Add theme system, player bar refresh, and extended format support ([58059d8](https://github.com/saitatter/pylrcget/commit/58059d8d43038c3bd8039a93dcf38e2b42800128))
 * Enhance ui with theme support and style updates ([58059d8](https://github.com/saitatter/pylrcget/commit/58059d8d43038c3bd8039a93dcf38e2b42800128))
   - Added theme selection in MusicFoldersDialog with QComboBox for user customization.
@@ -1360,7 +1366,7 @@ updated-dependencies:
 
 ## v0.2.0 (2026-04-06)
 
-### ✨ Features
+### Features
 * Add configurable lyrics export and refresh ui icons ([5cb1feb](https://github.com/saitatter/pylrcget/commit/5cb1feb0ec356998f39e019801f58c05b90b3e59))
 * **database:** Update to version 8 and add new config fields for lyrics export ([5cb1feb](https://github.com/saitatter/pylrcget/commit/5cb1feb0ec356998f39e019801f58c05b90b3e59))
 * **ui:** Enhance music folders dialog with lyrics export settings ([5cb1feb](https://github.com/saitatter/pylrcget/commit/5cb1feb0ec356998f39e019801f58c05b90b3e59))
@@ -1370,25 +1376,25 @@ updated-dependencies:
 * **ui:** Replace standard icons with svg icons and add icon loader utility ([5cb1feb](https://github.com/saitatter/pylrcget/commit/5cb1feb0ec356998f39e019801f58c05b90b3e59))
 * **config:** Update musicfoldersdialog to use dataclass replacement for config updates ([5cb1feb](https://github.com/saitatter/pylrcget/commit/5cb1feb0ec356998f39e019801f58c05b90b3e59))
 
-### 🐛 Fixes
+### Fixes
 * **ui:** Update lyrics export logic to respect save_lyrics_sidecars setting ([5cb1feb](https://github.com/saitatter/pylrcget/commit/5cb1feb0ec356998f39e019801f58c05b90b3e59))
 * **qss:** Correct url syntax for checkbox checked indicator image ([5cb1feb](https://github.com/saitatter/pylrcget/commit/5cb1feb0ec356998f39e019801f58c05b90b3e59))
 * **delegate:** Correct event type reference in editorevent method ([5cb1feb](https://github.com/saitatter/pylrcget/commit/5cb1feb0ec356998f39e019801f58c05b90b3e59))
 
-### ♻️ Refactors
+### Refactors
 * **main:** Integrate lyrics export in the main window's download process ([5cb1feb](https://github.com/saitatter/pylrcget/commit/5cb1feb0ec356998f39e019801f58c05b90b3e59))
 
 
 ## v0.1.1 (2026-04-06)
 
-### 🐛 Fixes
+### Fixes
 * **ci:** Use release pat for semantic-release pushes ([9314cc8](https://github.com/saitatter/pylrcget/commit/9314cc87383be090379d768a37902fabc6e2e6ac))
 * **build:** Make pyinstaller spec resolve root without __file__ ([5b83577](https://github.com/saitatter/pylrcget/commit/5b8357702c9f9adbf02f3f6df35995d47e5f96f7))
 
 
 ## v0.1.0 (2026-04-06)
 
-### ✨ Features
+### Features
 * **ui:** Move refresh and settings actions to top bar icon buttons ([7c91941](https://github.com/saitatter/pylrcget/commit/7c9194158932565844c7f704c2e27e46de5d5f98))
 * **release:** Add github actions workflow for automated releases and changelog generation ([7c91941](https://github.com/saitatter/pylrcget/commit/7c9194158932565844c7f704c2e27e46de5d5f98))
 * **ui:** Implement sorting functionality in tracklistwidget ([7c91941](https://github.com/saitatter/pylrcget/commit/7c9194158932565844c7f704c2e27e46de5d5f98))
@@ -1444,10 +1450,10 @@ updated-dependencies:
   - Developed LyricsDownloadWorker for downloading lyrics from LRCLIB API.
 - Added functionality for saving synced and plain lyrics to the database.
 
-### 🐛 Fixes
+### Fixes
 * **ui:** Import player class for audio functionality ([7c91941](https://github.com/saitatter/pylrcget/commit/7c9194158932565844c7f704c2e27e46de5d5f98))
 
-### ♻️ Refactors
+### Refactors
 * **ui:** Clean up mainwindow and signal wiring ([7c91941](https://github.com/saitatter/pylrcget/commit/7c9194158932565844c7f704c2e27e46de5d5f98))
 * **lyrics:** Preserve timestamp-only lines in synced editor ([7c91941](https://github.com/saitatter/pylrcget/commit/7c9194158932565844c7f704c2e27e46de5d5f98))
 * Centralize ui design tokens ([7c91941](https://github.com/saitatter/pylrcget/commit/7c9194158932565844c7f704c2e27e46de5d5f98))
@@ -1461,8 +1467,8 @@ updated-dependencies:
   * Update src/core/embed_lyrics.py
   ---------
 
-### 🧰 CI & Build
+### CI & Build
 * Polish ui copy ([7c91941](https://github.com/saitatter/pylrcget/commit/7c9194158932565844c7f704c2e27e46de5d5f98))
 
-### 🔧 Other Changes
+### Other Changes
 * Unify input and action controls ([7c91941](https://github.com/saitatter/pylrcget/commit/7c9194158932565844c7f704c2e27e46de5d5f98))

@@ -1,22 +1,22 @@
 changelog:
   categories:
-    - title: "✨ Features"
+    - title: "Features"
       labels:
         - "feature"
         - "feat"
-    - title: "🐛 Fixes"
+    - title: "Fixes"
       labels:
         - "bug"
         - "fix"
-    - title: "♻️ Refactors"
+    - title: "Refactors"
       labels:
         - "refactor"
-    - title: "🧰 CI & Build"
+    - title: "CI & Build"
       labels:
         - "ci"
         - "build"
         - "chore"
-    - title: "📚 Docs"
+    - title: "Docs"
       labels:
         - "docs"
   exclude:

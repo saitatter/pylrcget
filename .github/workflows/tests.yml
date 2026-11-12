@@ -1,13 +1,16 @@
 name: Tests
 
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 on:
   push:
     branches:
-      - main
-      - ui-refactor
-      - personalisation
-      - save-features
-      - skins-aero-peek
+      - "**"
   pull_request:
 
 jobs:
