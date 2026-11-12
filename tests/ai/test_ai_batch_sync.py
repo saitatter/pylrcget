@@ -2,7 +2,7 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
-from PySide6.QtCore import QObject, Signal
+from PySide6.QtCore import QCoreApplication, QEvent, QObject, Signal
 
 from tests import test_support
 from ui.controllers.ai_batch_sync_controller import (
@@ -59,6 +59,7 @@ def batch(tmp_path, monkeypatch):
     yield controller, tracks, store, overlay, events
     controller.cancel()
     controller.deleteLater()
+    QCoreApplication.sendPostedEvents(controller, QEvent.Type.DeferredDelete)
     events()
 
 

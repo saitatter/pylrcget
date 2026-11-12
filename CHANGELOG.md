@@ -18,6 +18,7 @@
 
 ### CI & Build
 - Releases require passing tests and lint, preserve reviewed changelog entries and historical notes, and use plain headings, complete commit lists and conventional release commits.
+- Batch AI tests explicitly release Qt controllers between runs to keep the full UI suite stable.
 
 ## v1.15.0 (2026-09-23)
 
