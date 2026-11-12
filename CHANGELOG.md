@@ -9,6 +9,7 @@
 - Releases preserve reviewed changelog entries and historical notes, with plain headings and complete commit lists.
 
 ### Fixes
+- Settings > AI Sync opens the AI setup dialog from Manage AI runtime, including on a fresh installation with no runtime folder (#61).
 - Packaged builds download and verify their own Python runtime when setting up AI synchronization, without requiring a system Python installation.
 
 ## v1.15.0 (2026-09-23)

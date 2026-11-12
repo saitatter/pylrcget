@@ -79,6 +79,9 @@ exports and embedding are explicit user actions.
 
 ## Optional AI Auto Sync
 
+Open **Settings > AI Sync > Manage AI runtime** to install missing AI packages.
+You can also select a track and click **Sync with AI** to open setup when needed.
+
 ```powershell
 python -m pip install -e ".[ai]"
 ```

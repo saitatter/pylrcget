@@ -4,11 +4,9 @@ import json
 import os
 import re
 from dataclasses import replace
-from pathlib import Path
 
-from PySide6.QtCore import Qt, QThread, QUrl, Signal
+from PySide6.QtCore import Qt, QThread, Signal
 from PySide6.QtGui import (
-    QDesktopServices,
     QFont,
     QKeySequence,
     QStandardItem,
@@ -67,10 +65,11 @@ from ui.services.logging_preferences import LOG_VERBOSITY_CHOICES
 from ui.theme_tokens import get_available_themes
 
 
-def _collect_ai_runtime_status(selected_device: str) -> dict[str, object]:
+def _collect_ai_runtime_status(selected_device: str, require_demucs: bool = True) -> dict[str, object]:
     """Probe AI capabilities without touching any Qt widgets."""
     from ui.workers.ai.ai_runtime import (
         default_ai_runtime_dir,
+        nvidia_gpu_available,
         resolve_ai_runtime_python,
     )
     from ui.workers.ai.ai_sync_lyrics_aligner import (
@@ -84,8 +83,11 @@ def _collect_ai_runtime_status(selected_device: str) -> dict[str, object]:
     try:
         runtime_python = resolve_ai_runtime_python()
         missing = get_missing_ai_dependencies(
+            prefer_cuda=selected_device == "cuda" or (
+                selected_device == "auto" and nvidia_gpu_available()
+            ),
             require_lyrics_aligner=True,
-            require_demucs=True,
+            require_demucs=require_demucs,
         )
     except (OSError, RuntimeError, ValueError) as exc:
         runtime_python = None
@@ -145,6 +147,7 @@ def _collect_ai_runtime_status(selected_device: str) -> dict[str, object]:
             "fallback": "success" if multilingual_ready else "warning",
         },
         "runtime_dir": str(default_ai_runtime_dir()),
+        "missing_packages": missing,
     }
 
 
@@ -152,13 +155,14 @@ class _AIRuntimeStatusWorker(QThread):
     statusReady = Signal(object)
     statusFailed = Signal(str)
 
-    def __init__(self, selected_device: str, parent=None) -> None:
+    def __init__(self, selected_device: str, parent=None, *, require_demucs: bool = True) -> None:
         super().__init__(parent)
         self._selected_device = selected_device
+        self._require_demucs = require_demucs
 
     def run(self) -> None:
         try:
-            self.statusReady.emit(_collect_ai_runtime_status(self._selected_device))
+            self.statusReady.emit(_collect_ai_runtime_status(self._selected_device, self._require_demucs))
         except Exception as exc:  # noqa: BLE001
             self.statusFailed.emit(str(exc))
 
@@ -567,7 +571,7 @@ class MusicFoldersDialog(QDialog):
         self.ai_runtime_refresh_btn = QPushButton("Refresh status")
         self.ai_runtime_refresh_btn.setToolTip("Check the installed AI runtime and available backends.")
         self.ai_runtime_manage_btn = QPushButton("Manage AI runtime")
-        self.ai_runtime_manage_btn.setToolTip("Open the folder containing the isolated AI runtime.")
+        self.ai_runtime_manage_btn.setToolTip("Install or repair the optional AI runtime.")
         set_button_role(self.ai_runtime_refresh_btn, "secondary")
         set_button_role(self.ai_runtime_manage_btn, "secondary")
         ai_runtime_buttons.addWidget(self.ai_runtime_refresh_btn)
@@ -717,7 +721,7 @@ class MusicFoldersDialog(QDialog):
         self.lyrics_source_down_btn.clicked.connect(lambda: self._move_lyrics_source(1))
         self.musixmatch_mode_combo.currentIndexChanged.connect(self._update_musixmatch_api_key_state)
         self.ai_runtime_refresh_btn.clicked.connect(self._refresh_ai_runtime_status)
-        self.ai_runtime_manage_btn.clicked.connect(self._open_ai_runtime_folder)
+        self.ai_runtime_manage_btn.clicked.connect(self._manage_ai_runtime)
         self.ai_device_combo.currentIndexChanged.connect(self._on_ai_runtime_setting_changed)
         self.ai_enable_demucs_chk.toggled.connect(self._on_ai_runtime_setting_changed)
         self.tabs.currentChanged.connect(self._on_settings_tab_changed)
@@ -836,7 +840,10 @@ class MusicFoldersDialog(QDialog):
         self.ai_runtime_refresh_btn.setEnabled(False)
 
         selected_device = str(self.ai_device_combo.currentData() or "auto")
-        worker = _AIRuntimeStatusWorker(selected_device, self)
+        worker = _AIRuntimeStatusWorker(
+            selected_device, self,
+            require_demucs=self.ai_enable_demucs_chk.isChecked(),
+        )
         worker.statusReady.connect(self._apply_ai_runtime_status)
         worker.statusFailed.connect(self._handle_ai_runtime_status_failure)
         worker.finished.connect(self._ai_runtime_status_finished)
@@ -853,6 +860,7 @@ class MusicFoldersDialog(QDialog):
         if not isinstance(values, dict) or not isinstance(tones, dict):
             self._handle_ai_runtime_status_failure("Invalid AI runtime status response")
             return
+        self._ai_runtime_status_result = result
         for key in self.ai_runtime_status_labels:
             self._set_ai_runtime_status(
                 key,
@@ -862,10 +870,11 @@ class MusicFoldersDialog(QDialog):
         runtime_dir = str(result.get("runtime_dir", ""))
         if runtime_dir:
             self.ai_runtime_manage_btn.setToolTip(
-                f"Open the isolated AI runtime folder: {runtime_dir}"
+                f"Install or repair AI dependencies in: {runtime_dir}"
             )
 
     def _handle_ai_runtime_status_failure(self, message: str) -> None:
+        self._ai_runtime_status_result = None
         self._set_ai_runtime_status("runtime", "Status unavailable", "warning")
         self._set_ai_runtime_status("device", str(message or "Status unavailable"), "warning")
         for key in ("english", "multilingual", "fallback"):
@@ -876,6 +885,20 @@ class MusicFoldersDialog(QDialog):
         worker = self.sender()
         if worker is self._ai_runtime_worker:
             self._ai_runtime_worker = None
+        if getattr(self, "_ai_runtime_setup_pending", False):
+            self._ai_runtime_setup_pending = False
+            self.ai_runtime_manage_btn.setEnabled(True)
+            result = getattr(self, "_ai_runtime_status_result", None)
+            if result is not None:
+                from ui.dialogs.ai_dependencies_dialog import AIDependenciesDialog
+
+                dialog = AIDependenciesDialog(
+                    list(result.get("missing_packages", [])),
+                    "Install missing AI packages here, then return to your tracks to sync lyrics.",
+                    self,
+                )
+                dialog.exec()
+                self._refresh_ai_runtime_status()
 
     def _stop_ai_runtime_worker(self) -> None:
         worker = self._ai_runtime_worker
@@ -885,12 +908,10 @@ class MusicFoldersDialog(QDialog):
             worker.wait()
         self._ai_runtime_worker = None
 
-    def _open_ai_runtime_folder(self) -> None:
-        from ui.workers.ai.ai_runtime import default_ai_runtime_dir
-
-        runtime_dir = Path(default_ai_runtime_dir())
-        runtime_dir.parent.mkdir(parents=True, exist_ok=True)
-        QDesktopServices.openUrl(QUrl.fromLocalFile(str(runtime_dir)))
+    def _manage_ai_runtime(self) -> None:
+        self._ai_runtime_setup_pending = True
+        self.ai_runtime_manage_btn.setEnabled(False)
+        self._refresh_ai_runtime_status()
 
     def closeEvent(self, event) -> None:
         self._stop_ai_runtime_worker()

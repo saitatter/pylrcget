@@ -11,6 +11,36 @@ class SettingsDialogTests(unittest.TestCase):
     def setUpClass(cls):
         cls.app = qt_app()
 
+    def test_manage_ai_runtime_opens_setup_without_existing_runtime(self):
+        with TemporaryDirectory() as tmp:
+            app_state = simple_app_state(initialize_database(tmp))
+            result = {
+                "values": {"runtime": "Not installed"},
+                "tones": {"runtime": "warning"},
+                "missing_packages": ["torch", "whisperx"],
+            }
+            try:
+                with (
+                    patch("ui.dialogs.music_folders_dialog._collect_ai_runtime_status", return_value=result),
+                    patch("ui.dialogs.ai_dependencies_dialog.AIDependenciesDialog") as setup,
+                ):
+                    dialog = MusicFoldersDialog(app_state)
+                    try:
+                        dialog.ai_runtime_manage_btn.click()
+                        worker = dialog._ai_runtime_worker
+                        self.assertIsNotNone(worker)
+                        worker.wait()
+                        self.app.processEvents()
+                        setup.assert_called_once()
+                        self.assertEqual(setup.call_args.args[0], ["torch", "whisperx"])
+                        setup.return_value.exec.assert_called_once()
+                        self.assertTrue(dialog.ai_runtime_manage_btn.isEnabled())
+                    finally:
+                        dialog._stop_ai_runtime_worker()
+                        dialog.deleteLater()
+            finally:
+                app_state.db.close()
+
     def test_settings_dialog_loads_and_saves_custom_hotkeys(self):
         with TemporaryDirectory() as tmp:
             app_state = simple_app_state(initialize_database(tmp))
