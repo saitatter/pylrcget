@@ -132,3 +132,38 @@ def test_repeated_block_repair_never_reorders_lines() -> None:
     assert repaired == sorted(set(repaired))
     assert repaired[:6] == times[:6]
     assert repaired[7] == 64.0
+
+
+def test_silence_is_detected_per_frame_and_only_raises_word_gap_scores() -> None:
+    torch = pytest.importorskip("torch")
+    from ui.workers.ai.lyrics_aligner import _prefer_spaces_in_silence
+
+    frames, bins, phonemes = 6, 4, 5
+    # Voice estimate is [frame, sample, channel, bin]: frames 1 and 4 are quiet
+    # in every bin, while bin 0 is quiet in every frame.
+    voice = torch.full((frames, 1, 1, bins), 20.0)
+    voice[:, :, :, 0] = 0.0
+    voice[1] = 1.0
+    voice[4] = 2.0
+    scores = torch.arange(frames * phonemes, dtype=torch.float32).reshape(1, frames, phonemes)
+    expected = scores.clone()
+    highest = scores.max()
+    space_indices = torch.tensor([0, 3])
+    for frame in (1, 4):
+        expected[0, frame, space_indices] = highest
+
+    _prefer_spaces_in_silence(scores, voice, space_indices=space_indices, vad_threshold=30)
+
+    assert torch.equal(scores, expected)
+
+
+def test_silence_masking_leaves_scores_alone_without_quiet_frames() -> None:
+    torch = pytest.importorskip("torch")
+    from ui.workers.ai.lyrics_aligner import _prefer_spaces_in_silence
+
+    voice = torch.full((3, 1, 1, 4), 50.0)
+    scores = torch.zeros((1, 3, 2))
+
+    _prefer_spaces_in_silence(scores, voice, space_indices=torch.tensor([0]), vad_threshold=30)
+
+    assert torch.count_nonzero(scores) == 0

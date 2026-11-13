@@ -145,6 +145,33 @@ def _patch_inference_dtw(model_module: Any) -> None:
     model_module.dtw_matrix = inference_dtw
 
 
+def _prefer_spaces_in_silence(
+    alignment_scores: Any,
+    voice_estimate: Any,
+    *,
+    space_indices: Any,
+    vad_threshold: float,
+) -> None:
+    """Give word gaps the highest score in frames without vocal energy.
+
+    ``voice_estimate`` is ``[frame, sample, channel, bin]``. Upstream sums it
+    over frequency bins to get one vocal magnitude per frame; frames below the
+    threshold are treated as silence, so the alignment path spends
+    instrumental passages between words instead of stretching words over them.
+    """
+    import torch
+
+    frame_magnitude = voice_estimate[:, 0, 0, :].detach().sum(dim=1)
+    silent_frames = torch.nonzero(frame_magnitude < vad_threshold, as_tuple=True)[0]
+    silent_frames = silent_frames[silent_frames < alignment_scores.shape[1]].to(alignment_scores.device)
+    if silent_frames.numel() == 0 or space_indices.numel() == 0:
+        return
+    # Every silent frame receives the same value, so one maximum is enough.
+    alignment_scores[:, silent_frames[:, None], space_indices.to(alignment_scores.device)] = (
+        alignment_scores.max()
+    )
+
+
 def _load_upstream_modules(root: Path) -> tuple[Any, Any]:
     """Load upstream model/DTW modules without making them global imports."""
     cache_key = str(root.resolve())
@@ -275,13 +302,12 @@ class EnglishLyricsAlignerBackend:
             voice_estimate, _unused, scores = self._model((audio_tensor, phonemes_idx))
             alignment_scores = scores if self.device == "cuda" else scores.cpu()
         if vad_threshold > 0:
-            vocals_mag = voice_estimate[:, 0, 0, :].detach().cpu().numpy().sum(axis=0)
-            predicted_silence = (vocals_mag < vad_threshold).nonzero()[0]
-            space_indices = torch.nonzero(phonemes_idx == 3, as_tuple=True)[1].to(
-                alignment_scores.device
+            _prefer_spaces_in_silence(
+                alignment_scores,
+                voice_estimate,
+                space_indices=torch.nonzero(phonemes_idx == 3, as_tuple=True)[1],
+                vad_threshold=vad_threshold,
             )
-            for frame in predicted_silence:
-                alignment_scores[:, int(frame), space_indices] = alignment_scores.max()
         optimal_path = _vectorized_optimal_alignment_path(alignment_scores)
         phoneme_onsets = self._align_module.compute_phoneme_onsets(
             optimal_path,
