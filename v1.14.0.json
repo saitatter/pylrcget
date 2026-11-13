@@ -1,0 +1,34 @@
+{
+  "schema_version": 2,
+  "repo": "saitatter/pylrcget",
+  "tag": "v1.14.0",
+  "preview": false,
+  "date": "08 Aug\n2026",
+  "published_at": "2026-08-08T19:53:39Z",
+  "metrics_captured_at": "2026-11-13T11:31:25.494359+00:00",
+  "metrics_as_of": "2026-08-08T19:53:39Z",
+  "statistics_basis": {
+    "open_issues": "issue_state_transitions_at_publication",
+    "stars": "surviving_stars_given_by_publication"
+  },
+  "previous": "v1.13.1",
+  "commit": "60ad87b462ed4579c4d0c1c1975894fcaeb0563a",
+  "items": [
+    "Alphabetic library indexes",
+    "Letter-specific pagination",
+    "Dedicated Album Artists view",
+    "Ignore leading sort articles",
+    "AI runtime compatibility fixes",
+    "Audio-loading fallbacks"
+  ],
+  "commits": 36,
+  "contributors": 1,
+  "contributor_names": [
+    "@saitatter"
+  ],
+  "issues_addressed": 0,
+  "issue_numbers": [],
+  "stars": 13,
+  "open_issues": 4,
+  "historical_backfill": true
+}
