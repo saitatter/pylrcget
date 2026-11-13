@@ -1,0 +1,49 @@
+{
+  "schema_version": 3,
+  "repo": "saitatter/pylrcget",
+  "tag": "v1.9.0",
+  "preview": false,
+  "date": "11 May\n2026",
+  "published_at": "2026-05-11T20:55:14Z",
+  "metrics_captured_at": "2026-11-13T11:31:25.494359+00:00",
+  "metrics_as_of": "2026-05-11T20:55:14Z",
+  "statistics_basis": {
+    "open_issues": "issue_state_transitions_at_publication",
+    "stars": "surviving_stars_given_by_publication"
+  },
+  "previous": "v1.8.0",
+  "commit": "3e72ccc19fe6bf1ce89847fd778256e4f76304fa",
+  "items": [
+    {
+      "emoji": "\u2705",
+      "text": "Row-level validation tooltips"
+    },
+    {
+      "emoji": "\u2705",
+      "text": "Click-to-jump validation hints"
+    },
+    {
+      "emoji": "\ud83d\udcdd",
+      "text": "Editor line numbers"
+    },
+    {
+      "emoji": "\u2705",
+      "text": "Validation status badge"
+    },
+    {
+      "emoji": "\ud83d\udce4",
+      "text": "Publishing checks for drafts"
+    }
+  ],
+  "commits": 2,
+  "contributors": 1,
+  "contributor_names": [
+    "@saitatter"
+  ],
+  "issues_addressed": 0,
+  "issue_numbers": [],
+  "stars": 4,
+  "open_issues": 1,
+  "historical_backfill": true,
+  "artwork_revision": "emoji"
+}
