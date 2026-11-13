@@ -1,0 +1,32 @@
+{
+  "schema_version": 2,
+  "repo": "saitatter/pylrcget",
+  "tag": "v1.4.0",
+  "preview": false,
+  "date": "01 May\n2026",
+  "published_at": "2026-05-01T13:11:23Z",
+  "metrics_captured_at": "2026-11-13T11:31:25.494359+00:00",
+  "metrics_as_of": "2026-05-01T13:11:23Z",
+  "statistics_basis": {
+    "open_issues": "issue_state_transitions_at_publication",
+    "stars": "surviving_stars_given_by_publication"
+  },
+  "previous": "v1.3.0",
+  "commit": "666c9efb489e8a39e36aaf309906595db156ae79",
+  "items": [
+    "Import lyric files as drafts",
+    "Selected-format lyric saving",
+    "Metadata-named sidecar discovery",
+    "Navigation and history refinements"
+  ],
+  "commits": 2,
+  "contributors": 1,
+  "contributor_names": [
+    "@saitatter"
+  ],
+  "issues_addressed": 0,
+  "issue_numbers": [],
+  "stars": 3,
+  "open_issues": 3,
+  "historical_backfill": true
+}
