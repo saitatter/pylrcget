@@ -461,6 +461,7 @@ def _repair_repeated_block_timestamps(lines: list[str]) -> list[str]:
         groups.setdefault(key, []).append(index)
 
     claimed: set[int] = set()
+    original_seconds: dict[int, float] = {}
     for indices in sorted(groups.values(), key=len, reverse=True):
         if len(indices) < 2:
             continue
@@ -479,10 +480,24 @@ def _repair_repeated_block_timestamps(lines: list[str]) -> list[str]:
                 actual_offset = parsed[index + offset][0] - start
                 expected_offset = reference_offsets[offset]
                 if abs(actual_offset - expected_offset) > 5.0:
+                    original_seconds.setdefault(index + offset, parsed[index + offset][0])
                     parsed[index + offset] = (
                         start + expected_offset,
                         parsed[index + offset][1],
                     )
+
+    # A repair must not reorder lines: one out-of-order timestamp invalidates
+    # the whole result and discards every other line's alignment with it.
+    reverted = True
+    while reverted:
+        reverted = False
+        for position in sorted(original_seconds):
+            seconds = parsed[position][0]
+            after_previous = position == 0 or parsed[position - 1][0] < seconds
+            before_next = position + 1 == len(parsed) or seconds < parsed[position + 1][0]
+            if not (after_previous and before_next):
+                parsed[position] = (original_seconds.pop(position), parsed[position][1])
+                reverted = True
 
     return [
         f"[{int(seconds // 60):02d}:{seconds % 60:05.2f}] {text}"

@@ -14,6 +14,7 @@
 - AI installation uses the tested Torch, Torchaudio and WhisperX package combination instead of resolving incompatible versions.
 - English synchronization with manual timing hints uses the guided alignment path so those hints are not bypassed by the English backend shortcut.
 - Auto mode accepts a working CPU runtime when CUDA is unavailable, while explicit CUDA still requires GPU support.
+- English AI synchronization keeps its alignment when repairing a repeated section would move a line before the previous one, instead of discarding the result and falling back to WhisperX.
 
 ### Refactors
 - English AI synchronization reduces time spent calculating model attention and the final timing path without changing their numeric precision, and skips redundant fuzzy comparisons for exact words.
