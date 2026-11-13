@@ -1,0 +1,53 @@
+{
+  "schema_version": 3,
+  "repo": "saitatter/pylrcget",
+  "tag": "v1.13.0",
+  "preview": false,
+  "date": "06 Jul\n2026",
+  "published_at": "2026-07-06T22:50:05Z",
+  "metrics_captured_at": "2026-11-13T11:31:25.494359+00:00",
+  "metrics_as_of": "2026-07-06T22:50:05Z",
+  "statistics_basis": {
+    "open_issues": "issue_state_transitions_at_publication",
+    "stars": "surviving_stars_given_by_publication"
+  },
+  "previous": "v1.12.0",
+  "commit": "3d711213804921763deb93548447b8bf97dd437b",
+  "items": [
+    {
+      "emoji": "\ud83d\udcc2",
+      "text": "Faster large-library scanning"
+    },
+    {
+      "emoji": "\ud83d\udcc2",
+      "text": "Selectable scan lyric sources"
+    },
+    {
+      "emoji": "\ud83d\udcc2",
+      "text": "Cached audio and sidecar discovery"
+    },
+    {
+      "emoji": "\ud83d\udce4",
+      "text": "Background sidecar-only export"
+    },
+    {
+      "emoji": "\ud83d\udce6",
+      "text": "macOS packaging and updates"
+    },
+    {
+      "emoji": "\u2699\ufe0f",
+      "text": "Configurable logging verbosity"
+    }
+  ],
+  "commits": 29,
+  "contributors": 1,
+  "contributor_names": [
+    "@saitatter"
+  ],
+  "issues_addressed": 0,
+  "issue_numbers": [],
+  "stars": 10,
+  "open_issues": 4,
+  "historical_backfill": true,
+  "artwork_revision": "emoji"
+}
