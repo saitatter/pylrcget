@@ -1,0 +1,49 @@
+{
+  "schema_version": 3,
+  "repo": "saitatter/pylrcget",
+  "tag": "v0.6.0",
+  "preview": false,
+  "date": "09 Apr\n2026",
+  "published_at": "2026-04-09T22:08:10Z",
+  "metrics_captured_at": "2026-11-13T11:31:25.494359+00:00",
+  "metrics_as_of": "2026-04-09T22:08:10Z",
+  "statistics_basis": {
+    "open_issues": "issue_state_transitions_at_publication",
+    "stars": "surviving_stars_given_by_publication"
+  },
+  "previous": "v0.5.0",
+  "commit": "c0d30e6a5f7914a1677ddf72a8450ba030b55c78",
+  "items": [
+    {
+      "emoji": "\ud83d\udcc2",
+      "text": "More resilient library scanning"
+    },
+    {
+      "emoji": "\ud83c\udfa7",
+      "text": "Unreadable audio handling"
+    },
+    {
+      "emoji": "\ud83d\udcc2",
+      "text": "Safer scan cancellation"
+    },
+    {
+      "emoji": "\ud83d\udd04",
+      "text": "Synchronization reaction delay"
+    },
+    {
+      "emoji": "\ud83c\udfb5",
+      "text": "Persistent playback speed"
+    }
+  ],
+  "commits": 2,
+  "contributors": 1,
+  "contributor_names": [
+    "@saitatter"
+  ],
+  "issues_addressed": 0,
+  "issue_numbers": [],
+  "stars": 0,
+  "open_issues": 2,
+  "historical_backfill": true,
+  "artwork_revision": "emoji"
+}
