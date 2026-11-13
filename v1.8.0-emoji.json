@@ -1,0 +1,45 @@
+{
+  "schema_version": 3,
+  "repo": "saitatter/pylrcget",
+  "tag": "v1.8.0",
+  "preview": false,
+  "date": "10 May\n2026",
+  "published_at": "2026-05-10T22:59:49Z",
+  "metrics_captured_at": "2026-11-13T11:31:25.494359+00:00",
+  "metrics_as_of": "2026-05-10T22:59:49Z",
+  "statistics_basis": {
+    "open_issues": "issue_state_transitions_at_publication",
+    "stars": "surviving_stars_given_by_publication"
+  },
+  "previous": "v1.7.0",
+  "commit": "0b2b537409b7b1a0224163bf9dd6ad354e42b5ba",
+  "items": [
+    {
+      "emoji": "\ud83d\udd04",
+      "text": "Sync lyrics to matching tracks"
+    },
+    {
+      "emoji": "\u2705",
+      "text": "Exact metadata match checks"
+    },
+    {
+      "emoji": "\ud83d\udcdd",
+      "text": "Review lyrics differences"
+    },
+    {
+      "emoji": "\ud83d\udd04",
+      "text": "Refined synchronization dialog"
+    }
+  ],
+  "commits": 9,
+  "contributors": 1,
+  "contributor_names": [
+    "@saitatter"
+  ],
+  "issues_addressed": 0,
+  "issue_numbers": [],
+  "stars": 4,
+  "open_issues": 1,
+  "historical_backfill": true,
+  "artwork_revision": "emoji"
+}
