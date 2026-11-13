@@ -30,9 +30,15 @@ Each release opens with the PyLrcGet music-studio banner. Customize up to six
 short highlight strings in the release tag's `items` array in
 `docs/release-summaries.json`; its `summary` array remains the release description.
 The artwork adds the version, date, previous version, commit count, contributors,
-referenced issues addressed, open issues and stars. Repository metrics are captured
-when the image is first rendered, normally during publication. Historical previews
-use current repository metrics, not reconstructed past counts.
+referenced issues addressed, open issues and stars. Human contributor accounts
+are deduplicated across Git author aliases; bots are excluded from that count.
+Repository counters are reconstructed for the publication instant. Open issues
+use creation dates plus closure/reopening events, excluding pull requests. Stars
+count currently surviving stargazers whose star date precedes publication, as in
+Collectarr; GitHub cannot recover stars later withdrawn. The release description
+states that limitation. Snapshots store both `metrics_as_of` (the publication
+instant) and `metrics_captured_at` (when the API history was retrieved). Preview
+mode uses the current instant.
 
 Install rendering dependencies with `pip install -e ".[release]"`. Preview local
 work without creating a tag or publishing anything:
@@ -51,3 +57,12 @@ at its immutable commit in the release description. The artwork does not appear 
 the application downloads. Existing per-tag artwork is reused, never overwritten.
 Keep this branch and its history: removing it can break past release images.
 The existing `RELEASE_PAT` must be allowed to create and update that branch.
+
+## Historical release descriptions
+
+All 32 published releases from v0.1.0 through v1.15.0 have reviewed English
+summaries and compact banner highlights in `docs/release-summaries.json`.
+Descriptions use the same complete non-merge commit history and contributor
+credits as new releases. Reformatting a release changes its description and adds
+immutable artwork on `release-banners`; release tags, dates, titles and download
+assets stay intact.

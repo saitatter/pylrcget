@@ -14,5 +14,408 @@
       "Manage AI runtime from Settings",
       "Reviewed notes and release artwork"
     ]
+  },
+  "v0.1.0": {
+    "summary": [
+      "Browse a local music library by artist, album and track, with sortable views and playback controls.",
+      "Find and edit lyrics in the first public PyLrcGet release."
+    ],
+    "items": [
+      "First public release",
+      "Artists, albums and tracks",
+      "Sortable library views",
+      "Music playback controls",
+      "Lyrics lookup and editing"
+    ]
+  },
+  "v0.1.1": {
+    "summary": [
+      "Repair the release build configuration so packaged application downloads can be produced."
+    ],
+    "items": [
+      "Packaged build configuration repaired",
+      "Automated release publishing repaired"
+    ]
+  },
+  "v0.2.0": {
+    "summary": [
+      "Configure lyrics sidecar export and choose whether lyrics files are saved alongside music.",
+      "Use refreshed SVG icons throughout the interface."
+    ],
+    "items": [
+      "Configurable lyrics export",
+      "Optional sidecar files",
+      "Refreshed SVG icons"
+    ]
+  },
+  "v0.3.0": {
+    "summary": [
+      "Use a consistent theme system and a refreshed player bar.",
+      "Scan and embed lyrics in additional audio formats, including ASF/WMA and DSD files."
+    ],
+    "items": [
+      "Theme system and shared colors",
+      "Refreshed player bar",
+      "ASF and WMA lyric embedding",
+      "DSF and DSDIFF format support"
+    ]
+  },
+  "v0.4.0": {
+    "summary": [
+      "Refine synchronization controls and incremental library scanning.",
+      "Use file signatures, scan exclusions and persistent playback settings to personalize the workflow."
+    ],
+    "items": [
+      "Synchronization workflow refinements",
+      "Incremental library scanning",
+      "File signatures and scan exclusions",
+      "Persistent playback preferences"
+    ]
+  },
+  "v0.5.0": {
+    "summary": [
+      "Navigate between artists, albums and tracks directly from library and player information.",
+      "Use clearer navigation history and settings grouped into Library, Lyrics and Appearance tabs."
+    ],
+    "items": [
+      "Artist and album drilldown",
+      "Clickable player information",
+      "Library navigation history",
+      "Tabbed application settings"
+    ]
+  },
+  "v0.6.0": {
+    "summary": [
+      "Improve library scanning, unreadable-file handling and cancellation cleanup.",
+      "Customize lyric synchronization reaction delay and persistent playback speed."
+    ],
+    "items": [
+      "More resilient library scanning",
+      "Unreadable audio handling",
+      "Safer scan cancellation",
+      "Synchronization reaction delay",
+      "Persistent playback speed"
+    ]
+  },
+  "v0.7.0": {
+    "summary": [
+      "Use additional synchronization controls and playback-position handling in the lyrics editor.",
+      "Inspect application activity in a filterable log panel with automatic scrolling."
+    ],
+    "items": [
+      "Synchronization controls",
+      "Playback-position editor handling",
+      "Automatic folder scanning",
+      "Filterable application log panel"
+    ]
+  },
+  "v0.8.0": {
+    "summary": [
+      "Download lyrics in bulk with progress feedback and configurable synced/plain download modes.",
+      "Export lyric files, inspect publishing history and scan Musepack audio."
+    ],
+    "items": [
+      "Bulk lyrics downloads",
+      "Configurable download modes",
+      "Synced-only download option",
+      "Lyrics file export",
+      "Publishing history",
+      "Musepack audio support"
+    ]
+  },
+  "v0.9.0": {
+    "summary": [
+      "Refresh individual tracks from disk and configure lyric lookup subfolders with embedded-first priority.",
+      "Customize interface scale, font size, artwork and startup view, with playback and layout refinements."
+    ],
+    "items": [
+      "Refresh individual tracks",
+      "Configurable lyric subfolders",
+      "Embedded-first lyric lookup",
+      "Appearance and startup settings",
+      "Playback and layout refinements"
+    ]
+  },
+  "v1.0.0": {
+    "summary": [
+      "Move to the first 1.x release with improved installers, packaged updates and release assets.",
+      "Retain per-track refresh, configurable lyric lookup and appearance controls, with fixes for startup and playback."
+    ],
+    "items": [
+      "First 1.x release",
+      "Installer-based update flow",
+      "Packaged update improvements",
+      "Configurable lyrics lookup",
+      "Appearance and startup controls"
+    ]
+  },
+  "v1.0.1": {
+    "summary": [
+      "Include build and maintenance changes in patch-release versioning so release automation handles them consistently."
+    ],
+    "items": [
+      "Patch versioning for build changes",
+      "Release automation maintenance"
+    ]
+  },
+  "v1.0.2": {
+    "summary": [
+      "Enforce conventional pull-request titles for squash merges to keep automated release versioning consistent."
+    ],
+    "items": [
+      "Conventional pull-request titles",
+      "Consistent squash release versioning"
+    ]
+  },
+  "v1.0.3": {
+    "summary": [
+      "Publish validated lyrics to LRCLIB, including batch publishing and instrumental marking, with retry feedback.",
+      "Search LRCLIB manually using separate artist, title and album fields, and configure its server URL.",
+      "Improve updater launch handling, downloaded-file integrity logging and error reporting."
+    ],
+    "items": [
+      "Publish lyrics to LRCLIB",
+      "Batch publishing and retries",
+      "Instrumental publishing",
+      "Manual LRCLIB search",
+      "Configurable LRCLIB server",
+      "Updater launch refinements"
+    ]
+  },
+  "v1.1.0": {
+    "summary": [
+      "Retry failed lyric downloads in a batch using more relaxed search, while keeping failures isolated per track.",
+      "Add portable single-file application downloads and improve Windows installer handoff."
+    ],
+    "items": [
+      "Batch retry for failed downloads",
+      "Relaxed lyrics search",
+      "Portable single-file downloads",
+      "Windows installer handoff"
+    ]
+  },
+  "v1.2.0": {
+    "summary": [
+      "Apply exact batch lyric matches automatically and review less certain matches before accepting them.",
+      "Use parallel batch matching, responsive layout refinements and shortcut hint badges."
+    ],
+    "items": [
+      "Parallel batch matching",
+      "Automatic exact matches",
+      "Review uncertain lyric matches",
+      "Responsive application layout",
+      "Shortcut hint badges"
+    ]
+  },
+  "v1.3.0": {
+    "summary": [
+      "Keep unsaved lyric drafts across editing, filter tracks with drafts and discard changes explicitly.",
+      "Switch between plain and synchronized editor modes and import individual audio files by drag and drop.",
+      "Improve keyboard handling, search escaping and sidecar export path checks."
+    ],
+    "items": [
+      "Persistent unsaved lyric drafts",
+      "Unsaved filter and discard action",
+      "Plain and synced editor modes",
+      "Drag-and-drop audio import",
+      "Safer sidecar export paths"
+    ]
+  },
+  "v1.4.0": {
+    "summary": [
+      "Import lyric files as drafts and improve downloads, sidecar discovery and navigation history.",
+      "Save only the selected lyric format and recognize sidecars named from track metadata."
+    ],
+    "items": [
+      "Import lyric files as drafts",
+      "Selected-format lyric saving",
+      "Metadata-named sidecar discovery",
+      "Navigation and history refinements"
+    ]
+  },
+  "v1.5.0": {
+    "summary": [
+      "Apply automatic fixes for lyric validation issues.",
+      "Follow library scanning in a progress overlay and use refined playback, volume and track-action controls."
+    ],
+    "items": [
+      "Lyrics validation autofix",
+      "Library scan progress overlay",
+      "Player control refinements",
+      "Volume and speed control polish",
+      "Clearer track action feedback"
+    ]
+  },
+  "v1.6.0": {
+    "summary": [
+      "Configure lyric file naming and embedded-output formats in download settings.",
+      "Improve light-theme contrast, shortcut badge placement and publishing retries after network timeouts."
+    ],
+    "items": [
+      "Configurable lyrics filenames",
+      "Configurable embedded output",
+      "Clearer lyrics download settings",
+      "Improved light-theme contrast",
+      "Publishing timeout retries"
+    ]
+  },
+  "v1.7.0": {
+    "summary": [
+      "Insert synchronized lyric lines more easily and use a context menu in the synced editor.",
+      "Sort the library by track number and keep playback shortcuts scoped to track lists."
+    ],
+    "items": [
+      "Easier synchronized line insertion",
+      "Synced editor context menu",
+      "Sortable track numbers",
+      "Scoped playback shortcuts"
+    ]
+  },
+  "v1.8.0": {
+    "summary": [
+      "Synchronize lyrics to other tracks with exactly matching metadata.",
+      "Compare lyric differences before applying synchronization to selected matches."
+    ],
+    "items": [
+      "Sync lyrics to matching tracks",
+      "Exact metadata match checks",
+      "Review lyrics differences",
+      "Refined synchronization dialog"
+    ]
+  },
+  "v1.9.0": {
+    "summary": [
+      "Inspect lyric validation issues using row tooltips, line numbers and click-to-jump hints.",
+      "Prevent publishing invalid lyrics or unsaved drafts and show validation state beside the editor."
+    ],
+    "items": [
+      "Row-level validation tooltips",
+      "Click-to-jump validation hints",
+      "Editor line numbers",
+      "Validation status badge",
+      "Publishing checks for drafts"
+    ]
+  },
+  "v1.10.0": {
+    "summary": [
+      "Customize keyboard shortcuts and retain interface state between sessions.",
+      "Use a streamlined AI auto-sync workflow, settings and selection actions, with more reliable responsive layouts."
+    ],
+    "items": [
+      "Customizable keyboard shortcuts",
+      "Persistent interface state",
+      "Improved AI auto-sync workflow",
+      "Streamlined selection actions",
+      "Responsive layout refinements"
+    ]
+  },
+  "v1.10.1": {
+    "summary": [
+      "Improve AI worker shutdown and dependency guidance.",
+      "Publish instrumental markings correctly to LRCLIB and preserve an intentionally empty lyric filename pattern."
+    ],
+    "items": [
+      "More reliable AI worker shutdown",
+      "Clearer AI dependency guidance",
+      "Instrumental LRCLIB publishing",
+      "Empty filename pattern persistence"
+    ]
+  },
+  "v1.11.0": {
+    "summary": [
+      "Use the dedicated Windows AI-enabled portable download for packaged AI synchronization.",
+      "Follow clearer AI dependency guidance tailored to source installations and packaged applications.",
+      "Include the required Whisper and Demucs runtime assets in AI-enabled builds."
+    ],
+    "items": [
+      "Windows AI portable download",
+      "Guided packaged AI setup",
+      "Clearer dependency guidance",
+      "Bundled Whisper and Demucs assets"
+    ]
+  },
+  "v1.12.0": {
+    "summary": [
+      "Switch AI synchronization to WhisperX with word-level forced alignment and Auto, CPU or CUDA device selection; remove the previous Demucs path.",
+      "Improve AI lyric placement with global and repeat-aware alignment, relaxed speech-detection retries and persistent settings.",
+      "Fall back to CPU when CUDA forced alignment fails.",
+      "Expand AI-enabled portable packaging and improve Linux launcher integration and editor navigation.",
+      "Linux Debian packages declare FFmpeg as a dependency for audio decoding."
+    ],
+    "items": [
+      "Global and repeat-aware alignment",
+      "Relaxed speech-detection retries",
+      "Persistent AI sync settings",
+      "CPU fallback for CUDA alignment",
+      "Expanded AI portable packaging",
+      "Editor navigation refinements"
+    ]
+  },
+  "v1.13.0": {
+    "summary": [
+      "Speed up large-library scanning using cached discovery, audio signatures and sidecar lookups, with selectable lyric sources.",
+      "Export lyric sidecars in the background without changing embedded tags.",
+      "Improve macOS packaging and updates, and configure logging verbosity."
+    ],
+    "items": [
+      "Faster large-library scanning",
+      "Selectable scan lyric sources",
+      "Cached audio and sidecar discovery",
+      "Background sidecar-only export",
+      "macOS packaging and updates",
+      "Configurable logging verbosity"
+    ]
+  },
+  "v1.13.1": {
+    "summary": [
+      "Package the macOS application bundle correctly in published downloads."
+    ],
+    "items": [
+      "macOS application bundle packaging"
+    ]
+  },
+  "v1.14.0": {
+    "summary": [
+      "Browse Tracks, Artists, Album Artists and Albums with alphabetic indexes and letter-specific pagination.",
+      "Choose whether sorting ignores leading articles such as The, A and An.",
+      "Improve AI package compatibility and audio-loading fallbacks, alongside synchronized-editor behavior."
+    ],
+    "items": [
+      "Alphabetic library indexes",
+      "Letter-specific pagination",
+      "Dedicated Album Artists view",
+      "Ignore leading sort articles",
+      "AI runtime compatibility fixes",
+      "Audio-loading fallbacks"
+    ]
+  },
+  "v1.14.1": {
+    "summary": [
+      "Skip the oversized Linux AI single-file build that exceeds PyInstaller archive limits.",
+      "Keep the standard Linux application, Debian package and regular portable downloads available."
+    ],
+    "items": [
+      "Oversized Linux AI build skipped",
+      "Standard Linux downloads retained",
+      "Debian packaging retained"
+    ]
+  },
+  "v1.15.0": {
+    "summary": [
+      "Search configured lyric providers through one workflow, with provider attribution and language-aware matching.",
+      "Clear saved plain/synced lyrics, PyLrcGet-embedded lyrics and detected sidecars selectively.",
+      "Browse the modernized library with alphabetic indexing, pagination and configurable page size.",
+      "Synchronize lyrics through cancellable language-aware AI routing: English lyrics-aligner when available, WhisperX for multilingual tracks.",
+      "Use improved audio-format handling, scanning, runtime compatibility and keyboard navigation.",
+      "Application downloads remain AI-free; optional AI dependencies run in a separate Python 3.13.15 runtime, with Pascal GPU compatibility."
+    ],
+    "items": [
+      "Multi-provider lyrics search",
+      "Selective lyrics cleanup",
+      "Modernized library navigation",
+      "Cancellable language-aware AI",
+      "English phonetic alignment",
+      "Audio and runtime compatibility"
+    ]
   }
 }

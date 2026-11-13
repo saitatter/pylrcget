@@ -124,15 +124,88 @@ def git(*args: str) -> str:
     return subprocess.check_output(["git", *args], cwd=ROOT, text=True, encoding="utf-8").strip()
 
 
-def gh(method: str, endpoint: str, payload: dict | None = None):
+def gh(method: str, endpoint: str, payload: dict | None = None, *, accept: str | None = None):
     if method == "GET" and payload:
         endpoint += ("&" if "?" in endpoint else "?") + urlencode(payload)
         payload = None
     command = ["gh", "api", "--method", method, endpoint]
+    if accept:
+        command += ["-H", f"Accept: {accept}"]
     if payload is not None:
         command += ["--input", "-"]
     result = subprocess.run(command, input=json.dumps(payload) if payload is not None else None, text=True, encoding="utf-8", capture_output=True, check=True)
     return json.loads(result.stdout)
+
+
+def _pages(endpoint: str, *, payload: dict | None = None, accept: str | None = None) -> list:
+    result = []
+    page = 1
+    while True:
+        rows = gh("GET", endpoint, {**(payload or {}), "per_page": 100, "page": page}, accept=accept)
+        result.extend(rows)
+        if len(rows) < 100:
+            return result
+        page += 1
+
+
+@functools.cache
+def repository_history(repo: str) -> tuple[list, list, list]:
+    """Fetch surviving stars and issue transitions once for historical rendering."""
+    issues = [row for row in _pages(f"repos/{repo}/issues", payload={"state": "all"}) if "pull_request" not in row]
+    issue_ids = {row["id"] for row in issues}
+    events = [
+        row for row in _pages(f"repos/{repo}/issues/events")
+        if row.get("event") in {"closed", "reopened"} and row.get("issue", {}).get("id") in issue_ids
+    ]
+    stars = _pages(f"repos/{repo}/stargazers", accept="application/vnd.github.star+json")
+    return issues, events, stars
+
+
+def stats_at(repo: str, moment: str) -> tuple[int, int]:
+    """Reconstruct open issues and surviving stars at an instant, including reopenings.
+
+    GitHub cannot recover withdrawn stars. Their absence must not be described
+    as an exact historical star count. Pull requests never enter issue counts.
+    """
+    def instant(value: str):
+        return datetime.fromisoformat(value).astimezone(UTC)
+
+    cutoff = instant(moment)
+    issues, events, stars = repository_history(repo)
+    states = {row["id"]: True for row in issues if instant(row["created_at"]) <= cutoff}
+    with_events = {row["issue"]["id"] for row in events}
+    # Imported/older closed issues may have no transition event available.
+    for row in issues:
+        if row["id"] in states and row["id"] not in with_events and row.get("closed_at"):
+            states[row["id"]] = instant(row["closed_at"]) > cutoff
+    for event in sorted(events, key=lambda row: instant(row["created_at"])):
+        issue_id = event["issue"]["id"]
+        if issue_id in states and instant(event["created_at"]) <= cutoff:
+            states[issue_id] = event["event"] == "reopened"
+    return sum(states.values()), sum(instant(row["starred_at"]) <= cutoff for row in stars)
+
+
+@functools.cache
+def _commit_author(repo: str, sha: str) -> dict:
+    return gh("GET", f"repos/{repo}/commits/{sha}").get("author") or {}
+
+
+def contributor_names(repo: str, revision: str) -> list[str]:
+    """Credit human GitHub accounts once even when Git author names differ."""
+    names: dict[str, str] = {}
+    seen_emails = set()
+    for row in git("log", "--reverse", "--no-merges", "--format=%H%x09%aN%x09%aE", revision).splitlines():
+        sha, name, email = row.split("\t", 2)
+        if name.lower().endswith("[bot]") or email in seen_emails:
+            continue
+        seen_emails.add(email)
+        login = re.fullmatch(r"(?:\d+\+)?([\w-]+)@users\.noreply\.github\.com", email)
+        account = {"login": login[1]} if login else _commit_author(repo, sha)
+        if account.get("type") == "Bot":
+            continue
+        credit = "@" + account["login"] if account.get("login") else name
+        names.setdefault(credit.casefold(), credit)
+    return list(names.values())
 
 
 def release_data(repo: str, tag: str, *, preview: bool = False) -> dict:
@@ -146,26 +219,21 @@ def release_data(repo: str, tag: str, *, preview: bool = False) -> dict:
     subjects = git("log", "--no-merges", "--format=%s", revision).splitlines()
     bodies = git("log", "--no-merges", "--format=%B", revision)
     issues = set(re.findall(r"(?i)\b(?:fix(?:es|ed)?|clos(?:e[sd]?)|resolv(?:e[sd]?))\s+#(\d+)", bodies))
-    names = []
-    for row in git("log", "--no-merges", "--format=%aN%x09%aE", revision).splitlines():
-        name, email = row.split("\t", 1)
-        login = re.fullmatch(r"(?:\d+\+)?([\w-]+)@users\.noreply\.github\.com", email)
-        credit = f"@{login[1]}" if login else name
-        if credit not in names:
-            names.append(credit)
+    names = contributor_names(repo, revision)
     metadata = json.loads((ROOT / "docs/release-summaries.json").read_text(encoding="utf-8")).get(tag, {})
     items = metadata.get("items") or [re.sub(r"^\w+(?:\([^)]*\))?!?:\s*", "", s).capitalize() for s in subjects if s.startswith(("feat", "fix"))][:6]
-    repository = gh("GET", f"repos/{repo}")
-    open_issues = gh("GET", "search/issues", {"q": f"repo:{repo} is:issue is:open", "per_page": 1})["total_count"]
     publication = datetime.now(UTC).isoformat() if preview else gh("GET", f"repos/{repo}/releases/tags/{tag}")["published_at"]
+    open_issues, stars = stats_at(repo, publication)
     return {
-        "schema_version": 1, "repo": repo, "tag": tag, "preview": preview,
+        "schema_version": 2, "repo": repo, "tag": tag, "preview": preview,
         "date": datetime.fromisoformat(publication).strftime("%d %b\n%Y"),
         "published_at": publication, "metrics_captured_at": datetime.now(UTC).isoformat(),
+        "metrics_as_of": publication,
+        "statistics_basis": {"open_issues": "issue_state_transitions_at_publication", "stars": "surviving_stars_given_by_publication"},
         "previous": previous, "commit": git("rev-parse", ref), "items": items,
         "commits": len(subjects), "contributors": len(names), "contributor_names": names,
         "issues_addressed": len(issues), "issue_numbers": sorted(issues, key=int),
-        "stars": repository["stargazers_count"], "open_issues": open_issues,
+        "stars": stars, "open_issues": open_issues,
     }
 
 

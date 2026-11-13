@@ -34,7 +34,11 @@ def render_notes(summary: list[str], commits: list[str], generated: str, banner_
     body = "Changes since last release:\n\n" + "\n".join(f"- {line}" for line in summary)
     body += "\n\n---\n\n## What's Changed\n\n" + "\n".join(commits)
     header = f"![PyLrcGet release highlights]({banner_url})\n\n" if banner_url else ""
-    return header + body + ("\n\n" + footer if footer else "") + "\n"
+    statistics_note = (
+        "\n<sub>Artwork counters reflect the release date. Stars later withdrawn "
+        "cannot be recovered from GitHub.</sub>\n" if banner_url else ""
+    )
+    return header + body + ("\n\n" + footer if footer else "") + "\n" + statistics_note
 
 
 def commit_rows(history: str, repo: str) -> list[str]:

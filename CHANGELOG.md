@@ -3,7 +3,7 @@
 ## Unreleased
 
 ### Features
-- Each release opens with personalized PyLrcGet studio artwork showing highlights, version history, contributors and a frozen statistics snapshot.
+- Each release opens with personalized PyLrcGet studio artwork showing highlights, version history, human contributor credits and repository statistics reconstructed at publication.
 - Synchronize selected tracks with AI from the selection bar or context menu, with sequential processing, cancellation, per-track results and unsaved drafts (#62).
 
 ### Fixes
@@ -26,6 +26,7 @@
 - AI worker modules use short names inside `ui.workers.ai` instead of repeating the `ai_sync_` prefix.
 
 ### Docs
+- Reformat all published release notes with version-specific summaries, app-branded artwork and repository counters reconstructed at publication.
 - Document focused commits, safe migrations, isolated tests and project organization with shared contributor and agent rules.
 
 ### CI & Build
