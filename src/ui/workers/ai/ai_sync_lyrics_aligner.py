@@ -366,9 +366,14 @@ def _build_lrc_from_predictions(
         for index, word in enumerate(expected):
             match: tuple[float, int] | None = None
             for candidate in range(cursor, min(len(predicted), cursor + 8)):
-                score = SequenceMatcher(None, word, predicted[candidate][1]).ratio() * 100
+                score = (
+                    100 if word == predicted[candidate][1]
+                    else SequenceMatcher(None, word, predicted[candidate][1]).ratio() * 100
+                )
                 if score >= 90 and (match is None or score > match[0]):
                     match = (score, candidate)
+                    if score == 100:
+                        break
             if match is None:
                 if index == 0:
                     first_match = None
