@@ -1,0 +1,32 @@
+{
+  "schema_version": 2,
+  "repo": "saitatter/pylrcget",
+  "tag": "v1.11.0",
+  "preview": false,
+  "date": "22 Jun\n2026",
+  "published_at": "2026-06-22T12:40:35Z",
+  "metrics_captured_at": "2026-11-13T11:31:25.494359+00:00",
+  "metrics_as_of": "2026-06-22T12:40:35Z",
+  "statistics_basis": {
+    "open_issues": "issue_state_transitions_at_publication",
+    "stars": "surviving_stars_given_by_publication"
+  },
+  "previous": "v1.10.1",
+  "commit": "676ce4ad7213be1f33147e044e7da89735836417",
+  "items": [
+    "Windows AI portable download",
+    "Guided packaged AI setup",
+    "Clearer dependency guidance",
+    "Bundled Whisper and Demucs assets"
+  ],
+  "commits": 2,
+  "contributors": 1,
+  "contributor_names": [
+    "@saitatter"
+  ],
+  "issues_addressed": 0,
+  "issue_numbers": [],
+  "stars": 9,
+  "open_issues": 4,
+  "historical_backfill": true
+}
