@@ -1,0 +1,30 @@
+{
+  "schema_version": 2,
+  "repo": "saitatter/pylrcget",
+  "tag": "v1.0.1",
+  "preview": false,
+  "date": "23 Apr\n2026",
+  "published_at": "2026-04-23T12:37:21Z",
+  "metrics_captured_at": "2026-11-13T11:31:25.494359+00:00",
+  "metrics_as_of": "2026-04-23T12:37:21Z",
+  "statistics_basis": {
+    "open_issues": "issue_state_transitions_at_publication",
+    "stars": "surviving_stars_given_by_publication"
+  },
+  "previous": "v1.0.0",
+  "commit": "930c8ac722e10689371545d6ea0fcfe5d771ce83",
+  "items": [
+    "Patch versioning for build changes",
+    "Release automation maintenance"
+  ],
+  "commits": 3,
+  "contributors": 1,
+  "contributor_names": [
+    "@saitatter"
+  ],
+  "issues_addressed": 0,
+  "issue_numbers": [],
+  "stars": 3,
+  "open_issues": 5,
+  "historical_backfill": true
+}
