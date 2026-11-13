@@ -5,6 +5,8 @@ import importlib.metadata
 import json
 import logging
 import os
+import platform
+import re
 import shlex
 import shutil
 import subprocess
@@ -150,7 +152,7 @@ def normalize_version_tag(tag_name: str) -> str:
     return text
 
 
-def platform_asset_names() -> list[str]:
+def _legacy_platform_asset_names() -> list[str]:
     if sys.platform.startswith("win"):
         return [
             "pylrcget-windows-installer.exe",
@@ -172,12 +174,32 @@ def platform_asset_names() -> list[str]:
     return []
 
 
+def platform_asset_names() -> list[str]:
+    legacy = _legacy_platform_asset_names()
+    architectures = {
+        "amd64": "x64", "x86_64": "x64", "aarch64": "arm64", "arm64": "arm64",
+        "i386": "x86", "i686": "x86", "x86": "x86",
+    }
+    arch = architectures.get(platform.machine().lower())
+    if not arch:
+        return legacy
+    return [re.sub(r"^(pylrcget-(?:windows|linux|macos))", rf"\1-{arch}", name) for name in legacy] + legacy
+
+
 def select_platform_asset(assets_payload: list[dict]) -> ReleaseAssetInfo | None:
     expected_names = platform_asset_names()
     if not expected_names:
         return None
 
+    family = "windows" if sys.platform.startswith("win") else "macos" if sys.platform == "darwin" else "linux"
+    has_explicit_architecture = any(
+        re.match(rf"^pylrcget-{family}-(?:x64|arm64|x86)(?:[.-])", str(asset.get("name") or ""))
+        for asset in assets_payload
+    )
+    legacy = set(_legacy_platform_asset_names())
     for expected_name in expected_names:
+        if has_explicit_architecture and expected_name in legacy:
+            continue
         for asset in assets_payload:
             if str(asset.get("name") or "") != expected_name:
                 continue

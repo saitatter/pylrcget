@@ -72,3 +72,15 @@ Emoji are pinned Noto Emoji PNG artwork (Apache-2.0), stored locally with source
 hashes and license under `docs/assets/release-banner/emoji`. Rendering snapshots
 needs no font emoji support or network access. Emoji appear on artwork only;
 release-description headings and change lists remain plain text.
+
+## Download architecture names
+
+Future downloads use `pylrcget-windows-x64-*`, `pylrcget-linux-x64-*` and
+`pylrcget-macos-arm64-*` names. The build verifies its target architecture before
+packaging. No x86 or universal macOS build is implied. Existing published asset
+names are unchanged.
+
+The updater prefers the native architecture and rejects another architecture.
+Future releases also retain the three previous installer names as labeled aliases
+of the same installer bytes, allowing already-installed versions that match exact
+filenames to update. These aliases do not represent additional CPU architectures.

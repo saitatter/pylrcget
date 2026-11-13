@@ -30,6 +30,7 @@
 - Document focused commits, safe migrations, isolated tests and project organization with shared contributor and agent rules.
 
 ### CI & Build
+- Future download names identify Windows/Linux x64 and macOS arm64; native updater selection and labeled installer aliases preserve automatic updates from existing installations.
 - Optional AI CI installs the pinned stack and runs its tests with CPU Torch; non-tensor English backend tests also run without AI dependencies.
 - Read-only benchmarks compare lyrics-aligner and WhisperX against embedded synchronized lyrics, isolate speed and accuracy experiments, and record cold/warm performance and complete-output parity.
 - Releases require passing tests and lint, preserve reviewed changelog entries and historical notes, and use plain headings, complete commit lists and conventional release commits.

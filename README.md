@@ -222,6 +222,11 @@ pyinstaller --noconfirm pylrcget-portable.spec
 Releases use Conventional Commits and semantic-release. See
 [CHANGELOG.md](CHANGELOG.md) for published changes.
 
+From the next release, download filenames identify the CPU target: Windows/Linux
+`x64` and macOS `arm64` (Apple Silicon). Existing release filenames stay unchanged.
+The updater selects the native target; labeled installer aliases keep updates
+working for previously installed versions. See [release packaging](docs/release-notes.md#download-architecture-names).
+
 - **No lyrics found:** check provider enablement/order and the track metadata.
 - **AI dependencies missing:** packaged builds can install them from the AI setup
   dialog; source builds need Python 3.13.15.
