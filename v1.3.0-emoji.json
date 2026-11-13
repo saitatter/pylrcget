@@ -1,0 +1,49 @@
+{
+  "schema_version": 3,
+  "repo": "saitatter/pylrcget",
+  "tag": "v1.3.0",
+  "preview": false,
+  "date": "27 Apr\n2026",
+  "published_at": "2026-04-27T21:46:20Z",
+  "metrics_captured_at": "2026-11-13T11:31:25.494359+00:00",
+  "metrics_as_of": "2026-04-27T21:46:20Z",
+  "statistics_basis": {
+    "open_issues": "issue_state_transitions_at_publication",
+    "stars": "surviving_stars_given_by_publication"
+  },
+  "previous": "v1.2.0",
+  "commit": "18c182dac72bbe8edf4ef32ead3fa3f3a9e22811",
+  "items": [
+    {
+      "emoji": "\ud83d\udcdd",
+      "text": "Persistent unsaved lyric drafts"
+    },
+    {
+      "emoji": "\ud83d\udee0\ufe0f",
+      "text": "Unsaved filter and discard action"
+    },
+    {
+      "emoji": "\ud83d\udd04",
+      "text": "Plain and synced editor modes"
+    },
+    {
+      "emoji": "\ud83d\udce5",
+      "text": "Drag-and-drop audio import"
+    },
+    {
+      "emoji": "\ud83d\udce4",
+      "text": "Safer sidecar export paths"
+    }
+  ],
+  "commits": 2,
+  "contributors": 1,
+  "contributor_names": [
+    "@saitatter"
+  ],
+  "issues_addressed": 0,
+  "issue_numbers": [],
+  "stars": 3,
+  "open_issues": 4,
+  "historical_backfill": true,
+  "artwork_revision": "emoji"
+}
