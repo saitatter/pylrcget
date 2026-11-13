@@ -149,6 +149,7 @@ def test_batch_result_updates_only_the_draft_in_an_isolated_database(tmp_path):
         get_track_by_id,
         initialize_database,
         update_track_plain_lyrics,
+        update_track_synced_lyrics,
     )
     from ui.main_window import MainWindow
 
@@ -159,6 +160,7 @@ def test_batch_result_updates_only_the_draft_in_an_isolated_database(tmp_path):
         add_tracks(db, [test_support.make_fs_track(path, artist="Artist", album="Album", title="Song")])
         track_id = db.execute("SELECT id FROM tracks").fetchone()[0]
         update_track_plain_lyrics(db, track_id, "Original lyrics")
+        update_track_synced_lyrics(db, track_id, "[00:02.00]Original lyrics", "Original lyrics")
         view = MagicMock()
         window = SimpleNamespace(
             app_state=SimpleNamespace(db=db), _editing_track_id=track_id,
@@ -170,7 +172,7 @@ def test_batch_result_updates_only_the_draft_in_an_isolated_database(tmp_path):
         )
         track = get_track_by_id(db, track_id)
         assert track.txt_lyrics == "Original lyrics"
-        assert not track.lrc_lyrics
+        assert track.lrc_lyrics == "[00:02.00]Original lyrics"
         assert track.dirty_lyrics_present
         assert track.dirty_lrc_lyrics == "[00:01.00]Original lyrics"
         assert not path.with_suffix(".lrc").exists()

@@ -4,9 +4,6 @@ from pathlib import Path
 
 import pytest
 
-np = pytest.importorskip("numpy")
-torch = pytest.importorskip("torch")
-
 from tests import test_support as _test_support  # noqa: F401
 from ui.workers.ai.ai_sync_contracts import AlignmentOptions, AlignmentRequest
 from ui.workers.ai.ai_sync_lyrics_aligner import (
@@ -70,6 +67,8 @@ def test_warm_backend_does_not_require_existing_audio_for_result_parsing(tmp_pat
 
 
 def test_vectorized_dtw_matches_reference_backtracking() -> None:
+    np = pytest.importorskip("numpy")
+    torch = pytest.importorskip("torch")
     scores = torch.tensor(
         [
             [
