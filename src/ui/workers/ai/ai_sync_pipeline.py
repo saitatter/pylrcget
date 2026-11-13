@@ -104,13 +104,19 @@ def align_with_optional_demucs(
     *,
     device: str,
     enable_demucs_candidate: bool,
+    aligner_device: str | None = None,
     aligner=_align_with_lyrics_aligner,
     demucs_available=_demucs_available,
     separated_audio=_separated_vocal_audio,
     quality=_demucs_candidate_quality,
 ) -> AlignmentCandidate:
-    """Align the mix and optionally select a higher-quality Demucs candidate."""
-    mix_lrc = aligner(audio_path, plain_lyrics, device=device)
+    """Align the mix and optionally select a higher-quality Demucs candidate.
+
+    ``device`` drives vocal separation; ``aligner_device`` may place the
+    aligner model elsewhere and defaults to the same device.
+    """
+    aligner_device = aligner_device or device
+    mix_lrc = aligner(audio_path, plain_lyrics, device=aligner_device)
     mix = AlignmentCandidate(
         lrc=mix_lrc, source="mix", quality=quality(mix_lrc, plain_lyrics)
     )
@@ -124,7 +130,7 @@ def align_with_optional_demucs(
         return mix
 
     with separated_audio(audio_path, device=device) as vocal_path:
-        vocal_lrc = aligner(vocal_path, plain_lyrics, device=device)
+        vocal_lrc = aligner(vocal_path, plain_lyrics, device=aligner_device)
     if not vocal_lrc.strip():
         return mix
 
@@ -144,6 +150,17 @@ def align_with_optional_demucs(
         vocal.quality,
     )
     return mix
+
+
+def _lyrics_aligner_device(worker, device: str) -> str:
+    """Place the English aligner on the CPU unless a device was chosen explicitly.
+
+    Its recurrent layers walk one long sequence step by step, which measured
+    slower on CUDA than on the CPU with identical output. Automatic selection
+    therefore keeps the accelerator for stages that benefit from it.
+    """
+    requested = str(getattr(worker, "_device", "") or "").strip().lower()
+    return "cpu" if requested == "auto" else device
 
 
 def _try_lyrics_aligner(
@@ -166,6 +183,7 @@ def _try_lyrics_aligner(
             worker.audio_path,
             worker.plain_lyrics,
             device=device,
+            aligner_device=_lyrics_aligner_device(worker, device),
             enable_demucs_candidate=worker._enable_demucs_candidate,
         )
     except (OSError, RuntimeError, ValueError) as exc:

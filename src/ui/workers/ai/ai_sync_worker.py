@@ -85,6 +85,7 @@ def _align_with_optional_demucs(
     *,
     device: str,
     enable_demucs_candidate: bool,
+    aligner_device: str | None = None,
 ) -> AlignmentCandidate:
     """Compatibility wrapper for the centralized mix/Demucs candidate router."""
     from .ai_sync_pipeline import align_with_optional_demucs
@@ -94,6 +95,7 @@ def _align_with_optional_demucs(
         plain_lyrics,
         device=device,
         enable_demucs_candidate=enable_demucs_candidate,
+        aligner_device=aligner_device,
         aligner=_align_with_lyrics_aligner,
         demucs_available=_demucs_available,
         separated_audio=_separated_vocal_audio,

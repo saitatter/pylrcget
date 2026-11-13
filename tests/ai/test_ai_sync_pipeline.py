@@ -55,3 +55,51 @@ def test_cuda_retry_policy_is_already_single_pass() -> None:
     assert _relaxed_vad_retry_configs(
         device="cuda", legacy_full_retries=True
     ) == ({"vad_onset": 0.15, "vad_offset": 0.05},)
+
+
+def test_automatic_device_runs_the_english_aligner_on_cpu_and_separation_on_the_accelerator(monkeypatch):
+    from contextlib import contextmanager
+    from types import SimpleNamespace
+
+    from ui.workers.ai.ai_sync_pipeline import (
+        _try_lyrics_aligner,
+        align_with_optional_demucs,
+    )
+
+    monkeypatch.setattr("ui.workers.ai.ai_sync_pipeline._lyrics_aligner_available", lambda: True)
+    devices: list[tuple[str, str]] = []
+
+    @contextmanager
+    def separated_audio(_path, *, device):
+        devices.append(("separation", device))
+        yield "vocals.wav"
+
+    def aligner(path, lyrics, *, device):
+        devices.append((path, device))
+        return f"[00:01.00] {lyrics}"
+
+    def router(*args, **kwargs):
+        return align_with_optional_demucs(
+            *args,
+            **kwargs,
+            aligner=aligner,
+            demucs_available=lambda: True,
+            separated_audio=separated_audio,
+            quality=lambda _lrc, _lyrics: 0.0,
+        )
+
+    def run(requested: str) -> list[tuple[str, str]]:
+        devices.clear()
+        worker = SimpleNamespace(
+            manual_anchors=[],
+            audio_path="mix.flac",
+            plain_lyrics="line",
+            _device=requested,
+            _enable_demucs_candidate=True,
+            _emit_stage=lambda *_args: None,
+        )
+        assert _try_lyrics_aligner(worker, device="cuda", stage=2, stage_message="English", router=router)
+        return list(devices)
+
+    assert run("auto") == [("mix.flac", "cpu"), ("separation", "cuda"), ("vocals.wav", "cpu")]
+    assert run("cuda") == [("mix.flac", "cuda"), ("separation", "cuda"), ("vocals.wav", "cuda")]
