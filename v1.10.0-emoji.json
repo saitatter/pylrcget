@@ -1,0 +1,49 @@
+{
+  "schema_version": 3,
+  "repo": "saitatter/pylrcget",
+  "tag": "v1.10.0",
+  "preview": false,
+  "date": "23 May\n2026",
+  "published_at": "2026-05-23T15:09:10Z",
+  "metrics_captured_at": "2026-11-13T11:31:25.494359+00:00",
+  "metrics_as_of": "2026-05-23T15:09:10Z",
+  "statistics_basis": {
+    "open_issues": "issue_state_transitions_at_publication",
+    "stars": "surviving_stars_given_by_publication"
+  },
+  "previous": "v1.9.0",
+  "commit": "bbbcb162356332eeb56b7a2546092c2bf2ab43dc",
+  "items": [
+    {
+      "emoji": "\u2328\ufe0f",
+      "text": "Customizable keyboard shortcuts"
+    },
+    {
+      "emoji": "\ud83d\udee0\ufe0f",
+      "text": "Persistent interface state"
+    },
+    {
+      "emoji": "\ud83e\udd16",
+      "text": "Improved AI auto-sync workflow"
+    },
+    {
+      "emoji": "\ud83d\udcdd",
+      "text": "Streamlined selection actions"
+    },
+    {
+      "emoji": "\ud83d\udee0\ufe0f",
+      "text": "Responsive layout refinements"
+    }
+  ],
+  "commits": 18,
+  "contributors": 1,
+  "contributor_names": [
+    "@saitatter"
+  ],
+  "issues_addressed": 0,
+  "issue_numbers": [],
+  "stars": 6,
+  "open_issues": 4,
+  "historical_backfill": true,
+  "artwork_revision": "emoji"
+}
