@@ -47,6 +47,7 @@ def test_auto_known_english_routes_before_whisper_language_detection(monkeypatch
         plain_lyrics = "I know the road is open\nAnd you will see me there\nWe are going home"
         _language = "auto"
         _enable_demucs_candidate = False
+        manual_anchors = ()
         progress = _Emitter()
         completed = _Emitter()
 

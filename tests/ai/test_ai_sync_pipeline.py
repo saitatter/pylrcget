@@ -13,6 +13,19 @@ def test_legacy_full_retry_path_is_disabled_by_default(monkeypatch) -> None:
     assert _legacy_full_retries_enabled() is False
 
 
+def test_manual_anchors_keep_the_guided_alignment_path(monkeypatch):
+    from types import SimpleNamespace
+    from unittest.mock import Mock
+
+    from ui.workers.ai.ai_sync_pipeline import _try_lyrics_aligner
+
+    monkeypatch.setattr("ui.workers.ai.ai_sync_pipeline._lyrics_aligner_available", lambda: True)
+    router = Mock()
+    worker = SimpleNamespace(manual_anchors=[{"line_index": 0, "time_ms": 2000}])
+    assert _try_lyrics_aligner(worker, device="cpu", stage=2, stage_message="English", router=router) is None
+    router.assert_not_called()
+
+
 def test_legacy_full_retry_path_accepts_explicit_compatibility_values(monkeypatch) -> None:
     for value in ("1", "true", "YES", "on"):
         monkeypatch.setenv("PYLRCGET_AI_LEGACY_FULL_RETRIES", value)

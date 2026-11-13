@@ -11,6 +11,7 @@
 - Packaged builds download and verify Python and the English alignment backend during AI setup, without requiring separate Python or Git installations (#41).
 - English AI setup installs its pronunciation data in the application cache, and synchronization finds it in source and external runtimes.
 - AI installation uses the tested Torch, Torchaudio and WhisperX package combination instead of resolving incompatible versions.
+- English synchronization with manual timing hints uses the guided alignment path so those hints are not bypassed by the English backend shortcut.
 
 ### Refactors
 - The instrumental lyrics status uses a plain text label without an emoji glyph.

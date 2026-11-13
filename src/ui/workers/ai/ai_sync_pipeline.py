@@ -158,7 +158,7 @@ def _try_lyrics_aligner(
     router=align_with_optional_demucs,
 ) -> AlignmentCandidate | None:
     """Run the configured English aligner once and centralize fallback handling."""
-    if not _lyrics_aligner_available():
+    if getattr(worker, "manual_anchors", None) or not _lyrics_aligner_available():
         return None
     worker._emit_stage(stage, 8, stage_message)
     try:
@@ -229,6 +229,7 @@ def run_ai_sync_pipeline(self, *, align_optional_demucs=None) -> None:
             )
         if (
             plain_lines
+            and not self.manual_anchors
             and transcribe_language == "en"
             and _select_alignment_backend(transcribe_language, device=device).backend_name
             == "lyrics-aligner"
@@ -419,7 +420,7 @@ def run_ai_sync_pipeline(self, *, align_optional_demucs=None) -> None:
                     return recovered_segments
             return aligned_segments
 
-        if plain_lines and not lyrics_aligner_attempted:
+        if plain_lines and not lyrics_aligner_attempted and not self.manual_anchors:
             if transcribe_language == "en":
                 detected_language = "en"
             elif transcribe_language is None:
