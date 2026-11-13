@@ -1,0 +1,41 @@
+{
+  "schema_version": 3,
+  "repo": "saitatter/pylrcget",
+  "tag": "v1.14.1",
+  "preview": false,
+  "date": "09 Aug\n2026",
+  "published_at": "2026-08-09T05:48:14Z",
+  "metrics_captured_at": "2026-11-13T11:31:25.494359+00:00",
+  "metrics_as_of": "2026-08-09T05:48:14Z",
+  "statistics_basis": {
+    "open_issues": "issue_state_transitions_at_publication",
+    "stars": "surviving_stars_given_by_publication"
+  },
+  "previous": "v1.14.0",
+  "commit": "7da314e9239764fe3f50fe91bd8dba95fb07e902",
+  "items": [
+    {
+      "emoji": "\ud83e\udd16",
+      "text": "Oversized Linux AI build skipped"
+    },
+    {
+      "emoji": "\ud83d\udce5",
+      "text": "Standard Linux downloads retained"
+    },
+    {
+      "emoji": "\ud83d\udce6",
+      "text": "Debian packaging retained"
+    }
+  ],
+  "commits": 2,
+  "contributors": 1,
+  "contributor_names": [
+    "@saitatter"
+  ],
+  "issues_addressed": 0,
+  "issue_numbers": [],
+  "stars": 13,
+  "open_issues": 4,
+  "historical_backfill": true,
+  "artwork_revision": "emoji"
+}
