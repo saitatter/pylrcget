@@ -1,0 +1,34 @@
+{
+  "schema_version": 2,
+  "repo": "saitatter/pylrcget",
+  "tag": "v0.8.0",
+  "preview": false,
+  "date": "11 Apr\n2026",
+  "published_at": "2026-04-11T22:28:00Z",
+  "metrics_captured_at": "2026-11-13T11:31:25.494359+00:00",
+  "metrics_as_of": "2026-04-11T22:28:00Z",
+  "statistics_basis": {
+    "open_issues": "issue_state_transitions_at_publication",
+    "stars": "surviving_stars_given_by_publication"
+  },
+  "previous": "v0.7.0",
+  "commit": "d5e83163b3317af4d45d967f8ab0b4ad1462b007",
+  "items": [
+    "Bulk lyrics downloads",
+    "Configurable download modes",
+    "Synced-only download option",
+    "Lyrics file export",
+    "Publishing history",
+    "Musepack audio support"
+  ],
+  "commits": 2,
+  "contributors": 1,
+  "contributor_names": [
+    "@saitatter"
+  ],
+  "issues_addressed": 0,
+  "issue_numbers": [],
+  "stars": 1,
+  "open_issues": 1,
+  "historical_backfill": true
+}
