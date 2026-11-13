@@ -16,7 +16,7 @@
 - Auto mode accepts a working CPU runtime when CUDA is unavailable, while explicit CUDA still requires GPU support.
 
 ### Refactors
-- English AI synchronization reduces time spent calculating model attention without changing its numeric precision.
+- English AI synchronization reduces time spent calculating model attention and the final timing path without changing their numeric precision.
 - The instrumental lyrics status uses a plain text label without an emoji glyph.
 
 ### Docs

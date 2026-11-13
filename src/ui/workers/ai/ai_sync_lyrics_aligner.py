@@ -70,40 +70,26 @@ def _patch_torch_compatibility(torch_module: Any) -> None:
 
 
 def _vectorized_optimal_alignment_path(matrix: Any, *, init: int = 200) -> Any:
-    """Run the upstream DTW recurrence without per-cell Python/NumPy work.
+    """Evaluate the final path with row-vectorized float64 accumulation.
 
-    The upstream ``align.py`` implementation converts the score matrix to
-    NumPy and walks every diagonal in Python.  That is a poor fit for CUDA:
-    the neural scores are computed on the GPU, immediately copied to the CPU,
-    and then processed by a Python loop.  The recurrence can be evaluated one
-    row at a time because each row depends only on the preceding row.  Keep
-    the accumulated matrix in float64 to preserve the existing NumPy
-    implementation's numeric behavior before copying only the completed
-    matrix back for the unchanged backtracking logic.
+    Copy the neural scores to the host once. Row operations avoid upstream
+    diagonal indexing and thousands of small CUDA kernels. Float64 and the
+    original tie-breaking rules preserve the upstream final alignment path.
     """
 
     import numpy as np
-    import torch
 
     if matrix.ndim != 3 or matrix.shape[0] != 1:
         raise ValueError("lyrics-aligner DTW expects a [1, time, phoneme] matrix")
-
-    _batch, sequence_length, phoneme_length = matrix.shape
-    accumulated = torch.full(
-        (1, sequence_length + 1, phoneme_length + 1),
-        -100000.0,
-        dtype=torch.float64,
-        device=matrix.device,
-    )
-    accumulated[:, 0, 0] = init
-    scores = matrix.to(dtype=torch.float64)
+    scores = matrix.detach().cpu().numpy()[0].astype(np.float64)
+    sequence_length, phoneme_length = scores.shape
+    accumulated = np.full((sequence_length + 1, phoneme_length + 1), -100000.0)
+    accumulated[0, 0] = init
     for row in range(1, sequence_length + 1):
-        accumulated[:, row, 1:] = scores[:, row - 1, :] + torch.maximum(
-            accumulated[:, row - 1, 1:],
-            accumulated[:, row - 1, :-1],
+        accumulated[row, 1:] = scores[row - 1] + np.maximum(
+            accumulated[row - 1, 1:], accumulated[row - 1, :-1],
         )
-
-    accumulated_scores = accumulated[0, 1:, 1:].detach().cpu().numpy()
+    accumulated_scores = accumulated[1:, 1:]
     sequence_length, phoneme_length = accumulated_scores.shape
     optimal_path = np.zeros((sequence_length, phoneme_length))
     optimal_path[-1, -1] = 1
@@ -296,10 +282,7 @@ class EnglishLyricsAlignerBackend:
             )
             for frame in predicted_silence:
                 alignment_scores[:, int(frame), space_indices] = alignment_scores.max()
-        if self.device == "cuda":
-            optimal_path = _vectorized_optimal_alignment_path(alignment_scores)
-        else:
-            optimal_path = self._align_module.optimal_alignment_path(alignment_scores)
+        optimal_path = _vectorized_optimal_alignment_path(alignment_scores)
         phoneme_onsets = self._align_module.compute_phoneme_onsets(
             optimal_path,
             hop_length=256,

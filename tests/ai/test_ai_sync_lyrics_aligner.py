@@ -66,31 +66,27 @@ def test_warm_backend_does_not_require_existing_audio_for_result_parsing(tmp_pat
     assert result.lines[0].start == 0.0
 
 
-def test_vectorized_dtw_matches_reference_backtracking() -> None:
+@pytest.mark.parametrize("device", ["cpu", "cuda"])
+@pytest.mark.parametrize("shape", [(1, 1, 1), (1, 9, 1), (1, 13, 5)])
+def test_vectorized_dtw_matches_reference_backtracking(device, shape) -> None:
     np = pytest.importorskip("numpy")
     torch = pytest.importorskip("torch")
-    scores = torch.tensor(
-        [
-            [
-                [2.0, 1.0, 0.0],
-                [0.0, 3.0, 1.0],
-                [0.0, 1.0, 4.0],
-                [0.0, 0.0, 5.0],
-            ]
-        ],
-        dtype=torch.float32,
-    )
+    if device == "cuda" and not torch.cuda.is_available():
+        pytest.skip("CUDA unavailable")
+    generator = torch.Generator().manual_seed(7)
+    # Integer-valued scores exercise exact ties and negative values.
+    scores = torch.randint(-3, 4, shape, generator=generator).to(device=device, dtype=torch.float32)
 
     actual = _vectorized_optimal_alignment_path(scores)
 
     accumulated = np.full((scores.shape[1] + 1, scores.shape[2] + 1), -100000.0)
     accumulated[0, 0] = 200
-    score_array = scores.numpy().astype("float64")
+    score_array = scores.cpu().numpy().astype("float64")
     for row in range(1, scores.shape[1] + 1):
-        accumulated[row, 1:] = score_array[0, row - 1, :] + np.maximum(
-            accumulated[row - 1, 1:],
-            accumulated[row - 1, :-1],
-        )
+        for column in range(1, scores.shape[2] + 1):
+            accumulated[row, column] = score_array[0, row - 1, column - 1] + max(
+                accumulated[row - 1, column], accumulated[row - 1, column - 1],
+            )
     expected_scores = accumulated[1:, 1:]
     expected = np.zeros_like(expected_scores)
     expected[-1, -1] = 1
