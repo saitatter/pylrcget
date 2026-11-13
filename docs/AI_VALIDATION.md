@@ -108,3 +108,12 @@ Torch and CUDA hidden, including the tensor parity test omitted by the lightweig
 environment. Four non-tensor backend tests now run without optional AI packages.
 The fresh runtime emitted an optional TorchCodec/FFmpeg-library warning, but the
 tested SoundFile/NumPy audio paths completed successfully.
+
+## Backend comparison and optimization follow-up
+
+[Independent experiments](AI_OPTIMIZATION_EXPERIMENTS.md) compare the actual
+WhisperX base and English lyrics-aligner pipelines on full recordings, verify
+individual DTW and matching changes, and exercise forced full-length Demucs
+stems. These measurements supersede device-only comparisons as evidence for
+backend selection on the two English samples. No broader language or model
+accuracy claim follows from them.

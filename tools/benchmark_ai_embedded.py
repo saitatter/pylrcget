@@ -24,7 +24,7 @@ sys.path[:0] = [str(ROOT), str(ROOT / "src")]
 from mutagen import File
 
 from tools.ai_sync_bench.metrics import percentile, summarize
-from ui.workers.ai.ai_sync_service import PersistentAIRuntime
+from ui.workers.ai.ai_sync_service import PersistentAIRuntime, build_runtime_environment
 
 TIMESTAMP = re.compile(r"\[(\d+):(\d+(?:\.\d+)?)\]")
 
@@ -118,6 +118,7 @@ def markdown_report(report: dict) -> str:
         return f"{value:.{digits}f}" if value is not None else "n/a"
 
     lines = ["# Embedded-ground-truth AI benchmark", "", f"Captured: {report['captured_at']}", "",
+             f"Backend: {report.get('backend', 'auto')}; Whisper model: {report.get('whisper_model', 'base')}", "",
              "Cold includes process startup and model loading. Warm values summarize measured runs after warm-up.", "",
              "| Input | Device | Demucs | Cold s | Warm median s | Warm p95 s | RTF | Coverage | Median error s | P95 error s | Max error s | Within 1 s |",
              "| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |"]
@@ -138,6 +139,24 @@ def markdown_report(report: dict) -> str:
     return "\n".join(lines)
 
 
+def backend_process_factory(backend: str, disabled_path: Path):
+    """Select a benchmark route in the child without changing the host environment."""
+    def process_factory(*command, **kwargs):
+        environment = dict(kwargs["env"])
+        if backend == "whisperx":
+            environment["PYLRCGET_LYRICS_ALIGNER_PATH"] = str(disabled_path)
+        elif backend == "lyrics-aligner":
+            from ui.workers.ai.ai_sync_lyrics_aligner import _backend_root
+            backend_root = _backend_root()
+            if backend_root is None:
+                raise RuntimeError("Requested lyrics-aligner is unavailable")
+            environment["PYLRCGET_LYRICS_ALIGNER_PATH"] = str(backend_root)
+        kwargs["env"] = environment
+        return subprocess.Popen(*command, **kwargs)
+
+    return process_factory
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--audio", type=Path, action="append", required=True)
@@ -145,22 +164,29 @@ def main() -> None:
     parser.add_argument("--output-root", type=Path, required=True)
     parser.add_argument("--devices", nargs="+", choices=("cpu", "cuda", "auto"), default=["cpu", "cuda", "auto"])
     parser.add_argument("--demucs", nargs="+", choices=("off", "on"), default=["off"])
+    parser.add_argument("--source-root", type=Path, default=ROOT / "src")
+    parser.add_argument("--backend", choices=("auto", "lyrics-aligner", "whisperx"), default="auto")
+    parser.add_argument("--whisper-model", default="base")
     parser.add_argument("--runs", type=int, default=3)
     parser.add_argument("--warmups", type=int, default=1)
     parser.add_argument("--timeout", type=float, default=600)
     args = parser.parse_args()
     if args.runs < 1 or args.warmups < 1:
         parser.error("At least one cold warm-up and one measured run are required")
+    args.source_root = args.source_root.resolve(strict=True)
     sources = [path.resolve(strict=True) for path in args.audio]
     validate_output_path(sources, args.output_root)
     work = args.output_root / (datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ") + "-" + uuid.uuid4().hex[:8])
     work.mkdir(parents=True)
-    probe = subprocess.check_output([str(args.runtime), "-c", "import torch,platform,json,importlib.metadata as m; print(json.dumps({'python':platform.python_version(),'torch':torch.__version__,'torch_threads':torch.get_num_threads(),'cuda':torch.cuda.is_available(),'gpu':torch.cuda.get_device_name(0) if torch.cuda.is_available() else None,'whisperx':m.version('whisperx')}))"], text=True, encoding="utf-8")
+    probe = subprocess.check_output([str(args.runtime), "-c", "import torch,platform,json,importlib.metadata as m; from ui.workers.ai import ai_sync_lyrics_aligner as backend; print(json.dumps({'loaded_ai_source':backend.__file__,'python':platform.python_version(),'torch':torch.__version__,'torch_threads':torch.get_num_threads(),'cuda':torch.cuda.is_available(),'gpu':torch.cuda.get_device_name(0) if torch.cuda.is_available() else None,'whisperx':m.version('whisperx')}))"], text=True, encoding="utf-8", cwd=args.source_root.parent, env=build_runtime_environment(args.source_root))
+    runtime_info = json.loads(probe)
+    if not Path(runtime_info["loaded_ai_source"]).resolve().is_relative_to(args.source_root):
+        raise RuntimeError("Runtime imported AI code outside the requested source tree")
     source_digest = hashlib.sha256()
-    for path in sorted((ROOT / "src/ui/workers/ai").glob("*.py")):
+    for path in sorted((args.source_root / "ui/workers/ai").glob("*.py")):
         source_digest.update(path.name.encode())
         source_digest.update(path.read_bytes())
-    report = {"schema_version": 1, "captured_at": datetime.now(UTC).isoformat(), "runtime": json.loads(probe), "ai_source_sha256": source_digest.hexdigest(), "warmups": args.warmups, "measured_runs": args.runs, "inputs": [], "configurations": []}
+    report = {"schema_version": 1, "captured_at": datetime.now(UTC).isoformat(), "runtime": runtime_info, "ai_source_sha256": source_digest.hexdigest(), "backend": args.backend, "whisper_model": args.whisper_model, "warmups": args.warmups, "measured_runs": args.runs, "inputs": [], "configurations": []}
     try:
         for number, source in enumerate(sources, 1):
             original = fingerprint(source)
@@ -174,16 +200,19 @@ def main() -> None:
                 for demucs in args.demucs:
                     entry = {"input": f"input-{number:02d}", "device": device, "demucs": demucs, "duration_s": duration, "runs": []}
                     report["configurations"].append(entry)
-                    service = PersistentAIRuntime(args.runtime, ROOT / "src", device=device)
+                    service = PersistentAIRuntime(
+                        args.runtime, args.source_root, device=device,
+                        process_factory=backend_process_factory(args.backend, work / "disabled-backend"),
+                    )
                     try:
                         for iteration in range(args.warmups + args.runs):
                             print(f"{entry['input']} {device} demucs={demucs} run={iteration + 1}/{args.warmups + args.runs}", flush=True)
                             started = time.monotonic()
                             progress = []
-                            config = {"audio_path": str(copied), "plain_lyrics": "\n".join(text for _, text in lines), "device": device, "language": "en", "whisper_model": "base", "enable_demucs_candidate": demucs == "on", "enable_fuzzy": True, "fuzzy_threshold": 60}
+                            config = {"audio_path": str(copied), "plain_lyrics": "\n".join(text for _, text in lines), "device": device, "language": "en", "whisper_model": args.whisper_model, "enable_demucs_candidate": demucs == "on", "enable_fuzzy": True, "fuzzy_threshold": 60}
                             try:
                                 ok, message, output = service.run(config, on_progress=progress.append, is_cancelled=lambda started=started: time.monotonic() - started > args.timeout)
-                                row = {"ok": ok, "message": message, "elapsed_s": time.monotonic() - started, "quality": quality(reference, output, duration), "progress": progress}
+                                row = {"ok": ok, "message": message, "elapsed_s": time.monotonic() - started, "quality": quality(reference, output, duration), "output_sha256": hashlib.sha256(output.encode("utf-8")).hexdigest(), "progress": progress}
                             except (OSError, RuntimeError, ValueError) as exc:
                                 row = {"ok": False, "error": str(exc), "elapsed_s": time.monotonic() - started}
                             if iteration == 0:

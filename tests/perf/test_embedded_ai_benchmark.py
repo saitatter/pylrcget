@@ -46,3 +46,29 @@ def test_report_handles_a_result_with_no_matching_reference_lines():
         "cold": {"elapsed_s": 1}, "runs": [{"ok": True, "elapsed_s": 1, "quality": result}],
     }]}
     assert "n/a" in markdown_report(report)
+
+
+def test_backend_selection_is_confined_to_child_environment(monkeypatch, tmp_path):
+    from tools import benchmark_ai_embedded as benchmark
+
+    received = {}
+    def popen(*args, **kwargs):
+        received.update(kwargs)
+        return "child"
+    monkeypatch.setattr(benchmark.subprocess, "Popen", popen)
+    host = {"PYLRCGET_LYRICS_ALIGNER_PATH": "configured", "OTHER": "value"}
+    factory = benchmark.backend_process_factory("whisperx", tmp_path / "disabled")
+    assert factory(["python"], env=host) == "child"
+    assert received["env"]["PYLRCGET_LYRICS_ALIGNER_PATH"] == str(tmp_path / "disabled")
+    assert received["env"]["OTHER"] == "value"
+    assert host["PYLRCGET_LYRICS_ALIGNER_PATH"] == "configured"
+
+
+def test_requested_english_backend_cannot_silently_fall_back(monkeypatch, tmp_path):
+    from tools import benchmark_ai_embedded as benchmark
+    from ui.workers.ai import ai_sync_lyrics_aligner
+
+    monkeypatch.setattr(ai_sync_lyrics_aligner, "_backend_root", lambda: None)
+    factory = benchmark.backend_process_factory("lyrics-aligner", tmp_path / "disabled")
+    with pytest.raises(RuntimeError, match="unavailable"):
+        factory(["python"], env={})

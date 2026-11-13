@@ -12,6 +12,11 @@ lyric line does not establish accurate synchronization.
 [Exportable SVG](assets/ai-benchmarks/2026-11-13.svg) and
 [anonymized measurements](benchmarks/ai-2026-11-13.json).
 
+The [follow-up comparison](AI_OPTIMIZATION_EXPERIMENTS.md) measures WhisperX
+against lyrics-aligner directly, tests optimizations independently and records
+the faster implementation now retained in the application. The timings below
+remain the original baseline.
+
 ## Method
 
 Two user-selected FLAC recordings had existing embedded synchronized lyrics:
