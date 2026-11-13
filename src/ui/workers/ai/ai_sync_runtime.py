@@ -4,9 +4,11 @@ from __future__ import annotations
 import subprocess
 import threading
 from collections import OrderedDict
+from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 
-from .ai_runtime import resolve_ai_runtime_python
+from .ai_dependencies import AI_PACKAGE_REQUIREMENTS
+from .ai_runtime import default_ai_nltk_dir, resolve_ai_runtime_python
 from .ai_sync_lyrics_aligner import is_available as _lyrics_aligner_available
 
 _INFERENCE_CACHE_LOCK = threading.Lock()
@@ -271,7 +273,49 @@ def _get_cached_align_model(
 def _module_available(module: str) -> bool:
     try:
         __import__(module)
-    except ImportError:
+    except (ImportError, OSError, AttributeError, RuntimeError):
+        return False
+    return True
+
+
+def _supported_package_version(package: str) -> bool:
+    expected = AI_PACKAGE_REQUIREMENTS[package].split("==", 1)[1]
+    try:
+        return version(package).split("+", 1)[0] == expected
+    except PackageNotFoundError:
+        return False
+
+
+def _english_pronunciation_available(executable: Path | None) -> bool:
+    script = (
+        "import importlib.util,sys\n"
+        "if any(importlib.util.find_spec(name) is None for name in ['g2p_en','librosa','nltk']):\n"
+        "    raise SystemExit(1)\n"
+        "import nltk\n"
+        f"nltk.data.path.insert(0, {str(default_ai_nltk_dir())!r})\n"
+        "for resource in ['corpora/cmudict', 'taggers/averaged_perceptron_tagger.zip', "
+        "'taggers/averaged_perceptron_tagger_eng']:\n"
+        "    nltk.data.find(resource)\n"
+    )
+    if executable is not None:
+        try:
+            result = subprocess.run([str(executable), "-c", script], capture_output=True, timeout=30, check=False)
+        except (OSError, subprocess.TimeoutExpired):
+            return False
+        return result.returncode == 0
+    try:
+        import importlib.util
+
+        if any(importlib.util.find_spec(name) is None for name in ("g2p_en", "librosa", "nltk")):
+            return False
+        import nltk
+
+        data_dir = str(default_ai_nltk_dir())
+        if data_dir not in nltk.data.path:
+            nltk.data.path.insert(0, data_dir)
+        for resource in ("corpora/cmudict", "taggers/averaged_perceptron_tagger.zip", "taggers/averaged_perceptron_tagger_eng"):
+            nltk.data.find(resource)
+    except (ImportError, LookupError, ValueError):
         return False
     return True
 
@@ -291,10 +335,18 @@ def get_missing_ai_dependencies(
     external_python = resolve_ai_runtime_python()
     if external_python is not None:
         packages = [package for _module, package in deps]
+        expected = {package: AI_PACKAGE_REQUIREMENTS[package].split("==", 1)[1] for package in packages}
         probe = (
-            "import importlib.util; "
-            "missing = [name for name in "
-            f"{packages!r} if importlib.util.find_spec(name) is None]; "
+            "import importlib.util\n"
+            "from importlib.metadata import version, PackageNotFoundError\n"
+            f"expected={expected!r}\n"
+            "missing=[]\n"
+            "for name, pinned in expected.items():\n"
+            "    try:\n"
+            "        if importlib.util.find_spec(name) is None or version(name).split('+', 1)[0] != pinned:\n"
+            "            missing.append(name)\n"
+            "    except PackageNotFoundError:\n"
+            "        missing.append(name)\n"
             "print('\\n'.join(missing))"
         )
         result = subprocess.run(
@@ -307,7 +359,9 @@ def get_missing_ai_dependencies(
             missing = [line.strip() for line in result.stdout.splitlines() if line.strip()]
             if prefer_cuda and not _cuda_runtime_available(external_python):
                 missing.append("torch-cuda")
-            if require_lyrics_aligner and not _lyrics_aligner_available():
+            if require_lyrics_aligner and (
+                not _lyrics_aligner_available() or not _english_pronunciation_available(external_python)
+            ):
                 missing.append("lyrics-aligner")
             if require_demucs and not _module_available_in_runtime(external_python, "demucs"):
                 missing.append("demucs")
@@ -316,11 +370,13 @@ def get_missing_ai_dependencies(
 
     missing: list[str] = []
     for module, package in deps:
-        if not _module_available(module):
+        if not _module_available(module) or not _supported_package_version(package):
             missing.append(package)
     if prefer_cuda and not _cuda_runtime_available(None):
         missing.append("torch-cuda")
-    if require_lyrics_aligner and not _lyrics_aligner_available():
+    if require_lyrics_aligner and (
+        not _lyrics_aligner_available() or not _english_pronunciation_available(None)
+    ):
         missing.append("lyrics-aligner")
     if require_demucs and not _module_available("demucs"):
         missing.append("demucs")

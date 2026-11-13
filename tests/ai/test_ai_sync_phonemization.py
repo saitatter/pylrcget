@@ -48,3 +48,14 @@ def test_english_g2p_phonemizer_has_bounded_cache() -> None:
     phonemizer.phonemize_word("three")
 
     assert phonemizer.cache_size == 2
+
+
+def test_missing_nltk_data_reports_a_repairable_backend_error() -> None:
+    import pytest
+
+    def convert(_word):
+        raise LookupError("averaged_perceptron_tagger_eng missing")
+
+    phonemizer = EnglishG2PPhonemizer(g2p_factory=lambda: convert)
+    with pytest.raises(RuntimeError, match="Manage AI runtime"):
+        phonemizer.phonemize_word("hello")

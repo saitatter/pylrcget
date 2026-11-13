@@ -14,11 +14,18 @@ dependencies = [
 
 [project.optional-dependencies]
 ai = [
-    "torch",
-    "torchaudio",
-    "whisperx",
-    "soundfile",
-    "g2p-en",
+    "torch==2.8.0",
+    "torchaudio==2.8.0",
+    "torchvision==0.23.0",
+    "whisperx==3.8.6",
+    "soundfile==0.14.0",
+    "g2p-en==2.1.0",
+    "librosa==1.0.0",
+    "demucs==4.1.0",
+    "transformers==4.57.6",
+    "huggingface-hub==0.36.2",
+    "pyannote-audio==4.0.7",
+    "numpy==2.5.2",
 ]
 dev = [
     "pytest==9.1.1",

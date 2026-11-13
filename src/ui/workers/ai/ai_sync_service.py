@@ -19,6 +19,8 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+from .ai_runtime import default_ai_nltk_dir
+
 logger = logging.getLogger(__name__)
 
 AI_SYNC_PROTOCOL_VERSION = 1
@@ -36,6 +38,10 @@ def build_runtime_environment(source_root: Path) -> dict[str, str]:
     ):
         environment.pop(variable, None)
     environment["PYTHONPATH"] = str(source_root)
+    environment["PYTHONUTF8"] = "1"
+    environment["NLTK_DATA"] = os.pathsep.join(filter(None, (
+        environment.get("NLTK_DATA", ""), str(default_ai_nltk_dir()),
+    )))
     return environment
 
 

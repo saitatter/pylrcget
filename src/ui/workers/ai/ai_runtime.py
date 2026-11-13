@@ -6,6 +6,7 @@ import os
 import shutil
 import subprocess
 import sys
+import textwrap
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -14,6 +15,7 @@ from .ai_bootstrap import (
     bootstrap_python_path,
     resolve_bootstrap_artifact,
 )
+from .ai_dependencies import AI_PACKAGE_REQUIREMENTS
 
 _SUPPORTED_PYTHON = (3, 13, 15)
 
@@ -68,6 +70,12 @@ def default_ai_runtime_dir() -> Path:
 
 def default_ai_bootstrap_dir() -> Path:
     return default_ai_runtime_dir().parent / "python-bootstrap"
+
+
+def default_ai_nltk_dir() -> Path:
+    runtime_dir = os.environ.get("PYLRCGET_AI_RUNTIME_DIR", "").strip()
+    root = Path(runtime_dir).expanduser() if runtime_dir else default_ai_runtime_dir()
+    return root.parent / "nltk_data"
 
 
 def default_lyrics_aligner_dir() -> Path:
@@ -192,26 +200,36 @@ def _build_ai_install_arguments(packages: list[str]) -> list[str]:
         Path(runtime_dir).expanduser() if runtime_dir else default_ai_runtime_dir()
     )
     missing = list(packages)
-    script = (
-        "import os,subprocess,sys,venv\n"
-        f"root={str(runtime_root)!r}\n"
-        "venv.EnvBuilder(with_pip=True).create(root)\n"
-        "python = root + ('\\\\Scripts\\\\python.exe' if sys.platform == 'win32' else '/bin/python')\n"
-        "args=sys.argv[1:]\n"
-        "aligner='lyrics-aligner' in args\n"
-        "args=[arg for arg in args if arg != 'lyrics-aligner']\n"
-        "if aligner:\n"
-        "    subprocess.check_call([python, '-m', 'pip', 'install', 'g2p-en', 'librosa'])\n"
-        "cuda='torch-cuda' in args\n"
-        "args=[arg for arg in args if arg != 'torch-cuda']\n"
-        "if cuda:\n"
-        "    subprocess.check_call([python, '-m', 'pip', 'install', "
-        "'torch==2.8.0', 'torchaudio==2.8.0', "
-        "'--index-url', 'https://download.pytorch.org/whl/cu128'])\n"
-        "if args:\n"
-        "    raise SystemExit(subprocess.call([python, '-m', 'pip', 'install', *args]))\n"
-        "raise SystemExit(0)"
+    constraints = "\n".join(AI_PACKAGE_REQUIREMENTS.values())
+    nltk_setup = (
+        "import nltk; root=" + repr(str(default_ai_nltk_dir())) + "; "
+        "[nltk.download(name, download_dir=root, raise_on_error=True) for name in "
+        "['cmudict', 'averaged_perceptron_tagger', 'averaged_perceptron_tagger_eng']]"
     )
+    script = textwrap.dedent(f"""\
+        import os, subprocess, sys, tempfile, venv
+        from pathlib import Path
+        root = {str(runtime_root)!r}
+        venv.EnvBuilder(with_pip=True).create(root)
+        python = os.path.join(root, 'Scripts', 'python.exe') if sys.platform == 'win32' else os.path.join(root, 'bin', 'python')
+        requested = sys.argv[1:]
+        aligner = 'lyrics-aligner' in requested
+        cuda = 'torch-cuda' in requested
+        requirements = {AI_PACKAGE_REQUIREMENTS!r}
+        args = [requirements.get(arg, arg) for arg in requested if arg not in ('lyrics-aligner', 'torch-cuda')]
+        with tempfile.TemporaryDirectory(prefix='pylrcget-ai-install-') as staging:
+            constraint_file = Path(staging) / 'constraints.txt'
+            constraint_file.write_text({constraints!r}, encoding='utf-8')
+            pip = [python, '-m', 'pip', 'install', '--upgrade', '--constraint', str(constraint_file)]
+            if cuda:
+                subprocess.check_call(pip + [requirements['torch'], requirements['torchaudio'], '--index-url', 'https://download.pytorch.org/whl/cu128'])
+                args = [arg for arg in args if arg not in (requirements['torch'], requirements['torchaudio'])]
+            if aligner:
+                subprocess.check_call(pip + [requirements['g2p-en'], requirements['librosa']])
+                subprocess.check_call([python, '-c', {nltk_setup!r}])
+            if args:
+                subprocess.check_call(pip + args)
+        """)
     return ["-c", script, *missing]
 
 

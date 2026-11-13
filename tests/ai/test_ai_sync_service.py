@@ -23,6 +23,16 @@ def test_runtime_environment_replaces_python_path() -> None:
     assert "PYTHONUSERBASE" not in environment
 
 
+def test_runtime_uses_application_nltk_data_without_losing_user_override(monkeypatch, tmp_path):
+    import os
+
+    monkeypatch.setenv("PYLRCGET_AI_RUNTIME_DIR", str(tmp_path / "ai-runtime"))
+    monkeypatch.setenv("NLTK_DATA", str(tmp_path / "custom-data"))
+    environment = build_runtime_environment(SRC_ROOT)
+    assert environment["NLTK_DATA"].split(os.pathsep) == [str(tmp_path / "custom-data"), str(tmp_path / "nltk_data")]
+    assert environment["PYTHONUTF8"] == "1"
+
+
 def test_external_runtime_handshake_and_shutdown() -> None:
     service = PersistentAIRuntime(sys.executable, SRC_ROOT, device="cpu")
     try:

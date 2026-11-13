@@ -9,6 +9,8 @@
 - LRCLIB requests share a configurable pause (one second by default), respect Retry-After and retry rate-limited lookups instead of sending bursts across workers (#64).
 - Settings > AI Sync opens the AI setup dialog from Manage AI runtime, including on a fresh installation with no runtime folder (#61).
 - Packaged builds download and verify Python and the English alignment backend during AI setup, without requiring separate Python or Git installations (#41).
+- English AI setup installs its pronunciation data in the application cache, and synchronization finds it in source and external runtimes.
+- AI installation uses the tested Torch, Torchaudio and WhisperX package combination instead of resolving incompatible versions.
 
 ### Refactors
 - The instrumental lyrics status uses a plain text label without an emoji glyph.

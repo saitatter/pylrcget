@@ -7,6 +7,8 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any, Protocol
 
+from .ai_runtime import default_ai_nltk_dir
+
 
 @dataclass(slots=True, frozen=True)
 class PhonemizedText:
@@ -63,11 +65,17 @@ class EnglishG2PPhonemizer:
                     raise ValueError(f"Could not phonemize English word {normalized!r}.")
                 return value
         self.warm()
-        phonemes = [
-            token.rstrip("012")
-            for token in self._g2p(normalized.strip("'"))
-            if re.fullmatch(r"[A-Z]+[012]?", token)
-        ]
+        try:
+            phonemes = [
+                token.rstrip("012")
+                for token in self._g2p(normalized.strip("'"))
+                if re.fullmatch(r"[A-Z]+[012]?", token)
+            ]
+        except LookupError as exc:
+            raise RuntimeError(
+                "English pronunciation data is missing. Open Settings > AI Sync > "
+                "Manage AI runtime to repair the English backend."
+            ) from exc
         value = " ".join(phonemes) or None
         with self._lock:
             self._cache[normalized] = value
@@ -106,6 +114,11 @@ class EnglishG2PPhonemizer:
         if self._g2p_factory is not None:
             return self._g2p_factory()
         try:
+            import nltk
+
+            data_dir = str(default_ai_nltk_dir())
+            if data_dir not in nltk.data.path:
+                nltk.data.path.append(data_dir)
             import g2p_en
         except ImportError as exc:
             raise RuntimeError("English lyrics alignment requires the optional g2p-en package.") from exc

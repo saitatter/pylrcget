@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import subprocess
 import sys
 
@@ -68,9 +69,14 @@ class _InstallAIDependenciesWorker(QThread):
                 return
 
         self.lineReady.emit(f"Running: {' '.join(cmd)}")
+        environment = os.environ.copy()
+        for name in ("PYTHONHOME", "PYTHONPATH", "PYTHONEXECUTABLE", "PYTHONUSERBASE"):
+            environment.pop(name, None)
+        environment["PYTHONUTF8"] = "1"
         try:
             process = subprocess.Popen(
                 cmd,
+                env=environment,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,

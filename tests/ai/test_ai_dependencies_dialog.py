@@ -19,6 +19,23 @@ from ui.workers.ai.ai_bootstrap import (
 from ui.workers.ai.ai_runtime import AIInstallPlan, resolve_ai_install_plan
 
 
+def test_installer_does_not_leak_source_python_paths_into_the_isolated_runtime(monkeypatch):
+    from types import SimpleNamespace
+    from unittest.mock import Mock
+
+    from ui.dialogs.ai_dependencies_dialog import _InstallAIDependenciesWorker
+
+    for name in ("PYTHONHOME", "PYTHONPATH", "PYTHONEXECUTABLE", "PYTHONUSERBASE"):
+        monkeypatch.setenv(name, "source-environment")
+    popen = Mock(return_value=SimpleNamespace(stdout=iter([]), wait=lambda: 0))
+    monkeypatch.setattr("ui.dialogs.ai_dependencies_dialog.subprocess.Popen", popen)
+    worker = _InstallAIDependenciesWorker(AIInstallPlan(command=[sys.executable, "-c", "pass"]))
+    worker.run()
+    environment = popen.call_args.kwargs["env"]
+    assert not any(name in environment for name in ("PYTHONHOME", "PYTHONPATH", "PYTHONEXECUTABLE", "PYTHONUSERBASE"))
+    assert environment["PYTHONUTF8"] == "1"
+
+
 def test_resolve_ai_install_command_for_source_runtime(monkeypatch):
     monkeypatch.setenv("PYLRCGET_AI_RUNTIME_DIR", r"C:\PyLrcGet\ai-runtime")
     monkeypatch.setattr(sys, "executable", sys.executable)
