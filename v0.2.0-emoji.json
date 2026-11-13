@@ -1,0 +1,41 @@
+{
+  "schema_version": 3,
+  "repo": "saitatter/pylrcget",
+  "tag": "v0.2.0",
+  "preview": false,
+  "date": "06 Apr\n2026",
+  "published_at": "2026-04-06T08:49:55Z",
+  "metrics_captured_at": "2026-11-13T11:31:25.494359+00:00",
+  "metrics_as_of": "2026-04-06T08:49:55Z",
+  "statistics_basis": {
+    "open_issues": "issue_state_transitions_at_publication",
+    "stars": "surviving_stars_given_by_publication"
+  },
+  "previous": "v0.1.1",
+  "commit": "5ac15fdeccf53b5ccbaa6c0ddc85260bc3d76181",
+  "items": [
+    {
+      "emoji": "\ud83d\udce4",
+      "text": "Configurable lyrics export"
+    },
+    {
+      "emoji": "\ud83d\udcc2",
+      "text": "Optional sidecar files"
+    },
+    {
+      "emoji": "\ud83d\udd04",
+      "text": "Refreshed SVG icons"
+    }
+  ],
+  "commits": 2,
+  "contributors": 1,
+  "contributor_names": [
+    "@saitatter"
+  ],
+  "issues_addressed": 0,
+  "issue_numbers": [],
+  "stars": 0,
+  "open_issues": 0,
+  "historical_backfill": true,
+  "artwork_revision": "emoji"
+}
