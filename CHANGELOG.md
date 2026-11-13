@@ -3,7 +3,7 @@
 ## Unreleased
 
 ### Features
-- Each release opens with personalized PyLrcGet studio artwork showing highlights, version history, human contributor credits and repository statistics reconstructed at publication.
+- Each release opens with personalized PyLrcGet studio artwork showing emoji highlights, version history, human contributor credits and repository statistics reconstructed at publication.
 - Synchronize selected tracks with AI from the selection bar or context menu, with sequential processing, cancellation, per-track results and unsaved drafts (#62).
 
 ### Fixes

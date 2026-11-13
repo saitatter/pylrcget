@@ -27,7 +27,7 @@ The GitHub CLI must be authenticated and release tags/history available locally.
 ## Personalized artwork
 
 Each release opens with the PyLrcGet music-studio banner. Customize up to six
-short highlight strings in the release tag's `items` array in
+short highlight objects (`{"emoji": "...", "text": "..."}`) in the release tag's `items` array in
 `docs/release-summaries.json`; its `summary` array remains the release description.
 The artwork adds the version, date, previous version, commit count, contributors,
 referenced issues addressed, open issues and stars. Human contributor accounts
@@ -47,13 +47,14 @@ work without creating a tag or publishing anything:
 python tools/release_banner.py --tag v1.16.0 --preview --out "$env:TEMP/pylrcget-preview.webp"
 ```
 
-Use `--set item_1="Custom highlight"` to override a highlight, or `--set stars=42`
+Use `--set item_1="Custom highlight"` and `--set emoji_1="..."` to override a row, or `--set stars=42`
 to override a numeric field in a local preview. The output includes a JSON snapshot.
 Render that snapshot again without GitHub access with `--data snapshot.json`.
 
 The Release workflow invokes `release_notes.py --banner --write`. It stores the
 WebP and JSON snapshot on the orphan `release-banners` branch, then links the image
-at its immutable commit in the release description. The artwork does not appear in
+at its immutable commit in the release description. Emoji revisions use
+`vX.Y.Z-emoji.webp` and a matching JSON snapshot, preserving earlier artwork. The artwork does not appear in
 the application downloads. Existing per-tag artwork is reused, never overwritten.
 Keep this branch and its history: removing it can break past release images.
 The existing `RELEASE_PAT` must be allowed to create and update that branch.
@@ -66,3 +67,8 @@ Descriptions use the same complete non-merge commit history and contributor
 credits as new releases. Reformatting a release changes its description and adds
 immutable artwork on `release-banners`; release tags, dates, titles and download
 assets stay intact.
+
+Emoji are pinned Noto Emoji PNG artwork (Apache-2.0), stored locally with source
+hashes and license under `docs/assets/release-banner/emoji`. Rendering snapshots
+needs no font emoji support or network access. Emoji appear on artwork only;
+release-description headings and change lists remain plain text.

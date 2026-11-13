@@ -7,12 +7,30 @@
       "Read reviewed release notes with personalized artwork, contributor credit and complete change lists."
     ],
     "items": [
-      "AI setup without Python or Git",
-      "English pronunciation setup repaired",
-      "Sync selected tracks with AI",
-      "Adjustable LRCLIB request pacing",
-      "Manage AI runtime from Settings",
-      "Reviewed notes and release artwork"
+      {
+        "emoji": "\ud83e\udd16",
+        "text": "AI setup without Python or Git"
+      },
+      {
+        "emoji": "\ud83d\udee0\ufe0f",
+        "text": "English pronunciation setup repaired"
+      },
+      {
+        "emoji": "\ud83d\udd04",
+        "text": "Sync selected tracks with AI"
+      },
+      {
+        "emoji": "\ud83d\udee0\ufe0f",
+        "text": "Adjustable LRCLIB request pacing"
+      },
+      {
+        "emoji": "\ud83e\udd16",
+        "text": "Manage AI runtime from Settings"
+      },
+      {
+        "emoji": "\ud83d\udee0\ufe0f",
+        "text": "Reviewed notes and release artwork"
+      }
     ]
   },
   "v0.1.0": {
@@ -21,11 +39,26 @@
       "Find and edit lyrics in the first public PyLrcGet release."
     ],
     "items": [
-      "First public release",
-      "Artists, albums and tracks",
-      "Sortable library views",
-      "Music playback controls",
-      "Lyrics lookup and editing"
+      {
+        "emoji": "\ud83d\ude80",
+        "text": "First public release"
+      },
+      {
+        "emoji": "\ud83c\udfb6",
+        "text": "Artists, albums and tracks"
+      },
+      {
+        "emoji": "\ud83d\uddc2\ufe0f",
+        "text": "Sortable library views"
+      },
+      {
+        "emoji": "\ud83c\udfb5",
+        "text": "Music playback controls"
+      },
+      {
+        "emoji": "\ud83d\udd0d",
+        "text": "Lyrics lookup and editing"
+      }
     ]
   },
   "v0.1.1": {
@@ -33,8 +66,14 @@
       "Repair the release build configuration so packaged application downloads can be produced."
     ],
     "items": [
-      "Packaged build configuration repaired",
-      "Automated release publishing repaired"
+      {
+        "emoji": "\ud83d\udce6",
+        "text": "Packaged build configuration repaired"
+      },
+      {
+        "emoji": "\ud83d\udce4",
+        "text": "Automated release publishing repaired"
+      }
     ]
   },
   "v0.2.0": {
@@ -43,9 +82,18 @@
       "Use refreshed SVG icons throughout the interface."
     ],
     "items": [
-      "Configurable lyrics export",
-      "Optional sidecar files",
-      "Refreshed SVG icons"
+      {
+        "emoji": "\ud83d\udce4",
+        "text": "Configurable lyrics export"
+      },
+      {
+        "emoji": "\ud83d\udcc2",
+        "text": "Optional sidecar files"
+      },
+      {
+        "emoji": "\ud83d\udd04",
+        "text": "Refreshed SVG icons"
+      }
     ]
   },
   "v0.3.0": {
@@ -54,10 +102,22 @@
       "Scan and embed lyrics in additional audio formats, including ASF/WMA and DSD files."
     ],
     "items": [
-      "Theme system and shared colors",
-      "Refreshed player bar",
-      "ASF and WMA lyric embedding",
-      "DSF and DSDIFF format support"
+      {
+        "emoji": "\ud83c\udfa8",
+        "text": "Theme system and shared colors"
+      },
+      {
+        "emoji": "\ud83c\udfb5",
+        "text": "Refreshed player bar"
+      },
+      {
+        "emoji": "\ud83d\udee0\ufe0f",
+        "text": "ASF and WMA lyric embedding"
+      },
+      {
+        "emoji": "\ud83c\udfa7",
+        "text": "DSF and DSDIFF format support"
+      }
     ]
   },
   "v0.4.0": {
@@ -66,10 +126,22 @@
       "Use file signatures, scan exclusions and persistent playback settings to personalize the workflow."
     ],
     "items": [
-      "Synchronization workflow refinements",
-      "Incremental library scanning",
-      "File signatures and scan exclusions",
-      "Persistent playback preferences"
+      {
+        "emoji": "\ud83d\udd04",
+        "text": "Synchronization workflow refinements"
+      },
+      {
+        "emoji": "\ud83d\udcc2",
+        "text": "Incremental library scanning"
+      },
+      {
+        "emoji": "\ud83d\udcc2",
+        "text": "File signatures and scan exclusions"
+      },
+      {
+        "emoji": "\ud83c\udfb5",
+        "text": "Persistent playback preferences"
+      }
     ]
   },
   "v0.5.0": {
@@ -78,10 +150,22 @@
       "Use clearer navigation history and settings grouped into Library, Lyrics and Appearance tabs."
     ],
     "items": [
-      "Artist and album drilldown",
-      "Clickable player information",
-      "Library navigation history",
-      "Tabbed application settings"
+      {
+        "emoji": "\ud83e\udded",
+        "text": "Artist and album drilldown"
+      },
+      {
+        "emoji": "\ud83c\udfb5",
+        "text": "Clickable player information"
+      },
+      {
+        "emoji": "\ud83e\udded",
+        "text": "Library navigation history"
+      },
+      {
+        "emoji": "\u2699\ufe0f",
+        "text": "Tabbed application settings"
+      }
     ]
   },
   "v0.6.0": {
@@ -90,11 +174,26 @@
       "Customize lyric synchronization reaction delay and persistent playback speed."
     ],
     "items": [
-      "More resilient library scanning",
-      "Unreadable audio handling",
-      "Safer scan cancellation",
-      "Synchronization reaction delay",
-      "Persistent playback speed"
+      {
+        "emoji": "\ud83d\udcc2",
+        "text": "More resilient library scanning"
+      },
+      {
+        "emoji": "\ud83c\udfa7",
+        "text": "Unreadable audio handling"
+      },
+      {
+        "emoji": "\ud83d\udcc2",
+        "text": "Safer scan cancellation"
+      },
+      {
+        "emoji": "\ud83d\udd04",
+        "text": "Synchronization reaction delay"
+      },
+      {
+        "emoji": "\ud83c\udfb5",
+        "text": "Persistent playback speed"
+      }
     ]
   },
   "v0.7.0": {
@@ -103,10 +202,22 @@
       "Inspect application activity in a filterable log panel with automatic scrolling."
     ],
     "items": [
-      "Synchronization controls",
-      "Playback-position editor handling",
-      "Automatic folder scanning",
-      "Filterable application log panel"
+      {
+        "emoji": "\ud83d\udd04",
+        "text": "Synchronization controls"
+      },
+      {
+        "emoji": "\ud83c\udfb5",
+        "text": "Playback-position editor handling"
+      },
+      {
+        "emoji": "\ud83d\udcc2",
+        "text": "Automatic folder scanning"
+      },
+      {
+        "emoji": "\ud83d\udee0\ufe0f",
+        "text": "Filterable application log panel"
+      }
     ]
   },
   "v0.8.0": {
@@ -115,12 +226,30 @@
       "Export lyric files, inspect publishing history and scan Musepack audio."
     ],
     "items": [
-      "Bulk lyrics downloads",
-      "Configurable download modes",
-      "Synced-only download option",
-      "Lyrics file export",
-      "Publishing history",
-      "Musepack audio support"
+      {
+        "emoji": "\ud83d\udce5",
+        "text": "Bulk lyrics downloads"
+      },
+      {
+        "emoji": "\ud83d\udce5",
+        "text": "Configurable download modes"
+      },
+      {
+        "emoji": "\ud83d\udce5",
+        "text": "Synced-only download option"
+      },
+      {
+        "emoji": "\ud83d\udce4",
+        "text": "Lyrics file export"
+      },
+      {
+        "emoji": "\ud83d\udce4",
+        "text": "Publishing history"
+      },
+      {
+        "emoji": "\ud83c\udfa7",
+        "text": "Musepack audio support"
+      }
     ]
   },
   "v0.9.0": {
@@ -129,11 +258,26 @@
       "Customize interface scale, font size, artwork and startup view, with playback and layout refinements."
     ],
     "items": [
-      "Refresh individual tracks",
-      "Configurable lyric subfolders",
-      "Embedded-first lyric lookup",
-      "Appearance and startup settings",
-      "Playback and layout refinements"
+      {
+        "emoji": "\ud83d\udd04",
+        "text": "Refresh individual tracks"
+      },
+      {
+        "emoji": "\u2699\ufe0f",
+        "text": "Configurable lyric subfolders"
+      },
+      {
+        "emoji": "\ud83d\udd0d",
+        "text": "Embedded-first lyric lookup"
+      },
+      {
+        "emoji": "\ud83c\udfa8",
+        "text": "Appearance and startup settings"
+      },
+      {
+        "emoji": "\ud83c\udfb5",
+        "text": "Playback and layout refinements"
+      }
     ]
   },
   "v1.0.0": {
@@ -142,11 +286,26 @@
       "Retain per-track refresh, configurable lyric lookup and appearance controls, with fixes for startup and playback."
     ],
     "items": [
-      "First 1.x release",
-      "Installer-based update flow",
-      "Packaged update improvements",
-      "Configurable lyrics lookup",
-      "Appearance and startup controls"
+      {
+        "emoji": "\ud83d\ude80",
+        "text": "First 1.x release"
+      },
+      {
+        "emoji": "\ud83d\udce6",
+        "text": "Installer-based update flow"
+      },
+      {
+        "emoji": "\ud83d\udce6",
+        "text": "Packaged update improvements"
+      },
+      {
+        "emoji": "\ud83d\udd0d",
+        "text": "Configurable lyrics lookup"
+      },
+      {
+        "emoji": "\ud83c\udfa8",
+        "text": "Appearance and startup controls"
+      }
     ]
   },
   "v1.0.1": {
@@ -154,8 +313,14 @@
       "Include build and maintenance changes in patch-release versioning so release automation handles them consistently."
     ],
     "items": [
-      "Patch versioning for build changes",
-      "Release automation maintenance"
+      {
+        "emoji": "\ud83d\udce6",
+        "text": "Patch versioning for build changes"
+      },
+      {
+        "emoji": "\ud83d\udee0\ufe0f",
+        "text": "Release automation maintenance"
+      }
     ]
   },
   "v1.0.2": {
@@ -163,8 +328,14 @@
       "Enforce conventional pull-request titles for squash merges to keep automated release versioning consistent."
     ],
     "items": [
-      "Conventional pull-request titles",
-      "Consistent squash release versioning"
+      {
+        "emoji": "\ud83d\udee0\ufe0f",
+        "text": "Conventional pull-request titles"
+      },
+      {
+        "emoji": "\ud83d\udee0\ufe0f",
+        "text": "Consistent squash release versioning"
+      }
     ]
   },
   "v1.0.3": {
@@ -174,12 +345,30 @@
       "Improve updater launch handling, downloaded-file integrity logging and error reporting."
     ],
     "items": [
-      "Publish lyrics to LRCLIB",
-      "Batch publishing and retries",
-      "Instrumental publishing",
-      "Manual LRCLIB search",
-      "Configurable LRCLIB server",
-      "Updater launch refinements"
+      {
+        "emoji": "\ud83d\udce4",
+        "text": "Publish lyrics to LRCLIB"
+      },
+      {
+        "emoji": "\ud83d\udce4",
+        "text": "Batch publishing and retries"
+      },
+      {
+        "emoji": "\ud83d\udce4",
+        "text": "Instrumental publishing"
+      },
+      {
+        "emoji": "\ud83d\udd0d",
+        "text": "Manual LRCLIB search"
+      },
+      {
+        "emoji": "\u2699\ufe0f",
+        "text": "Configurable LRCLIB server"
+      },
+      {
+        "emoji": "\ud83d\udee0\ufe0f",
+        "text": "Updater launch refinements"
+      }
     ]
   },
   "v1.1.0": {
@@ -188,10 +377,22 @@
       "Add portable single-file application downloads and improve Windows installer handoff."
     ],
     "items": [
-      "Batch retry for failed downloads",
-      "Relaxed lyrics search",
-      "Portable single-file downloads",
-      "Windows installer handoff"
+      {
+        "emoji": "\ud83d\udce5",
+        "text": "Batch retry for failed downloads"
+      },
+      {
+        "emoji": "\ud83d\udd0d",
+        "text": "Relaxed lyrics search"
+      },
+      {
+        "emoji": "\ud83d\udce5",
+        "text": "Portable single-file downloads"
+      },
+      {
+        "emoji": "\ud83d\udce6",
+        "text": "Windows installer handoff"
+      }
     ]
   },
   "v1.2.0": {
@@ -200,11 +401,26 @@
       "Use parallel batch matching, responsive layout refinements and shortcut hint badges."
     ],
     "items": [
-      "Parallel batch matching",
-      "Automatic exact matches",
-      "Review uncertain lyric matches",
-      "Responsive application layout",
-      "Shortcut hint badges"
+      {
+        "emoji": "\ud83d\udee0\ufe0f",
+        "text": "Parallel batch matching"
+      },
+      {
+        "emoji": "\ud83d\udee0\ufe0f",
+        "text": "Automatic exact matches"
+      },
+      {
+        "emoji": "\ud83d\udee0\ufe0f",
+        "text": "Review uncertain lyric matches"
+      },
+      {
+        "emoji": "\ud83d\udee0\ufe0f",
+        "text": "Responsive application layout"
+      },
+      {
+        "emoji": "\u2328\ufe0f",
+        "text": "Shortcut hint badges"
+      }
     ]
   },
   "v1.3.0": {
@@ -214,11 +430,26 @@
       "Improve keyboard handling, search escaping and sidecar export path checks."
     ],
     "items": [
-      "Persistent unsaved lyric drafts",
-      "Unsaved filter and discard action",
-      "Plain and synced editor modes",
-      "Drag-and-drop audio import",
-      "Safer sidecar export paths"
+      {
+        "emoji": "\ud83d\udcdd",
+        "text": "Persistent unsaved lyric drafts"
+      },
+      {
+        "emoji": "\ud83d\udee0\ufe0f",
+        "text": "Unsaved filter and discard action"
+      },
+      {
+        "emoji": "\ud83d\udd04",
+        "text": "Plain and synced editor modes"
+      },
+      {
+        "emoji": "\ud83d\udce5",
+        "text": "Drag-and-drop audio import"
+      },
+      {
+        "emoji": "\ud83d\udce4",
+        "text": "Safer sidecar export paths"
+      }
     ]
   },
   "v1.4.0": {
@@ -227,10 +458,22 @@
       "Save only the selected lyric format and recognize sidecars named from track metadata."
     ],
     "items": [
-      "Import lyric files as drafts",
-      "Selected-format lyric saving",
-      "Metadata-named sidecar discovery",
-      "Navigation and history refinements"
+      {
+        "emoji": "\ud83d\udce5",
+        "text": "Import lyric files as drafts"
+      },
+      {
+        "emoji": "\ud83c\udfa7",
+        "text": "Selected-format lyric saving"
+      },
+      {
+        "emoji": "\ud83d\udcc2",
+        "text": "Metadata-named sidecar discovery"
+      },
+      {
+        "emoji": "\ud83e\udded",
+        "text": "Navigation and history refinements"
+      }
     ]
   },
   "v1.5.0": {
@@ -239,11 +482,26 @@
       "Follow library scanning in a progress overlay and use refined playback, volume and track-action controls."
     ],
     "items": [
-      "Lyrics validation autofix",
-      "Library scan progress overlay",
-      "Player control refinements",
-      "Volume and speed control polish",
-      "Clearer track action feedback"
+      {
+        "emoji": "\u2705",
+        "text": "Lyrics validation autofix"
+      },
+      {
+        "emoji": "\ud83d\udcc2",
+        "text": "Library scan progress overlay"
+      },
+      {
+        "emoji": "\ud83c\udfb5",
+        "text": "Player control refinements"
+      },
+      {
+        "emoji": "\ud83c\udfb5",
+        "text": "Volume and speed control polish"
+      },
+      {
+        "emoji": "\ud83d\udee0\ufe0f",
+        "text": "Clearer track action feedback"
+      }
     ]
   },
   "v1.6.0": {
@@ -252,11 +510,26 @@
       "Improve light-theme contrast, shortcut badge placement and publishing retries after network timeouts."
     ],
     "items": [
-      "Configurable lyrics filenames",
-      "Configurable embedded output",
-      "Clearer lyrics download settings",
-      "Improved light-theme contrast",
-      "Publishing timeout retries"
+      {
+        "emoji": "\u2699\ufe0f",
+        "text": "Configurable lyrics filenames"
+      },
+      {
+        "emoji": "\u2699\ufe0f",
+        "text": "Configurable embedded output"
+      },
+      {
+        "emoji": "\ud83d\udce5",
+        "text": "Clearer lyrics download settings"
+      },
+      {
+        "emoji": "\ud83c\udfa8",
+        "text": "Improved light-theme contrast"
+      },
+      {
+        "emoji": "\ud83d\udce4",
+        "text": "Publishing timeout retries"
+      }
     ]
   },
   "v1.7.0": {
@@ -265,10 +538,22 @@
       "Sort the library by track number and keep playback shortcuts scoped to track lists."
     ],
     "items": [
-      "Easier synchronized line insertion",
-      "Synced editor context menu",
-      "Sortable track numbers",
-      "Scoped playback shortcuts"
+      {
+        "emoji": "\ud83d\udd04",
+        "text": "Easier synchronized line insertion"
+      },
+      {
+        "emoji": "\ud83d\udd04",
+        "text": "Synced editor context menu"
+      },
+      {
+        "emoji": "\ud83d\uddc2\ufe0f",
+        "text": "Sortable track numbers"
+      },
+      {
+        "emoji": "\u2328\ufe0f",
+        "text": "Scoped playback shortcuts"
+      }
     ]
   },
   "v1.8.0": {
@@ -277,10 +562,22 @@
       "Compare lyric differences before applying synchronization to selected matches."
     ],
     "items": [
-      "Sync lyrics to matching tracks",
-      "Exact metadata match checks",
-      "Review lyrics differences",
-      "Refined synchronization dialog"
+      {
+        "emoji": "\ud83d\udd04",
+        "text": "Sync lyrics to matching tracks"
+      },
+      {
+        "emoji": "\u2705",
+        "text": "Exact metadata match checks"
+      },
+      {
+        "emoji": "\ud83d\udcdd",
+        "text": "Review lyrics differences"
+      },
+      {
+        "emoji": "\ud83d\udd04",
+        "text": "Refined synchronization dialog"
+      }
     ]
   },
   "v1.9.0": {
@@ -289,11 +586,26 @@
       "Prevent publishing invalid lyrics or unsaved drafts and show validation state beside the editor."
     ],
     "items": [
-      "Row-level validation tooltips",
-      "Click-to-jump validation hints",
-      "Editor line numbers",
-      "Validation status badge",
-      "Publishing checks for drafts"
+      {
+        "emoji": "\u2705",
+        "text": "Row-level validation tooltips"
+      },
+      {
+        "emoji": "\u2705",
+        "text": "Click-to-jump validation hints"
+      },
+      {
+        "emoji": "\ud83d\udcdd",
+        "text": "Editor line numbers"
+      },
+      {
+        "emoji": "\u2705",
+        "text": "Validation status badge"
+      },
+      {
+        "emoji": "\ud83d\udce4",
+        "text": "Publishing checks for drafts"
+      }
     ]
   },
   "v1.10.0": {
@@ -302,11 +614,26 @@
       "Use a streamlined AI auto-sync workflow, settings and selection actions, with more reliable responsive layouts."
     ],
     "items": [
-      "Customizable keyboard shortcuts",
-      "Persistent interface state",
-      "Improved AI auto-sync workflow",
-      "Streamlined selection actions",
-      "Responsive layout refinements"
+      {
+        "emoji": "\u2328\ufe0f",
+        "text": "Customizable keyboard shortcuts"
+      },
+      {
+        "emoji": "\ud83d\udee0\ufe0f",
+        "text": "Persistent interface state"
+      },
+      {
+        "emoji": "\ud83e\udd16",
+        "text": "Improved AI auto-sync workflow"
+      },
+      {
+        "emoji": "\ud83d\udcdd",
+        "text": "Streamlined selection actions"
+      },
+      {
+        "emoji": "\ud83d\udee0\ufe0f",
+        "text": "Responsive layout refinements"
+      }
     ]
   },
   "v1.10.1": {
@@ -315,10 +642,22 @@
       "Publish instrumental markings correctly to LRCLIB and preserve an intentionally empty lyric filename pattern."
     ],
     "items": [
-      "More reliable AI worker shutdown",
-      "Clearer AI dependency guidance",
-      "Instrumental LRCLIB publishing",
-      "Empty filename pattern persistence"
+      {
+        "emoji": "\ud83e\udd16",
+        "text": "More reliable AI worker shutdown"
+      },
+      {
+        "emoji": "\ud83e\udd16",
+        "text": "Clearer AI dependency guidance"
+      },
+      {
+        "emoji": "\ud83d\udce4",
+        "text": "Instrumental LRCLIB publishing"
+      },
+      {
+        "emoji": "\ud83d\udee0\ufe0f",
+        "text": "Empty filename pattern persistence"
+      }
     ]
   },
   "v1.11.0": {
@@ -328,10 +667,22 @@
       "Include the required Whisper and Demucs runtime assets in AI-enabled builds."
     ],
     "items": [
-      "Windows AI portable download",
-      "Guided packaged AI setup",
-      "Clearer dependency guidance",
-      "Bundled Whisper and Demucs assets"
+      {
+        "emoji": "\ud83d\udce5",
+        "text": "Windows AI portable download"
+      },
+      {
+        "emoji": "\ud83e\udd16",
+        "text": "Guided packaged AI setup"
+      },
+      {
+        "emoji": "\ud83e\udde9",
+        "text": "Clearer dependency guidance"
+      },
+      {
+        "emoji": "\ud83e\udd16",
+        "text": "Bundled Whisper and Demucs assets"
+      }
     ]
   },
   "v1.12.0": {
@@ -343,12 +694,30 @@
       "Linux Debian packages declare FFmpeg as a dependency for audio decoding."
     ],
     "items": [
-      "Global and repeat-aware alignment",
-      "Relaxed speech-detection retries",
-      "Persistent AI sync settings",
-      "CPU fallback for CUDA alignment",
-      "Expanded AI portable packaging",
-      "Editor navigation refinements"
+      {
+        "emoji": "\ud83d\udee0\ufe0f",
+        "text": "Global and repeat-aware alignment"
+      },
+      {
+        "emoji": "\ud83d\udee0\ufe0f",
+        "text": "Relaxed speech-detection retries"
+      },
+      {
+        "emoji": "\ud83e\udd16",
+        "text": "Persistent AI sync settings"
+      },
+      {
+        "emoji": "\ud83d\udee0\ufe0f",
+        "text": "CPU fallback for CUDA alignment"
+      },
+      {
+        "emoji": "\ud83e\udd16",
+        "text": "Expanded AI portable packaging"
+      },
+      {
+        "emoji": "\ud83e\udded",
+        "text": "Editor navigation refinements"
+      }
     ]
   },
   "v1.13.0": {
@@ -358,12 +727,30 @@
       "Improve macOS packaging and updates, and configure logging verbosity."
     ],
     "items": [
-      "Faster large-library scanning",
-      "Selectable scan lyric sources",
-      "Cached audio and sidecar discovery",
-      "Background sidecar-only export",
-      "macOS packaging and updates",
-      "Configurable logging verbosity"
+      {
+        "emoji": "\ud83d\udcc2",
+        "text": "Faster large-library scanning"
+      },
+      {
+        "emoji": "\ud83d\udcc2",
+        "text": "Selectable scan lyric sources"
+      },
+      {
+        "emoji": "\ud83d\udcc2",
+        "text": "Cached audio and sidecar discovery"
+      },
+      {
+        "emoji": "\ud83d\udce4",
+        "text": "Background sidecar-only export"
+      },
+      {
+        "emoji": "\ud83d\udce6",
+        "text": "macOS packaging and updates"
+      },
+      {
+        "emoji": "\u2699\ufe0f",
+        "text": "Configurable logging verbosity"
+      }
     ]
   },
   "v1.13.1": {
@@ -371,7 +758,10 @@
       "Package the macOS application bundle correctly in published downloads."
     ],
     "items": [
-      "macOS application bundle packaging"
+      {
+        "emoji": "\ud83d\udce6",
+        "text": "macOS application bundle packaging"
+      }
     ]
   },
   "v1.14.0": {
@@ -381,12 +771,30 @@
       "Improve AI package compatibility and audio-loading fallbacks, alongside synchronized-editor behavior."
     ],
     "items": [
-      "Alphabetic library indexes",
-      "Letter-specific pagination",
-      "Dedicated Album Artists view",
-      "Ignore leading sort articles",
-      "AI runtime compatibility fixes",
-      "Audio-loading fallbacks"
+      {
+        "emoji": "\ud83e\udded",
+        "text": "Alphabetic library indexes"
+      },
+      {
+        "emoji": "\ud83e\udded",
+        "text": "Letter-specific pagination"
+      },
+      {
+        "emoji": "\ud83c\udfb6",
+        "text": "Dedicated Album Artists view"
+      },
+      {
+        "emoji": "\ud83d\udee0\ufe0f",
+        "text": "Ignore leading sort articles"
+      },
+      {
+        "emoji": "\ud83e\udd16",
+        "text": "AI runtime compatibility fixes"
+      },
+      {
+        "emoji": "\ud83c\udfa7",
+        "text": "Audio-loading fallbacks"
+      }
     ]
   },
   "v1.14.1": {
@@ -395,9 +803,18 @@
       "Keep the standard Linux application, Debian package and regular portable downloads available."
     ],
     "items": [
-      "Oversized Linux AI build skipped",
-      "Standard Linux downloads retained",
-      "Debian packaging retained"
+      {
+        "emoji": "\ud83e\udd16",
+        "text": "Oversized Linux AI build skipped"
+      },
+      {
+        "emoji": "\ud83d\udce5",
+        "text": "Standard Linux downloads retained"
+      },
+      {
+        "emoji": "\ud83d\udce6",
+        "text": "Debian packaging retained"
+      }
     ]
   },
   "v1.15.0": {
@@ -410,12 +827,30 @@
       "Application downloads remain AI-free; optional AI dependencies run in a separate Python 3.13.15 runtime, with Pascal GPU compatibility."
     ],
     "items": [
-      "Multi-provider lyrics search",
-      "Selective lyrics cleanup",
-      "Modernized library navigation",
-      "Cancellable language-aware AI",
-      "English phonetic alignment",
-      "Audio and runtime compatibility"
+      {
+        "emoji": "\ud83d\udd0d",
+        "text": "Multi-provider lyrics search"
+      },
+      {
+        "emoji": "\ud83d\udcdd",
+        "text": "Selective lyrics cleanup"
+      },
+      {
+        "emoji": "\ud83e\udded",
+        "text": "Modernized library navigation"
+      },
+      {
+        "emoji": "\ud83e\udd16",
+        "text": "Cancellable language-aware AI"
+      },
+      {
+        "emoji": "\ud83c\udfa7",
+        "text": "English phonetic alignment"
+      },
+      {
+        "emoji": "\ud83e\udde9",
+        "text": "Audio and runtime compatibility"
+      }
     ]
   }
 }

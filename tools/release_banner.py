@@ -76,6 +76,23 @@ def fit_text(text: str, slot: Slot):
     return face, shortened + "…"
 
 
+def item_text(item: str | dict) -> str:
+    return item["text"] if isinstance(item, dict) else item
+
+
+def emoji_rows(data: dict) -> bool:
+    return data.get("schema_version", 1) >= 3 or any(isinstance(item, dict) for item in data["items"])
+
+
+@functools.cache
+def emoji_image(emoji: str):
+    code = "_".join(f"{ord(char):x}" for char in emoji if char != "\ufe0f")
+    if not re.fullmatch(r"[0-9a-f]+(?:_[0-9a-f]+)*", code):
+        raise ValueError("An emoji code point is required")
+    with Image.open(ASSETS / "emoji" / f"emoji_u{code}.png") as source:
+        return source.convert("RGBA").resize((34, 34), Image.Resampling.LANCZOS)
+
+
 def fields(data: dict) -> dict[str, str]:
     people = list(data.get("contributor_names", []))
     if len(people) > 4:
@@ -86,7 +103,7 @@ def fields(data: dict) -> dict[str, str]:
         "open_issues": f"{data.get('open_issues', '—')} open\nissues",
         "stars": f"{data.get('stars', '—')} stars", "commits": str(data["commits"]),
         "contributor_count": str(data["contributors"]), "issues_addressed": str(data["issues_addressed"]),
-        **{f"item_{i + 1}": f"{i + 1:02d}  {text}" for i, text in enumerate(data["items"][:6])},
+        **{f"item_{i + 1}": (item_text(item) if emoji_rows(data) else f"{i + 1:02d}  {item_text(item)}") for i, item in enumerate(data["items"][:6])},
         **{f"person_{i + 1}": name for i, name in enumerate(people)},
     }
     if not people:
@@ -105,6 +122,11 @@ def render(data: dict, out: Path) -> None:
         if not text:
             continue
         slot = SLOTS[key]
+        if key.startswith("item_") and emoji_rows(data):
+            item = data["items"][int(key.removeprefix("item_")) - 1]
+            icon = item.get("emoji", "\U0001f6e0\ufe0f") if isinstance(item, dict) else "\U0001f6e0\ufe0f"
+            canvas.alpha_composite(emoji_image(icon), (slot.box[0], slot.box[1]))
+            slot = Slot((slot.box[0] + 50, *slot.box[1:]), slot.size)
         face, content = fit_text(text, slot)
         x0, y0, x1, y1 = slot.box
         layer = Image.new("RGBA", (x1 - x0 + 30, y1 - y0 + 30))
@@ -225,10 +247,11 @@ def release_data(repo: str, tag: str, *, preview: bool = False) -> dict:
     publication = datetime.now(UTC).isoformat() if preview else gh("GET", f"repos/{repo}/releases/tags/{tag}")["published_at"]
     open_issues, stars = stats_at(repo, publication)
     return {
-        "schema_version": 2, "repo": repo, "tag": tag, "preview": preview,
+        "schema_version": 3, "repo": repo, "tag": tag, "preview": preview,
         "date": datetime.fromisoformat(publication).strftime("%d %b\n%Y"),
         "published_at": publication, "metrics_captured_at": datetime.now(UTC).isoformat(),
         "metrics_as_of": publication,
+        "artwork_revision": "emoji",
         "statistics_basis": {"open_issues": "issue_state_transitions_at_publication", "stars": "surviving_stars_given_by_publication"},
         "previous": previous, "commit": git("rev-parse", ref), "items": items,
         "commits": len(subjects), "contributors": len(names), "contributor_names": names,
@@ -237,19 +260,23 @@ def release_data(repo: str, tag: str, *, preview: bool = False) -> dict:
     }
 
 
-def publish(repo: str, tag: str, image_path: Path, data: dict) -> str:
+def publish(repo: str, tag: str, image_path: Path, data: dict, *, revision: str | None = None) -> str:
     """Append artwork and its snapshot to an orphan branch; never overwrite a tag."""
     if not re.fullmatch(r"v\d+\.\d+\.\d+(?:[-.\w]*)?", tag):
         raise ValueError("A published version tag is required for banner publication")
     if data.get("preview"):
         raise ValueError("Preview banners cannot be published")
+    revision = revision if revision is not None else data.get("artwork_revision")
+    if revision is not None and not re.fullmatch(r"[a-z0-9][a-z0-9-]{0,31}", revision):
+        raise ValueError("An artwork revision must be a short lowercase slug")
+    stem = f"{tag}-{revision}" if revision else tag
     try:
         head = gh("GET", f"repos/{repo}/git/ref/heads/{BANNER_BRANCH}")["object"]["sha"]
     except subprocess.CalledProcessError as exc:
         if "404" not in exc.stderr:
             raise
         head = None
-    filename = f"{tag}.webp"
+    filename = f"{stem}.webp"
     base_tree = None
     if head:
         tree = gh("GET", f"repos/{repo}/git/trees/{head}")
@@ -258,7 +285,7 @@ def publish(repo: str, tag: str, image_path: Path, data: dict) -> str:
             return f"https://raw.githubusercontent.com/{repo}/{commit}/{filename}"
         base_tree = tree["sha"]
     entries = []
-    for name, content in ((filename, image_path.read_bytes()), (f"{tag}.json", json.dumps(data, indent=2).encode("utf-8"))):
+    for name, content in ((filename, image_path.read_bytes()), (f"{stem}.json", json.dumps(data, indent=2).encode("utf-8"))):
         blob = gh("POST", f"repos/{repo}/git/blobs", {"content": base64.b64encode(content).decode("ascii"), "encoding": "base64"})
         entries.append({"path": name, "mode": "100644", "type": "blob", "sha": blob["sha"]})
     payload = {"tree": entries}
@@ -287,11 +314,14 @@ def main() -> None:
         key, sep, value = override.partition("=")
         if not sep:
             parser.error("Overrides must use KEY=VALUE")
-        if re.fullmatch(r"item_[1-6]", key):
+        if re.fullmatch(r"(?:item|emoji)_[1-6]", key):
             index = int(key[-1]) - 1
             while len(data["items"]) <= index:
-                data["items"].append("")
-            data["items"][index] = value
+                data["items"].append({"text": "", "emoji": "\U0001f6e0\ufe0f"})
+            current = data["items"][index]
+            item = dict(current) if isinstance(current, dict) else {"text": current, "emoji": "\U0001f6e0\ufe0f"}
+            item["emoji" if key.startswith("emoji_") else "text"] = value
+            data["items"][index] = item
         elif key in data:
             data[key] = int(value) if key in {"commits", "contributors", "issues_addressed", "stars", "open_issues"} else value
         else:

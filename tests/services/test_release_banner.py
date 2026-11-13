@@ -68,7 +68,8 @@ def test_existing_banner_reuses_immutable_url_without_writes(tmp_path, monkeypat
     assert calls == ["GET", "GET", "GET"]
 
 
-def test_first_banner_creates_an_orphan_commit_with_image_and_snapshot(tmp_path, monkeypatch):
+@pytest.mark.parametrize("revision", [None, "emoji"])
+def test_first_banner_creates_an_orphan_commit_with_image_and_snapshot(tmp_path, monkeypatch, revision):
     calls = []
 
     def api(method, endpoint, payload=None):
@@ -83,12 +84,13 @@ def test_first_banner_creates_an_orphan_commit_with_image_and_snapshot(tmp_path,
     image = tmp_path / "banner.webp"
     image.write_bytes(b"image bytes")
     data = snapshot() | {"preview": False}
-    result = banner.publish("owner/repo", "v1.16.0", image, data)
+    result = banner.publish("owner/repo", "v1.16.0", image, data, revision=revision)
+    stem = "v1.16.0-emoji" if revision else "v1.16.0"
     commit = next(payload for _, endpoint, payload in calls if endpoint.endswith("/git/commits"))
     tree = next(payload for _, endpoint, payload in calls if endpoint.endswith("/git/trees"))
     assert commit["parents"] == []
-    assert {entry["path"] for entry in tree["tree"]} == {"v1.16.0.webp", "v1.16.0.json"}
-    assert result.endswith("/new-banner-commit/v1.16.0.webp")
+    assert {entry["path"] for entry in tree["tree"]} == {f"{stem}.webp", f"{stem}.json"}
+    assert result.endswith(f"/new-banner-commit/{stem}.webp")
 
 
 def test_permission_failure_does_not_create_a_branch(tmp_path, monkeypatch):
@@ -202,3 +204,29 @@ def test_contributors_deduplicate_accounts_and_exclude_bots(monkeypatch):
         return {"login": "app[bot]", "type": "Bot"} if sha == "d" else {"login": "human", "type": "User"}
     monkeypatch.setattr(banner, "_commit_author", author)
     assert banner.contributor_names("owner/repo", "old..new") == ["@human", "@other"]
+
+
+def test_emoji_rows_render_offline_without_number_prefixes(tmp_path, monkeypatch):
+    data = snapshot() | {"schema_version": 3, "items": [{"emoji": "\U0001f680", "text": "First release"}]}
+    assert banner.fields(data)["item_1"] == "First release"
+    monkeypatch.setattr(banner, "gh", Mock(side_effect=AssertionError("Offline render")))
+    out = tmp_path / "emoji.webp"
+    banner.render(data, out)
+    icon = banner.emoji_image("\U0001f680")
+    errors = []
+    with Image.open(out) as actual:
+        for x in range(0, 34, 4):
+            for y in range(0, 34, 4):
+                expected = icon.getpixel((x, y))
+                if expected[3] == 255:
+                    received = actual.getpixel((515 + x, 247 + y))
+                    errors.extend(abs(a - b) for a, b in zip(expected[:3], received))
+    assert errors and sum(errors) / len(errors) < 15
+
+
+def test_invalid_artwork_revision_is_rejected_before_network(monkeypatch, tmp_path):
+    api = Mock()
+    monkeypatch.setattr(banner, "gh", api)
+    with pytest.raises(ValueError, match="revision"):
+        banner.publish("owner/repo", "v1.16.0", tmp_path / "unused", snapshot() | {"preview": False}, revision="../bad")
+    api.assert_not_called()
