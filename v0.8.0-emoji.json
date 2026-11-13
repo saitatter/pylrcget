@@ -1,0 +1,53 @@
+{
+  "schema_version": 3,
+  "repo": "saitatter/pylrcget",
+  "tag": "v0.8.0",
+  "preview": false,
+  "date": "11 Apr\n2026",
+  "published_at": "2026-04-11T22:28:00Z",
+  "metrics_captured_at": "2026-11-13T11:31:25.494359+00:00",
+  "metrics_as_of": "2026-04-11T22:28:00Z",
+  "statistics_basis": {
+    "open_issues": "issue_state_transitions_at_publication",
+    "stars": "surviving_stars_given_by_publication"
+  },
+  "previous": "v0.7.0",
+  "commit": "d5e83163b3317af4d45d967f8ab0b4ad1462b007",
+  "items": [
+    {
+      "emoji": "\ud83d\udce5",
+      "text": "Bulk lyrics downloads"
+    },
+    {
+      "emoji": "\ud83d\udce5",
+      "text": "Configurable download modes"
+    },
+    {
+      "emoji": "\ud83d\udce5",
+      "text": "Synced-only download option"
+    },
+    {
+      "emoji": "\ud83d\udce4",
+      "text": "Lyrics file export"
+    },
+    {
+      "emoji": "\ud83d\udce4",
+      "text": "Publishing history"
+    },
+    {
+      "emoji": "\ud83c\udfa7",
+      "text": "Musepack audio support"
+    }
+  ],
+  "commits": 2,
+  "contributors": 1,
+  "contributor_names": [
+    "@saitatter"
+  ],
+  "issues_addressed": 0,
+  "issue_numbers": [],
+  "stars": 1,
+  "open_issues": 1,
+  "historical_backfill": true,
+  "artwork_revision": "emoji"
+}
