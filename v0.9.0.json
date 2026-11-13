@@ -1,0 +1,33 @@
+{
+  "schema_version": 2,
+  "repo": "saitatter/pylrcget",
+  "tag": "v0.9.0",
+  "preview": false,
+  "date": "12 Apr\n2026",
+  "published_at": "2026-04-12T18:05:11Z",
+  "metrics_captured_at": "2026-11-13T11:31:25.494359+00:00",
+  "metrics_as_of": "2026-04-12T18:05:11Z",
+  "statistics_basis": {
+    "open_issues": "issue_state_transitions_at_publication",
+    "stars": "surviving_stars_given_by_publication"
+  },
+  "previous": "v0.8.0",
+  "commit": "e65cb65c114a67ec91a8b71806c311fbfd7ae853",
+  "items": [
+    "Refresh individual tracks",
+    "Configurable lyric subfolders",
+    "Embedded-first lyric lookup",
+    "Appearance and startup settings",
+    "Playback and layout refinements"
+  ],
+  "commits": 2,
+  "contributors": 1,
+  "contributor_names": [
+    "@saitatter"
+  ],
+  "issues_addressed": 0,
+  "issue_numbers": [],
+  "stars": 1,
+  "open_issues": 1,
+  "historical_backfill": true
+}
