@@ -1,0 +1,629 @@
+{
+  "schema_version": 1,
+  "local_date": "2026-11-13",
+  "timezone": "Europe/Bucharest",
+  "captured_at_utc": [
+    "2026-11-12T22:39:45.207256+00:00",
+    "2026-11-12T22:48:52.935077+00:00"
+  ],
+  "hardware": {
+    "cpu": "AMD Ryzen 7 9700X",
+    "cpu_cores": 8,
+    "cpu_logical_processors": 16,
+    "gpu": "NVIDIA GeForce RTX 4070 Ti SUPER",
+    "gpu_memory_gib": 16,
+    "driver": "610.88"
+  },
+  "runtime": {
+    "python": "3.13.15",
+    "torch": "2.8.0+cu128",
+    "torch_threads": 8,
+    "cuda": true,
+    "gpu": "NVIDIA GeForce RTX 4070 Ti SUPER",
+    "whisperx": "3.8.6"
+  },
+  "ai_source_sha256": "5e931c5bf44613ac92d4650155f6e372b75742ee01035a3b252c68aaf238e168",
+  "warmups": 1,
+  "measured_runs_per_configuration": 3,
+  "total_executions": 32,
+  "originals_unchanged": true,
+  "inputs": [
+    {
+      "id": "input-01",
+      "label": "Acoustic A",
+      "duration_s": 326.08,
+      "reference_lines": 34
+    },
+    {
+      "id": "input-02",
+      "label": "Studio B",
+      "duration_s": 224.89333333333335,
+      "reference_lines": 40
+    }
+  ],
+  "configurations": [
+    {
+      "input": "input-01",
+      "device": "cpu",
+      "demucs": "off",
+      "cold_s": 23.46375490000355,
+      "warm_s": [
+        20.07782029999362,
+        19.638634299997648,
+        19.81052970000019
+      ],
+      "quality": {
+        "reference_lines": 34,
+        "output_lines": 34,
+        "matched_lines": 34,
+        "coverage": 1.0,
+        "missing_lines": 0,
+        "extra_or_changed_lines": 0,
+        "mean_error_s": 1.606176470588239,
+        "median_error_s": 0.3300000000000125,
+        "p90_error_s": 1.7459999999999947,
+        "p95_error_s": 10.146500000000003,
+        "max_error_s": 20.24000000000001,
+        "median_signed_offset_s": -0.3199999999999932,
+        "within_0.25s": 0.29411764705882354,
+        "within_0.5s": 0.7058823529411765,
+        "within_1s": 0.8235294117647058,
+        "within_2s": 0.9117647058823529,
+        "backward_timestamps": 0,
+        "duplicate_timestamps": 0,
+        "outside_audio": 0,
+        "outliers": [
+          {
+            "line": 27,
+            "output_line": 27,
+            "reference_s": 280.88,
+            "actual_s": 260.64,
+            "error_s": 20.24000000000001
+          },
+          {
+            "line": 2,
+            "output_line": 2,
+            "reference_s": 66.25,
+            "actual_s": 54.94,
+            "error_s": 11.310000000000002
+          },
+          {
+            "line": 3,
+            "output_line": 3,
+            "reference_s": 85.81,
+            "actual_s": 76.28999999999999,
+            "error_s": 9.52000000000001
+          },
+          {
+            "line": 34,
+            "output_line": 34,
+            "reference_s": 317.17,
+            "actual_s": 319.12,
+            "error_s": 1.9499999999999886
+          },
+          {
+            "line": 20,
+            "output_line": 20,
+            "reference_s": 194.67,
+            "actual_s": 195.94,
+            "error_s": 1.2700000000000102
+          }
+        ]
+      },
+      "selected_sources": [
+        "Lyrics synchronized successfully with lyrics-aligner (mix)."
+      ]
+    },
+    {
+      "input": "input-01",
+      "device": "cuda",
+      "demucs": "off",
+      "cold_s": 23.450223699997878,
+      "warm_s": [
+        20.59876980000263,
+        21.268778899997415,
+        23.595640600004117
+      ],
+      "quality": {
+        "reference_lines": 34,
+        "output_lines": 34,
+        "matched_lines": 34,
+        "coverage": 1.0,
+        "missing_lines": 0,
+        "extra_or_changed_lines": 0,
+        "mean_error_s": 1.606176470588239,
+        "median_error_s": 0.3300000000000125,
+        "p90_error_s": 1.7459999999999947,
+        "p95_error_s": 10.146500000000003,
+        "max_error_s": 20.24000000000001,
+        "median_signed_offset_s": -0.3199999999999932,
+        "within_0.25s": 0.29411764705882354,
+        "within_0.5s": 0.7058823529411765,
+        "within_1s": 0.8235294117647058,
+        "within_2s": 0.9117647058823529,
+        "backward_timestamps": 0,
+        "duplicate_timestamps": 0,
+        "outside_audio": 0,
+        "outliers": [
+          {
+            "line": 27,
+            "output_line": 27,
+            "reference_s": 280.88,
+            "actual_s": 260.64,
+            "error_s": 20.24000000000001
+          },
+          {
+            "line": 2,
+            "output_line": 2,
+            "reference_s": 66.25,
+            "actual_s": 54.94,
+            "error_s": 11.310000000000002
+          },
+          {
+            "line": 3,
+            "output_line": 3,
+            "reference_s": 85.81,
+            "actual_s": 76.28999999999999,
+            "error_s": 9.52000000000001
+          },
+          {
+            "line": 34,
+            "output_line": 34,
+            "reference_s": 317.17,
+            "actual_s": 319.12,
+            "error_s": 1.9499999999999886
+          },
+          {
+            "line": 20,
+            "output_line": 20,
+            "reference_s": 194.67,
+            "actual_s": 195.94,
+            "error_s": 1.2700000000000102
+          }
+        ]
+      },
+      "selected_sources": [
+        "Lyrics synchronized successfully with lyrics-aligner (mix)."
+      ]
+    },
+    {
+      "input": "input-01",
+      "device": "auto",
+      "demucs": "off",
+      "cold_s": 27.30516780000471,
+      "warm_s": [
+        21.997797499992885,
+        22.06356190000224,
+        21.799401699994633
+      ],
+      "quality": {
+        "reference_lines": 34,
+        "output_lines": 34,
+        "matched_lines": 34,
+        "coverage": 1.0,
+        "missing_lines": 0,
+        "extra_or_changed_lines": 0,
+        "mean_error_s": 1.606176470588239,
+        "median_error_s": 0.3300000000000125,
+        "p90_error_s": 1.7459999999999947,
+        "p95_error_s": 10.146500000000003,
+        "max_error_s": 20.24000000000001,
+        "median_signed_offset_s": -0.3199999999999932,
+        "within_0.25s": 0.29411764705882354,
+        "within_0.5s": 0.7058823529411765,
+        "within_1s": 0.8235294117647058,
+        "within_2s": 0.9117647058823529,
+        "backward_timestamps": 0,
+        "duplicate_timestamps": 0,
+        "outside_audio": 0,
+        "outliers": [
+          {
+            "line": 27,
+            "output_line": 27,
+            "reference_s": 280.88,
+            "actual_s": 260.64,
+            "error_s": 20.24000000000001
+          },
+          {
+            "line": 2,
+            "output_line": 2,
+            "reference_s": 66.25,
+            "actual_s": 54.94,
+            "error_s": 11.310000000000002
+          },
+          {
+            "line": 3,
+            "output_line": 3,
+            "reference_s": 85.81,
+            "actual_s": 76.28999999999999,
+            "error_s": 9.52000000000001
+          },
+          {
+            "line": 34,
+            "output_line": 34,
+            "reference_s": 317.17,
+            "actual_s": 319.12,
+            "error_s": 1.9499999999999886
+          },
+          {
+            "line": 20,
+            "output_line": 20,
+            "reference_s": 194.67,
+            "actual_s": 195.94,
+            "error_s": 1.2700000000000102
+          }
+        ]
+      },
+      "selected_sources": [
+        "Lyrics synchronized successfully with lyrics-aligner (mix)."
+      ]
+    },
+    {
+      "input": "input-02",
+      "device": "cpu",
+      "demucs": "off",
+      "cold_s": 18.31608650000271,
+      "warm_s": [
+        14.923466300002474,
+        15.202132399994298,
+        14.871287299996766
+      ],
+      "quality": {
+        "reference_lines": 40,
+        "output_lines": 40,
+        "matched_lines": 40,
+        "coverage": 1.0,
+        "missing_lines": 0,
+        "extra_or_changed_lines": 0,
+        "mean_error_s": 1.2342499999999994,
+        "median_error_s": 0.120000000000001,
+        "p90_error_s": 4.139999999999994,
+        "p95_error_s": 5.342500000000002,
+        "max_error_s": 9.800000000000011,
+        "median_signed_offset_s": -0.04500000000000526,
+        "within_0.25s": 0.625,
+        "within_0.5s": 0.7,
+        "within_1s": 0.7,
+        "within_2s": 0.775,
+        "backward_timestamps": 0,
+        "duplicate_timestamps": 0,
+        "outside_audio": 0,
+        "outliers": [
+          {
+            "line": 38,
+            "output_line": 38,
+            "reference_s": 203.98,
+            "actual_s": 213.78,
+            "error_s": 9.800000000000011
+          },
+          {
+            "line": 39,
+            "output_line": 39,
+            "reference_s": 208.61,
+            "actual_s": 215.9,
+            "error_s": 7.289999999999992
+          },
+          {
+            "line": 40,
+            "output_line": 40,
+            "reference_s": 213.98,
+            "actual_s": 219.22,
+            "error_s": 5.240000000000009
+          },
+          {
+            "line": 22,
+            "output_line": 22,
+            "reference_s": 124.99,
+            "actual_s": 120.22,
+            "error_s": 4.769999999999996
+          },
+          {
+            "line": 21,
+            "output_line": 21,
+            "reference_s": 113.87,
+            "actual_s": 117.94,
+            "error_s": 4.069999999999993
+          }
+        ]
+      },
+      "selected_sources": [
+        "Lyrics synchronized successfully with lyrics-aligner (mix)."
+      ]
+    },
+    {
+      "input": "input-02",
+      "device": "cuda",
+      "demucs": "off",
+      "cold_s": 16.59750090000307,
+      "warm_s": [
+        13.553756799999974,
+        13.54252809999889,
+        13.93802660000074
+      ],
+      "quality": {
+        "reference_lines": 40,
+        "output_lines": 40,
+        "matched_lines": 40,
+        "coverage": 1.0,
+        "missing_lines": 0,
+        "extra_or_changed_lines": 0,
+        "mean_error_s": 1.2342499999999994,
+        "median_error_s": 0.120000000000001,
+        "p90_error_s": 4.139999999999994,
+        "p95_error_s": 5.342500000000002,
+        "max_error_s": 9.800000000000011,
+        "median_signed_offset_s": -0.04500000000000526,
+        "within_0.25s": 0.625,
+        "within_0.5s": 0.7,
+        "within_1s": 0.7,
+        "within_2s": 0.775,
+        "backward_timestamps": 0,
+        "duplicate_timestamps": 0,
+        "outside_audio": 0,
+        "outliers": [
+          {
+            "line": 38,
+            "output_line": 38,
+            "reference_s": 203.98,
+            "actual_s": 213.78,
+            "error_s": 9.800000000000011
+          },
+          {
+            "line": 39,
+            "output_line": 39,
+            "reference_s": 208.61,
+            "actual_s": 215.9,
+            "error_s": 7.289999999999992
+          },
+          {
+            "line": 40,
+            "output_line": 40,
+            "reference_s": 213.98,
+            "actual_s": 219.22,
+            "error_s": 5.240000000000009
+          },
+          {
+            "line": 22,
+            "output_line": 22,
+            "reference_s": 124.99,
+            "actual_s": 120.22,
+            "error_s": 4.769999999999996
+          },
+          {
+            "line": 21,
+            "output_line": 21,
+            "reference_s": 113.87,
+            "actual_s": 117.94,
+            "error_s": 4.069999999999993
+          }
+        ]
+      },
+      "selected_sources": [
+        "Lyrics synchronized successfully with lyrics-aligner (mix)."
+      ]
+    },
+    {
+      "input": "input-02",
+      "device": "auto",
+      "demucs": "off",
+      "cold_s": 15.489219300005061,
+      "warm_s": [
+        12.630870900000446,
+        13.183112900005654,
+        14.129917700003716
+      ],
+      "quality": {
+        "reference_lines": 40,
+        "output_lines": 40,
+        "matched_lines": 40,
+        "coverage": 1.0,
+        "missing_lines": 0,
+        "extra_or_changed_lines": 0,
+        "mean_error_s": 1.2342499999999994,
+        "median_error_s": 0.120000000000001,
+        "p90_error_s": 4.139999999999994,
+        "p95_error_s": 5.342500000000002,
+        "max_error_s": 9.800000000000011,
+        "median_signed_offset_s": -0.04500000000000526,
+        "within_0.25s": 0.625,
+        "within_0.5s": 0.7,
+        "within_1s": 0.7,
+        "within_2s": 0.775,
+        "backward_timestamps": 0,
+        "duplicate_timestamps": 0,
+        "outside_audio": 0,
+        "outliers": [
+          {
+            "line": 38,
+            "output_line": 38,
+            "reference_s": 203.98,
+            "actual_s": 213.78,
+            "error_s": 9.800000000000011
+          },
+          {
+            "line": 39,
+            "output_line": 39,
+            "reference_s": 208.61,
+            "actual_s": 215.9,
+            "error_s": 7.289999999999992
+          },
+          {
+            "line": 40,
+            "output_line": 40,
+            "reference_s": 213.98,
+            "actual_s": 219.22,
+            "error_s": 5.240000000000009
+          },
+          {
+            "line": 22,
+            "output_line": 22,
+            "reference_s": 124.99,
+            "actual_s": 120.22,
+            "error_s": 4.769999999999996
+          },
+          {
+            "line": 21,
+            "output_line": 21,
+            "reference_s": 113.87,
+            "actual_s": 117.94,
+            "error_s": 4.069999999999993
+          }
+        ]
+      },
+      "selected_sources": [
+        "Lyrics synchronized successfully with lyrics-aligner (mix)."
+      ]
+    },
+    {
+      "input": "input-01",
+      "device": "auto",
+      "demucs": "on",
+      "cold_s": 25.095392700000957,
+      "warm_s": [
+        21.34755569999834,
+        21.963731600000756,
+        21.10724879999907
+      ],
+      "quality": {
+        "reference_lines": 34,
+        "output_lines": 34,
+        "matched_lines": 34,
+        "coverage": 1.0,
+        "missing_lines": 0,
+        "extra_or_changed_lines": 0,
+        "mean_error_s": 1.606176470588239,
+        "median_error_s": 0.3300000000000125,
+        "p90_error_s": 1.7459999999999947,
+        "p95_error_s": 10.146500000000003,
+        "max_error_s": 20.24000000000001,
+        "median_signed_offset_s": -0.3199999999999932,
+        "within_0.25s": 0.29411764705882354,
+        "within_0.5s": 0.7058823529411765,
+        "within_1s": 0.8235294117647058,
+        "within_2s": 0.9117647058823529,
+        "backward_timestamps": 0,
+        "duplicate_timestamps": 0,
+        "outside_audio": 0,
+        "outliers": [
+          {
+            "line": 27,
+            "output_line": 27,
+            "reference_s": 280.88,
+            "actual_s": 260.64,
+            "error_s": 20.24000000000001
+          },
+          {
+            "line": 2,
+            "output_line": 2,
+            "reference_s": 66.25,
+            "actual_s": 54.94,
+            "error_s": 11.310000000000002
+          },
+          {
+            "line": 3,
+            "output_line": 3,
+            "reference_s": 85.81,
+            "actual_s": 76.28999999999999,
+            "error_s": 9.52000000000001
+          },
+          {
+            "line": 34,
+            "output_line": 34,
+            "reference_s": 317.17,
+            "actual_s": 319.12,
+            "error_s": 1.9499999999999886
+          },
+          {
+            "line": 20,
+            "output_line": 20,
+            "reference_s": 194.67,
+            "actual_s": 195.94,
+            "error_s": 1.2700000000000102
+          }
+        ]
+      },
+      "selected_sources": [
+        "Lyrics synchronized successfully with lyrics-aligner (mix)."
+      ]
+    },
+    {
+      "input": "input-02",
+      "device": "auto",
+      "demucs": "on",
+      "cold_s": 16.855264500001795,
+      "warm_s": [
+        12.92110789999424,
+        13.48010179999983,
+        13.626694899998256
+      ],
+      "quality": {
+        "reference_lines": 40,
+        "output_lines": 40,
+        "matched_lines": 40,
+        "coverage": 1.0,
+        "missing_lines": 0,
+        "extra_or_changed_lines": 0,
+        "mean_error_s": 1.2342499999999994,
+        "median_error_s": 0.120000000000001,
+        "p90_error_s": 4.139999999999994,
+        "p95_error_s": 5.342500000000002,
+        "max_error_s": 9.800000000000011,
+        "median_signed_offset_s": -0.04500000000000526,
+        "within_0.25s": 0.625,
+        "within_0.5s": 0.7,
+        "within_1s": 0.7,
+        "within_2s": 0.775,
+        "backward_timestamps": 0,
+        "duplicate_timestamps": 0,
+        "outside_audio": 0,
+        "outliers": [
+          {
+            "line": 38,
+            "output_line": 38,
+            "reference_s": 203.98,
+            "actual_s": 213.78,
+            "error_s": 9.800000000000011
+          },
+          {
+            "line": 39,
+            "output_line": 39,
+            "reference_s": 208.61,
+            "actual_s": 215.9,
+            "error_s": 7.289999999999992
+          },
+          {
+            "line": 40,
+            "output_line": 40,
+            "reference_s": 213.98,
+            "actual_s": 219.22,
+            "error_s": 5.240000000000009
+          },
+          {
+            "line": 22,
+            "output_line": 22,
+            "reference_s": 124.99,
+            "actual_s": 120.22,
+            "error_s": 4.769999999999996
+          },
+          {
+            "line": 21,
+            "output_line": 21,
+            "reference_s": 113.87,
+            "actual_s": 117.94,
+            "error_s": 4.069999999999993
+          }
+        ]
+      },
+      "selected_sources": [
+        "Lyrics synchronized successfully with lyrics-aligner (mix)."
+      ]
+    }
+  ],
+  "backend": {
+    "repository": "schufo/lyrics-aligner",
+    "commit": "72be8a14b9126c201e0b8920513764c44ccd3f9e",
+    "model_parameters_sha256": "cf907661b6e3c477b24cf61f0bdf2a08aa1cfdc1e326f112861559a81785469e",
+    "model_python_sha256_lf": "8c77f2092e9593eca5b95cc6ccc24165eedfc3d2de3c8fe8f6011f65d1043e54",
+    "align_python_sha256_lf": "bd212c35865a14b5fcc1b0edca772f9389ced58dcc207721a8115944de6c4f9e"
+  }
+}

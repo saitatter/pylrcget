@@ -88,6 +88,19 @@ from the context menu. Tracks run one at a time; instrumental tracks, missing
 audio and tracks without lyrics are skipped. Results stay as unsaved drafts.
 Cancel stops the current sync and queue; drafts already completed remain available.
 
+AI setup installs a tested combination of Torch 2.8.0, Torchaudio 2.8.0 and
+WhisperX 3.8.6. It also prepares the English pronunciation dictionaries in the
+application's `nltk_data` cache. Missing data or unsupported core package versions
+are reported for repair through **Manage AI runtime**.
+
+CPU forces processor execution; Auto selects an available accelerator. Explicit
+CUDA reports an error when CUDA is unavailable. Manual timing hints use guided
+alignment. The fuzzy threshold applies to fallback text matching, and Demucs
+separation can be skipped when the original mix already scores well.
+
+See the [local AI validation report](docs/AI_VALIDATION.md) for tested configurations
+and measured timing limits.
+
 ```powershell
 python -m pip install -e ".[ai]"
 ```

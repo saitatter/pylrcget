@@ -22,6 +22,7 @@
 
 ### CI & Build
 - Optional AI CI installs the pinned stack and runs its tests with CPU Torch; non-tensor English backend tests also run without AI dependencies.
+- Read-only benchmarks compare cold and warm CPU/CUDA/Auto performance, line coverage and timing errors against embedded synchronized lyrics.
 - Releases require passing tests and lint, preserve reviewed changelog entries and historical notes, and use plain headings, complete commit lists and conventional release commits.
 - Batch AI tests explicitly release Qt controllers between runs to keep the full UI suite stable.
 

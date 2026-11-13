@@ -2,6 +2,8 @@
 
 - [Contributing](../CONTRIBUTING.md)
 - [Release notes](release-notes.md)
+- [Local AI validation](AI_VALIDATION.md)
+- [AI performance and embedded-ground-truth benchmarks](AI_BENCHMARKS.md)
 - [UI modernization results](UI_MODERNIZATION_RESULTS.md)
 - [Multi-provider and Musixmatch notes](MULTI_PROVIDER_MUSIXMATCH.md)
 - [Scanner/LRCLIB/AI benchmark summary](../benchmarks/RESULTS_SUMMARY.md)
