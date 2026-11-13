@@ -70,7 +70,6 @@ def _collect_ai_runtime_status(selected_device: str, require_demucs: bool = True
     """Probe AI capabilities without touching any Qt widgets."""
     from ui.workers.ai.ai_runtime import (
         default_ai_runtime_dir,
-        nvidia_gpu_available,
         resolve_ai_runtime_python,
     )
     from ui.workers.ai.ai_sync_lyrics_aligner import (
@@ -84,9 +83,7 @@ def _collect_ai_runtime_status(selected_device: str, require_demucs: bool = True
     try:
         runtime_python = resolve_ai_runtime_python()
         missing = get_missing_ai_dependencies(
-            prefer_cuda=selected_device == "cuda" or (
-                selected_device == "auto" and nvidia_gpu_available()
-            ),
+            prefer_cuda=selected_device == "cuda",
             require_lyrics_aligner=True,
             require_demucs=require_demucs,
         )
@@ -520,7 +517,11 @@ class MusicFoldersDialog(QDialog):
         for label, value in AI_SYNC_LANGUAGE_OPTIONS:
             self.ai_language_combo.addItem(label, value)
         # Fuzzy matching controls
-        self.ai_enable_fuzzy_chk = QCheckBox("Enable fuzzy matching (tolerates ASR errors)")
+        self.ai_enable_fuzzy_chk = QCheckBox("Fuzzy matching for fallback text alignment")
+        self.ai_enable_fuzzy_chk.setToolTip(
+            "Applies when fallback text matching is used. English phonetic alignment "
+            "uses its own scoring and does not use this threshold."
+        )
         self.ai_enable_fuzzy_chk.setChecked(True)
         self.ai_fuzzy_threshold_spin = QSpinBox()
         self.ai_fuzzy_threshold_spin.setRange(0, 100)

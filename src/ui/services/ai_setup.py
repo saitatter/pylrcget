@@ -12,7 +12,7 @@ from ui.workers.ai.ai_sync_runtime import (
 
 def ensure_ai_sync_dependencies(parent: QWidget, settings: dict) -> bool:
     device = str(settings.get("device") or "auto")
-    prefer_cuda = device == "cuda" or (device == "auto" and nvidia_gpu_available())
+    prefer_cuda = device == "cuda"
 
     def missing_packages():
         return get_missing_ai_dependencies(
@@ -25,6 +25,10 @@ def ensure_ai_sync_dependencies(parent: QWidget, settings: dict) -> bool:
     available, message = _check_ai_sync_available()
     if available and not missing:
         return True
+    # Auto accepts a working CPU runtime. Prefer GPU packages only when creating
+    # or repairing Torch on a host that actually has an NVIDIA accelerator.
+    if device == "auto" and "torch" in missing and nvidia_gpu_available():
+        missing.append("torch-cuda")
     if prefer_cuda and "torch-cuda" in missing:
         message += "\n\nCUDA-enabled Torch is required for the selected GPU mode."
     if AIDependenciesDialog(missing, message, parent).exec() != QDialog.DialogCode.Accepted:

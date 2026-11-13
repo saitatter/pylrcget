@@ -12,6 +12,7 @@
 - English AI setup installs its pronunciation data in the application cache, and synchronization finds it in source and external runtimes.
 - AI installation uses the tested Torch, Torchaudio and WhisperX package combination instead of resolving incompatible versions.
 - English synchronization with manual timing hints uses the guided alignment path so those hints are not bypassed by the English backend shortcut.
+- Auto mode accepts a working CPU runtime when CUDA is unavailable, while explicit CUDA still requires GPU support.
 
 ### Refactors
 - The instrumental lyrics status uses a plain text label without an emoji glyph.
