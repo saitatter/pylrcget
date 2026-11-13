@@ -23,3 +23,31 @@ Preview with `python tools/release_notes.py --tag vX.Y.Z`; apply to an existing
 release with `--write`. This changes only the release description, not tags,
 assets or package versions. The Release workflow applies it automatically.
 The GitHub CLI must be authenticated and release tags/history available locally.
+
+## Personalized artwork
+
+Each release opens with the PyLrcGet music-studio banner. Customize up to six
+short highlight strings in the release tag's `items` array in
+`docs/release-summaries.json`; its `summary` array remains the release description.
+The artwork adds the version, date, previous version, commit count, contributors,
+referenced issues addressed, open issues and stars. Repository metrics are captured
+when the image is first rendered, normally during publication. Historical previews
+use current repository metrics, not reconstructed past counts.
+
+Install rendering dependencies with `pip install -e ".[release]"`. Preview local
+work without creating a tag or publishing anything:
+
+```powershell
+python tools/release_banner.py --tag v1.16.0 --preview --out "$env:TEMP/pylrcget-preview.webp"
+```
+
+Use `--set item_1="Custom highlight"` to override a highlight, or `--set stars=42`
+to override a numeric field in a local preview. The output includes a JSON snapshot.
+Render that snapshot again without GitHub access with `--data snapshot.json`.
+
+The Release workflow invokes `release_notes.py --banner --write`. It stores the
+WebP and JSON snapshot on the orphan `release-banners` branch, then links the image
+at its immutable commit in the release description. The artwork does not appear in
+the application downloads. Existing per-tag artwork is reused, never overwritten.
+Keep this branch and its history: removing it can break past release images.
+The existing `RELEASE_PAT` must be allowed to create and update that branch.

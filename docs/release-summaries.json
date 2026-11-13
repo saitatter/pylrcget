@@ -1,1 +1,18 @@
-{}
+{
+  "v1.16.0": {
+    "summary": [
+      "Set up local AI synchronization directly from Settings, without separate Python or Git installations.",
+      "Synchronize selected tracks in a cancellable batch, keeping results as unsaved drafts.",
+      "Control the pause between LRCLIB requests and respect server rate-limit delays.",
+      "Read reviewed release notes with personalized artwork, contributor credit and complete change lists."
+    ],
+    "items": [
+      "AI setup without Python or Git",
+      "English pronunciation setup repaired",
+      "Sync selected tracks with AI",
+      "Adjustable LRCLIB request pacing",
+      "Manage AI runtime from Settings",
+      "Reviewed notes and release artwork"
+    ]
+  }
+}

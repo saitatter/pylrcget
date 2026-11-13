@@ -6,6 +6,8 @@ import argparse
 import json
 import re
 import subprocess
+import sys
+import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -25,13 +27,14 @@ def changelog_summary(changelog: str, tag: str) -> list[str]:
     return [line[2:] for line in section.group(1).splitlines() if line.startswith("- ")][:10]
 
 
-def render_notes(summary: list[str], commits: list[str], generated: str) -> str:
+def render_notes(summary: list[str], commits: list[str], generated: str, banner_url: str | None = None) -> str:
     # GitHub supplies contributor credits and the comparison, not the commit list.
     footer_match = re.search(r"(?m)^## New Contributors|^\*\*Full Changelog\*\*", generated)
     footer = generated[footer_match.start():].strip() if footer_match else ""
     body = "Changes since last release:\n\n" + "\n".join(f"- {line}" for line in summary)
     body += "\n\n---\n\n## What's Changed\n\n" + "\n".join(commits)
-    return body + ("\n\n" + footer if footer else "") + "\n"
+    header = f"![PyLrcGet release highlights]({banner_url})\n\n" if banner_url else ""
+    return header + body + ("\n\n" + footer if footer else "") + "\n"
 
 
 def commit_rows(history: str, repo: str) -> list[str]:
@@ -54,7 +57,10 @@ def main() -> None:
     parser.add_argument("--repo", default="saitatter/pylrcget")
     parser.add_argument("--tag", required=True)
     parser.add_argument("--write", action="store_true")
+    parser.add_argument("--banner", action="store_true", help="Publish immutable studio artwork when writing the release")
     args = parser.parse_args()
+    if args.banner and not args.write:
+        parser.error("--banner requires --write; use release_banner.py to preview artwork locally")
     # Verify refs before using them in a revision range.
     run("git", "rev-parse", "--verify", f"refs/tags/{args.tag}")
     tags = run("git", "tag", "--merged", args.tag, "--sort=-version:refname").splitlines()
@@ -70,13 +76,28 @@ def main() -> None:
     if previous:
         command.extend(["-f", f"previous_tag_name={previous}"])
     generated = json.loads(run(*command))["body"]
-    notes = render_notes(summary, commits, generated)
-    if len(notes.encode("utf-8")) > 120000:
-        raise ValueError("Release description is too large; shorten the history before publishing")
+    release = None
+    banner_url = None
     if args.write:
         release = json.loads(run("gh", "release", "view", args.tag, "--repo", args.repo, "--json", "isDraft,body"))
         if release["isDraft"]:
             raise ValueError("Draft releases are not updated")
+        existing = re.match(r"!\[[^\]]*\]\((https://raw\.githubusercontent\.com/[^)]+)\)", release["body"])
+        if existing:
+            banner_url = existing[1]
+    if args.banner:
+        sys.path.insert(0, str(ROOT))
+        from tools.release_banner import publish, release_data, render
+
+        data = release_data(args.repo, args.tag)
+        with tempfile.TemporaryDirectory(prefix="pylrcget-release-banner-") as temporary:
+            out = Path(temporary) / f"{args.tag}.webp"
+            render(data, out)
+            banner_url = publish(args.repo, args.tag, out, data)
+    notes = render_notes(summary, commits, generated, banner_url)
+    if len(notes.encode("utf-8")) > 120000:
+        raise ValueError("Release description is too large; shorten the history before publishing")
+    if args.write:
         if release["body"].strip() == notes.strip():
             return
         subprocess.run(

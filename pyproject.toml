@@ -28,10 +28,12 @@ ai = [
     "numpy==2.5.2",
 ]
 dev = [
+    "Pillow==12.3.0",
     "pytest==9.1.1",
     "pytest-cov==7.1.0",
     "ruff==0.16.8",
 ]
+release = ["Pillow==12.3.0"]
 
 [tool.semantic_release]
 version_toml = ["pyproject.toml:project.version"]

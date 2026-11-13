@@ -55,7 +55,9 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.RELEASE_PAT }}
           RELEASE_TAG: ${{ steps.semantic-release.outputs.tag }}
-        run: python tools/release_notes.py --repo "$GITHUB_REPOSITORY" --tag "$RELEASE_TAG" --write
+        run: |
+          python -m pip install "Pillow==12.3.0"
+          python tools/release_notes.py --repo "$GITHUB_REPOSITORY" --tag "$RELEASE_TAG" --banner --write
 
   build-release-assets:
     needs: release

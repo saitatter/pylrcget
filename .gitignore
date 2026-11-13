@@ -77,4 +77,5 @@ node_modules/
 # Local benchmark tooling is retained separately; release tooling is versioned.
 tools/*
 !tools/release_notes.py
+!tools/release_banner.py
 !tools/benchmark_ai_embedded.py
