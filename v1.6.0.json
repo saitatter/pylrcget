@@ -1,0 +1,33 @@
+{
+  "schema_version": 2,
+  "repo": "saitatter/pylrcget",
+  "tag": "v1.6.0",
+  "preview": false,
+  "date": "10 May\n2026",
+  "published_at": "2026-05-10T19:13:47Z",
+  "metrics_captured_at": "2026-11-13T11:31:25.494359+00:00",
+  "metrics_as_of": "2026-05-10T19:13:47Z",
+  "statistics_basis": {
+    "open_issues": "issue_state_transitions_at_publication",
+    "stars": "surviving_stars_given_by_publication"
+  },
+  "previous": "v1.5.0",
+  "commit": "67264bfaac7728cf8409384570d1ba394d120498",
+  "items": [
+    "Configurable lyrics filenames",
+    "Configurable embedded output",
+    "Clearer lyrics download settings",
+    "Improved light-theme contrast",
+    "Publishing timeout retries"
+  ],
+  "commits": 13,
+  "contributors": 1,
+  "contributor_names": [
+    "@saitatter"
+  ],
+  "issues_addressed": 0,
+  "issue_numbers": [],
+  "stars": 4,
+  "open_issues": 1,
+  "historical_backfill": true
+}
