@@ -1,0 +1,32 @@
+{
+  "schema_version": 2,
+  "repo": "saitatter/pylrcget",
+  "tag": "v1.1.0",
+  "preview": false,
+  "date": "24 Apr\n2026",
+  "published_at": "2026-04-24T16:26:15Z",
+  "metrics_captured_at": "2026-11-13T11:31:25.494359+00:00",
+  "metrics_as_of": "2026-04-24T16:26:15Z",
+  "statistics_basis": {
+    "open_issues": "issue_state_transitions_at_publication",
+    "stars": "surviving_stars_given_by_publication"
+  },
+  "previous": "v1.0.3",
+  "commit": "db2281123211bcae870f43af97084b01d950ebe1",
+  "items": [
+    "Batch retry for failed downloads",
+    "Relaxed lyrics search",
+    "Portable single-file downloads",
+    "Windows installer handoff"
+  ],
+  "commits": 2,
+  "contributors": 1,
+  "contributor_names": [
+    "@saitatter"
+  ],
+  "issues_addressed": 0,
+  "issue_numbers": [],
+  "stars": 3,
+  "open_issues": 4,
+  "historical_backfill": true
+}
