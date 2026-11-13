@@ -1,0 +1,45 @@
+{
+  "schema_version": 3,
+  "repo": "saitatter/pylrcget",
+  "tag": "v1.7.0",
+  "preview": false,
+  "date": "10 May\n2026",
+  "published_at": "2026-05-10T21:25:33Z",
+  "metrics_captured_at": "2026-11-13T11:31:25.494359+00:00",
+  "metrics_as_of": "2026-05-10T21:25:33Z",
+  "statistics_basis": {
+    "open_issues": "issue_state_transitions_at_publication",
+    "stars": "surviving_stars_given_by_publication"
+  },
+  "previous": "v1.6.0",
+  "commit": "3c31020a1d2d6452df4421b246e6c7b40d7db3f7",
+  "items": [
+    {
+      "emoji": "\ud83d\udd04",
+      "text": "Easier synchronized line insertion"
+    },
+    {
+      "emoji": "\ud83d\udd04",
+      "text": "Synced editor context menu"
+    },
+    {
+      "emoji": "\ud83d\uddc2\ufe0f",
+      "text": "Sortable track numbers"
+    },
+    {
+      "emoji": "\u2328\ufe0f",
+      "text": "Scoped playback shortcuts"
+    }
+  ],
+  "commits": 7,
+  "contributors": 1,
+  "contributor_names": [
+    "@saitatter"
+  ],
+  "issues_addressed": 0,
+  "issue_numbers": [],
+  "stars": 4,
+  "open_issues": 1,
+  "historical_backfill": true,
+  "artwork_revision": "emoji"
+}
