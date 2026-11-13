@@ -18,10 +18,10 @@ from PySide6.QtWidgets import (
 
 from ui.button_roles import set_button_role
 from ui.spacing import SPACE_2, SPACE_3, SPACE_4, set_layout_spacing
-from ui.workers.ai.ai_aligner_bootstrap import ensure_lyrics_aligner
-from ui.workers.ai.ai_bootstrap import ensure_bootstrap_python
-from ui.workers.ai.ai_runtime import AIInstallPlan, resolve_ai_install_plan
-from ui.workers.ai.ai_sync_worker import get_missing_ai_dependencies
+from ui.workers.ai.aligner_bootstrap import ensure_lyrics_aligner
+from ui.workers.ai.python_bootstrap import ensure_bootstrap_python
+from ui.workers.ai.runtime import AIInstallPlan, resolve_ai_install_plan
+from ui.workers.ai.sync_worker import get_missing_ai_dependencies
 
 logger = logging.getLogger(__name__)
 

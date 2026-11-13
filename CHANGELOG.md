@@ -21,6 +21,7 @@
 - The instrumental lyrics status uses a plain text label without an emoji glyph.
 - Library scans read FLAC tags without loading embedded artwork, reuse the folder listing from discovery for sidecar checks and stop probing each sidecar candidate, so initial scans of network libraries take about half the time and unchanged rescans finish several times faster.
 - Auto device mode runs the English alignment model on the CPU, where it measured faster than CUDA with identical output; an explicit CUDA choice, vocal separation and WhisperX keep using the selected device.
+- AI worker modules use short names inside `ui.workers.ai` instead of repeating the `ai_sync_` prefix.
 
 ### Docs
 - Document focused commits, safe migrations, isolated tests and project organization with shared contributor and agent rules.

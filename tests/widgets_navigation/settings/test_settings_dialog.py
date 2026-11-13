@@ -85,23 +85,23 @@ class SettingsDialogTests(unittest.TestCase):
             try:
                 with (
                     patch(
-                        "ui.workers.ai.ai_runtime.resolve_ai_runtime_python",
+                        "ui.workers.ai.runtime.resolve_ai_runtime_python",
                         return_value=Path("C:/ai-runtime/Scripts/python.exe"),
                     ),
                     patch(
-                        "ui.workers.ai.ai_runtime.default_ai_runtime_dir",
+                        "ui.workers.ai.runtime.default_ai_runtime_dir",
                         return_value=Path("C:/ai-runtime"),
                     ),
                     patch(
-                        "ui.workers.ai.ai_sync_runtime._cuda_runtime_available",
+                        "ui.workers.ai.inference_runtime._cuda_runtime_available",
                         return_value=True,
                     ),
                     patch(
-                        "ui.workers.ai.ai_sync_runtime.get_missing_ai_dependencies",
+                        "ui.workers.ai.inference_runtime.get_missing_ai_dependencies",
                         return_value=["demucs"],
                     ),
                     patch(
-                        "ui.workers.ai.ai_sync_lyrics_aligner.is_available",
+                        "ui.workers.ai.lyrics_aligner.is_available",
                         return_value=True,
                     ),
                 ):

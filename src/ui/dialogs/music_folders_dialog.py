@@ -68,16 +68,16 @@ from ui.theme_tokens import get_available_themes
 
 def _collect_ai_runtime_status(selected_device: str, require_demucs: bool = True) -> dict[str, object]:
     """Probe AI capabilities without touching any Qt widgets."""
-    from ui.workers.ai.ai_runtime import (
-        default_ai_runtime_dir,
-        resolve_ai_runtime_python,
-    )
-    from ui.workers.ai.ai_sync_lyrics_aligner import (
-        is_available as english_aligner_available,
-    )
-    from ui.workers.ai.ai_sync_runtime import (
+    from ui.workers.ai.inference_runtime import (
         _cuda_runtime_available,
         get_missing_ai_dependencies,
+    )
+    from ui.workers.ai.lyrics_aligner import (
+        is_available as english_aligner_available,
+    )
+    from ui.workers.ai.runtime import (
+        default_ai_runtime_dir,
+        resolve_ai_runtime_python,
     )
 
     try:

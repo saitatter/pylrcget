@@ -27,11 +27,11 @@ from tools.ai_sync_bench.metrics import (
     alignment_quality,
     render_report_markdown,
 )
-from ui.workers.ai.ai_sync_contracts import (
+from ui.workers.ai.contracts import (
     AlignmentOptions,
     AlignmentRequest,
 )
-from ui.workers.ai.ai_sync_stable_ts import StableTsResearchBackend
+from ui.workers.ai.stable_ts import StableTsResearchBackend
 
 
 def _git_sha() -> str:

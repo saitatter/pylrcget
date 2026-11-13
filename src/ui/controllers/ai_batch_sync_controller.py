@@ -11,7 +11,7 @@ from PySide6.QtCore import QObject, QTimer
 
 from core.utils import plain_text_from_lrc
 from db.models import Track
-from ui.workers.ai.ai_sync_worker import AiSyncWorker
+from ui.workers.ai.sync_worker import AiSyncWorker
 
 
 def batch_lyrics_source(track: Track) -> str:

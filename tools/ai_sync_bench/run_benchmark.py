@@ -24,7 +24,7 @@ if str(REPO_ROOT) not in sys.path:
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
-from ui.workers.ai.ai_sync_profiler import StageProfiler
+from ui.workers.ai.profiler import StageProfiler
 
 if __package__:
     from .corpus import BenchmarkCase, build_corpus, load_corpus
@@ -117,7 +117,7 @@ class _CurrentWorkerContext:
         self.completed_result = (bool(ok), str(message), str(output))
 
     def _resolve_device(self) -> str:
-        from ui.workers.ai.ai_runtime import resolve_torch_device
+        from ui.workers.ai.runtime import resolve_torch_device
 
         return resolve_torch_device(self._device)
 
@@ -154,7 +154,7 @@ class CurrentPipelineBackend:
         self.device = device
 
     def align(self, case: BenchmarkCase) -> tuple[list[float | None], dict[str, Any]]:
-        from ui.workers.ai.ai_sync_pipeline import run_ai_sync_pipeline
+        from ui.workers.ai.pipeline import run_ai_sync_pipeline
 
         profiler = StageProfiler(metadata={"backend": self.name, "case_id": case.case_id})
         with profiler.stage("process_startup"):

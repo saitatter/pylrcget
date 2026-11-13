@@ -3,11 +3,11 @@
 from PySide6.QtWidgets import QDialog, QWidget
 
 from ui.dialogs.ai_dependencies_dialog import AIDependenciesDialog
-from ui.workers.ai.ai_runtime import nvidia_gpu_available
-from ui.workers.ai.ai_sync_runtime import (
+from ui.workers.ai.inference_runtime import (
     _check_ai_sync_available,
     get_missing_ai_dependencies,
 )
+from ui.workers.ai.runtime import nvidia_gpu_available
 
 
 def ensure_ai_sync_dependencies(parent: QWidget, settings: dict) -> bool:

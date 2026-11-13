@@ -24,7 +24,7 @@ sys.path[:0] = [str(ROOT), str(ROOT / "src")]
 from mutagen import File
 
 from tools.ai_sync_bench.metrics import percentile, summarize
-from ui.workers.ai.ai_sync_service import PersistentAIRuntime, build_runtime_environment
+from ui.workers.ai.service import PersistentAIRuntime, build_runtime_environment
 
 TIMESTAMP = re.compile(r"\[(\d+):(\d+(?:\.\d+)?)\]")
 
@@ -146,7 +146,7 @@ def backend_process_factory(backend: str, disabled_path: Path):
         if backend == "whisperx":
             environment["PYLRCGET_LYRICS_ALIGNER_PATH"] = str(disabled_path)
         elif backend == "lyrics-aligner":
-            from ui.workers.ai.ai_sync_lyrics_aligner import _backend_root
+            from ui.workers.ai.lyrics_aligner import _backend_root
             backend_root = _backend_root()
             if backend_root is None:
                 raise RuntimeError("Requested lyrics-aligner is unavailable")
@@ -178,7 +178,7 @@ def main() -> None:
     validate_output_path(sources, args.output_root)
     work = args.output_root / (datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ") + "-" + uuid.uuid4().hex[:8])
     work.mkdir(parents=True)
-    probe = subprocess.check_output([str(args.runtime), "-c", "import torch,platform,json,importlib.metadata as m; from ui.workers.ai import ai_sync_lyrics_aligner as backend; print(json.dumps({'loaded_ai_source':backend.__file__,'python':platform.python_version(),'torch':torch.__version__,'torch_threads':torch.get_num_threads(),'cuda':torch.cuda.is_available(),'gpu':torch.cuda.get_device_name(0) if torch.cuda.is_available() else None,'whisperx':m.version('whisperx')}))"], text=True, encoding="utf-8", cwd=args.source_root.parent, env=build_runtime_environment(args.source_root))
+    probe = subprocess.check_output([str(args.runtime), "-c", "import torch,platform,json,importlib.metadata as m; from ui.workers.ai import lyrics_aligner as backend; print(json.dumps({'loaded_ai_source':backend.__file__,'python':platform.python_version(),'torch':torch.__version__,'torch_threads':torch.get_num_threads(),'cuda':torch.cuda.is_available(),'gpu':torch.cuda.get_device_name(0) if torch.cuda.is_available() else None,'whisperx':m.version('whisperx')}))"], text=True, encoding="utf-8", cwd=args.source_root.parent, env=build_runtime_environment(args.source_root))
     runtime_info = json.loads(probe)
     if not Path(runtime_info["loaded_ai_source"]).resolve().is_relative_to(args.source_root):
         raise RuntimeError("Runtime imported AI code outside the requested source tree")

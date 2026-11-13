@@ -22,7 +22,7 @@ alignment accuracy for other songs, languages or hardware.
 - Settings probes reported Ready for the English and multilingual backends in
   CPU, CUDA and Auto modes.
 
-The tested package constraints are declared in `ai_dependencies.py` and matched
+The tested package constraints are declared in `package_requirements.py` and matched
 by the `ai` extra in `pyproject.toml`. The important versions include Torch and
 Torchaudio 2.8.0, WhisperX 3.8.6, Transformers 4.57.6 and Demucs 4.1.0.
 

@@ -66,9 +66,9 @@ def test_backend_selection_is_confined_to_child_environment(monkeypatch, tmp_pat
 
 def test_requested_english_backend_cannot_silently_fall_back(monkeypatch, tmp_path):
     from tools import benchmark_ai_embedded as benchmark
-    from ui.workers.ai import ai_sync_lyrics_aligner
+    from ui.workers.ai import lyrics_aligner
 
-    monkeypatch.setattr(ai_sync_lyrics_aligner, "_backend_root", lambda: None)
+    monkeypatch.setattr(lyrics_aligner, "_backend_root", lambda: None)
     factory = benchmark.backend_process_factory("lyrics-aligner", tmp_path / "disabled")
     with pytest.raises(RuntimeError, match="unavailable"):
         factory(["python"], env={})

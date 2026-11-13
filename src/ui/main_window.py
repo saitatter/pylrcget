@@ -1078,7 +1078,7 @@ class MainWindow(QMainWindow):
                 event.ignore()
                 return
         try:
-            from ui.workers.ai.ai_sync_service import shutdown_all_ai_runtimes
+            from ui.workers.ai.service import shutdown_all_ai_runtimes
 
             shutdown_all_ai_runtimes()
         except (ImportError, OSError, RuntimeError):
@@ -1621,7 +1621,7 @@ class MainWindow(QMainWindow):
             self.ai_batch_sync.start(track_ids, settings)
 
     def _on_auto_sync_requested(self) -> None:
-        from ui.workers.ai.ai_sync_worker import AiSyncWorker
+        from ui.workers.ai.sync_worker import AiSyncWorker
 
         if self.ai_batch_sync.busy:
             self._show_status_message("AI sync is already running. Please wait.")

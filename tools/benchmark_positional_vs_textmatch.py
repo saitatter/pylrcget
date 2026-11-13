@@ -28,7 +28,7 @@ REPORT = OUT / "lyrics_aligner_pipeline_benchmark.json"
 if str(REPO) not in sys.path:
     sys.path.insert(0, str(REPO))
 
-from src.ui.workers.ai.ai_sync_worker import (
+from src.ui.workers.ai.sync_worker import (
     _align_with_optional_demucs,
 )
 
