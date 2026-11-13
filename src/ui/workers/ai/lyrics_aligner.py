@@ -411,7 +411,7 @@ def _build_lrc_from_predictions(
             seconds = predicted[first_match][0]
             minutes, remainder = divmod(seconds, 60)
             output.append(f"[{int(minutes):02d}:{remainder:05.2f}] {text}")
-    return "\n".join(_repair_repeated_block_timestamps(output))
+    return "\n".join(output)
 
 
 def _result_lines(lyrics: str, raw_lrc: str) -> list[AlignedLine]:
@@ -463,72 +463,6 @@ def _build_lrc(lyrics: str, onset_file: Path) -> str:
         except ValueError:
             continue
     return _build_lrc_from_predictions(lyrics, predicted)
-
-
-def _repair_repeated_block_timestamps(lines: list[str]) -> list[str]:
-    """Repair isolated timing jumps inside repeated four-line lyric blocks."""
-    parsed: list[tuple[float, str]] = []
-    for line in lines:
-        match = re.match(r"\[(\d+):(\d+\.\d+)\]\s+(.*)", line)
-        if match:
-            parsed.append(
-                (
-                    int(match.group(1)) * 60 + float(match.group(2)),
-                    match.group(3),
-                )
-            )
-
-    groups: dict[tuple[str, ...], list[int]] = {}
-    for index in range(len(parsed) - 3):
-        key = tuple(
-            re.sub(r"[^a-z0-9]+", " ", parsed[index + offset][1].lower()).strip()
-            for offset in range(4)
-        )
-        groups.setdefault(key, []).append(index)
-
-    claimed: set[int] = set()
-    original_seconds: dict[int, float] = {}
-    for indices in sorted(groups.values(), key=len, reverse=True):
-        if len(indices) < 2:
-            continue
-        block_indices = {index + offset for index in indices for offset in range(4)}
-        if claimed & block_indices:
-            continue
-        claimed.update(block_indices)
-        reference = indices[0]
-        reference_offsets = [
-            parsed[reference + offset][0] - parsed[reference][0]
-            for offset in range(4)
-        ]
-        for index in indices[1:]:
-            start = parsed[index][0]
-            for offset in range(1, 4):
-                actual_offset = parsed[index + offset][0] - start
-                expected_offset = reference_offsets[offset]
-                if abs(actual_offset - expected_offset) > 5.0:
-                    original_seconds.setdefault(index + offset, parsed[index + offset][0])
-                    parsed[index + offset] = (
-                        start + expected_offset,
-                        parsed[index + offset][1],
-                    )
-
-    # A repair must not reorder lines: one out-of-order timestamp invalidates
-    # the whole result and discards every other line's alignment with it.
-    reverted = True
-    while reverted:
-        reverted = False
-        for position in sorted(original_seconds):
-            seconds = parsed[position][0]
-            after_previous = position == 0 or parsed[position - 1][0] < seconds
-            before_next = position + 1 == len(parsed) or seconds < parsed[position + 1][0]
-            if not (after_previous and before_next):
-                parsed[position] = (original_seconds.pop(position), parsed[position][1])
-                reverted = True
-
-    return [
-        f"[{int(seconds // 60):02d}:{seconds % 60:05.2f}] {text}"
-        for seconds, text in parsed
-    ]
 
 
 __all__ = [

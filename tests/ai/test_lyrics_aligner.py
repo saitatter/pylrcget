@@ -102,38 +102,6 @@ def test_vectorized_dtw_matches_reference_backtracking(device, shape) -> None:
     np.testing.assert_array_equal(actual, expected)
 
 
-def _lrc_seconds(lines: list[str]) -> list[float]:
-    return [int(line[1:3]) * 60 + float(line[4:9]) for line in lines]
-
-
-def test_repeated_block_repair_still_fixes_an_isolated_jump() -> None:
-    from ui.workers.ai.lyrics_aligner import _repair_repeated_block_timestamps
-
-    block = ["alpha", "beta", "gamma", "delta"]
-    times = [10.0, 12.0, 14.0, 16.0, 50.0, 52.0, 70.0, 71.0]
-    lines = [f"[{int(t // 60):02d}:{t % 60:05.2f}] {text}" for t, text in zip(times, block * 2, strict=True)]
-
-    repaired = _lrc_seconds(_repair_repeated_block_timestamps(lines))
-
-    assert repaired == [10.0, 12.0, 14.0, 16.0, 50.0, 52.0, 54.0, 56.0]
-
-
-def test_repeated_block_repair_never_reorders_lines() -> None:
-    from ui.workers.ai.lyrics_aligner import _repair_repeated_block_timestamps
-
-    block = ["alpha", "beta", "gamma", "delta"]
-    # The second block's last line is late; pulling it to the reference offset
-    # (50 + 6) would land before the line that precedes it (58).
-    times = [10.0, 12.0, 14.0, 16.0, 50.0, 53.0, 58.0, 64.0]
-    lines = [f"[{int(t // 60):02d}:{t % 60:05.2f}] {text}" for t, text in zip(times, block * 2, strict=True)]
-
-    repaired = _lrc_seconds(_repair_repeated_block_timestamps(lines))
-
-    assert repaired == sorted(set(repaired))
-    assert repaired[:6] == times[:6]
-    assert repaired[7] == 64.0
-
-
 def test_silence_is_detected_per_frame_and_only_raises_word_gap_scores() -> None:
     torch = pytest.importorskip("torch")
     from ui.workers.ai.lyrics_aligner import _prefer_spaces_in_silence
