@@ -1,0 +1,45 @@
+{
+  "schema_version": 3,
+  "repo": "saitatter/pylrcget",
+  "tag": "v1.10.1",
+  "preview": false,
+  "date": "22 Jun\n2026",
+  "published_at": "2026-06-22T11:57:19Z",
+  "metrics_captured_at": "2026-11-13T11:31:25.494359+00:00",
+  "metrics_as_of": "2026-06-22T11:57:19Z",
+  "statistics_basis": {
+    "open_issues": "issue_state_transitions_at_publication",
+    "stars": "surviving_stars_given_by_publication"
+  },
+  "previous": "v1.10.0",
+  "commit": "f56fd141f6e66353500ee8bf93cdbeecf089156f",
+  "items": [
+    {
+      "emoji": "\ud83e\udd16",
+      "text": "More reliable AI worker shutdown"
+    },
+    {
+      "emoji": "\ud83e\udd16",
+      "text": "Clearer AI dependency guidance"
+    },
+    {
+      "emoji": "\ud83d\udce4",
+      "text": "Instrumental LRCLIB publishing"
+    },
+    {
+      "emoji": "\ud83d\udee0\ufe0f",
+      "text": "Empty filename pattern persistence"
+    }
+  ],
+  "commits": 9,
+  "contributors": 1,
+  "contributor_names": [
+    "@saitatter"
+  ],
+  "issues_addressed": 0,
+  "issue_numbers": [],
+  "stars": 9,
+  "open_issues": 4,
+  "historical_backfill": true,
+  "artwork_revision": "emoji"
+}
