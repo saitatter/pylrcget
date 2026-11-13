@@ -379,6 +379,7 @@ class LibraryScanner(QThread):
                 excluded_paths=self.excluded_paths,
                 excluded_patterns=self.excluded_patterns,
                 strict_roots=True,
+                sidecar_lookup_cache=sidecar_lookup_cache,
             )
             timings.record("path_discovery_s", time.perf_counter() - discovery_started)
             if self.isInterruptionRequested():

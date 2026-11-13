@@ -18,6 +18,7 @@
 ### Refactors
 - English AI synchronization reduces time spent calculating model attention and the final timing path without changing their numeric precision, and skips redundant fuzzy comparisons for exact words.
 - The instrumental lyrics status uses a plain text label without an emoji glyph.
+- Library scans read FLAC tags without loading embedded artwork, reuse the folder listing from discovery for sidecar checks and stop probing each sidecar candidate, so initial scans of network libraries take about half the time and unchanged rescans finish several times faster.
 
 ### Docs
 - Document focused commits, safe migrations, isolated tests and project organization with shared contributor and agent rules.
@@ -27,6 +28,7 @@
 - Read-only benchmarks compare lyrics-aligner and WhisperX against embedded synchronized lyrics, isolate speed and accuracy experiments, and record cold/warm performance and complete-output parity.
 - Releases require passing tests and lint, preserve reviewed changelog entries and historical notes, and use plain headings, complete commit lists and conventional release commits.
 - Batch AI tests explicitly release Qt controllers between runs to keep the full UI suite stable.
+- A read-only scan snapshot tool compares the scanner's database result before and after a change.
 
 ## v1.15.0 (2026-09-23)
 

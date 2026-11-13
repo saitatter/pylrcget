@@ -24,6 +24,7 @@ from core.embed_lyrics import (
     VORBIS_SYNCED_KEY,
 )
 from core.models import FsTrack
+from library.flac_reader import open_flac_tags
 from library.scan_state import TRACK_SCAN_STATE_SIGNATURE_VERSION
 
 logger = logging.getLogger(__name__)
@@ -117,6 +118,26 @@ class _SidecarDirIndex:
     by_suffix: dict[str, tuple[SidecarDirEntry, ...]]
 
 
+def sidecar_dir_entry(entry: os.DirEntry[str]) -> SidecarDirEntry | None:
+    """Describe a directory entry when it is a sidecar lyrics file."""
+    suffix = os.path.splitext(entry.name)[1]
+    if os.path.normcase(suffix) not in SIDECAR_EXTS:
+        return None
+    try:
+        if entry.is_dir(follow_symlinks=False):
+            return None
+        stat = entry.stat(follow_symlinks=False)
+    except OSError:
+        return None
+    return SidecarDirEntry(
+        name=entry.name,
+        path=entry.path,
+        lower_name=os.path.normcase(entry.name),
+        size=int(stat.st_size),
+        mtime_ns=int(stat.st_mtime_ns),
+    )
+
+
 class SidecarLookupCache:
     def __init__(self) -> None:
         self._dir_entries: dict[str, _SidecarDirIndex] = {}
@@ -128,6 +149,34 @@ class SidecarLookupCache:
     def candidate_exists(self, candidate: str) -> bool:
         return self.resolve_entry(candidate) is not None
 
+    @staticmethod
+    def _build_index(items: list[SidecarDirEntry]) -> _SidecarDirIndex:
+        by_lower_name: dict[str, SidecarDirEntry] = {}
+        by_stem: dict[str, list[SidecarDirEntry]] = {}
+        by_suffix: dict[str, list[SidecarDirEntry]] = {}
+        for item in items:
+            stem, suffix = os.path.splitext(item.lower_name)
+            by_lower_name[item.lower_name] = item
+            by_stem.setdefault(stem, []).append(item)
+            by_suffix.setdefault(suffix, []).append(item)
+        return _SidecarDirIndex(
+            by_lower_name=by_lower_name,
+            by_stem={key: tuple(value) for key, value in by_stem.items()},
+            by_suffix={key: tuple(value) for key, value in by_suffix.items()},
+        )
+
+    def _store_index(self, dir_key: str, index: _SidecarDirIndex) -> _SidecarDirIndex:
+        with self._lock:
+            return self._dir_entries.setdefault(dir_key, index)
+
+    def prime_directory(self, directory: str, items: list[SidecarDirEntry]) -> None:
+        """Record a directory listing the caller already paid for.
+
+        Path discovery lists every scanned directory, so handing its sidecar
+        entries over avoids listing the same directory a second time.
+        """
+        self._store_index(self._dir_key(directory), self._build_index(items))
+
     def _index_for_directory(self, directory: str) -> _SidecarDirIndex:
         dir_key = self._dir_key(directory)
         with self._lock:
@@ -135,43 +184,21 @@ class SidecarLookupCache:
         if index is not None:
             return index
 
-        by_lower_name: dict[str, SidecarDirEntry] = {}
-        by_stem: dict[str, list[SidecarDirEntry]] = {}
-        by_suffix: dict[str, list[SidecarDirEntry]] = {}
+        items: list[SidecarDirEntry] = []
         try:
             with os.scandir(directory) as entries:
                 for entry in entries:
-                    stem, suffix = os.path.splitext(entry.name)
-                    if os.path.normcase(suffix) not in SIDECAR_EXTS:
-                        continue
-                    try:
-                        stat = entry.stat(follow_symlinks=False)
-                    except OSError:
-                        continue
-                    lower_name = os.path.normcase(entry.name)
-                    item = SidecarDirEntry(
-                        name=entry.name,
-                        path=entry.path,
-                        lower_name=lower_name,
-                        size=int(stat.st_size),
-                        mtime_ns=int(stat.st_mtime_ns),
-                    )
-                    by_lower_name[lower_name] = item
-                    by_stem.setdefault(os.path.normcase(stem), []).append(item)
-                    by_suffix.setdefault(os.path.normcase(suffix), []).append(item)
+                    item = sidecar_dir_entry(entry)
+                    if item is not None:
+                        items.append(item)
         except OSError:
             pass
-        index = _SidecarDirIndex(
-            by_lower_name=by_lower_name,
-            by_stem={key: tuple(value) for key, value in by_stem.items()},
-            by_suffix={key: tuple(value) for key, value in by_suffix.items()},
-        )
-        with self._lock:
-            existing = self._dir_entries.get(dir_key)
-            if existing is not None:
-                return existing
-            self._dir_entries[dir_key] = index
-        return index
+        return self._store_index(dir_key, self._build_index(items))
+
+    def resolve_names(self, directory: str, filenames: list[str]) -> list[SidecarDirEntry | None]:
+        """Resolve candidate file names that all live in ``directory``."""
+        by_lower_name = self._index_for_directory(directory).by_lower_name
+        return [by_lower_name.get(os.path.normcase(filename)) for filename in filenames]
 
     def resolve_entry(self, candidate: str) -> SidecarDirEntry | None:
         directory, filename = os.path.split(candidate)
@@ -335,6 +362,7 @@ def _iter_audio_paths_core(
     excluded_paths: str | None = None,
     excluded_patterns: str | None = None,
     strict_roots: bool = False,
+    sidecar_lookup_cache: SidecarLookupCache | None = None,
 ) -> tuple[
     list[str],
     dict[str, tuple[float | None, int | None]],
@@ -361,6 +389,7 @@ def _iter_audio_paths_core(
                 continue
 
             child_dirs: list[str] = []
+            sidecar_entries: list[SidecarDirEntry] = []
             try:
                 with os.scandir(dirpath) as it:
                     for entry in it:
@@ -379,6 +408,10 @@ def _iter_audio_paths_core(
 
                         ext = os.path.splitext(entry.name)[1].lower()
                         if ext not in AUDIO_EXTS:
+                            if sidecar_lookup_cache is not None:
+                                sidecar_entry = sidecar_dir_entry(entry)
+                                if sidecar_entry is not None:
+                                    sidecar_entries.append(sidecar_entry)
                             continue
                         file_path = entry.path
                         normalized, posix_path = _join_normalized_path(normalized_dir, entry.name)
@@ -401,6 +434,9 @@ def _iter_audio_paths_core(
                     ) from exc
                 continue
 
+            # Only a complete listing may answer later sidecar lookups.
+            if sidecar_lookup_cache is not None:
+                sidecar_lookup_cache.prime_directory(dirpath, sidecar_entries)
             stack.extend(reversed(child_dirs))
     return paths, signatures, audio_signatures_ns
 
@@ -458,17 +494,23 @@ def iter_audio_paths_with_signatures_and_audio_signatures(
     excluded_paths: str | None = None,
     excluded_patterns: str | None = None,
     strict_roots: bool = False,
+    sidecar_lookup_cache: SidecarLookupCache | None = None,
 ) -> tuple[
     list[str],
     dict[str, tuple[float | None, int | None]],
     dict[str, tuple[int | None, int | None]],
 ]:
-    """Enumerate once and return both legacy and ns-precision audio signatures."""
+    """Enumerate once and return both legacy and ns-precision audio signatures.
+
+    A ``sidecar_lookup_cache`` is primed with the sidecar files of every
+    listed directory so the scan does not list those directories again.
+    """
     return _iter_audio_paths_core(
         directories,
         excluded_paths=excluded_paths,
         excluded_patterns=excluded_patterns,
         strict_roots=strict_roots,
+        sidecar_lookup_cache=sidecar_lookup_cache,
     )
 
 
@@ -1004,7 +1046,9 @@ def read_audio_metadata(path: str) -> tuple[object, AudioMetadata] | None:
 
 
 def read_audio_metadata_for_scan(path: str) -> tuple[object, AudioMetadata] | None:
-    audio = MutagenFile(path, easy=False)
+    audio = open_flac_tags(path) if path[-5:].lower() == ".flac" else None
+    if audio is None:
+        audio = MutagenFile(path, easy=False)
     if audio is None:
         return None
     return audio, read_audio_metadata_from_audio(audio, path)
@@ -1074,6 +1118,20 @@ def _metadata_sidecar_names(
     return unique
 
 
+def _sidecar_candidate_dirs(path: str, lyrics_lookup_subdir: str | None = None) -> list[str]:
+    parent = Path(path).parent
+    dirs = [str(parent)]
+    normalized_subdir = _normalized_lyrics_lookup_subdir(lyrics_lookup_subdir)
+    if normalized_subdir:
+        dirs.append(str(parent / normalized_subdir))
+    return dirs
+
+
+def _join_sidecar_candidate(directory: str, name: str) -> str:
+    # Matches ``str(Path(directory) / name)`` for the sanitized names used here.
+    return name if directory == "." else os.path.join(directory, name)
+
+
 def _sidecar_base_candidates(
     path: str,
     lyrics_lookup_subdir: str | None = None,
@@ -1081,25 +1139,28 @@ def _sidecar_base_candidates(
     metadata: AudioMetadata | None = None,
     lyrics_file_pattern: str | None = None,
 ) -> list[str]:
-    audio_path = Path(path)
     names = _metadata_sidecar_names(path, metadata, lyrics_file_pattern)
-    dirs: list[Path] = [audio_path.parent]
+    return [
+        _join_sidecar_candidate(directory, name)
+        for directory in _sidecar_candidate_dirs(path, lyrics_lookup_subdir)
+        for name in names
+    ]
 
-    normalized_subdir = _normalized_lyrics_lookup_subdir(lyrics_lookup_subdir)
-    if normalized_subdir:
-        dirs.append(audio_path.parent / normalized_subdir)
 
-    unique: list[str] = []
-    seen: set[str] = set()
-    for directory in dirs:
-        for name in names:
-            candidate = directory / name
-            rendered = os.path.normcase(str(candidate))
-            if rendered in seen:
-                continue
-            seen.add(rendered)
-            unique.append(str(candidate))
-    return unique
+# Windows resolves these names to devices, so their absolute form is not
+# simply the directory joined with the file name.
+_RESERVED_DEVICE_NAMES = frozenset(
+    {"CON", "PRN", "AUX", "NUL", "CONIN$", "CONOUT$"}
+    | {f"{prefix}{digit}" for prefix in ("COM", "LPT") for digit in "0123456789\u00b9\u00b2\u00b3"}
+)
+
+
+def _normalized_sidecar_candidate(normalized_dir: str, directory: str, filename: str) -> str:
+    """Return ``normcase(abspath(directory/filename))`` without a per-file system call."""
+    if filename.partition(".")[0].rstrip(" ").upper() in _RESERVED_DEVICE_NAMES:
+        return os.path.normcase(os.path.abspath(_join_sidecar_candidate(directory, filename)))
+    separator = "" if normalized_dir.endswith(os.sep) else os.sep
+    return f"{normalized_dir}{separator}{os.path.normcase(filename)}"
 
 
 def get_sidecar_scan_state(
@@ -1133,58 +1194,56 @@ def get_sidecar_scan_state(
     lrc_path: str | None = None
     newest_mtime = audio_signature[0] if audio_signature is not None else None
     total_size = audio_signature[1] if audio_signature is not None else 0
-    sidecar_candidates: list[tuple[str, str]] = []
-    for base in _sidecar_base_candidates(
-        path,
-        lyrics_lookup_subdir,
-        metadata=metadata,
-        lyrics_file_pattern=lyrics_file_pattern,
-    ):
-        for suffix in (".txt", ".lrc"):
-            sidecar_candidates.append((base + suffix, suffix))
-
-    cached_entries = (
-        sidecar_lookup_cache.resolve_entries([candidate for candidate, _suffix in sidecar_candidates])
-        if sidecar_lookup_cache is not None
-        else None
-    )
-    for candidate, suffix in sidecar_candidates:
-        normalized_candidate = os.path.normcase(os.path.abspath(candidate))
-        entry = cached_entries[candidate] if cached_entries is not None else None
-        resolved = entry.path if entry is not None else candidate if os.path.isfile(candidate) else None
-        if resolved is None:
-            records.append(f"{normalized_candidate}|missing")
-            continue
-        normalized = os.path.normcase(os.path.abspath(resolved))
-        if sidecar_lookup_cache is not None:
-            if entry is None:
-                records.append(f"{normalized_candidate}|unavailable")
-                continue
-            mtime_ns = entry.mtime_ns
-            size = entry.size
-        else:
-            try:
-                stat = os.stat(resolved)
-            except OSError:
-                records.append(f"{normalized_candidate}|unavailable")
-                continue
-            mtime_ns = int(stat.st_mtime_ns)
-            size = int(stat.st_size)
-        candidate_mtime = mtime_ns / 1_000_000_000
-        newest_mtime = candidate_mtime if newest_mtime is None else max(newest_mtime, candidate_mtime)
-        total_size += size
-        if normalized in seen_paths:
-            continue
-        seen_paths.add(normalized)
-        records.append(
-            f"{normalized_candidate}|{normalized}|{mtime_ns}|{size}"
+    names = _metadata_sidecar_names(path, metadata, lyrics_file_pattern)
+    filenames = [name + suffix for name in names for suffix in (".txt", ".lrc")]
+    for directory in _sidecar_candidate_dirs(path, lyrics_lookup_subdir):
+        normalized_dir = os.path.normcase(os.path.abspath(directory))
+        # The directory index is authoritative: a name it does not list is
+        # missing, with no per-candidate file system probe.
+        cached_entries = (
+            sidecar_lookup_cache.resolve_names(directory, filenames)
+            if sidecar_lookup_cache is not None
+            else None
         )
-        if suffix == ".txt":
-            txt_present = True
-            txt_path = txt_path or resolved
-        else:
-            lrc_present = True
-            lrc_path = lrc_path or resolved
+        for position, filename in enumerate(filenames):
+            normalized_candidate = _normalized_sidecar_candidate(normalized_dir, directory, filename)
+            if cached_entries is not None:
+                entry = cached_entries[position]
+                if entry is None:
+                    records.append(f"{normalized_candidate}|missing")
+                    continue
+                resolved = entry.path
+                normalized = _normalized_sidecar_candidate(normalized_dir, directory, entry.name)
+                mtime_ns = entry.mtime_ns
+                size = entry.size
+            else:
+                resolved = _join_sidecar_candidate(directory, filename)
+                if not os.path.isfile(resolved):
+                    records.append(f"{normalized_candidate}|missing")
+                    continue
+                normalized = normalized_candidate
+                try:
+                    stat = os.stat(resolved)
+                except OSError:
+                    records.append(f"{normalized_candidate}|unavailable")
+                    continue
+                mtime_ns = int(stat.st_mtime_ns)
+                size = int(stat.st_size)
+            candidate_mtime = mtime_ns / 1_000_000_000
+            newest_mtime = candidate_mtime if newest_mtime is None else max(newest_mtime, candidate_mtime)
+            total_size += size
+            if normalized in seen_paths:
+                continue
+            seen_paths.add(normalized)
+            records.append(
+                f"{normalized_candidate}|{normalized}|{mtime_ns}|{size}"
+            )
+            if filename.endswith(".txt"):
+                txt_present = True
+                txt_path = txt_path or resolved
+            else:
+                lrc_present = True
+                lrc_path = lrc_path or resolved
 
     serialized = "\n".join(sorted(records))
     digest_input = f"{TRACK_SCAN_STATE_SIGNATURE_VERSION}\n{serialized}".encode()

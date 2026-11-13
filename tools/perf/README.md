@@ -40,6 +40,19 @@ For format diversity, `generate_test_library.py` can use an installed
 `ffmpeg` executable with `--formats mp3,flac,m4a,ogg,opus,wma,wav`; WAV-only
 corpora do not need external tools.
 
+Check that a scanner change keeps the scan result identical by taking a
+snapshot before and after it. The library is only read and the database is
+temporary; the snapshot also verifies that an unchanged rescan alters nothing:
+
+```powershell
+python tools/perf/snapshot_scan.py --library "\\MOS\Music" --output before.json
+python tools/perf/snapshot_scan.py --library "\\MOS\Music" --output after.json
+python tools/perf/snapshot_scan.py --compare before.json after.json
+```
+
+Artist and album display casing follows the first scanned spelling, so compare
+snapshots taken with the same worker count.
+
 Compare two reports with:
 
 ```powershell
