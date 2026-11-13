@@ -1,0 +1,33 @@
+{
+  "schema_version": 2,
+  "repo": "saitatter/pylrcget",
+  "tag": "v1.10.0",
+  "preview": false,
+  "date": "23 May\n2026",
+  "published_at": "2026-05-23T15:09:10Z",
+  "metrics_captured_at": "2026-11-13T11:31:25.494359+00:00",
+  "metrics_as_of": "2026-05-23T15:09:10Z",
+  "statistics_basis": {
+    "open_issues": "issue_state_transitions_at_publication",
+    "stars": "surviving_stars_given_by_publication"
+  },
+  "previous": "v1.9.0",
+  "commit": "bbbcb162356332eeb56b7a2546092c2bf2ab43dc",
+  "items": [
+    "Customizable keyboard shortcuts",
+    "Persistent interface state",
+    "Improved AI auto-sync workflow",
+    "Streamlined selection actions",
+    "Responsive layout refinements"
+  ],
+  "commits": 18,
+  "contributors": 1,
+  "contributor_names": [
+    "@saitatter"
+  ],
+  "issues_addressed": 0,
+  "issue_numbers": [],
+  "stars": 6,
+  "open_issues": 4,
+  "historical_backfill": true
+}
