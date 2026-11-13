@@ -124,6 +124,41 @@ def _vectorized_optimal_alignment_path(matrix: Any, *, init: int = 200) -> Any:
     return optimal_path
 
 
+def _patch_inference_dtw(model_module: Any) -> None:
+    """Keep upstream float32 inference scores while removing diagonal indexing.
+
+    The model calls this separately from the final float64 path search. Each
+    cell depends only on the previous row. A single host transfer and NumPy
+    row operations avoid thousands of tiny Torch indexing/reduction kernels.
+    Leave gradients, other modes and unsupported dtypes to upstream unchanged.
+    """
+    original = model_module.dtw_matrix
+    if getattr(original, "_pylrcget_inference_dtw", False):
+        return
+
+    def inference_dtw(scores, mode="faster", idx_to_skip=None):
+        import numpy as np
+        import torch
+
+        if (
+            torch.is_grad_enabled() or mode != "faster" or idx_to_skip is not None
+            or scores.dtype != torch.float32 or torch.get_default_dtype() != torch.float32
+        ):
+            return original(scores, mode=mode, idx_to_skip=idx_to_skip)
+        values = scores.detach().cpu().numpy()
+        batch, frames, phonemes = values.shape
+        accumulated = np.full((batch, frames + 1, phonemes + 1), -100000, dtype=np.float32)
+        accumulated[:, 0, 0] = 200000
+        for row in range(1, frames + 1):
+            accumulated[:, row, 1:] = values[:, row - 1, :] + np.maximum(
+                accumulated[:, row - 1, 1:], accumulated[:, row - 1, :-1],
+            )
+        return torch.from_numpy(accumulated[:, 1:, 1:]).to(scores.device)
+
+    inference_dtw._pylrcget_inference_dtw = True
+    model_module.dtw_matrix = inference_dtw
+
+
 def _load_upstream_modules(root: Path) -> tuple[Any, Any]:
     """Load upstream model/DTW modules without making them global imports."""
     cache_key = str(root.resolve())
@@ -191,6 +226,7 @@ class EnglishLyricsAlignerBackend:
         self._phonemizer.warm()
         _patch_torch_compatibility(torch)
         model_module, align_module = _load_upstream_modules(self.root)
+        _patch_inference_dtw(model_module)
         with (self.root / "files" / "phoneme2idx.pickle").open("rb") as handle:
             phoneme2idx = pickle.load(handle)
         model = model_module.InformedOpenUnmix3().to(self.device)
