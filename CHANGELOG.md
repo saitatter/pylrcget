@@ -30,6 +30,7 @@
 - Document focused commits, safe migrations, isolated tests and project organization with shared contributor and agent rules.
 
 ### CI & Build
+- Release automation uses python-semantic-release 10.7.0 (#60).
 - Development checks use pytest 9.2.0 and Ruff 0.17.3 (#63).
 - Future download names identify Windows/Linux x64 and macOS arm64; native updater selection and labeled installer aliases preserve automatic updates from existing installations.
 - Optional AI CI installs the pinned stack and runs its tests with CPU Torch; non-tensor English backend tests also run without AI dependencies.
