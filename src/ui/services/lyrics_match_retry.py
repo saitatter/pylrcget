@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from difflib import SequenceMatcher
 
 _WORD_RE = re.compile(r"[a-z0-9]+")
@@ -34,6 +34,8 @@ class LyricsMatchCandidate:
     plain_lyrics: str
     synced_lyrics: str
     provider: str | None = None
+    id: int | None = None
+    lyrics_loaded: bool = True
 
 
 def build_retry_search_queries(*, artist: str, title: str, album: str) -> list[RetrySearchQuery]:
@@ -99,10 +101,29 @@ def choose_best_candidate(
             kind=kind,
             plain_lyrics=str(getattr(result, "plain_lyrics", "") or ""),
             synced_lyrics=str(getattr(result, "synced_lyrics", "") or ""),
+            id=getattr(result, "id", None),
+            lyrics_loaded=getattr(result, "lyrics_loaded", True),
         )
         if best is None or candidate.score > best.score:
             best = candidate
     return best
+
+
+def load_candidate_lyrics(api, candidate: LyricsMatchCandidate) -> LyricsMatchCandidate | None:
+    """Fetch only the chosen v2 result; legacy search already includes lyrics."""
+    if candidate.lyrics_loaded:
+        return candidate
+    if candidate.id is None:
+        raise ValueError("LRCLIB search summary has no record ID")
+    lyrics = api.get_lyrics_by_id(candidate.id)
+    plain = str(lyrics.plain_lyrics or "").strip()
+    synced = str(lyrics.synced_lyrics or "").strip()
+    if not plain and not synced:
+        return None
+    return replace(
+        candidate, plain_lyrics=plain, synced_lyrics=synced,
+        kind="Synced" if synced else "Plain", lyrics_loaded=True,
+    )
 
 
 def _score_result(
@@ -144,9 +165,9 @@ def _normalize_text(value: str) -> str:
 
 
 def _result_kind(result) -> str:
-    if getattr(result, "synced_lyrics", None):
+    if getattr(result, "synced_lyrics", None) or getattr(result, "has_synced_lyrics", False):
         return "Synced"
-    if getattr(result, "plain_lyrics", None):
+    if getattr(result, "plain_lyrics", None) or getattr(result, "has_plain_lyrics", False):
         return "Plain"
     if getattr(result, "instrumental", False):
         return "Instrumental"

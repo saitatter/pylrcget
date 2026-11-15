@@ -3,6 +3,7 @@
 ## Unreleased
 
 ### Features
+- LRCLIB searches use lightweight v2 summaries and load lyrics only for the chosen result, with automatic v1 fallback for older instances.
 - Each release opens with personalized PyLrcGet studio artwork showing emoji highlights, version history, human contributor credits and repository statistics reconstructed at publication.
 - Synchronize selected tracks with AI from the selection bar or context menu, with sequential processing, cancellation, per-track results and unsaved drafts (#62).
 

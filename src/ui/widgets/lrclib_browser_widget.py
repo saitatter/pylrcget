@@ -30,6 +30,9 @@ from lyrics.provider_search import search_configured_providers
 from lyrics.providers.contracts import LyricsSearchContext, LyricsSearchResult
 from lyrics.source_settings import LYRICS_SOURCE_LABELS, load_lyrics_source_settings
 from ui.button_roles import set_button_role
+from ui.controllers.lyrics_search_details_controller import (
+    LyricsSearchDetailsController,
+)
 from ui.dialogs.form_layout import configure_form_layout
 from ui.dialogs.publish_lyrics_dialog import PublishProgress, PublishWorker
 from ui.spacing import SPACE_2, SPACE_3, SPACE_4, set_layout_spacing
@@ -282,9 +285,9 @@ _TYPE_COLORS = {
 
 
 def _match_rank(r: LyricsSearchResult) -> int:
-    if r.synced_lyrics:
+    if r.synced_lyrics or r.has_synced_lyrics:
         return 0
-    if r.plain_lyrics:
+    if r.plain_lyrics or r.has_plain_lyrics:
         return 1
     if r.instrumental:
         return 2
@@ -301,6 +304,8 @@ class LrclibBrowserWidget(QWidget):
         self._search_worker: _SearchWorker | None = None
         self._selected_result = None
         self._lrclib_url = "https://lrclib.net/api"
+        self._details = LyricsSearchDetailsController(self)
+        self._details.loaded.connect(self._on_details_loaded)
 
         root = QVBoxLayout(self)
         set_layout_spacing(root, margins=SPACE_3, spacing=SPACE_2)
@@ -420,6 +425,7 @@ class LrclibBrowserWidget(QWidget):
     # --- Search ---
 
     def _do_search(self):
+        self._details.cancel()
         query = self.query_edit.text().strip()
         artist = self.artist_edit.text().strip()
         title = self.title_edit.text().strip()
@@ -474,9 +480,9 @@ class LrclibBrowserWidget(QWidget):
 
             if r.instrumental:
                 kind = "Instrumental"
-            elif r.synced_lyrics:
+            elif r.synced_lyrics or r.has_synced_lyrics:
                 kind = "Synced"
-            elif r.plain_lyrics:
+            elif r.plain_lyrics or r.has_plain_lyrics:
                 kind = "Plain"
             else:
                 kind = "—"
@@ -489,6 +495,7 @@ class LrclibBrowserWidget(QWidget):
     # --- Preview ---
 
     def _on_selection_changed(self):
+        self._details.cancel()
         rows = self.table.selectionModel().selectedRows()
         if not rows:
             self._clear_preview()
@@ -501,6 +508,16 @@ class LrclibBrowserWidget(QWidget):
 
         r = self._results[idx]
         self._selected_result = r
+        if not r.lyrics_loaded:
+            self.synced_preview.clear()
+            self.plain_preview.clear()
+            self.copy_synced_btn.setEnabled(False)
+            self.copy_plain_btn.setEnabled(False)
+            self.publish_btn.setEnabled(False)
+            self.preview_header.setText("Loading lyrics...")
+            self._details.request(self._lrclib_url, r)
+            return
+        self.publish_btn.setEnabled(True)
         artist = r.artist or ""
         title = r.title or ""
         album = r.album or ""
@@ -536,7 +553,20 @@ class LrclibBrowserWidget(QWidget):
         elif plain.strip():
             self.preview_tabs.setCurrentIndex(1)
 
+    def _on_details_loaded(self, original, result, error: str):
+        if self._selected_result is not original:
+            return
+        if error:
+            self.preview_header.setText(f"Could not load lyrics: {error}")
+            return
+        for index, row in enumerate(self._results):
+            if row is original:
+                self._results[index] = result
+        self._on_selection_changed()
+
     def _clear_preview(self):
+        self._details.cancel()
+        self.publish_btn.setEnabled(True)
         self._selected_result = None
         self.preview_header.setText("Select a result to preview lyrics")
         self.synced_preview.clear()

@@ -23,6 +23,9 @@ from lyrics.provider_search import search_configured_providers
 from lyrics.providers.contracts import LyricsSearchContext, LyricsSearchResult
 from lyrics.source_settings import LYRICS_SOURCE_LABELS, load_lyrics_source_settings
 from ui.button_roles import set_button_role
+from ui.controllers.lyrics_search_details_controller import (
+    LyricsSearchDetailsController,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -89,6 +92,9 @@ class SearchLyricsDialog(QDialog):
         self._db = db
         self._results: list = []
         self._worker: _SearchWorker | None = None
+        self._details = LyricsSearchDetailsController(self)
+        self._details.loaded.connect(self._on_details_loaded)
+        self.finished.connect(self._details.cancel)
         if db is not None:
             config = get_config(db)
             self.source_settings = load_lyrics_source_settings(config.ui_state_json)
@@ -217,6 +223,7 @@ class SearchLyricsDialog(QDialog):
         self._do_search()
 
     def _do_search(self):
+        self._details.cancel()
         query = self.query_edit.text().strip()
         artist = self.artist_edit.text().strip()
         title = self.title_edit.text().strip()
@@ -253,9 +260,9 @@ class SearchLyricsDialog(QDialog):
     @staticmethod
     def _match_rank(r: LyricsSearchResult) -> int:
         """Lower = better match. Synced > Plain > Instrumental > none."""
-        if r.synced_lyrics:
+        if r.synced_lyrics or r.has_synced_lyrics:
             return 0
-        if r.plain_lyrics:
+        if r.plain_lyrics or r.has_plain_lyrics:
             return 1
         if r.instrumental:
             return 2
@@ -286,9 +293,9 @@ class SearchLyricsDialog(QDialog):
             self.table.setItem(row, 3, QTableWidgetItem(f"{minutes}:{seconds:02d}"))
             if r.instrumental:
                 kind = "Instrumental"
-            elif r.synced_lyrics:
+            elif r.synced_lyrics or r.has_synced_lyrics:
                 kind = "Synced"
-            elif r.plain_lyrics:
+            elif r.plain_lyrics or r.has_plain_lyrics:
                 kind = "Plain"
             else:
                 kind = "—"
@@ -299,6 +306,7 @@ class SearchLyricsDialog(QDialog):
             self.table.setItem(row, 5, QTableWidgetItem(source))
 
     def _on_selection_changed(self):
+        self._details.cancel()
         has_selection = bool(self.table.selectionModel().selectedRows())
         self.use_btn.setEnabled(has_selection)
 
@@ -313,8 +321,27 @@ class SearchLyricsDialog(QDialog):
         if idx < 0 or idx >= len(self._results):
             return
         r = self._results[idx]
+        if not r.lyrics_loaded:
+            self.use_btn.setEnabled(False)
+            self.status_label.setText("Loading selected lyrics...")
+            self._details.request(self.lrclib_instance, r)
+            return
         self.lyricsSelected.emit(r.plain_lyrics or "", r.synced_lyrics or "")
         self.accept()
+
+    def _on_details_loaded(self, original, result, error: str):
+        rows = self.table.selectionModel().selectedRows()
+        if not rows or rows[0].row() >= len(self._results):
+            return
+        index = rows[0].row()
+        if self._results[index] is not original:
+            return
+        self.use_btn.setEnabled(True)
+        if error:
+            self.status_label.setText(f"Could not load lyrics: {error}")
+            return
+        self._results[index] = result
+        self._use_selected()
 
     def _populate_history(self) -> None:
         """Show up to 5 recent search queries as quick-fill buttons."""

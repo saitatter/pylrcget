@@ -46,6 +46,7 @@ from ui.services.download_modes import normalize_download_mode
 from ui.services.lyrics_match_retry import (
     build_retry_search_queries,
     choose_best_candidate,
+    load_candidate_lyrics,
 )
 
 logger = logging.getLogger(__name__)
@@ -266,6 +267,11 @@ def find_best_lyrics_match(
         if best is not None and best.score >= early_exit_score:
             break
 
+    if best is None:
+        return None
+    if not best.lyrics_loaded and before_request is not None and not before_request():
+        raise LyricsMatchCancelled
+    best = load_candidate_lyrics(api, best)
     if best is None:
         return None
     return LyricsDownloadMatch(best, int(best.score), best.query_label)

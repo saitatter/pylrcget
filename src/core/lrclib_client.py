@@ -117,6 +117,10 @@ class SearchResult:
     instrumental: bool
     plain_lyrics: str | None = None
     synced_lyrics: str | None = None
+    has_plain_lyrics: bool = False
+    has_synced_lyrics: bool = False
+    has_word_sync: bool = False
+    lyrics_loaded: bool = True
 
 
 def _lyrics_from_dict(d: dict[str, Any]) -> Lyrics:
@@ -137,17 +141,21 @@ def _lyrics_from_dict(d: dict[str, Any]) -> Lyrics:
     )
 
 
-def _search_result_from_dict(d: dict[str, Any]) -> SearchResult:
+def _search_result_from_dict(d: dict[str, Any], *, summary: bool = False) -> SearchResult:
     return SearchResult(
         id=d.get("id", 0),
-        name=d.get("name", ""),
-        track_name=d.get("trackName", ""),
+        name=d.get("name") or d.get("trackName") or "",
+        track_name=d.get("trackName") or d.get("name") or "",
         artist_name=d.get("artistName", ""),
         album_name=d.get("albumName", ""),
         duration=d.get("duration", 0),
         instrumental=d.get("instrumental", False),
         plain_lyrics=d.get("plainLyrics"),
         synced_lyrics=d.get("syncedLyrics"),
+        has_plain_lyrics=bool(d.get("hasPlainLyrics") or str(d.get("plainLyrics") or "").strip()),
+        has_synced_lyrics=bool(d.get("hasSyncedLyrics") or str(d.get("syncedLyrics") or "").strip()),
+        has_word_sync=bool(d.get("hasWordSync", False)),
+        lyrics_loaded=not summary,
     )
 
 
@@ -209,6 +217,7 @@ class LrcLibAPI:
         self._timeout = timeout_s
         self._session = session or requests.Session()
         self._is_cancelled = is_cancelled or (lambda: False)
+        self._search_v2_supported = True
         version = _get_app_version()
         self._session.headers.setdefault(
             "User-Agent",
@@ -260,7 +269,7 @@ class LrcLibAPI:
         response = self._request("GET", f"/get/{lrclib_id}")
         return _lyrics_from_dict(response.json())
 
-    # --- GET /api/search ---
+    # --- GET /api/v2/search, with legacy /api/search fallback ---
     def search_lyrics(
         self,
         *,
@@ -269,6 +278,9 @@ class LrcLibAPI:
         artist_name: str | None = None,
         album_name: str | None = None,
     ) -> list[SearchResult]:
+        """Return search summaries; v1 fallback records also contain lyrics."""
+        query = (query or "").strip()
+        track_name = (track_name or "").strip()
         if not query and not track_name:
             raise ValueError("Either query or track_name is required")
         params = {k: v for k, v in {
@@ -276,7 +288,25 @@ class LrcLibAPI:
             "track_name": track_name,
             "artist_name": artist_name,
             "album_name": album_name,
-        }.items() if v is not None}
+        }.items() if v and str(v).strip()}
+        if query and query.strip():
+            params = {"q": query}
+        if self._search_v2_supported:
+            try:
+                response = self._request("GET", "/v2/search", params=params)
+            except NotFoundError:
+                self._search_v2_supported = False
+            else:
+                try:
+                    payload = response.json()
+                except ValueError:
+                    # Older servers can serve their HTML application for an
+                    # unknown route. Never fall back on rate/network errors.
+                    self._search_v2_supported = False
+                else:
+                    if not isinstance(payload, list) or any(not isinstance(item, dict) for item in payload):
+                        raise ValueError("Invalid LRCLIB v2 search response")
+                    return [_search_result_from_dict(item, summary=True) for item in payload]
         try:
             response = self._request("GET", "/search", params=params)
         except NotFoundError:

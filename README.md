@@ -130,6 +130,13 @@ required for the base AI workflow.
 
 ## Lyrics providers
 
+LRCLIB searches use the lightweight `/api/v2/search` endpoint. Search results
+show lyrics availability without downloading every result's lyrics; the selected
+record is loaded in the background through `/api/get/{id}`. Older instances
+automatically fall back to `/api/search` when v2 is unavailable. Rate limits,
+server errors and network failures do not trigger fallback; request pacing and
+`Retry-After` handling apply to both API versions.
+
 In **Settings > Lyrics > Providers > LRCLIB**, adjust **Request interval** to
 pace requests across workers (default: one second). Rate-limited lookups honor
 the server's Retry-After delay and retry automatically. Increase the interval

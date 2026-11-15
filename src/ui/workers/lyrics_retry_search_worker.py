@@ -14,6 +14,7 @@ from ui.services.lyrics_match_retry import (
     RetrySearchQuery,
     build_retry_search_queries,
     choose_best_candidate,
+    load_candidate_lyrics,
 )
 
 RELAXED_RETRY_ACCEPT_SCORE = 90
@@ -157,7 +158,9 @@ class LyricsRetrySearchWorker(QThread):
                 best = candidate
             if best is not None and best.score >= RELAXED_RETRY_ACCEPT_SCORE:
                 break
-        return best
+        if self.isInterruptionRequested() or best is None:
+            return None
+        return load_candidate_lyrics(api, best)
 
     def _search_retry_query(
         self,

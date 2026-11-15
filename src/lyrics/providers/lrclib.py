@@ -185,6 +185,9 @@ class LrclibProvider:
                 instrumental=bool(result.instrumental),
                 plain_lyrics=result.plain_lyrics,
                 synced_lyrics=result.synced_lyrics,
+                has_plain_lyrics=bool(getattr(result, "has_plain_lyrics", False)),
+                has_synced_lyrics=bool(getattr(result, "has_synced_lyrics", False)),
+                lyrics_loaded=getattr(result, "lyrics_loaded", True),
             )
             for result in results
         ]

@@ -48,6 +48,9 @@ class LyricsSearchResult:
     plain_lyrics: str | None = None
     synced_lyrics: str | None = None
     match_score: float | None = None
+    has_plain_lyrics: bool = False
+    has_synced_lyrics: bool = False
+    lyrics_loaded: bool = True
 
 
 @dataclass(slots=True)
