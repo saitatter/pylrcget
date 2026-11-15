@@ -530,6 +530,12 @@ def test_ensure_strictly_increasing_alignment_indices_unstacks_tail():
 
 
 def test_ai_sync_availability_does_not_require_demucs(monkeypatch):
+    monkeypatch.setattr(inference_runtime, "resolve_ai_runtime_python", lambda: None)
+    monkeypatch.setattr(
+        inference_runtime,
+        "version",
+        lambda package: inference_runtime.AI_PACKAGE_REQUIREMENTS[package].split("==", 1)[1],
+    )
     real_import = builtins.__import__
 
     def fake_import(name, globals=None, locals=None, fromlist=(), level=0):
@@ -545,6 +551,7 @@ def test_ai_sync_availability_does_not_require_demucs(monkeypatch):
 
     assert ok is True
     assert msg == ""
+    assert get_missing_ai_dependencies(require_demucs=True) == ["demucs"]
 
 
 def test_ai_sync_availability_message_guides_exe_users(monkeypatch):
