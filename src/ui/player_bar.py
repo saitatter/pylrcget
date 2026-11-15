@@ -379,7 +379,8 @@ class PlayerBar(QWidget):
         self.cmb_speed.setCurrentIndex(0)
         self.cmb_speed.lineEdit().setPlaceholderText("custom")
         self.cmb_speed.lineEdit().setTextMargins(0, 0, 0, 0)
-        self.cmb_speed.lineEdit().installEventFilter(self)
+        self._speed_editor = self.cmb_speed.lineEdit()
+        self._speed_editor.installEventFilter(self)
         self.cmb_speed.installEventFilter(self)
         self.lbl_speed_prefix = QLabel("Speed", self.cmb_speed)
         self.lbl_speed_prefix.setObjectName("SpeedComboPrefix")
@@ -713,7 +714,7 @@ class PlayerBar(QWidget):
 
     def eventFilter(self, watched, event):
         if (
-            watched is self.cmb_speed.lineEdit()
+            watched is self._speed_editor
             and event.type() == QEvent.Type.KeyPress
             and event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter)
         ):
