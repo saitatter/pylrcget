@@ -71,8 +71,8 @@ def test_automatic_device_runs_the_english_aligner_on_cpu_and_separation_on_the_
         devices.append(("separation", device))
         yield "vocals.wav"
 
-    def aligner(path, lyrics, *, device):
-        devices.append((path, device))
+    def aligner(path, lyrics, *, device, vocal_stem_path=None):
+        devices.append((vocal_stem_path or path, device))
         return f"[00:01.00] {lyrics}"
 
     def router(*args, **kwargs):
@@ -98,5 +98,5 @@ def test_automatic_device_runs_the_english_aligner_on_cpu_and_separation_on_the_
         assert _try_lyrics_aligner(worker, device="cuda", stage=2, stage_message="English", router=router)
         return list(devices)
 
-    assert run("auto") == [("mix.flac", "cpu"), ("separation", "cuda"), ("vocals.wav", "cpu")]
-    assert run("cuda") == [("mix.flac", "cuda"), ("separation", "cuda"), ("vocals.wav", "cuda")]
+    assert run("auto") == [("separation", "cuda"), ("vocals.wav", "cpu")]
+    assert run("cuda") == [("separation", "cuda"), ("vocals.wav", "cuda")]

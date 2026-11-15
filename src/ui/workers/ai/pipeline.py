@@ -110,46 +110,56 @@ def align_with_optional_demucs(
     separated_audio=_separated_vocal_audio,
     quality=_demucs_candidate_quality,
 ) -> AlignmentCandidate:
-    """Align the mix and optionally select a higher-quality Demucs candidate.
+    """Align the mix, adding separated-vocal evidence when Demucs is enabled.
+
+    The aligner searches one path over the scores of the mix and of its
+    separated vocals, which is more accurate than either recording alone.
+    Separation takes a few seconds on an accelerator and is then always used.
+    On the CPU it takes far longer than the alignment itself, so it only runs
+    when the mix alignment looks structurally poor.
 
     ``device`` drives vocal separation; ``aligner_device`` may place the
     aligner model elsewhere and defaults to the same device.
     """
     aligner_device = aligner_device or device
+    use_demucs = enable_demucs_candidate and demucs_available()
+
+    def align_with_vocal_stem() -> AlignmentCandidate | None:
+        try:
+            with separated_audio(audio_path, device=device) as vocal_path:
+                lrc = aligner(
+                    audio_path,
+                    plain_lyrics,
+                    device=aligner_device,
+                    vocal_stem_path=vocal_path,
+                )
+        except (OSError, RuntimeError, ValueError) as exc:
+            logger.warning("Demucs vocal evidence failed; aligning the mix alone: %s", exc)
+            return None
+        if not lrc.strip():
+            return None
+        return AlignmentCandidate(
+            lrc=lrc, source="mix + Demucs vocal", quality=quality(lrc, plain_lyrics)
+        )
+
+    if use_demucs and device != "cpu":
+        candidate = align_with_vocal_stem()
+        if candidate is not None:
+            return candidate
+
     mix_lrc = aligner(audio_path, plain_lyrics, device=aligner_device)
     mix = AlignmentCandidate(
         lrc=mix_lrc, source="mix", quality=quality(mix_lrc, plain_lyrics)
     )
-    if not enable_demucs_candidate or not mix.lrc.strip() or not demucs_available():
+    if not use_demucs or device != "cpu" or not mix.lrc.strip():
         return mix
     if mix.quality >= _DEMUCS_QUALITY_GATE:
         logger.info(
-            "Skipping Demucs candidate because mix quality is already high (%.2f).",
+            "Skipping CPU vocal separation because the mix alignment looks consistent (%.2f).",
             mix.quality,
         )
         return mix
-
-    with separated_audio(audio_path, device=device) as vocal_path:
-        vocal_lrc = aligner(vocal_path, plain_lyrics, device=aligner_device)
-    if not vocal_lrc.strip():
-        return mix
-
-    vocal = AlignmentCandidate(
-        lrc=vocal_lrc, source="Demucs vocal", quality=quality(vocal_lrc, plain_lyrics)
-    )
-    if vocal.quality > mix.quality + 0.5:
-        logger.info(
-            "Selected Demucs vocal candidate (quality %.2f vs mix %.2f).",
-            vocal.quality,
-            mix.quality,
-        )
-        return vocal
-    logger.info(
-        "Kept original mix candidate (quality %.2f vs Demucs %.2f).",
-        mix.quality,
-        vocal.quality,
-    )
-    return mix
+    return align_with_vocal_stem() or mix
 
 
 def _lyrics_aligner_device(worker, device: str) -> str:

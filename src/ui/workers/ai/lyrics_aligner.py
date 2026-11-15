@@ -30,6 +30,7 @@ from .runtime import default_lyrics_aligner_dir
 
 logger = logging.getLogger(__name__)
 
+_MODEL_SAMPLE_RATE = 16000
 _BACKEND_LOCK = threading.Lock()
 _BACKEND_CACHE: dict[tuple[str, str], EnglishLyricsAlignerBackend] = {}
 
@@ -282,25 +283,38 @@ class EnglishLyricsAlignerBackend:
         )[None, :]
         return symbols, word_list, tensor
 
+    def _model_evidence(self, audio_path: str, phonemes_idx: Any) -> tuple[Any, Any]:
+        """Return the model's voice estimate and phoneme scores for one recording."""
+        assert self._model is not None
+        import librosa as librosa_module
+        import torch
+
+        audio, _sample_rate = librosa_module.load(audio_path, sr=_MODEL_SAMPLE_RATE, mono=True)
+        audio_tensor = torch.tensor(audio, dtype=torch.float32, device=self.device)[None, None, :]
+        with torch.no_grad():
+            voice_estimate, _unused, scores = self._model((audio_tensor, phonemes_idx))
+        return voice_estimate, scores if self.device == "cuda" else scores.cpu()
+
     def _word_predictions(
         self,
         audio_path: str,
         lyrics: str,
         *,
         vad_threshold: float = 30,
+        vocal_stem_path: str | None = None,
     ) -> list[tuple[float, str]]:
         self._ensure_loaded()
-        assert self._model is not None
         assert self._align_module is not None
-        import librosa as librosa_module
         import torch
 
         symbols, word_list, phonemes_idx = self._phoneme_inputs(lyrics, torch)
-        audio, sample_rate = librosa_module.load(audio_path, sr=16000, mono=True)
-        audio_tensor = torch.tensor(audio, dtype=torch.float32, device=self.device)[None, None, :]
-        with torch.no_grad():
-            voice_estimate, _unused, scores = self._model((audio_tensor, phonemes_idx))
-            alignment_scores = scores if self.device == "cuda" else scores.cpu()
+        voice_estimate, alignment_scores = self._model_evidence(audio_path, phonemes_idx)
+        if vocal_stem_path:
+            # The mix and its separated vocals fail on different passages, so
+            # one path is searched over the evidence of both recordings.
+            _stem_voice, stem_scores = self._model_evidence(vocal_stem_path, phonemes_idx)
+            frames = min(alignment_scores.shape[1], stem_scores.shape[1])
+            alignment_scores = alignment_scores[:, :frames] + stem_scores[:, :frames]
         if vad_threshold > 0:
             _prefer_spaces_in_silence(
                 alignment_scores,
@@ -312,7 +326,7 @@ class EnglishLyricsAlignerBackend:
         phoneme_onsets = self._align_module.compute_phoneme_onsets(
             optimal_path,
             hop_length=256,
-            sampling_rate=sample_rate,
+            sampling_rate=_MODEL_SAMPLE_RATE,
         )
         word_onsets, _word_offsets = self._align_module.compute_word_alignment(
             symbols,
@@ -320,9 +334,15 @@ class EnglishLyricsAlignerBackend:
         )
         return [(float(timestamp), word) for word, timestamp in zip(word_list, word_onsets)]
 
-    def align(self, request: AlignmentRequest) -> AlignmentResult:
+    def align(
+        self,
+        request: AlignmentRequest,
+        *,
+        vocal_stem_path: str | None = None,
+    ) -> AlignmentResult:
         started = time.perf_counter()
-        predicted = self._word_predictions(request.audio_path, request.plain_lyrics)
+        stem_options = {"vocal_stem_path": vocal_stem_path} if vocal_stem_path else {}
+        predicted = self._word_predictions(request.audio_path, request.plain_lyrics, **stem_options)
         raw_lrc = _build_lrc_from_predictions(request.plain_lyrics, predicted)
         lines = _result_lines(request.plain_lyrics, raw_lrc)
         expected_count = sum(bool(_words(line)) for line in request.plain_lyrics.splitlines())
@@ -341,6 +361,7 @@ class EnglishLyricsAlignerBackend:
                 "checkpoint_loads": self._load_count,
                 "g2p_cache_size": self._phonemizer.cache_size,
                 "predicted_words": len(predicted),
+                "vocal_stem": bool(vocal_stem_path),
             },
         )
 
@@ -363,8 +384,14 @@ def clear_backend_cache() -> None:
         _BACKEND_CACHE.clear()
 
 
-def align(audio_path: str, lyrics: str, *, device: str) -> str:
-    """Compatibility API returning the existing line-level LRC string."""
+def align(
+    audio_path: str,
+    lyrics: str,
+    *,
+    device: str,
+    vocal_stem_path: str | None = None,
+) -> str:
+    """Return line-level LRC, optionally adding evidence from a separated vocal stem."""
     request = AlignmentRequest(
         job_id="lyrics-aligner-compat",
         audio_path=audio_path,
@@ -374,7 +401,7 @@ def align(audio_path: str, lyrics: str, *, device: str) -> str:
         device=device,
         options=AlignmentOptions(),
     )
-    return get_cached_backend(device=device).align(request).to_lrc()
+    return get_cached_backend(device=device).align(request, vocal_stem_path=vocal_stem_path).to_lrc()
 
 
 def _build_lrc_from_predictions(

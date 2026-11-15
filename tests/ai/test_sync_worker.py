@@ -72,12 +72,12 @@ def test_demucs_candidate_quality_prefers_consistent_repeated_blocks():
     assert candidate_quality(consistent, plain) > candidate_quality(collapsed, plain)
 
 
-def test_optional_demucs_keeps_mix_when_candidate_proxy_does_not_win(monkeypatch):
-    monkeypatch.setattr(
-        sync_worker,
-        "_align_with_lyrics_aligner",
-        lambda path, lyrics, *, device: f"[00:01.00] {lyrics}",
-    )
+def _fake_aligner(path, lyrics, *, device, vocal_stem_path=None):
+    return f"[00:01.00] {lyrics}" if vocal_stem_path is None else f"[00:02.00] {lyrics}"
+
+
+def test_optional_demucs_adds_vocal_evidence_on_cpu_when_the_mix_looks_poor(monkeypatch):
+    monkeypatch.setattr(sync_worker, "_align_with_lyrics_aligner", _fake_aligner)
     monkeypatch.setattr(sync_worker, "_demucs_available", lambda: True)
     monkeypatch.setattr(
         sync_worker,
@@ -94,16 +94,63 @@ def test_optional_demucs_keeps_mix_when_candidate_proxy_does_not_win(monkeypatch
     )
 
     assert isinstance(candidate, AlignmentCandidate)
+    assert candidate.source == "mix + Demucs vocal"
+    assert candidate.lrc.startswith("[00:02.00]")
+
+
+def test_optional_demucs_always_adds_vocal_evidence_on_an_accelerator(monkeypatch):
+    calls = []
+
+    def aligner(path, lyrics, *, device, vocal_stem_path=None):
+        calls.append((path, vocal_stem_path))
+        return f"[00:02.00] {lyrics}"
+
+    monkeypatch.setattr(sync_worker, "_align_with_lyrics_aligner", aligner)
+    monkeypatch.setattr(sync_worker, "_demucs_available", lambda: True)
+    monkeypatch.setattr(
+        sync_worker,
+        "_separated_vocal_audio",
+        lambda path, *, device: _fake_vocal_context(),
+    )
+    monkeypatch.setattr(sync_worker, "_demucs_candidate_quality", lambda raw, lyrics: 16.0)
+
+    candidate = sync_worker._align_with_optional_demucs(
+        "track.flac",
+        "line",
+        device="cuda",
+        enable_demucs_candidate=True,
+    )
+
+    assert candidate.source == "mix + Demucs vocal"
+    assert calls == [("track.flac", "vocals.wav")]
+
+
+def test_optional_demucs_failure_keeps_the_mix_alignment(monkeypatch):
+    monkeypatch.setattr(sync_worker, "_align_with_lyrics_aligner", _fake_aligner)
+    monkeypatch.setattr(sync_worker, "_demucs_available", lambda: True)
+
+    def fail_separation(*_args, **_kwargs):
+        raise RuntimeError("CUDA out of memory")
+
+    monkeypatch.setattr(sync_worker, "_separated_vocal_audio", fail_separation)
+    monkeypatch.setattr(sync_worker, "_demucs_candidate_quality", lambda raw, lyrics: 16.0)
+
+    candidate = sync_worker._align_with_optional_demucs(
+        "track.flac",
+        "line",
+        device="cuda",
+        enable_demucs_candidate=True,
+    )
+
     assert candidate.source == "mix"
     assert candidate.lrc.startswith("[00:01.00]")
-    assert candidate.quality == 1.0
 
 
 def test_optional_demucs_skips_separation_for_high_quality_mix(monkeypatch):
     monkeypatch.setattr(
         sync_worker,
         "_align_with_lyrics_aligner",
-        lambda path, lyrics, *, device: f"[00:01.00] {lyrics}",
+        _fake_aligner,
     )
     monkeypatch.setattr(sync_worker, "_demucs_available", lambda: True)
     monkeypatch.setattr(

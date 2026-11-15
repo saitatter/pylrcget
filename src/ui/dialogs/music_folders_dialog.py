@@ -528,7 +528,12 @@ class MusicFoldersDialog(QDialog):
         self.ai_fuzzy_threshold_spin.setValue(60)
         self.ai_fuzzy_threshold_spin.setSuffix(" %")
         self.ai_enable_demucs_chk = QCheckBox(
-            "Try optional Demucs vocal stem and keep it only if quality improves"
+            "Use Demucs vocal separation to improve English timing"
+        )
+        self.ai_enable_demucs_chk.setToolTip(
+            "Aligns the lyrics against the song and its separated vocals together. "
+            "Adds a few seconds per track with a GPU. On CPU, separation is slow and "
+            "runs only when the first alignment looks inconsistent."
         )
         self.ai_enable_demucs_chk.setChecked(True)
 

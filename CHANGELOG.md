@@ -7,6 +7,7 @@
 - Synchronize selected tracks with AI from the selection bar or context menu, with sequential processing, cancellation, per-track results and unsaved drafts (#62).
 
 ### Fixes
+- English AI synchronization combines the song and Demucs vocal evidence for timing, uses separation selectively on CPU and falls back to the original mix if separation fails.
 - LRCLIB requests share a configurable pause (one second by default), respect Retry-After and retry rate-limited lookups instead of sending bursts across workers (#64).
 - Settings > AI Sync opens the AI setup dialog from Manage AI runtime, including on a fresh installation with no runtime folder (#61).
 - Packaged builds download and verify Python and the English alignment backend during AI setup, without requiring separate Python or Git installations (#41).

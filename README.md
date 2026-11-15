@@ -93,10 +93,13 @@ WhisperX 3.8.6. It also prepares the English pronunciation dictionaries in the
 application's `nltk_data` cache. Missing data or unsupported core package versions
 are reported for repair through **Manage AI runtime**.
 
-CPU forces processor execution; Auto selects an available accelerator. Explicit
-CUDA reports an error when CUDA is unavailable. Manual timing hints use guided
-alignment. The fuzzy threshold applies to fallback text matching, and Demucs
-separation can be skipped when the original mix already scores well.
+CPU forces processor execution; Auto selects an available accelerator, while
+the English alignment model itself stays on the CPU where it runs faster.
+Explicit CUDA reports an error when CUDA is unavailable. Manual timing hints use
+guided alignment. The fuzzy threshold applies to fallback text matching. With
+Demucs enabled, English lyrics are aligned against the song and its separated
+vocals together; separation always runs with an accelerator and, on CPU, only
+when the first alignment looks inconsistent.
 
 See the [local AI validation report](docs/AI_VALIDATION.md) for tested configurations
 and measured timing limits.
@@ -122,7 +125,7 @@ To use a separately installed Python 3.13.15 bootstrap explicitly:
 $env:PYLRCGET_AI_BOOTSTRAP_PYTHON = "C:\Path\to\python.exe"
 ```
 
-Optional Demucs is used only as a candidate vocal-stem path and is not
+Optional Demucs adds separated-vocal evidence to English alignment and is not
 required for the base AI workflow.
 
 ## Lyrics providers
