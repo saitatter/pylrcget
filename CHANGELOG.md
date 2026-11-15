@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## v1.16.0 (2026-11-15)
+
 ### Features
 - LRCLIB searches use lightweight v2 summaries and load lyrics only for the chosen result, with automatic v1 fallback for older instances.
 - Each release opens with personalized PyLrcGet studio artwork showing emoji highlights, version history, human contributor credits and repository statistics reconstructed at publication.
