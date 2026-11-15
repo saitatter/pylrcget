@@ -1,0 +1,57 @@
+{
+  "schema_version": 3,
+  "repo": "saitatter/pylrcget",
+  "tag": "v1.16.0",
+  "preview": false,
+  "date": "15 Nov\n2026",
+  "published_at": "2026-11-15T10:49:00Z",
+  "metrics_captured_at": "2026-11-15T10:49:07.682122+00:00",
+  "metrics_as_of": "2026-11-15T10:49:00Z",
+  "artwork_revision": "emoji",
+  "statistics_basis": {
+    "open_issues": "issue_state_transitions_at_publication",
+    "stars": "surviving_stars_given_by_publication"
+  },
+  "previous": "v1.15.0",
+  "commit": "f6b5f1074c901f28bd3515bde0f309192e4f2f20",
+  "items": [
+    {
+      "emoji": "\ud83e\udd16",
+      "text": "AI setup without Python or Git"
+    },
+    {
+      "emoji": "\ud83d\udee0\ufe0f",
+      "text": "English pronunciation setup repaired"
+    },
+    {
+      "emoji": "\ud83d\udd04",
+      "text": "Sync selected tracks with AI"
+    },
+    {
+      "emoji": "\ud83d\udee0\ufe0f",
+      "text": "Adjustable LRCLIB request pacing"
+    },
+    {
+      "emoji": "\ud83e\udd16",
+      "text": "Manage AI runtime from Settings"
+    },
+    {
+      "emoji": "\ud83d\udee0\ufe0f",
+      "text": "Reviewed notes and release artwork"
+    }
+  ],
+  "commits": 36,
+  "contributors": 1,
+  "contributor_names": [
+    "@saitatter"
+  ],
+  "issues_addressed": 4,
+  "issue_numbers": [
+    "41",
+    "61",
+    "62",
+    "64"
+  ],
+  "stars": 18,
+  "open_issues": 0
+}
