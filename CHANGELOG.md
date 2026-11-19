@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## v1.16.2 (2026-11-19)
+
 ### Fixes
 - Synced-only downloads look for synchronized alternatives when an exact LRCLIB match has only plain lyrics and skip tracks without usable synced results (#68).
 - Bulk lyrics downloads show how many matches were found and report how many tracks had lyrics saved after applying the matches (#68).
