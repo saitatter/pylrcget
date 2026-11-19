@@ -42,7 +42,14 @@ class LyricsApplyCandidatesWorker(QThread):
 
     def run(self) -> None:
         applied_ids: list[int] = []
+        errors: list[str] = []
+        skipped = 0
         db = None
+        logger.info(
+            "Applying %d lyrics candidate(s) (mode=%s).",
+            len(self.candidates),
+            self.download_mode,
+        )
         try:
             db = sqlite3.connect(self.db_path, timeout=15.0)
             db.row_factory = sqlite3.Row
@@ -51,23 +58,79 @@ class LyricsApplyCandidatesWorker(QThread):
 
             for candidate in self.candidates:
                 if self.isInterruptionRequested():
+                    logger.info(
+                        "Lyrics candidate apply interrupted after %d of %d candidate(s).",
+                        len(applied_ids),
+                        len(self.candidates),
+                    )
                     break
-                updated = self._apply_candidate(db, candidate, config)
-                if updated is None:
+                track_id = int(candidate.track_id)
+                try:
+                    updated = self._apply_candidate(db, candidate, config, errors)
+                except Exception as exc:
+                    # One broken track must not stop the remaining candidates in the batch.
+                    logger.warning(
+                        "Failed to apply lyrics candidate for track %s (%s): %s: %s",
+                        track_id,
+                        candidate.track_label,
+                        type(exc).__name__,
+                        exc,
+                        exc_info=True,
+                    )
+                    errors.append(f"{candidate.track_label}: {exc}")
+                    try:
+                        db.rollback()
+                    except sqlite3.Error:
+                        pass
                     continue
-                applied_ids.append(int(candidate.track_id))
+                if updated is None:
+                    skipped += 1
+                    logger.info(
+                        "Skipped lyrics candidate for track %s (%s): no lyrics usable in mode %s.",
+                        track_id,
+                        candidate.track_label,
+                        self.download_mode,
+                    )
+                    continue
+                applied_ids.append(track_id)
                 history_entries.append(self._history_entry(db, candidate, bool(updated.lrc_lyrics)))
 
-            record_download_history_batch(db, history_entries)
-            self.finishedApply.emit(len(applied_ids), applied_ids, "")
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("Failed to apply lyrics candidates in background: %s", exc)
-            self.finishedApply.emit(len(applied_ids), applied_ids, str(exc))
+            try:
+                record_download_history_batch(db, history_entries)
+            except sqlite3.Error as exc:
+                logger.warning("Failed to record download history for applied candidates: %s", exc)
+                errors.append(f"download history: {exc}")
+        except Exception as exc:
+            logger.warning("Failed to apply lyrics candidates in background: %s", exc, exc_info=True)
+            errors.append(str(exc))
         finally:
             if db is not None:
                 db.close()
 
-    def _apply_candidate(self, db: sqlite3.Connection, candidate: LyricsMatchCandidate, config):
+        logger.info(
+            "Lyrics candidate apply finished: %d applied, %d skipped, %d error(s) of %d candidate(s).",
+            len(applied_ids),
+            skipped,
+            len(errors),
+            len(self.candidates),
+        )
+        self.finishedApply.emit(len(applied_ids), applied_ids, self._summarize_errors(errors))
+
+    @staticmethod
+    def _summarize_errors(errors: list[str]) -> str:
+        if not errors:
+            return ""
+        if len(errors) == 1:
+            return errors[0]
+        return f"{len(errors)} problems; first: {errors[0]}"
+
+    def _apply_candidate(
+        self,
+        db: sqlite3.Connection,
+        candidate: LyricsMatchCandidate,
+        config,
+        errors: list[str],
+    ):
         mode = normalize_download_mode(self.download_mode)
         synced_text = (candidate.synced_lyrics or "").strip()
         plain_text = (candidate.plain_lyrics or "").strip()
@@ -94,7 +157,12 @@ class LyricsApplyCandidatesWorker(QThread):
             return None
 
         track = get_track_by_id(db, int(candidate.track_id))
-        sync_track_outputs_with_result(track, config)
+        # Lyrics are committed at this point; output failures are reported but keep the track applied.
+        outputs = sync_track_outputs_with_result(track, config)
+        if outputs.sidecar_error is not None:
+            errors.append(f"{candidate.track_label}: sidecar not written: {outputs.sidecar_error}")
+        if outputs.embed_error is not None:
+            errors.append(f"{candidate.track_label}: lyrics not embedded: {outputs.embed_error}")
         return track
 
     def _history_entry(self, db: sqlite3.Connection, candidate: LyricsMatchCandidate, synced: bool) -> dict[str, object]:

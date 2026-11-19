@@ -347,7 +347,7 @@ class BulkLyricsDownloadWorker(QThread):
                                         str(candidate.provider or "lrclib").casefold(),
                                         str(candidate.provider or "lrclib").title(),
                                     )
-                                    msg = f"Candidate found Â· {provider_label}. Match: {candidate.score}%."
+                                    msg = f"Candidate found via {provider_label}. Match: {candidate.score}%."
                                 else:
                                     fail_count += 1
                                     msg = "No usable lyrics found on the enabled lyrics providers for this track."

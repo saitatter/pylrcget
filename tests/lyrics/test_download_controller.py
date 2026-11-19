@@ -600,6 +600,154 @@ class LyricsDownloadControllerTests(unittest.TestCase):
             finally:
                 db.close()
 
+    @staticmethod
+    def _synced_candidate(track_id: int, title: str, score: int) -> LyricsMatchCandidate:
+        return LyricsMatchCandidate(
+            track_id=track_id,
+            track_label=f"Artist - {title}",
+            query_label="exact metadata",
+            score=score,
+            artist_name="Artist",
+            track_name=title,
+            album_name="Album",
+            duration=180,
+            kind="Synced",
+            plain_lyrics=f"{title} plain",
+            synced_lyrics=f"[00:01.00]{title}",
+        )
+
+    def _add_album(self, db, tmp: str, count: int) -> list[int]:
+        tracks = []
+        for index in range(count):
+            audio = Path(tmp) / f"track{index}.mp3"
+            touch_text(audio, "a")
+            tracks.append(make_fs_track(audio, artist="Artist", album="Album", title=f"Song {index}"))
+        add_tracks(db, tracks)
+        return [int(row["id"]) for row in db.execute("SELECT id FROM tracks ORDER BY id").fetchall()]
+
+    def _run_batch(self, controller, candidates, mode: str) -> None:
+        ids = [candidate.track_id for candidate in candidates]
+        controller.start_downloads(ids, mode_override=mode)
+        worker = _FakeWorker.instances[0]
+        for candidate in candidates:
+            worker.itemFinished.emit(candidate.track_id, True, candidate.track_label, "Candidate found.")
+        worker.finishedBatch.emit(
+            True,
+            "Finished lyrics search.",
+            {
+                "total": len(candidates),
+                "ok": len(candidates),
+                "failed": 0,
+                "cancelled": False,
+                "candidates": list(candidates),
+            },
+        )
+        self._wait_for_apply_worker(controller)
+
+    def test_embed_failure_does_not_leave_exact_matches_working(self):
+        # Regression for #68: an embed error on one exact match aborted the whole apply batch
+        # and left every exact match in the "Working..." state.
+        from mutagen import MutagenError
+
+        with tempfile.TemporaryDirectory() as tmp:
+            db = initialize_database(tmp)
+            try:
+                set_config(
+                    db,
+                    replace(get_config(db), save_lyrics_sidecars=True, try_embed_lyrics=True),
+                )
+                ids = self._add_album(db, tmp, 7)
+                app_state = SimpleNamespace(db=db, db_path=str(Path(tmp) / "pylrcget.db.sqlite3"))
+                controller, _, notifications, download_states, _ = self._make_controller(app_state, _FakeOverlay())
+                exact = [self._synced_candidate(track_id, f"Song {i}", 100) for i, track_id in enumerate(ids[:5])]
+                review = [self._synced_candidate(track_id, f"Song {i + 5}", 62) for i, track_id in enumerate(ids[5:])]
+                _FakeMatchDialog.selected = []
+
+                with (
+                    patch("ui.controllers.lyrics_download_controller.BulkLyricsDownloadWorker", _FakeWorker),
+                    patch("ui.controllers.lyrics_download_controller.BatchLyricsMatchDialog", _FakeMatchDialog),
+                    patch("ui.controllers.lyrics_download_controller.QTimer.singleShot"),
+                    patch(
+                        "ui.services.lyrics_download_service.embed_lyrics_for_track",
+                        side_effect=MutagenError("bad tag"),
+                    ),
+                ):
+                    self._run_batch(controller, exact + review, "synced_only")
+
+                for track_id in ids[:5]:
+                    self.assertTrue(get_track_by_id(db, track_id).lrc_lyrics)
+                    self.assertEqual(download_states[track_id], "success")
+                for track_id in ids[5:]:
+                    self.assertIsNone(get_track_by_id(db, track_id).lrc_lyrics)
+                    self.assertEqual(download_states[track_id], "idle")
+                self.assertEqual(sorted(p.name for p in Path(tmp).glob("*.lrc")), [f"track{i}.lrc" for i in range(5)])
+                self.assertIn(("Applied lyrics to 5 downloaded tracks.", "success"), notifications)
+                self.assertTrue(
+                    any(level == "error" and "not embedded" in message for message, level in notifications)
+                )
+            finally:
+                db.close()
+
+    def test_failed_candidate_is_isolated_and_leaves_working_state(self):
+        from db.queries import update_track_synced_lyrics as real_update
+
+        with tempfile.TemporaryDirectory() as tmp:
+            db = initialize_database(tmp)
+            try:
+                ids = self._add_album(db, tmp, 3)
+                app_state = SimpleNamespace(db=db, db_path=str(Path(tmp) / "pylrcget.db.sqlite3"))
+                controller, _, notifications, download_states, _ = self._make_controller(app_state, _FakeOverlay())
+                candidates = [self._synced_candidate(track_id, f"Song {i}", 100) for i, track_id in enumerate(ids)]
+
+                def flaky_update(db_conn, track_id, *args, **kwargs):
+                    if int(track_id) == ids[0]:
+                        raise RuntimeError("boom")
+                    return real_update(db_conn, track_id, *args, **kwargs)
+
+                with (
+                    patch("ui.controllers.lyrics_download_controller.BulkLyricsDownloadWorker", _FakeWorker),
+                    patch("ui.controllers.lyrics_download_controller.QTimer.singleShot"),
+                    patch("ui.workers.lyrics_apply_worker.update_track_synced_lyrics", side_effect=flaky_update),
+                ):
+                    self._run_batch(controller, candidates, "prefer_synced")
+
+                self.assertEqual(download_states[ids[0]], "error")
+                self.assertIsNone(get_track_by_id(db, ids[0]).lrc_lyrics)
+                for track_id in ids[1:]:
+                    self.assertEqual(download_states[track_id], "success")
+                    self.assertTrue(get_track_by_id(db, track_id).lrc_lyrics)
+                self.assertTrue(any(level == "error" and "boom" in message for message, level in notifications))
+                self.assertIn(("Applied lyrics to 2 downloaded tracks.", "success"), notifications)
+            finally:
+                db.close()
+
+    def test_skipped_candidate_leaves_working_state(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            db = initialize_database(tmp)
+            try:
+                ids = self._add_album(db, tmp, 1)
+                app_state = SimpleNamespace(db=db, db_path=str(Path(tmp) / "pylrcget.db.sqlite3"))
+                controller, _, notifications, download_states, _ = self._make_controller(app_state, _FakeOverlay())
+                plain_only = replace(
+                    self._synced_candidate(ids[0], "Song 0", 100),
+                    kind="Plain",
+                    synced_lyrics="",
+                )
+
+                with (
+                    patch("ui.controllers.lyrics_download_controller.BulkLyricsDownloadWorker", _FakeWorker),
+                    patch("ui.controllers.lyrics_download_controller.QTimer.singleShot"),
+                ):
+                    self._run_batch(controller, [plain_only], "synced_only")
+
+                self.assertEqual(download_states[ids[0]], "error")
+                self.assertIn(
+                    ("Lyrics matches had no lyrics usable in the current download mode.", "warning"),
+                    notifications,
+                )
+            finally:
+                db.close()
+
     def test_overlay_status_only_progress_does_not_reset_bar(self):
         overlay = DownloadProgressOverlay()
         try:

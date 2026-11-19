@@ -1,4 +1,29 @@
 {
+  "v1.16.1": {
+    "summary": [
+      "Bulk downloads apply every matched track even when one file cannot be embedded or saved.",
+      "Tracks that could not be applied return to a ready state instead of staying stuck as Working.",
+      "Embedding errors are reported as warnings, and the log explains each failed track."
+    ],
+    "items": [
+      {
+        "emoji": "\ud83d\udce5",
+        "text": "Bulk downloads finish every match"
+      },
+      {
+        "emoji": "\u2705",
+        "text": "No more tracks stuck as Working"
+      },
+      {
+        "emoji": "\ud83d\udee0\ufe0f",
+        "text": "Embed errors no longer stop batches"
+      },
+      {
+        "emoji": "\ud83d\udcdd",
+        "text": "Clearer download logging"
+      }
+    ]
+  },
   "v1.16.0": {
     "summary": [
       "Set up local AI synchronization directly from Settings, without separate Python or Git installations.",
