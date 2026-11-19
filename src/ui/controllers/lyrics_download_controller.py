@@ -229,6 +229,16 @@ class LyricsDownloadController(QObject):
         self._overlay.finish_batch(msg, cancelled=bool(stats_dict.get("cancelled")))
         exact_candidates = [candidate for candidate in candidates if int(candidate.score) >= 100]
         review_candidates = [candidate for candidate in candidates if int(candidate.score) < 100]
+        logger.info(
+            "Lyrics download batch finished: %d total, %d found, %d failed, cancelled=%s; "
+            "%d exact candidate(s), %d for review.",
+            stats_dict["total"],
+            stats_dict["ok"],
+            stats_dict["failed"],
+            stats_dict["cancelled"],
+            len(exact_candidates),
+            len(review_candidates),
+        )
         show_retry_failed = getattr(self._overlay, "show_retry_failed", None)
         if callable(show_retry_failed):
             retry_count = (
@@ -352,10 +362,12 @@ class LyricsDownloadController(QObject):
     def _review_retry_candidates(self, candidates: list[LyricsMatchCandidate], *, context: str = "retry") -> None:
         dialog = BatchLyricsMatchDialog(candidates, parent=self.parent())
         if not dialog.exec():
+            logger.info("Lyrics match review dismissed; %d candidate(s) discarded.", len(candidates))
             for candidate in candidates:
                 self._set_track_download_state(int(candidate.track_id), DownloadState.IDLE)
             return
         selected = dialog.selected_candidates()
+        logger.info("Lyrics match review committed: %d of %d candidate(s) selected.", len(selected), len(candidates))
         if not selected:
             for candidate in candidates:
                 self._set_track_download_state(int(candidate.track_id), DownloadState.IDLE)
@@ -388,15 +400,18 @@ class LyricsDownloadController(QObject):
             parent=self,
         )
         self._apply_workers.add(worker)
+        candidate_ids = [int(candidate.track_id) for candidate in candidates]
         worker.finishedApply.connect(
-            lambda applied_count, applied_ids, error, apply_worker=worker, apply_context=context: self._on_apply_candidates_finished(
+            lambda applied_count, applied_ids, error, apply_worker=worker, apply_context=context, requested_ids=candidate_ids: self._on_apply_candidates_finished(
                 int(applied_count),
                 [int(track_id) for track_id in applied_ids],
                 str(error or ""),
                 worker=apply_worker,
                 context=apply_context,
+                requested_ids=requested_ids,
             )
         )
+        logger.info("Starting apply of %d %s lyrics candidate(s).", len(candidates), context)
         worker.start()
 
     def _on_apply_candidates_finished(
@@ -407,12 +422,30 @@ class LyricsDownloadController(QObject):
         *,
         worker: LyricsApplyCandidatesWorker,
         context: str,
+        requested_ids: list[int] | None = None,
     ) -> None:
         self._apply_workers.discard(worker)
         worker.deleteLater()
+        applied_set = {int(track_id) for track_id in applied_ids}
         for track_id in applied_ids:
             self._set_track_download_state(int(track_id), DownloadState.SUCCESS)
             self._schedule_track_download_state_reset(int(track_id), DownloadState.SUCCESS)
+        # Candidates that were not applied (failure, skip or interruption) must leave the
+        # "Working..." state; otherwise the row stays busy until the app restarts.
+        unapplied_ids = [
+            int(track_id) for track_id in dict.fromkeys(requested_ids or []) if int(track_id) not in applied_set
+        ]
+        for track_id in unapplied_ids:
+            self._set_track_download_state(track_id, DownloadState.ERROR)
+            self._schedule_track_download_state_reset(track_id, DownloadState.ERROR)
+        logger.info(
+            "Applied %d of %d %s lyrics candidate(s); %d not applied.%s",
+            len(applied_set),
+            len(requested_ids or applied_ids),
+            context,
+            len(unapplied_ids),
+            f" Error: {error}" if error else "",
+        )
         if error:
             notify_user(
                 self._app_state,
@@ -420,6 +453,14 @@ class LyricsDownloadController(QObject):
                 "error",
                 show_status=self._show_status,
                 status_timeout_ms=4500,
+            )
+        elif not applied_count and unapplied_ids:
+            notify_user(
+                self._app_state,
+                "Lyrics matches had no lyrics usable in the current download mode.",
+                "warning",
+                show_status=self._show_status,
+                status_timeout_ms=4000,
             )
         if not applied_count:
             return

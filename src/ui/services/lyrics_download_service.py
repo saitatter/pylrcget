@@ -8,6 +8,7 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass
 
+from mutagen import MutagenError
 from requests import exceptions as requests_exceptions
 
 from core.embed_lyrics import embed_lyrics_for_track
@@ -309,18 +310,31 @@ def sync_track_outputs_with_result(
         try:
             notify_cb("Writing lyrics sidecar files...")
             sidecar_paths = tuple(export_lyrics_sidecars(track, config))
-        except (OSError, PermissionError, ValueError) as exc:
+        except (OSError, ValueError) as exc:
             sidecar_error = exc
-            logger.warning("Failed to export lyrics sidecars for track %s: %s", track.id, exc)
+            logger.warning(
+                "Failed to export lyrics sidecars for track %s (%s): %s",
+                track.id,
+                track.file_path,
+                exc,
+            )
 
     if config.try_embed_lyrics:
         try:
             notify_cb("Embedding lyrics into the audio file...")
             embed_lyrics_for_track(track, getattr(config, "lyrics_embed_format", "both"))
             embedded = True
-        except (OSError, ValueError) as exc:
+        except (OSError, ValueError, MutagenError) as exc:
+            # Mutagen tag/format errors derive from Exception, not OSError; they must not
+            # abort callers that write several tracks in one pass.
             embed_error = exc
-            logger.warning("Failed to embed lyrics for track %s: %s", track.id, exc)
+            logger.warning(
+                "Failed to embed lyrics for track %s (%s): %s: %s",
+                track.id,
+                track.file_path,
+                type(exc).__name__,
+                exc,
+            )
 
     return TrackOutputSyncResult(
         sidecar_paths=sidecar_paths,
