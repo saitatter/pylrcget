@@ -1,0 +1,30 @@
+{
+  "schema_version": 3,
+  "repo": "saitatter/pylrcget",
+  "tag": "v1.16.2",
+  "preview": false,
+  "date": "19 Nov\n2026",
+  "published_at": "2026-11-19T22:35:33Z",
+  "metrics_captured_at": "2026-11-19T22:35:42.567961+00:00",
+  "metrics_as_of": "2026-11-19T22:35:33Z",
+  "artwork_revision": "emoji",
+  "statistics_basis": {
+    "open_issues": "issue_state_transitions_at_publication",
+    "stars": "surviving_stars_given_by_publication"
+  },
+  "previous": "v1.16.1",
+  "commit": "70d23d454545e3a1b9087a3c9aa34dda686ef37f",
+  "items": [
+    "Distinguish bulk matches from saved lyrics",
+    "Find usable lrclib matches in synced-only mode"
+  ],
+  "commits": 3,
+  "contributors": 1,
+  "contributor_names": [
+    "@saitatter"
+  ],
+  "issues_addressed": 0,
+  "issue_numbers": [],
+  "stars": 17,
+  "open_issues": 1
+}
