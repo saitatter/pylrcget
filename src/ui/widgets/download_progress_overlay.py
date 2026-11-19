@@ -26,15 +26,15 @@ class DownloadProgressOverlay(QWidget):
     minimized = Signal()           # overlay hidden while operation still running
     activeChanged = Signal(bool)   # True = batch started, False = batch finished/cancelled
 
-    def __init__(self, parent: QWidget | None = None, *, verb: str = "Download"):
+    def __init__(self, parent: QWidget | None = None, *, verb: str = "Search"):
         super().__init__(parent)
         self.setObjectName("DownloadOverlay")
         self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.hide()
 
-        self._verb = verb  # "Download" or "Publish"
+        self._verb = verb
         self._verb_ing = "Scanning" if verb == "Scan" else f"{verb.rstrip('e')}ing" if verb.endswith('e') else f"{verb}ing"
-        self._verb_ed = "Scanned" if verb == "Scan" else f"{verb.rstrip('e')}ed" if verb.endswith('e') else f"{verb}ed"
+        self._verb_ed = "Scanned" if verb == "Scan" else f"{verb.removesuffix('e')}ed"
         self._active = False
         self._ok_count = 0
         self._fail_count = 0
@@ -205,7 +205,10 @@ class DownloadProgressOverlay(QWidget):
         self._auto_close_timer.start(timeout)
 
     def _refresh_summary(self) -> None:
-        self.ok_label.setText(f"{self._ok_count} {self._verb_ed.upper()}")
+        label = self._verb_ed.upper()
+        if self._verb == "Search":
+            label = "MATCH FOUND" if self._ok_count == 1 else "MATCHES FOUND"
+        self.ok_label.setText(f"{self._ok_count} {label}")
         self.fail_label.setText(f"{self._fail_count} FAILED")
 
     def _handle_cancel(self) -> None:

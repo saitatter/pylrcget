@@ -125,8 +125,9 @@ def test_synced_only_bulk_counts_only_usable_matches(tmp_path: Path):
         )
         worker.run()
 
-    (_message, stats), = finished
+    (message, stats), = finished
     assert (stats["ok"], stats["failed"]) == (1, 1)
+    assert "Matches found: 1, Failed: 1" in message
     assert items[track_ids["Plain"]] == (False, "Synced lyrics were not found. Only plain lyrics are available.")
     assert items[track_ids["Synced"]][0] is True
     assert [candidate.track_id for candidate in stats["candidates"]] == [track_ids["Synced"]]

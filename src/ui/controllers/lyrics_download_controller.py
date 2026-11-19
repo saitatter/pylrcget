@@ -484,14 +484,13 @@ class LyricsDownloadController(QObject):
             )
         if not applied_count:
             return
-        self._after_candidates_applied(applied_count, applied_ids=applied_ids, context=context)
+        self._after_candidates_applied(applied_count, applied_ids=applied_ids)
 
     def _after_candidates_applied(
         self,
         applied_count: int,
         *,
         applied_ids: list[int],
-        context: str,
     ) -> None:
         self._flush_pending_download_history()
         self._refresh_visible_library_view()
@@ -505,10 +504,10 @@ class LyricsDownloadController(QObject):
             except (sqlite3.Error, AttributeError, TypeError) as exc:
                 logger.warning("Failed to refresh applied lyrics for track %s: %s", current_track_id, exc)
         self._refresh_history()
-        label = "downloaded" if context == "download" else "failed"
+        tracks = "track" if applied_count == 1 else "tracks"
         notify_user(
             self._app_state,
-            f"Applied lyrics to {applied_count} {label} track{'s' if applied_count != 1 else ''}.",
+            f"Saved lyrics for {applied_count} {tracks}.",
             "success",
             show_status=self._show_status,
             status_timeout_ms=3500,

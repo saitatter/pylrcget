@@ -318,13 +318,13 @@ class LyricsDownloadControllerTests(unittest.TestCase):
                     worker.itemFinished.emit(42, True, "Artist - Found", "Downloaded synced lyrics.")
                     worker.finishedBatch.emit(
                         True,
-                        "Finished lyrics download. Success: 1, Failed: 1.",
+                        "Lyrics search complete. Matches found: 1, Failed: 1.",
                         {"ok": 1, "failed": 1, "cancelled": False},
                     )
 
                 self.assertEqual(overlay.retry_failed_counts[-1], 1)
                 self.assertEqual(download_states[41], "error")
-                self.assertIn(("Finished lyrics download. Success: 1, Failed: 1.", "warning"), notifications)
+                self.assertIn(("Lyrics search complete. Matches found: 1, Failed: 1.", "warning"), notifications)
                 with patch("ui.controllers.lyrics_download_controller.LyricsRetrySearchWorker") as retry_worker:
                     controller._retry_failed_downloads_with_search()
                     self.assertEqual(retry_worker.call_args.kwargs["download_mode"], "synced_only")
@@ -356,7 +356,7 @@ class LyricsDownloadControllerTests(unittest.TestCase):
                     worker.itemFinished.emit(43, False, "Artist - Missing", "No lyrics found on configured providers.")
                     worker.finishedBatch.emit(
                         True,
-                        "Finished lyrics download. Success: 0, Failed: 1.",
+                        "Lyrics search complete. Matches found: 0, Failed: 1.",
                         {"ok": 0, "failed": 1, "cancelled": False},
                     )
 
@@ -424,7 +424,7 @@ class LyricsDownloadControllerTests(unittest.TestCase):
                 self.assertEqual(download_states[track_id], "success")
                 self.assertIn(f"lyrics:{track_id}", refreshed)
                 self.assertLess(refreshed.index("view"), refreshed.index(f"lyrics:{track_id}"))
-                self.assertIn(("Applied lyrics to 1 downloaded track.", "success"), notifications)
+                self.assertIn(("Saved lyrics for 1 track.", "success"), notifications)
                 self.assertIn("view", refreshed)
                 self.assertIn("history", refreshed)
             finally:
@@ -477,7 +477,7 @@ class LyricsDownloadControllerTests(unittest.TestCase):
                 self.assertEqual(download_states[track_id], "success")
                 self.assertIn(f"lyrics:{track_id}", refreshed)
                 self.assertLess(refreshed.index("view"), refreshed.index(f"lyrics:{track_id}"))
-                self.assertIn(("Applied lyrics to 1 downloaded track.", "success"), notifications)
+                self.assertIn(("Saved lyrics for 1 track.", "success"), notifications)
                 self.assertEqual(_FakeMatchDialog.instances, [])
                 self.assertTrue(
                     any(call.args and call.args[0] == 1800 for call in single_shot.call_args_list),
@@ -684,7 +684,7 @@ class LyricsDownloadControllerTests(unittest.TestCase):
                     self.assertIsNone(get_track_by_id(db, track_id).lrc_lyrics)
                     self.assertEqual(download_states[track_id], "idle")
                 self.assertEqual(sorted(p.name for p in Path(tmp).glob("*.lrc")), [f"track{i}.lrc" for i in range(5)])
-                self.assertIn(("Applied lyrics to 5 downloaded tracks.", "success"), notifications)
+                self.assertIn(("Saved lyrics for 5 tracks.", "success"), notifications)
                 self.assertTrue(
                     any(level == "error" and "not embedded" in message for message, level in notifications)
                 )
@@ -720,7 +720,7 @@ class LyricsDownloadControllerTests(unittest.TestCase):
                     self.assertEqual(download_states[track_id], "success")
                     self.assertTrue(get_track_by_id(db, track_id).lrc_lyrics)
                 self.assertTrue(any(level == "error" and "boom" in message for message, level in notifications))
-                self.assertIn(("Applied lyrics to 2 downloaded tracks.", "success"), notifications)
+                self.assertIn(("Saved lyrics for 2 tracks.", "success"), notifications)
             finally:
                 db.close()
 

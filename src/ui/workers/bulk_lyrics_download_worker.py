@@ -394,7 +394,7 @@ class BulkLyricsDownloadWorker(QThread):
         if cancelled:
             self.finishedBatch.emit(False, "Lyrics download cancelled.", stats)
         else:
-            self.finishedBatch.emit(True, f"Finished lyrics download. Success: {ok_count}, Failed: {fail_count}.", stats)
+            self.finishedBatch.emit(True, f"Lyrics search complete. Matches found: {ok_count}, Failed: {fail_count}.", stats)
 
     @staticmethod
     def _group_jobs(jobs: list[_DownloadJob]) -> list[_DownloadLookupGroup]:
