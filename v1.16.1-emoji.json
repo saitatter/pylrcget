@@ -1,0 +1,46 @@
+{
+  "schema_version": 3,
+  "repo": "saitatter/pylrcget",
+  "tag": "v1.16.1",
+  "preview": false,
+  "date": "19 Nov\n2026",
+  "published_at": "2026-11-19T20:50:17Z",
+  "metrics_captured_at": "2026-11-19T20:50:26.959504+00:00",
+  "metrics_as_of": "2026-11-19T20:50:17Z",
+  "artwork_revision": "emoji",
+  "statistics_basis": {
+    "open_issues": "issue_state_transitions_at_publication",
+    "stars": "surviving_stars_given_by_publication"
+  },
+  "previous": "v1.16.0",
+  "commit": "f67516e4e3619bedcf61e1be594023a0f3e27803",
+  "items": [
+    {
+      "emoji": "\ud83d\udce5",
+      "text": "Bulk downloads finish every match"
+    },
+    {
+      "emoji": "\u2705",
+      "text": "No more tracks stuck as Working"
+    },
+    {
+      "emoji": "\ud83d\udee0\ufe0f",
+      "text": "Embed errors no longer stop batches"
+    },
+    {
+      "emoji": "\ud83d\udcdd",
+      "text": "Clearer download logging"
+    }
+  ],
+  "commits": 2,
+  "contributors": 1,
+  "contributor_names": [
+    "@saitatter"
+  ],
+  "issues_addressed": 1,
+  "issue_numbers": [
+    "68"
+  ],
+  "stars": 17,
+  "open_issues": 0
+}
