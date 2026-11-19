@@ -61,7 +61,6 @@ class LrclibProvider:
         requested_mode: DownloadMode,
         cancel_event: threading.Event | None = None,
     ) -> LyricsProviderResult | None:
-        del requested_mode
         # Import lazily because the legacy matcher is still hosted by the UI
         # service during this compatibility phase.
         from ui.services.lyrics_download_service import find_best_lyrics_match
@@ -90,6 +89,7 @@ class LrclibProvider:
                 artist=artist,
                 album=album,
                 duration_s=duration_s,
+                synced_only=requested_mode == "synced_only",
                 before_request=before_request,
                 on_rate_limit=self._on_rate_limit,
             )

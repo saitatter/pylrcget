@@ -74,7 +74,9 @@ class LyricsDownloadController(QObject):
         self._state_tokens: dict[int, int] = {}
         self._pending_history_entries: list[dict[str, object]] = []
         self._failed_download_track_ids: list[int] = []
+        self._failed_download_request: LyricsDownloadRequest | None = None
         self._retry_search_worker: LyricsRetrySearchWorker | None = None
+        self._retry_search_request: LyricsDownloadRequest | None = None
 
         retry_failed_signal = getattr(self._overlay, "retryFailedRequested", None)
         if retry_failed_signal is not None:
@@ -91,6 +93,7 @@ class LyricsDownloadController(QObject):
         self._active_track_ids = set(request.track_ids)
         self._pending_history_entries = []
         self._failed_download_track_ids = []
+        self._failed_download_request = request
 
         self._overlay.start_batch(self._download_mode_label(request.mode), len(request.track_ids))
         self._show_status(f"Starting lyrics download... ({request.lrclib_instance})", None)
@@ -315,16 +318,24 @@ class LyricsDownloadController(QObject):
             self._overlay.finish_batch(msg)
             notify_user(self._app_state, msg, "info", show_status=self._show_status, status_timeout_ms=4000)
             return
-        config = get_config(self._app_state.db)
-        lrclib_instance = self._normalize_lrclib_base(config.lrclib_instance or "https://lrclib.net")
+        request = self._failed_download_request
+        if request is None:
+            config = get_config(self._app_state.db)
+            request = LyricsDownloadRequest(
+                track_ids=tuple(failed_ids),
+                mode=self._resolve_download_mode("use_global"),
+                lrclib_instance=self._normalize_lrclib_base(config.lrclib_instance or "https://lrclib.net"),
+            )
+        self._retry_search_request = request
 
         self._overlay.start_batch("Retry failed search", len(failed_ids))
         self._show_status("Searching LRCLIB with relaxed queries...", None)
         self._retry_search_worker = LyricsRetrySearchWorker(
             self._app_state.db_path,
             failed_ids,
-            lrclib_instance,
+            request.lrclib_instance,
             lrclib_enabled=lrclib_enabled,
+            download_mode=request.mode,
             parent=self,
         )
         self._retry_search_worker.progress.connect(self._on_retry_search_progress)
@@ -343,6 +354,8 @@ class LyricsDownloadController(QObject):
         self._show_status(status, None)
 
     def _on_retry_search_finished(self, candidates: list, error: str) -> None:
+        request = self._retry_search_request
+        self._retry_search_request = None
         self._retry_search_worker = None
         if error:
             msg = f"Relaxed lyrics search failed: {error}"
@@ -357,9 +370,14 @@ class LyricsDownloadController(QObject):
             return
 
         self._overlay.finish_batch(f"Relaxed lyrics search found {len(candidates)} candidate match(es).")
-        self._review_retry_candidates([candidate for candidate in candidates if isinstance(candidate, LyricsMatchCandidate)])
+        self._review_retry_candidates(
+            [candidate for candidate in candidates if isinstance(candidate, LyricsMatchCandidate)],
+            request=request,
+        )
 
-    def _review_retry_candidates(self, candidates: list[LyricsMatchCandidate], *, context: str = "retry") -> None:
+    def _review_retry_candidates(
+        self, candidates: list[LyricsMatchCandidate], *, context: str = "retry", request: LyricsDownloadRequest | None = None,
+    ) -> None:
         dialog = BatchLyricsMatchDialog(candidates, parent=self.parent())
         if not dialog.exec():
             logger.info("Lyrics match review dismissed; %d candidate(s) discarded.", len(candidates))
@@ -384,12 +402,14 @@ class LyricsDownloadController(QObject):
         for candidate in candidates:
             if int(candidate.track_id) not in selected_ids:
                 self._set_track_download_state(int(candidate.track_id), DownloadState.IDLE)
-        self._start_apply_candidates(selected, context=context)
+        self._start_apply_candidates(selected, context=context, request=request)
 
-    def _start_apply_candidates(self, candidates: list[LyricsMatchCandidate], *, context: str) -> None:
+    def _start_apply_candidates(
+        self, candidates: list[LyricsMatchCandidate], *, context: str, request: LyricsDownloadRequest | None = None,
+    ) -> None:
         if not candidates:
             return
-        request = self._active_request
+        request = request or self._active_request
         mode = request.mode if request is not None else self._resolve_download_mode("use_global")
         lrclib_instance = request.lrclib_instance if request is not None else ""
         worker = LyricsApplyCandidatesWorker(
@@ -541,14 +561,16 @@ class LyricsDownloadController(QObject):
 
         normalized_message = (message or "").strip()
         lowered = normalized_message.casefold()
-        if "synced lyrics" in lowered:
+        if "not found" in lowered or "does not exist" in lowered or (
+            lowered.startswith("no ") and "found on" in lowered
+        ):
+            status = "not_found"
+        elif "synced lyrics" in lowered:
             status = "synced"
         elif "plain lyrics" in lowered:
             status = "plain"
         elif "instrumental" in lowered:
             status = "instrumental"
-        elif "does not exist" in lowered or "not found" in lowered:
-            status = "not_found"
         else:
             status = "error"
 

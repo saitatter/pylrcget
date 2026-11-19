@@ -1,14 +1,18 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Iterator
 from dataclasses import dataclass, replace
 from difflib import SequenceMatcher
 
 _WORD_RE = re.compile(r"[a-z0-9]+")
+_NUMBERED_MOVEMENT_RE = re.compile(r"^.+?\s+[-–—]\s+[IVXLCDM]+\.\s+(.+)$", re.IGNORECASE)
+_LIVE_SUFFIX_RE = re.compile(r"\s+(?:\(live\)|\[live\]|[-–—]\s+live)$", re.IGNORECASE)
 TITLE_SCORE_WEIGHT = 0.58
 ARTIST_SCORE_WEIGHT = 0.34
 ALBUM_SCORE_WEIGHT = 0.08
 SYNCED_LYRICS_SCORE_BONUS = 3
+SYNCED_FIELD_MIN_SIMILARITY = 0.75
 
 
 @dataclass(frozen=True)
@@ -38,7 +42,9 @@ class LyricsMatchCandidate:
     lyrics_loaded: bool = True
 
 
-def build_retry_search_queries(*, artist: str, title: str, album: str) -> list[RetrySearchQuery]:
+def build_retry_search_queries(
+    *, artist: str, title: str, album: str, include_movement_title: bool = False,
+) -> list[RetrySearchQuery]:
     artist = (artist or "").strip()
     title = (title or "").strip()
     album = (album or "").strip()
@@ -52,6 +58,8 @@ def build_retry_search_queries(*, artist: str, title: str, album: str) -> list[R
     if title:
         queries.append(RetrySearchQuery("title only", title=title))
         queries.append(RetrySearchQuery("free text: title", query=title))
+    if include_movement_title and artist and (movement := _NUMBERED_MOVEMENT_RE.match(title)):
+        queries.append(RetrySearchQuery("movement title", artist=artist, title=movement[1], album=album))
 
     unique: list[RetrySearchQuery] = []
     seen: set[tuple[str, str, str, str]] = set()
@@ -73,9 +81,30 @@ def choose_best_candidate(
     album: str,
     query_label: str,
     results: list,
+    synced_only: bool = False,
 ) -> LyricsMatchCandidate | None:
-    best: LyricsMatchCandidate | None = None
+    candidates = iter_lyrics_candidates(
+        track_id=track_id, track_label=track_label, artist=artist, title=title,
+        album=album, query_label=query_label, results=results, synced_only=synced_only,
+    )
+    return max(candidates, key=lambda candidate: candidate.score, default=None)
+
+
+def iter_lyrics_candidates(
+    *,
+    track_id: int,
+    track_label: str,
+    artist: str,
+    title: str,
+    album: str,
+    query_label: str,
+    results: list,
+    synced_only: bool,
+) -> Iterator[LyricsMatchCandidate]:
     for result in results:
+        kind = _result_kind(result)
+        if kind not in {"Synced", "Plain"} or (synced_only and kind != "Synced"):
+            continue
         score = _score_result(
             artist=artist,
             title=title,
@@ -83,13 +112,13 @@ def choose_best_candidate(
             result_artist=str(getattr(result, "artist_name", "") or ""),
             result_title=str(getattr(result, "track_name", "") or ""),
             result_album=str(getattr(result, "album_name", "") or ""),
+            require_track_match=synced_only,
         )
-        kind = _result_kind(result)
-        if kind not in {"Synced", "Plain"}:
+        if score is None:
             continue
-        if kind == "Synced":
+        if kind == "Synced" and not synced_only:
             score += SYNCED_LYRICS_SCORE_BONUS
-        candidate = LyricsMatchCandidate(
+        yield LyricsMatchCandidate(
             track_id=int(track_id),
             track_label=track_label,
             query_label=query_label,
@@ -104,9 +133,6 @@ def choose_best_candidate(
             id=getattr(result, "id", None),
             lyrics_loaded=getattr(result, "lyrics_loaded", True),
         )
-        if best is None or candidate.score > best.score:
-            best = candidate
-    return best
 
 
 def load_candidate_lyrics(api, candidate: LyricsMatchCandidate) -> LyricsMatchCandidate | None:
@@ -134,9 +160,17 @@ def _score_result(
     result_artist: str,
     result_title: str,
     result_album: str,
-) -> int:
+    require_track_match: bool,
+) -> int | None:
     title_score = _text_similarity(title, result_title)
     artist_score = _text_similarity(artist, result_artist)
+    if require_track_match:
+        title_similarity = max(
+            title_score,
+            _text_similarity(_LIVE_SUFFIX_RE.sub("", title), _LIVE_SUFFIX_RE.sub("", result_title)),
+        )
+        if min(title_similarity, artist_score) < SYNCED_FIELD_MIN_SIMILARITY:
+            return None
     album_score = _text_similarity(album, result_album) if album.strip() else 0.0
     score = (
         (title_score * TITLE_SCORE_WEIGHT)
@@ -165,9 +199,13 @@ def _normalize_text(value: str) -> str:
 
 
 def _result_kind(result) -> str:
-    if getattr(result, "synced_lyrics", None) or getattr(result, "has_synced_lyrics", False):
+    if str(getattr(result, "synced_lyrics", None) or "").strip() or (
+        not getattr(result, "lyrics_loaded", True) and getattr(result, "has_synced_lyrics", False)
+    ):
         return "Synced"
-    if getattr(result, "plain_lyrics", None) or getattr(result, "has_plain_lyrics", False):
+    if str(getattr(result, "plain_lyrics", None) or "").strip() or (
+        not getattr(result, "lyrics_loaded", True) and getattr(result, "has_plain_lyrics", False)
+    ):
         return "Plain"
     if getattr(result, "instrumental", False):
         return "Instrumental"

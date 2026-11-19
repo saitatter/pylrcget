@@ -334,7 +334,8 @@ class BulkLyricsDownloadWorker(QThread):
                                     continue
                                 if result.match is None:
                                     fail_count += 1
-                                    msg = "No lyrics found on the enabled lyrics providers for this track."
+                                    lyric_type = "synced lyrics" if self.download_mode == "synced_only" else "lyrics"
+                                    msg = f"No {lyric_type} found on the enabled lyrics providers for this track."
                                     self.itemFinished.emit(job.track_id, False, job.label, msg)
                                     self.progress.emit(completed, total, job.label, msg, self._elapsed())
                                     continue
@@ -350,7 +351,11 @@ class BulkLyricsDownloadWorker(QThread):
                                     msg = f"Candidate found via {provider_label}. Match: {candidate.score}%."
                                 else:
                                     fail_count += 1
-                                    msg = "No usable lyrics found on the enabled lyrics providers for this track."
+                                    msg = (
+                                        "Synced lyrics were not found. Only plain lyrics are available."
+                                        if self.download_mode == "synced_only" and (result.match.plain_lyrics or "").strip()
+                                        else "No usable lyrics found on the enabled lyrics providers for this track."
+                                    )
                                 self.itemFinished.emit(job.track_id, candidate is not None, job.label, msg)
                                 self.progress.emit(completed, total, job.label, msg, self._elapsed())
 
@@ -572,9 +577,9 @@ class BulkLyricsDownloadWorker(QThread):
         return time.perf_counter() - self._started_at
 
     def _candidate_from_match(self, job: _DownloadJob, match: LyricsProviderResult) -> LyricsMatchCandidate | None:
-        synced = str(match.synced_lyrics or "")
-        plain = str(match.plain_lyrics or "")
-        if not synced and not plain:
+        synced = str(match.synced_lyrics or "").strip()
+        plain = str(match.plain_lyrics or "").strip()
+        if not synced and (not plain or self.download_mode == "synced_only"):
             return None
         return LyricsMatchCandidate(
             track_id=job.track_id,

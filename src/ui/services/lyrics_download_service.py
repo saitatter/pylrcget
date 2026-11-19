@@ -45,8 +45,9 @@ from lyrics.providers.contracts import LyricsProviderResult, TrackLookupContext
 from lyrics.source_settings import LYRICS_SOURCE_LABELS, load_lyrics_source_settings
 from ui.services.download_modes import normalize_download_mode
 from ui.services.lyrics_match_retry import (
+    LyricsMatchCandidate,
     build_retry_search_queries,
-    choose_best_candidate,
+    iter_lyrics_candidates,
     load_candidate_lyrics,
 )
 
@@ -200,9 +201,11 @@ def find_best_lyrics_match(
     artist: str,
     album: str,
     duration_s: int | None,
+    synced_only: bool = False,
     before_request: BeforeRequestCallback | None = None,
     on_rate_limit: RateLimitCallback | None = None,
 ) -> LyricsDownloadMatch | None:
+    plain_fallback = None
     try:
         lyrics = fetch_lyrics_with_retry(
             api,
@@ -215,10 +218,16 @@ def find_best_lyrics_match(
             before_request=before_request,
             on_rate_limit=on_rate_limit,
         )
-        if _strip_empty(getattr(lyrics, "synced_lyrics", None)) or _strip_empty(getattr(lyrics, "plain_lyrics", None)):
+        if _strip_empty(getattr(lyrics, "synced_lyrics", None)):
             logger.debug("LRCLIB exact match selected for track %s with exact metadata.", track_label)
             return LyricsDownloadMatch(lyrics, 100, "exact metadata")
-        notify(f"Exact {provider_label} match has no usable lyrics; trying alternatives...")
+        if _strip_empty(getattr(lyrics, "plain_lyrics", None)):
+            plain_fallback = LyricsDownloadMatch(lyrics, 100, "exact metadata")
+            if not synced_only:
+                return plain_fallback
+            notify(f"Exact {provider_label} match has only plain lyrics; searching for synced versions...")
+        else:
+            notify(f"Exact {provider_label} match has no usable lyrics; trying alternatives...")
     except LyricsMatchCancelled:
         raise
     except Exception as exc:
@@ -227,8 +236,11 @@ def find_best_lyrics_match(
         notify(f"Exact {provider_label} match not found; trying alternatives...")
 
     best = None
+    synced_candidates: list[LyricsMatchCandidate] = []
     early_exit_score = _lrclib_early_exit_score()
-    for query in build_retry_search_queries(artist=artist, title=title, album=album):
+    for query in build_retry_search_queries(
+        artist=artist, title=title, album=album, include_movement_title=synced_only,
+    ):
         try:
             if before_request is not None and not before_request():
                 raise LyricsMatchCancelled
@@ -248,7 +260,7 @@ def find_best_lyrics_match(
             if _should_retry_lrclib_error(exc):
                 raise
             continue
-        candidate = choose_best_candidate(
+        candidates = iter_lyrics_candidates(
             track_id=track_id,
             track_label=track_label,
             artist=artist,
@@ -256,7 +268,12 @@ def find_best_lyrics_match(
             album=album,
             query_label=query.label,
             results=results,
+            synced_only=synced_only,
         )
+        if synced_only:
+            synced_candidates.extend(candidates)
+            continue
+        candidate = max(candidates, key=lambda item: item.score, default=None)
         if candidate is not None and (best is None or candidate.score > best.score):
             best = candidate
             logger.debug(
@@ -268,6 +285,8 @@ def find_best_lyrics_match(
         if best is not None and best.score >= early_exit_score:
             break
 
+    if synced_only:
+        return _load_synced_search_match(api, synced_candidates, duration_s, before_request) or plain_fallback
     if best is None:
         return None
     if not best.lyrics_loaded and before_request is not None and not before_request():
@@ -276,6 +295,36 @@ def find_best_lyrics_match(
     if best is None:
         return None
     return LyricsDownloadMatch(best, int(best.score), best.query_label)
+
+
+def _load_synced_search_match(
+    api: LrcLibAPI,
+    candidates: list[LyricsMatchCandidate],
+    duration_s: int | None,
+    before_request: BeforeRequestCallback | None,
+) -> LyricsDownloadMatch | None:
+    def rank(candidate: LyricsMatchCandidate) -> tuple[int, float]:
+        duration_delta = abs(candidate.duration - duration_s) if duration_s and candidate.duration else float("inf")
+        # Only auto-apply a search result when both metadata and duration agree.
+        score = min(candidate.score, 99) if duration_delta > 2 else candidate.score
+        return score, -duration_delta
+
+    fetched_ids: set[int] = set()
+    for candidate in sorted(candidates, key=rank, reverse=True):
+        if not candidate.lyrics_loaded:
+            if candidate.id in fetched_ids:
+                continue
+            if before_request is not None and not before_request():
+                raise LyricsMatchCancelled
+            if candidate.id is not None:
+                fetched_ids.add(candidate.id)
+        try:
+            loaded = load_candidate_lyrics(api, candidate)
+        except NotFoundError:
+            continue
+        if loaded is not None and _strip_empty(loaded.synced_lyrics):
+            return LyricsDownloadMatch(loaded, rank(candidate)[0], candidate.query_label)
+    return None
 
 
 def sync_track_outputs(

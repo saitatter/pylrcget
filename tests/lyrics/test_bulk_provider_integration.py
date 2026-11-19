@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
-from db.database import add_tracks, initialize_database
+from db.database import add_tracks, get_config, initialize_database, set_config
 from lyrics.providers import LyricsProviderCapabilities, LyricsProviderResult
 from lyrics.source_settings import (
     default_lyrics_source_settings,
@@ -12,6 +13,7 @@ from lyrics.source_settings import (
 )
 from tests.test_support import make_fs_track
 from ui.workers.bulk_lyrics_download_worker import BulkLyricsDownloadWorker
+from ui.workers.lyrics_apply_worker import LyricsApplyCandidatesWorker
 
 
 class _FakeMusixmatchProvider:
@@ -90,3 +92,49 @@ def test_bulk_worker_falls_back_from_lrclib_plain_to_musixmatch_synced(tmp_path:
     assert finished[0]["ok"] == 1
     assert finished[0]["candidates"]
     assert finished[0]["candidates"][0].provider == "musixmatch"
+
+
+def test_synced_only_bulk_counts_only_usable_matches(tmp_path: Path):
+    db = initialize_database(str(tmp_path))
+    try:
+        for title in ("Plain", "Synced"):
+            audio = tmp_path / f"{title}.mp3"
+            audio.write_bytes(b"audio")
+            add_tracks(db, [make_fs_track(audio, artist="Artist", album="Album", title=title)])
+        set_config(db, replace(get_config(db), save_lyrics_sidecars=True, try_embed_lyrics=False))
+        track_ids = {row["title"]: row["id"] for row in db.execute("SELECT id, title FROM tracks")}
+    finally:
+        db.close()
+
+    db_path = str(tmp_path / "pylrcget.db.sqlite3")
+    instance = "https://lrclib.test/api"
+    worker = BulkLyricsDownloadWorker(db_path, list(track_ids.values()), instance, download_mode="synced_only")
+    finished = []
+    items = {}
+    worker.finishedBatch.connect(lambda _ok, message, stats: finished.append((message, stats)))
+    worker.itemFinished.connect(lambda track_id, ok, _label, message: items.update({track_id: (ok, message)}))
+    plain = SimpleNamespace(plain_lyrics="plain", synced_lyrics=None)
+    synced = SimpleNamespace(
+        artist_name="Artist", track_name="Synced", album_name="Album", duration=180,
+        plain_lyrics=None, synced_lyrics="[00:01.00]line",
+    )
+    with patch("ui.workers.bulk_lyrics_download_worker.LrcLibAPI") as api_cls:
+        api_cls.return_value.get_lyrics.return_value = plain
+        api_cls.return_value.search_lyrics.side_effect = lambda **params: (
+            [synced] if "Synced" in (params["track_name"] or params["query"] or "") else [plain]
+        )
+        worker.run()
+
+    (_message, stats), = finished
+    assert (stats["ok"], stats["failed"]) == (1, 1)
+    assert items[track_ids["Plain"]] == (False, "Synced lyrics were not found. Only plain lyrics are available.")
+    assert items[track_ids["Synced"]][0] is True
+    assert [candidate.track_id for candidate in stats["candidates"]] == [track_ids["Synced"]]
+    assert list(tmp_path.glob("*.lrc")) == []
+
+    apply_worker = LyricsApplyCandidatesWorker(
+        db_path, stats["candidates"], download_mode="synced_only", lrclib_instance=instance,
+    )
+    apply_worker.run()
+
+    assert [path.name for path in tmp_path.glob("*.lrc")] == ["Synced.lrc"]

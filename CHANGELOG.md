@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Fixes
+- Synced-only downloads look for synchronized alternatives when an exact LRCLIB match has only plain lyrics and skip tracks without usable synced results (#68).
+
 ## v1.16.1 (2026-11-19)
 
 ### Fixes

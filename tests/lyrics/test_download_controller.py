@@ -311,7 +311,7 @@ class LyricsDownloadControllerTests(unittest.TestCase):
                     patch("ui.controllers.lyrics_download_controller.BulkLyricsDownloadWorker", _FakeWorker),
                     patch("ui.controllers.lyrics_download_controller.QTimer.singleShot"),
                 ):
-                    controller.start_downloads([41, 42], mode_override="prefer_synced")
+                    controller.start_downloads([41, 42], mode_override="synced_only")
                     worker = _FakeWorker.instances[0]
 
                     worker.itemFinished.emit(41, False, "Artist - Missing", "No lyrics found on LRCLIB for this track.")
@@ -325,6 +325,9 @@ class LyricsDownloadControllerTests(unittest.TestCase):
                 self.assertEqual(overlay.retry_failed_counts[-1], 1)
                 self.assertEqual(download_states[41], "error")
                 self.assertIn(("Finished lyrics download. Success: 1, Failed: 1.", "warning"), notifications)
+                with patch("ui.controllers.lyrics_download_controller.LyricsRetrySearchWorker") as retry_worker:
+                    controller._retry_failed_downloads_with_search()
+                    self.assertEqual(retry_worker.call_args.kwargs["download_mode"], "synced_only")
             finally:
                 db.close()
 

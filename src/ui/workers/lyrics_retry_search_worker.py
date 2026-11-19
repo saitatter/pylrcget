@@ -9,6 +9,7 @@ from PySide6.QtCore import QObject, QThread, Signal
 
 from core.lrclib_client import LrcLibAPI
 from db.queries import get_track_by_id
+from ui.services.download_modes import normalize_download_mode
 from ui.services.lyrics_match_retry import (
     LyricsMatchCandidate,
     RetrySearchQuery,
@@ -42,6 +43,7 @@ class LyricsRetrySearchWorker(QThread):
         lrclib_instance: str,
         *,
         lrclib_enabled: bool = True,
+        download_mode: str = "prefer_synced",
         parent: QObject | None = None,
     ) -> None:
         super().__init__(parent)
@@ -49,6 +51,7 @@ class LyricsRetrySearchWorker(QThread):
         self.track_ids = [int(track_id) for track_id in track_ids]
         self.lrclib_instance = lrclib_instance
         self.lrclib_enabled = bool(lrclib_enabled)
+        self._synced_only = normalize_download_mode(download_mode) == "synced_only"
         self._thread_local = threading.local()
 
     def run(self) -> None:
@@ -147,7 +150,9 @@ class LyricsRetrySearchWorker(QThread):
     def _search_retry_track(self, track: _RetryTrack) -> LyricsMatchCandidate | None:
         best: LyricsMatchCandidate | None = None
         api = self._api_for_current_thread()
-        for query in build_retry_search_queries(artist=track.artist, title=track.title, album=track.album):
+        for query in build_retry_search_queries(
+            artist=track.artist, title=track.title, album=track.album, include_movement_title=self._synced_only,
+        ):
             if self.isInterruptionRequested():
                 break
             try:
@@ -160,7 +165,10 @@ class LyricsRetrySearchWorker(QThread):
                 break
         if self.isInterruptionRequested() or best is None:
             return None
-        return load_candidate_lyrics(api, best)
+        candidate = load_candidate_lyrics(api, best)
+        if self._synced_only and candidate is not None and not candidate.synced_lyrics.strip():
+            return None
+        return candidate
 
     def _search_retry_query(
         self,
@@ -182,6 +190,7 @@ class LyricsRetrySearchWorker(QThread):
             album=track.album,
             query_label=query.label,
             results=results,
+            synced_only=self._synced_only,
         )
 
     def _api_for_current_thread(self) -> LrcLibAPI:
