@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## v1.16.1 (2026-11-19)
+
 ### Fixes
 - Bulk downloads apply every matched track even when one track cannot be embedded or saved, and tracks that could not be applied no longer stay stuck as "Working..." (#68).
 - A tag or format error while embedding lyrics is reported as a warning instead of stopping the remaining downloads.
