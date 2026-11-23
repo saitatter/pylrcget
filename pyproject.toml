@@ -14,26 +14,26 @@ dependencies = [
 
 [project.optional-dependencies]
 ai = [
-    "torch==2.8.0",
-    "torchaudio==2.8.0",
-    "torchvision==0.23.0",
+    "torch==2.15.0",
+    "torchaudio==2.11.1",
+    "torchvision==0.29.2",
     "whisperx==3.8.6",
     "soundfile==0.14.0",
     "g2p-en==2.1.0",
-    "librosa==1.0.0",
+    "librosa==1.0.1",
     "demucs==4.1.0",
-    "transformers==4.57.6",
-    "huggingface-hub==0.36.2",
-    "pyannote-audio==4.0.7",
-    "numpy==2.5.2",
+    "transformers==5.23.0",
+    "huggingface-hub==2.4.0",
+    "pyannote-audio==4.1.1",
+    "numpy==2.5.5",
 ]
 dev = [
-    "Pillow==12.3.0",
+    "Pillow==13.0.0",
     "pytest==9.2.0",
     "pytest-cov==7.1.0",
-    "ruff==0.17.3",
+    "ruff==0.17.6",
 ]
-release = ["Pillow==12.3.0"]
+release = ["Pillow==13.0.0"]
 
 [tool.semantic_release]
 version_toml = ["pyproject.toml:project.version"]
